@@ -1,8 +1,8 @@
-site_name: mypackage
-site_description: My short description for my project.
+site_name: pipekit
+site_description: A carrier-agnostic operator-graph framework for composable scientific pipelines.
 site_author: J. Emmanuel Johnson
-repo_url: https://github.com/jejjohnson/pypackage_template
-repo_name: jejjohnson/pypackage_template
+repo_url: https://github.com/jejjohnson/pipekit
+repo_name: jejjohnson/pipekit
 
 theme:
   name: material
@@ -31,7 +31,12 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [src]
+          paths:
+            - packages/pipekit/src
+            - packages/pipekit-array/src
+            - packages/pipekit-cycle/src
+            - packages/pipekit-experiment/src
+            - packages/pipekit-evaluate/src
           options:
             docstring_style: google
             show_source: true
@@ -42,11 +47,11 @@ plugins:
 
 nav:
   - Home: index.md
-  - Examples:
-      - Demo: notebooks/example_demo.ipynb
-  - API Reference: api/reference.md
+  - API Reference:
+      - pipekit: api/pipekit.md
+      - pipekit-cycle: api/pipekit-cycle.md
+      - pipekit-experiment: api/pipekit-experiment.md
   - Contributing: contributing.md
-  - Changelog: CHANGELOG.md
 
 markdown_extensions:
   - admonition
