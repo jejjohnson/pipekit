@@ -11,8 +11,137 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      pipekit_released: ${{ steps.release.outputs['packages/pipekit--release_created'] }}
+      pipekit_array_released: ${{ steps.release.outputs['packages/pipekit-array--release_created'] }}
+      pipekit_cycle_released: ${{ steps.release.outputs['packages/pipekit-cycle--release_created'] }}
+      pipekit_experiment_released: ${{ steps.release.outputs['packages/pipekit-experiment--release_created'] }}
+      pipekit_evaluate_released: ${{ steps.release.outputs['packages/pipekit-evaluate--release_created'] }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      - id: release
+        uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  publish-pipekit:
+    name: Publish pipekit to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit/dist
+
+  publish-pipekit-array:
+    name: Publish pipekit-array to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_array_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit-array
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit-array
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit-array/dist
+
+  publish-pipekit-cycle:
+    name: Publish pipekit-cycle to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_cycle_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit-cycle
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit-cycle
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit-cycle/dist
+
+  publish-pipekit-experiment:
+    name: Publish pipekit-experiment to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_experiment_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit-experiment
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit-experiment
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit-experiment/dist
+
+  publish-pipekit-evaluate:
+    name: Publish pipekit-evaluate to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_evaluate_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit-evaluate
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit-evaluate
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit-evaluate/dist

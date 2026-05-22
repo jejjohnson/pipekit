@@ -7,10 +7,8 @@
 #
 # Scopes below map file paths to the standard taxonomy:
 #   area:*   — which part of the project the change touches
-#   layer:*  — which implementation layer (if the project has a layer stack)
+#   layer:*  — which implementation layer (heuristic; pipekit isn't strictly layered)
 #   type:*   — left to issue templates (NOT auto-applied on PRs)
-#
-# Adjust paths under layer:* to match your project's internal module layout.
 
 "area:engineering":
   - changed-files:
@@ -20,6 +18,9 @@
       - "Makefile"
       - ".pre-commit-config.yaml"
       - "uv.lock"
+      - "release-please-config.json"
+      - ".release-please-manifest.json"
+      - "packages/*/pyproject.toml"
 
 "area:docs":
   - changed-files:
@@ -28,39 +29,34 @@
       - "mkdocs.yml"
       - "notebooks/**"
       - "*.md"
+      - "packages/*/README.md"
 
 "area:testing":
   - changed-files:
-    - any-glob-to-any-file: "tests/**"
+    - any-glob-to-any-file: "packages/*/tests/**"
 
-# Catch-all for source changes that don't match a specific layer scope.
-# Ensures every `src/**` PR receives at least one area label.
+# Catch-all for source changes that don't match a specific package.
 "area:code":
   - changed-files:
-    - any-glob-to-any-file: "src/**"
+    - any-glob-to-any-file: "packages/*/src/**"
 
-# --- Layer scopes — edit to match your project's layer stack --------------
-# Example layout for a library with a three-layer stack
-# (primitives → components → public models). Delete or rename if your
-# project doesn't have a formal layer split.
+# --- Layer scopes ---------------------------------------------------------
+# pipekit's natural "layers" are the package boundaries themselves —
+# `layer:0-primitives` = the carrier-agnostic core; everything else builds
+# on top. The layer:* labels are retained from the template taxonomy with
+# pipekit-specific path mappings.
 
 "layer:0-primitives":
   - changed-files:
-    - any-glob-to-any-file:
-      - "src/**/_primitives/**"
-      - "src/**/_src/primitives*.py"
+    - any-glob-to-any-file: "packages/pipekit/src/**"
 
 "layer:1-components":
   - changed-files:
     - any-glob-to-any-file:
-      - "src/**/_components/**"
-      - "src/**/_src/components*.py"
-
-"layer:2-models":
-  - changed-files:
-    - any-glob-to-any-file:
-      - "src/**/_models/**"
-      - "src/**/_src/models*.py"
+      - "packages/pipekit-array/src/**"
+      - "packages/pipekit-cycle/src/**"
+      - "packages/pipekit-experiment/src/**"
+      - "packages/pipekit-evaluate/src/**"
 
 # --- Default / legacy labels retained for Dependabot compatibility ---------
 
@@ -68,5 +64,6 @@
   - changed-files:
     - any-glob-to-any-file:
       - "pyproject.toml"
+      - "packages/*/pyproject.toml"
       - ".pre-commit-config.yaml"
       - "uv.lock"
