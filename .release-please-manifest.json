@@ -1,7 +1,7 @@
 {
-  "packages/pipekit": "0.0.0",
-  "packages/pipekit-array": "0.0.0",
-  "packages/pipekit-cycle": "0.0.0",
-  "packages/pipekit-experiment": "0.0.0",
-  "packages/pipekit-evaluate": "0.0.0"
+  "packages/pipekit": "0.0.1",
+  "packages/pipekit-array": "0.0.1",
+  "packages/pipekit-cycle": "0.0.1",
+  "packages/pipekit-experiment": "0.0.1",
+  "packages/pipekit-evaluate": "0.0.1"
 }
