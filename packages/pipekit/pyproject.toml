@@ -1,0 +1,32 @@
+[project]
+name = "pipekit"
+version = "0.0.1"
+description = "Carrier-agnostic operator-graph framework for composable scientific pipelines."
+authors = [
+    {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
+]
+license = { file = "../../LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = ["pipeline", "operators", "composition", "scientific-computing"]
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 2 - Pre-Alpha",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/jejjohnson/pipekit"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pipekit"]

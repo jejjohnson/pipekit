@@ -36,7 +36,11 @@ PKG_VERSION := $(shell grep -E '^version\s*=' pyproject.toml 2>/dev/null \
 # ---------------------------------------------------------------------------
 # Paths (override via .env or command line)
 # ---------------------------------------------------------------------------
-PKGROOT ?= src/mypackage
+PKGROOTS ?= packages/pipekit/src/pipekit \
+            packages/pipekit-array/src/pipekit_array \
+            packages/pipekit-cycle/src/pipekit_cycle \
+            packages/pipekit-experiment/src/pipekit_experiment \
+            packages/pipekit-evaluate/src/pipekit_evaluate
 
 # ---------------------------------------------------------------------------
 # ANSI colours
@@ -119,9 +123,9 @@ format: ## 🖊️  Format code with ruff (format + auto-fix) — entire repo
 	uv run --group lint ruff check --fix .
 	@printf "$(GREEN)>>> ✅ Format complete!$(RESET)\n"
 
-typecheck: ## 🔬 Type-check with ty
+typecheck: ## 🔬 Type-check with ty (all workspace packages)
 	@printf "$(YELLOW)>>> Running type checks...$(RESET)\n"
-	uv run --group typecheck ty check $(PKGROOT)
+	uv run --group typecheck ty check $(PKGROOTS)
 	@printf "$(GREEN)>>> ✅ Type check passed!$(RESET)\n"
 
 # ===========================================================================
