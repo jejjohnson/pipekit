@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-experiment"
-version = "0.0.0"
+version = "0.1.0"
 description = "Experiment tracking adapters and content-addressed model registry for pipekit pipelines."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},

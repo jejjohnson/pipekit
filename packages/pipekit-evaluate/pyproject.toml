@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-evaluate"
-version = "0.0.0"
+version = "0.1.0"
 description = "Multidimensional evaluation framework (Unit × Lens × Stage) for pipekit pipelines."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
