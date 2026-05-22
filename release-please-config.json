@@ -21,7 +21,7 @@
       "package-name": "pipekit",
       "component": "pipekit",
       "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "src/pipekit/__init__.py"
@@ -32,7 +32,7 @@
       "package-name": "pipekit-array",
       "component": "pipekit-array",
       "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "src/pipekit_array/__init__.py"
@@ -43,7 +43,7 @@
       "package-name": "pipekit-cycle",
       "component": "pipekit-cycle",
       "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "src/pipekit_cycle/__init__.py"
@@ -54,7 +54,7 @@
       "package-name": "pipekit-experiment",
       "component": "pipekit-experiment",
       "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "src/pipekit_experiment/__init__.py"
@@ -65,7 +65,7 @@
       "package-name": "pipekit-evaluate",
       "component": "pipekit-evaluate",
       "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "src/pipekit_evaluate/__init__.py"
