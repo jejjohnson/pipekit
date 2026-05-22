@@ -182,7 +182,7 @@ class EnsembleDACycle(StatefulOperator):
         self.n_steps = n_steps
         self.n_members = n_members
 
-    def _apply(
+    def _apply(  # ty: ignore[invalid-method-override]
         self,
         members: list[Any],
         state: Any,

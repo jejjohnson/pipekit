@@ -145,15 +145,16 @@ class CompositeObs(Operator):
         Each component must expose a `linearize`. If a non-linearisable
         component is present, raises `NotImplementedError`.
         """
-        lins = []
+        lins: list[Operator] = []
         carrier = state
         for op in self.components:
-            if not hasattr(op, "linearize"):
+            linearize = getattr(op, "linearize", None)
+            if linearize is None:
                 raise NotImplementedError(
                     f"CompositeObs: component {type(op).__name__} has no "
                     "`linearize` — cannot build composite tangent linear."
                 )
-            lins.append(op.linearize(carrier))
+            lins.append(linearize(carrier))
             carrier = op(carrier)
         return CompositeObs(tuple(lins))
 

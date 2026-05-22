@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "include-component-in-tag": false,
+  "include-component-in-tag": true,
+  "separate-pull-requests": false,
   "changelog-sections": [
     {"type": "feat", "section": "Features", "hidden": false},
     {"type": "fix", "section": "Bug Fixes", "hidden": false},
@@ -15,14 +16,59 @@
     {"type": "chore", "section": "Miscellaneous", "hidden": true}
   ],
   "packages": {
-    ".": {
+    "packages/pipekit": {
       "release-type": "python",
-      "package-name": "mypackage",
+      "package-name": "pipekit",
+      "component": "pipekit",
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
-        "pyproject.toml"
+        "src/pipekit/__init__.py"
+      ]
+    },
+    "packages/pipekit-array": {
+      "release-type": "python",
+      "package-name": "pipekit-array",
+      "component": "pipekit-array",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_array/__init__.py"
+      ]
+    },
+    "packages/pipekit-cycle": {
+      "release-type": "python",
+      "package-name": "pipekit-cycle",
+      "component": "pipekit-cycle",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_cycle/__init__.py"
+      ]
+    },
+    "packages/pipekit-experiment": {
+      "release-type": "python",
+      "package-name": "pipekit-experiment",
+      "component": "pipekit-experiment",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_experiment/__init__.py"
+      ]
+    },
+    "packages/pipekit-evaluate": {
+      "release-type": "python",
+      "package-name": "pipekit-evaluate",
+      "component": "pipekit-evaluate",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_evaluate/__init__.py"
       ]
     }
   }

@@ -27,6 +27,7 @@ See master plan Report 12, section 2.4 and section 5.
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
 import os
@@ -112,7 +113,7 @@ class LocalModelRegistry:
         self,
         *,
         tags: dict[str, Any] | None = None,
-    ) -> list[str]:
+    ) -> builtins.list[str]:
         """Return stored model hashes, optionally filtered by tag values."""
         hashes: list[str] = []
         for child in sorted(self.root.iterdir()):
@@ -173,7 +174,7 @@ class S3ModelRegistry:
         storage_options: dict[str, Any] | None = None,
     ) -> None:
         try:
-            import fsspec  # noqa: F401
+            import fsspec  # noqa: F401  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise ImportError(
                 "S3ModelRegistry requires fsspec. Install with "
@@ -183,7 +184,7 @@ class S3ModelRegistry:
         self.storage_options = dict(storage_options) if storage_options else {}
 
     def _fs(self):
-        import fsspec
+        import fsspec  # ty: ignore[unresolved-import]
 
         fs, _ = fsspec.core.url_to_fs(self.uri, **self.storage_options)
         return fs
@@ -241,7 +242,7 @@ class S3ModelRegistry:
         self,
         *,
         tags: dict[str, Any] | None = None,
-    ) -> list[str]:
+    ) -> builtins.list[str]:
         fs = self._fs()
         entries = fs.ls(self.uri.rstrip("/"))
         hashes: list[str] = []

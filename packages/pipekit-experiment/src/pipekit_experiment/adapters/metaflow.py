@@ -28,7 +28,7 @@ from pipekit import Operator
 
 def _require_metaflow() -> Any:
     try:
-        import metaflow
+        import metaflow  # ty: ignore[unresolved-import]
     except ImportError as e:
         raise ImportError(
             "MetaflowStepAdapter requires metaflow. Install with "

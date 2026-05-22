@@ -11,6 +11,7 @@ See master plan Report 12, section 2.2.
 
 from __future__ import annotations
 
+import builtins
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 
@@ -60,7 +61,7 @@ class ModelRegistry(Protocol):
     def load(self, ref: str) -> Operator:
         """Resolve ``ref`` (hash or name) and return the rebuilt operator."""
 
-    def list(self, *, tags: dict[str, Any] | None = None) -> list[str]:
+    def list(self, *, tags: dict[str, Any] | None = None) -> builtins.list[str]:
         """Return content hashes, optionally filtered by tag values."""
 
     def tag(self, hash: str, name: str, *, force: bool = False) -> None:

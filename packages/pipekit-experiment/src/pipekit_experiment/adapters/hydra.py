@@ -27,7 +27,7 @@ from pipekit import Operator
 
 def _require_hydra() -> Any:
     try:
-        import hydra.utils as hu
+        import hydra.utils as hu  # ty: ignore[unresolved-import]
     except ImportError as e:
         raise ImportError(
             "HydraConfigLoader requires hydra-core. Install with "
@@ -38,7 +38,7 @@ def _require_hydra() -> Any:
 
 def _require_hydra_zen() -> Any:
     try:
-        import hydra_zen
+        import hydra_zen  # ty: ignore[unresolved-import]
     except ImportError as e:
         raise ImportError(
             "to_hydra_cfg requires hydra-zen. Install with "
@@ -113,7 +113,7 @@ class HydraConfigLoader:
         (the latter is a transitive dep of ``hydra-core``).
         """
         try:
-            from omegaconf import OmegaConf
+            from omegaconf import OmegaConf  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise ImportError(
                 "from_yaml requires omegaconf (a transitive dep of "
