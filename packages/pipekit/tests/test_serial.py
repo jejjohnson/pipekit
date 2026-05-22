@@ -98,3 +98,30 @@ def test_unregister_is_idempotent():
             return x
 
     unregister(T)  # not registered — should not raise
+
+
+def test_loads_sandboxed_rejects_missing_module_field():
+    """Malformed state without a `module` field raises ValueError, not Permission."""
+    import json as _json
+
+    bogus = _json.dumps({"class": "Identity", "config": {}})
+    with pytest.raises(ValueError, match="module"):
+        loads_sandboxed(bogus)
+
+
+def test_loads_sandboxed_rejects_missing_class_field():
+    """Malformed state without a `class` field raises ValueError, not Permission."""
+    import json as _json
+
+    bogus = _json.dumps({"module": "pipekit.blocks", "config": {}})
+    with pytest.raises(ValueError, match="class"):
+        loads_sandboxed(bogus)
+
+
+def test_loads_sandboxed_rejects_non_string_module():
+    """A non-string `module` field is a shape error, not a permission error."""
+    import json as _json
+
+    bogus = _json.dumps({"module": 42, "class": "Identity", "config": {}})
+    with pytest.raises(ValueError, match="module"):
+        loads_sandboxed(bogus)

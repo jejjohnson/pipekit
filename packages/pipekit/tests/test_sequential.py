@@ -145,3 +145,20 @@ def test_repr(Scale_cls):
 class _Identity(Operator):
     def _apply(self, x):
         return x
+
+
+def test_sequential_state_without_carrier_raises():
+    """Calling `pipe(state=...)` without a carrier raises a clear TypeError."""
+    from pipekit import CarryState, StatefulOperator
+
+    class Step(StatefulOperator):
+        def _apply(self, carrier, state):
+            return carrier + 1, state
+
+    class S(CarryState):
+        def __init__(self) -> None:
+            self.t = 0
+
+    pipe = Sequential([Step()])
+    with pytest.raises(TypeError, match="no carrier"):
+        pipe(state=S())

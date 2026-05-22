@@ -39,10 +39,11 @@ class Sequential(Operator):
     """Apply a list of operators in order, threading the output of each into the next.
 
     Args:
-        operators: A list of `Operator` instances. Empty list is allowed;
-            calling an empty `Sequential` requires no input and raises
-            cleanly if one is passed (the pipeline has no operations to
-            perform).
+        operators: A list of `Operator` instances. The empty list is
+            allowed but degenerate: ``Sequential([])(x)`` returns ``x``
+            unchanged, while ``Sequential([])()`` raises `TypeError`
+            (the empty pipeline has no first operator to consult, and
+            the carrier has to come from somewhere).
 
     Raises:
         TypeError: if any element is not an `Operator`, or if any
@@ -102,6 +103,11 @@ class Sequential(Operator):
                 raise TypeError(
                     "Sequential contains StatefulOperator(s) but was called "
                     "without a `state` argument. Supply the initial CarryState."
+                )
+            if carrier is _MISSING:
+                raise TypeError(
+                    "Sequential was called with `state` but no carrier. "
+                    "Stateful pipelines need both: pipe(carrier, state)."
                 )
             return self._apply_stateful(carrier, state)
         # Stateless path — original behaviour.

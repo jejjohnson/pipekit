@@ -137,3 +137,19 @@ def test_compute_output_signature_default_is_passthrough(Scale_cls):
 def test_class_flags_default_false(Scale_cls):
     assert Scale_cls.forbid_in_yaml is False
     assert Scale_cls._terminal is False
+
+
+def test_operator_rejects_mixed_node_and_literal_args(Scale_cls, TwoInput_cls):
+    """Graph-construction mode is all-or-none: mixing Nodes and literals raises."""
+    from pipekit import Input
+
+    op = TwoInput_cls()
+    a = Input("a")
+    with pytest.raises(TypeError, match="every positional arg to be a Node"):
+        op(a, 42)
+    # Pure literals: eager path, normal _apply.
+    assert op(1.0, 2.0) == 3.0
+    # Pure Nodes: graph-construction path.
+    from pipekit._base.graph import Node
+
+    assert isinstance(op(a, Input("b")), Node)

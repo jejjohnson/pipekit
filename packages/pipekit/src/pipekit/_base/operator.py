@@ -131,14 +131,34 @@ class Operator(ConfigMixin):
         """Dispatch eager vs symbolic on positional arguments.
 
         If any positional argument is a `Node` (which `Input` subclasses),
-        returns a new `Node` recording this operator and its parents.
-        Otherwise calls `_apply`. Subclasses override `_apply`, not
+        all positional args must be `Node`s and the call returns a new
+        `Node` recording this operator and its parents. Otherwise the
+        call routes to `_apply`. Subclasses override `_apply`, not
         `__call__`.
+
+        Raises:
+            TypeError: if graph-construction mode is triggered (at
+                least one `Node` arg) but other positional args are not
+                `Node`s. Mixing nodes and literals would crash
+                downstream when `Graph` walks ``parents``; reject it at
+                construction with a clear message.
         """
         # Lazy import to break the operator <-> graph circular dependency.
         from pipekit._base.graph import Node
 
         if any(isinstance(a, Node) for a in args):
+            non_node = [
+                (i, type(a).__name__)
+                for i, a in enumerate(args)
+                if not isinstance(a, Node)
+            ]
+            if non_node:
+                raise TypeError(
+                    f"{type(self).__name__}: graph-construction mode requires "
+                    "every positional arg to be a Node. Non-Node arg(s) at "
+                    f"position(s) {non_node!r}. Wrap literals in `Const(value)` "
+                    "or supply them as a separate `Input`."
+                )
             return Node(operator=self, parents=tuple(args))
         out = self._apply(*args, **kwargs)
         # Reserved hook dispatch — no-op in v0.1; Spy/Hook family lands later

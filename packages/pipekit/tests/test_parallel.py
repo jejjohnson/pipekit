@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import time
+import threading
 
 import pytest
 from pipekit import (
@@ -41,19 +41,23 @@ def test_threadmap_returns_results_in_order():
 
 
 def test_threadmap_releases_overlap():
-    """Sleep-bound work should be parallel — total time < sum of sleeps."""
+    """Workers run concurrently — proven via a Barrier, not wall-clock.
 
-    class Sleeper(Operator):
+    Each worker waits on a 4-party `Barrier`. If `ThreadMap` were
+    sequential, the first worker would block forever (no other party
+    reaches the barrier) and the test would time out. If it's
+    concurrent, all four parties trip the barrier and the call returns.
+    """
+
+    barrier = threading.Barrier(4, timeout=5.0)
+
+    class BarrierOp(Operator):
         def _apply(self, x):
-            time.sleep(0.05)
+            barrier.wait()
             return x
 
-    op = ThreadMap(Sleeper(), n_workers=4)
-    t0 = time.perf_counter()
-    op([1, 2, 3, 4])
-    elapsed = time.perf_counter() - t0
-    # 4 sleeps of 50ms, 4 workers — should be ~50ms wall, not 200ms.
-    assert elapsed < 0.15
+    op = ThreadMap(BarrierOp(), n_workers=4)
+    assert op([1, 2, 3, 4]) == [1, 2, 3, 4]
 
 
 def test_threadmap_rejects_zero_workers():

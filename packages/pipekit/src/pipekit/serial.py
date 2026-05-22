@@ -31,15 +31,19 @@ def dumps(op: Operator) -> str:
     """JSON-encode an operator's state record.
 
     Round-trip: ``loads(dumps(op))`` reconstructs an operator with the
-    same config. Operators with `forbid_in_yaml = True` emit debug
-    payloads (closures don't serialise); attempting to ``loads`` those
-    raises a clear `RuntimeError`.
+    same config. Operators with `forbid_in_yaml = True` emit
+    debug-only payloads — their constructors typically need closure
+    arguments that aren't in the config, so the round-trip raises
+    `TypeError` from the constructor at ``loads`` time.
 
     Args:
         op: The operator to encode.
 
     Returns:
         A JSON string suitable for round-trip via `loads`.
+
+    Raises:
+        TypeError: if ``op`` isn't an `Operator`.
     """
     if not isinstance(op, Operator):
         raise TypeError(f"dumps expects an Operator, got {type(op).__name__}.")
@@ -119,7 +123,19 @@ def loads_sandboxed(s: str) -> Operator:
         raise ValueError(
             f"loads_sandboxed expects a JSON object, got a {type(state).__name__}."
         )
-    key = f"{state.get('module')}.{state.get('class')}"
+    module = state.get("module")
+    cls = state.get("class")
+    if not isinstance(module, str):
+        raise ValueError(
+            "loads_sandboxed: state must include a string `module` field, "
+            f"got {type(module).__name__}."
+        )
+    if not isinstance(cls, str):
+        raise ValueError(
+            "loads_sandboxed: state must include a string `class` field, "
+            f"got {type(cls).__name__}."
+        )
+    key = f"{module}.{cls}"
     if key not in _ALLOWED:
         raise PermissionError(
             f"loads_sandboxed: {key!r} is not in the allowlist. "

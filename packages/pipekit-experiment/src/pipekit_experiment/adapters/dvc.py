@@ -69,10 +69,14 @@ class DVCDatasetVersioning:
         )
 
     def add(self, path: str | Path) -> Path:
-        """Stage ``path`` into DVC. Returns the ``.dvc`` pointer file path."""
+        """Stage ``path`` into DVC. Returns the ``.dvc`` pointer file path.
+
+        The returned `Path` is anchored under ``self.repo`` when ``path``
+        is given as a relative path, so callers can rely on
+        ``add(...).exists()`` regardless of the process cwd.
+        """
         self._run("add", str(path))
-        pointer = Path(str(path) + ".dvc")
-        return pointer
+        return self._pointer_path(path)
 
     def pull(self, path: str | Path) -> None:
         """Fetch the data referenced by ``path`` (or ``path.dvc``)."""

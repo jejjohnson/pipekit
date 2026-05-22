@@ -42,6 +42,12 @@ class Node:
     argument is a `Node` (or `Input`, which subclasses `Node`). Carries
     the operator and its parent vertices. Compared by identity so the
     ``id(...)``-keyed evaluation cache during topological sort works.
+
+    Raises:
+        TypeError: if any element of ``parents`` is not a `Node`.
+            `Graph` evaluation walks ``parents`` recursively and indexes
+            an ``id(...)``-keyed cache; non-Node parents would crash with
+            an unhelpful ``KeyError`` deep in the traversal.
     """
 
     __slots__ = ("operator", "parents")
@@ -51,6 +57,13 @@ class Node:
         operator: Operator | None,
         parents: tuple[Any, ...],
     ) -> None:
+        for i, p in enumerate(parents):
+            if not isinstance(p, Node):
+                raise TypeError(
+                    f"Node.parents[{i}] is {type(p).__name__}, expected Node. "
+                    "Wrap literal values in `Const(value)` to lift them into "
+                    "the graph."
+                )
         self.operator = operator
         self.parents = parents
 

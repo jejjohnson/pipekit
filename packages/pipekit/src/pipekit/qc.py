@@ -153,8 +153,12 @@ class AssertHasAttribute(Operator):
 
     Args:
         name: Attribute name to look up via ``getattr``.
-        value: If supplied, the attribute's value must equal this. If
-            ``None`` (default), only presence is checked.
+        value: Optional expected value. **Omit** the argument (it
+            defaults to a private ``_MISSING`` sentinel) to check
+            presence only; **pass** any value — including ``None`` — to
+            additionally require equality with the attribute. ``None``
+            as a *default* is therefore not a sentinel: it's a real
+            value the user might assert against.
     """
 
     def __init__(self, name: str, value: Any = _MISSING) -> None:

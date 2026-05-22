@@ -176,3 +176,9 @@ def test_repr(Scale_cls):
     y = Scale_cls(2.0)(x)
     g = Graph(inputs={"x": x}, outputs={"y": y})
     assert repr(g) == "Graph(inputs=[x], outputs=[y])"
+
+
+def test_node_rejects_non_node_parents(Scale_cls):
+    """Constructing a Node with non-Node parents raises immediately."""
+    with pytest.raises(TypeError, match="expected Node"):
+        Node(operator=Scale_cls(2.0), parents=(42,))
