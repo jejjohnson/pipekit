@@ -23,7 +23,7 @@ import hashlib
 import json
 import os
 from collections.abc import Callable, Iterable, Iterator
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, cast
 
 from pipekit import Operator
 
@@ -164,7 +164,9 @@ class IterableDataset(TrainingDataset):
         self._content_hash = content_hash
 
     def __iter__(self) -> Iterator[tuple[Any, Any]]:
-        source = self.source() if callable(self.source) else self.source
+        # ty can't narrow the union; cast both branches via Any.
+        raw_source = cast(Any, self.source)
+        source = raw_source() if callable(raw_source) else raw_source
         yield from source
 
     def content_hash(self) -> str:
@@ -260,7 +262,7 @@ class SimulationDataset(TrainingDataset):
     # --- iteration / indexing -------------------------------------------
 
     def __len__(self) -> int:
-        start_t, end_t = self._SPLIT_TENTHS[self.split]
+        start_t, end_t = self._SPLIT_TENTHS[cast(Split, self.split)]
         end = self.n_samples * end_t // 10
         start = self.n_samples * start_t // 10
         return end - start
@@ -293,7 +295,7 @@ class SimulationDataset(TrainingDataset):
 
     def _split_offset(self) -> int:
         """Stable per-split offset into the seed space."""
-        start_t, _ = self._SPLIT_TENTHS[self.split]
+        start_t, _ = self._SPLIT_TENTHS[cast(Split, self.split)]
         return self.n_samples * start_t // 10
 
     # --- hashing / config ----------------------------------------------
@@ -406,10 +408,10 @@ class CachedDataset(TrainingDataset):
                 f"CachedDataset format={format!r} is scheduled for v0.2. "
                 "Use format='zarr' for v0.1; see docs/design/api/datasets.md."
             )
-        super().__init__(seed=source.seed, split=source.split)
+        super().__init__(seed=source.seed, split=cast(Split, source.split))
         self.source = source
         self.cache_dir = str(cache_dir)
-        self.format = format
+        self.format: Literal["zarr", "parquet", "tfrecord"] = format
 
     def with_split(self, split: Split) -> CachedDataset:
         return CachedDataset(
@@ -431,7 +433,7 @@ class CachedDataset(TrainingDataset):
     def _materialised(self) -> bool:
         """Check whether the cache has already been written."""
         try:
-            import zarr  # noqa: F401
+            import zarr
         except ImportError:
             return False
         path = self._cache_path()
@@ -449,38 +451,38 @@ class CachedDataset(TrainingDataset):
         import numpy as np
         import zarr
 
-        n = len(self.source)
-        # Probe shapes from the first sample.
-        first_x, first_y = self.source[0]
+        # `self.source` is typed as TrainingDataset; the indexability
+        # guard in __init__ means it also implements __len__/__getitem__.
+        # ty can't combine the runtime guard with the static type, so
+        # we cast at the boundary.
+        source = cast(Any, self.source)
+        n = len(source)
+        first_x, first_y = source[0]
         first_x = np.asarray(first_x)
         first_y = np.asarray(first_y)
 
         path = self._cache_path()
         os.makedirs(path, exist_ok=True)
-        root = zarr.open(path, mode="w")
-        x_arr = root.create_array(
-            "x", shape=(n,) + first_x.shape, dtype=first_x.dtype
-        )
-        y_arr = root.create_array(
-            "y", shape=(n,) + first_y.shape, dtype=first_y.dtype
-        )
+        root = cast(Any, zarr.open(path, mode="w"))
+        x_arr = root.create_array("x", shape=(n, *first_x.shape), dtype=first_x.dtype)
+        y_arr = root.create_array("y", shape=(n, *first_y.shape), dtype=first_y.dtype)
         x_arr[0] = first_x
         y_arr[0] = first_y
         for i in range(1, n):
-            xi, yi = self.source[i]
+            xi, yi = source[i]
             x_arr[i] = np.asarray(xi)
             y_arr[i] = np.asarray(yi)
 
     def _open_cache(self) -> tuple[Any, Any]:
         import zarr
 
-        root = zarr.open(self._cache_path(), mode="r")
+        root = cast(Any, zarr.open(self._cache_path(), mode="r"))
         return root["x"], root["y"]
 
     # --- iteration / indexing -----------------------------------------
 
     def __len__(self) -> int:
-        return len(self.source)
+        return len(cast(Any, self.source))
 
     def __getitem__(self, idx: int) -> tuple[Any, Any]:
         if not self._materialised():

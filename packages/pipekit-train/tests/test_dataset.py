@@ -111,7 +111,7 @@ def test_iterable_dataset_wraps_callable_source():
     ds = IterableDataset(source=gen, content_hash="abc")
     pairs = list(ds)
     assert len(pairs) == 3
-    assert pairs[0] == (np.array([0]), np.array([0]))  # noqa: PLR2004
+    assert pairs[0] == (np.array([0]), np.array([0]))
 
 
 def test_iterable_dataset_wraps_sequence_source():
@@ -198,9 +198,7 @@ def test_simulation_dataset_rejects_non_forward_model():
 
 def test_simulation_dataset_rejects_non_operator_prior():
     with pytest.raises(TypeError, match="Operator"):
-        SimulationDataset(
-            forward_model=_MockForward(), prior=lambda: 0, n_samples=10
-        )
+        SimulationDataset(forward_model=_MockForward(), prior=lambda: 0, n_samples=10)
 
 
 def test_simulation_dataset_rejects_nonpositive_n_samples():
@@ -244,7 +242,7 @@ def test_cached_dataset_round_trip(tmp_path):
     # Re-iterate — should now read from cache, not regenerate.
     pairs_second = list(cached)
     assert len(pairs_first) == len(pairs_second) == 8  # 80% of 10
-    for (x1, y1), (x2, y2) in zip(pairs_first, pairs_second):
+    for (x1, y1), (x2, y2) in zip(pairs_first, pairs_second, strict=True):
         np.testing.assert_array_almost_equal(np.asarray(x1), np.asarray(x2))
         np.testing.assert_array_almost_equal(np.asarray(y1), np.asarray(y2))
 
@@ -301,5 +299,5 @@ def test_cached_dataset_unimplemented_formats(tmp_path):
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
     )
-    with pytest.raises(NotImplementedError, match="v0.2"):
+    with pytest.raises(NotImplementedError, match=r"v0\.2"):
         CachedDataset(source=sim, cache_dir=str(tmp_path), format="parquet")

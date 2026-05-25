@@ -287,22 +287,22 @@ class TrainingLoop(StatefulOperator):
                 f"{sorted(_BACKEND_MODULES)}; got {backend!r}."
             )
         if max_steps < 1:
-            raise ValueError(
-                f"TrainingLoop.max_steps must be >= 1; got {max_steps}."
-            )
+            raise ValueError(f"TrainingLoop.max_steps must be >= 1; got {max_steps}.")
         if batch_size < 1:
-            raise ValueError(
-                f"TrainingLoop.batch_size must be >= 1; got {batch_size}."
-            )
+            raise ValueError(f"TrainingLoop.batch_size must be >= 1; got {batch_size}.")
         self.model_op = model_op
         self.dataset = dataset
         self.val_dataset = val_dataset
         self.loss = loss
         self.task = task
-        self.optimizer_config = dict(optimizer_config) if optimizer_config else {
-            "name": "adamw",
-            "lr": 3e-4,
-        }
+        self.optimizer_config = (
+            dict(optimizer_config)
+            if optimizer_config
+            else {
+                "name": "adamw",
+                "lr": 3e-4,
+            }
+        )
         self.max_steps = int(max_steps)
         self.steps_per_epoch = steps_per_epoch
         self.batch_size = int(batch_size)
@@ -408,7 +408,7 @@ class TrainingLoop(StatefulOperator):
 
         try:
             training_pipeline_yaml = json.dumps(dumps(self), indent=2, default=repr)
-        except Exception:  # noqa: BLE001
+        except Exception:
             # forbid_in_yaml means we may not round-trip cleanly;
             # surface a JSON repr of get_config() instead.
             training_pipeline_yaml = json.dumps(
@@ -434,7 +434,9 @@ class TrainingLoop(StatefulOperator):
             "dataset": type(self.dataset).__name__,
             "dataset_hash": self.dataset.content_hash(),
             "val_dataset": (
-                type(self.val_dataset).__name__ if self.val_dataset is not None else None
+                type(self.val_dataset).__name__
+                if self.val_dataset is not None
+                else None
             ),
             "loss": type(self.loss).__name__ if self.loss is not None else None,
             "task": type(self.task).__name__ if self.task is not None else None,
@@ -460,7 +462,7 @@ def _capture_deps_lock() -> str:
     """
     try:
         result = subprocess.run(
-            ["uv", "pip", "freeze"],  # noqa: S603, S607
+            ["uv", "pip", "freeze"],
             capture_output=True,
             text=True,
             timeout=10,

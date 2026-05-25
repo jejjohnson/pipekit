@@ -205,10 +205,7 @@ class Composite(Operator):
         total = None
         for i, (weight, loss) in enumerate(self.components):
             result = loss(predicted, target)
-            if isinstance(result, tuple):
-                value = result[0]
-            else:
-                value = result
+            value = result[0] if isinstance(result, tuple) else result
             name = f"{type(loss).__name__}_{i}"
             aux[name] = value
             weighted = weight * value

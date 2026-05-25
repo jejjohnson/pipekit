@@ -40,7 +40,8 @@ PKGROOTS ?= packages/pipekit/src/pipekit \
             packages/pipekit-array/src/pipekit_array \
             packages/pipekit-cycle/src/pipekit_cycle \
             packages/pipekit-experiment/src/pipekit_experiment \
-            packages/pipekit-evaluate/src/pipekit_evaluate
+            packages/pipekit-evaluate/src/pipekit_evaluate \
+            packages/pipekit-train/src/pipekit_train
 
 # ---------------------------------------------------------------------------
 # ANSI colours

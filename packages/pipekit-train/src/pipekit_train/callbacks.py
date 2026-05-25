@@ -111,7 +111,9 @@ class EarlyStopping(Operator):
         min_delta: float = 0.0,
     ) -> None:
         if mode not in {"min", "max"}:
-            raise ValueError(f"EarlyStopping.mode must be 'min' or 'max'; got {mode!r}.")
+            raise ValueError(
+                f"EarlyStopping.mode must be 'min' or 'max'; got {mode!r}."
+            )
         if patience < 1:
             raise ValueError(f"EarlyStopping.patience must be >= 1; got {patience}.")
         if min_delta < 0:

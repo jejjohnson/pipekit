@@ -1,4 +1,7 @@
-"""Tests for the bundled callbacks (`EarlyStopping`, `Checkpoint`, `LogToExperiment`)."""
+"""Tests for the bundled callbacks.
+
+Covers `EarlyStopping`, `Checkpoint`, and `LogToExperiment`.
+"""
 
 from __future__ import annotations
 

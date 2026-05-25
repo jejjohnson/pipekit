@@ -17,7 +17,6 @@ from pipekit_train import (
     MSE,
     IterableDataset,
     TrainerCarryState,
-    TrainingDataset,
     TrainingLoop,
     ValidationStep,
 )
@@ -41,10 +40,10 @@ class _ScaleModel(Operator):
 
 
 def _toy_dataset(n: int = 4) -> IterableDataset:
-    return IterableDataset(
-        source=[(np.array([i], dtype=float), np.array([i * 2], dtype=float)) for i in range(n)],
-        content_hash=f"toy-{n}",
-    )
+    pairs = [
+        (np.array([i], dtype=float), np.array([i * 2], dtype=float)) for i in range(n)
+    ]
+    return IterableDataset(source=pairs, content_hash=f"toy-{n}")
 
 
 # --- TrainerCarryState ----------------------------------------------------
