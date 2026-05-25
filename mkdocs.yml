@@ -52,6 +52,10 @@ nav:
       - pipekit: api/pipekit.md
       - pipekit-cycle: api/pipekit-cycle.md
       - pipekit-experiment: api/pipekit-experiment.md
+      - pipekit-train: api/pipekit-train.md
+  - Notebooks:
+      - Quickstart (MLP regression): notebooks/pipekit_train_quickstart.ipynb
+      - Cycle handoff (emulator → forecast): notebooks/pipekit_train_cycle_handoff.ipynb
   - Contributing: contributing.md
 
 markdown_extensions:
