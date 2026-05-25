@@ -44,12 +44,15 @@ v0.2 issue.
 
 ### Q5: Hyperparameter sweeps (`sweep.py`)
 
-Master plan section 3.1 lists `sweep.py` (HyperSweep, ParameterGrid).
-v0.1 ships only the inner training loop; sweeps are a v0.2 feature
-that builds on top. The integration target is Optuna or Ray Tune
-through the `LogToExperiment` callback (each sweep trial logs to the
-same `ExperimentTracker`; the sweep orchestrator reads metrics back
-via the tracker's API).
+**Resolved in v0.2** via `pipekit_train.sweep`.
+
+Ships `ParameterGrid` (Cartesian-product iterator) and `HyperSweep`
+(a `StatefulOperator` that orchestrates N independent `TrainingLoop`
+runs, ranks them by a configured metric, and surfaces a `sweep_id`
+on every `SweepResult` for cross-trial tracker provenance). v0.2
+runs trials sequentially; Optuna / Ray Tune sampler adapters and
+parallel execution land in v0.2.1 / v0.3 — any iterable of param
+dicts works as `search_space` so users can plug those in today.
 
 ### Q6: Streaming / online updates
 

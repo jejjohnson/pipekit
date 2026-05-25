@@ -23,6 +23,7 @@ from pipekit_train.dataset import (
 )
 from pipekit_train.loop import TrainerCarryState, TrainingLoop, ValidationStep
 from pipekit_train.loss import KL, MSE, NLL, Composite, Loss
+from pipekit_train.sweep import HyperSweep, ParameterGrid, SweepCarryState, SweepResult
 from pipekit_train.writer import JSONLWriter, MetricWriter
 
 
@@ -35,12 +36,16 @@ __all__ = [
     "Checkpoint",
     "Composite",
     "EarlyStopping",
+    "HyperSweep",
     "IterableDataset",
     "JSONLWriter",
     "LogToExperiment",
     "Loss",
     "MetricWriter",
+    "ParameterGrid",
     "SimulationDataset",
+    "SweepCarryState",
+    "SweepResult",
     "TrainerCarryState",
     "TrainingDataset",
     "TrainingLoop",

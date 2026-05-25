@@ -219,3 +219,74 @@ class ValidationStep(Operator):
 step round-trips through YAML and the user can swap in
 `pipekit-evaluate` metrics (when that package ships) without
 changing the TrainingLoop config.
+
+---
+
+## `HyperSweep` + `ParameterGrid` (v0.2)
+
+Hyperparameter sweep orchestration. Lives in `pipekit_train.sweep`
+and composes with the rest of Layer 3 (the trial's `TrainingLoop` is
+built per-call via a user-supplied template).
+
+```python
+class ParameterGrid(Operator):
+    """Cartesian product over named parameter axes.
+
+    Iterating yields {axis_name: value} dicts. `len(grid)` is the
+    product of axis lengths for non-empty grids, and 0 for the
+    empty grid ({}) — the pragmatic "no axes ⇒ no trials"
+    departure from the math convention that ∏ over zero axes = 1.
+    """
+    grid: dict[str, list[Any]]
+
+
+@dataclass
+class SweepResult:
+    """One trial's result; sorted by HyperSweep.select_metric."""
+    params: dict[str, Any]
+    trained_model_op: Operator
+    artifact: Any                 # TrainingArtifact | _LocalArtifact
+    final_metric: float
+    sweep_id: str
+    trial_index: int
+
+
+class HyperSweep(StatefulOperator):
+    """Orchestrate N independent TrainingLoop runs.
+
+    Args:
+        loop_template: (params) -> TrainingLoop.
+        search_space: ParameterGrid or any iterable of param dicts
+            (so Optuna trial generators plug in v0.2.1).
+        select_metric: Key inside artifact.backend_info["final_metrics"].
+        select_mode: "min" / "max".
+        n_trials: Optional cap.
+        sweep_id: Stable identifier across trials (uuid by default).
+        on_trial: Optional (SweepResult, SweepCarryState) -> None
+            progress callback.
+
+    Returns from `run()`: list[SweepResult] sorted by select_metric.
+    """
+```
+
+**Composition**: `HyperSweep` is a `StatefulOperator` carrying
+`SweepCarryState(completed, best_metric, best_trial_index)`, so
+coarse-then-fine sweeps compose into `Sequential` and the running
+best survives across stages.
+
+**Tracker provenance**: `sweep_id` is the cross-trial tag. Users
+either wire a `LogToExperiment` callback inside their
+`loop_template`, including `sweep_id` in the per-run config, or
+inspect `SweepResult.sweep_id` after the fact. v0.2 leaves this
+explicit; an auto-wiring `LogToExperiment(sweep_id=…)` convenience
+is a v0.2.1 nice-to-have.
+
+**Scope**:
+
+| Capability | v0.2 | v0.2.1 | v0.3 |
+|---|---|---|---|
+| `ParameterGrid` (Cartesian) | ✅ | — | — |
+| Generic iterable search space | ✅ | — | — |
+| Optuna / Ray Tune sampler adapters | — | ✅ | — |
+| Auto-`LogToExperiment` per trial | — | ✅ | — |
+| Parallel trials (multiprocessing) | — | — | ✅ |

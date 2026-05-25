@@ -31,6 +31,10 @@ The full multi-file design lives in the package:
 
 ::: pipekit_train.loop
 
+## Hyperparameter sweeps
+
+::: pipekit_train.sweep
+
 ## Backend adapters
 
 The Equinox+Optax+Orbax adapter is the v0.1 reference. Lightning and
