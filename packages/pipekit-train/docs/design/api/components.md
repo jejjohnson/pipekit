@@ -14,7 +14,6 @@ hooks below.
 ## `Callback` Protocol
 
 ```python
-@runtime_checkable
 class Callback(Protocol):
     """Per-step / per-epoch / per-eval hooks.
 
@@ -54,6 +53,16 @@ master plan's three: `on_train_begin` + `on_train_end` at the ends,
 `on_step_end` for every step, `on_epoch_end` for the (optional)
 epoch boundaries, `on_eval_end` after each eval pass. Each hook is
 optional — adapter dispatch uses `getattr(cb, hook, None)`.
+
+**Note on `@runtime_checkable`.** Unlike `Loss` and `MetricWriter`,
+`Callback` is *not* decorated with `@runtime_checkable`. The
+optional-hook contract above is incompatible with structural
+`isinstance` (which requires every named method to be present): a
+metric-logger callback that implements only `on_step_end` is valid
+at runtime but would be rejected by `isinstance(cb, Callback)`. The
+Protocol therefore exists as the type-checker contract describing
+the *full* hook surface; runtime conformance is duck-typed via
+`getattr`. See ADR D9 in [decisions.md](../decisions.md).
 
 ## Bundled callbacks
 

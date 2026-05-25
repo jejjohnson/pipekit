@@ -9,25 +9,30 @@ implementation of the `TrainingLoop`. See
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol
 
 
 if TYPE_CHECKING:
     from pipekit import CarryState
 
 
-@runtime_checkable
 class Callback(Protocol):
     """Per-step / per-epoch / per-eval hooks.
 
-    Each hook is optional — adapter dispatch uses
-    ``getattr(cb, hook, None)``. Adapters translate these calls into
-    their backend's native callback API (Lightning's ``pl.Callback``;
-    Equinox: explicit hook points in the outer loop; Keras's
-    ``keras.callbacks.Callback``).
+    Each of the five hooks is **optional** at runtime. Adapters
+    dispatch via ``getattr(cb, hook_name, None)`` so a callback that
+    only cares about one hook (say, ``on_step_end`` for a metric
+    logger) implements just that method.
 
-    See ``docs/design/api/components.md`` and ADR D9 in
-    ``docs/design/decisions.md``.
+    This Protocol is intentionally **not** ``@runtime_checkable``:
+    structural ``isinstance`` would require every callback to
+    implement all five methods, which contradicts the
+    partial-implementation model documented in
+    ``docs/design/api/components.md``. The Protocol exists as the
+    type-checker contract describing the *full* hook surface; the
+    runtime contract is "ducks with the methods you actually use".
+
+    See ADR D9 in ``docs/design/decisions.md``.
     """
 
     def on_train_begin(self, loop: Any, state: CarryState) -> None: ...

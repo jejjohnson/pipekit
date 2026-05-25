@@ -201,29 +201,44 @@ through.
 
 ---
 
-## D9: TrainTask Protocol per backend
+## D9: TrainTask Protocol per backend; Callback hooks are optional
 
 **Status:** accepted (ports eqx_trainer D4)
 
-**Context:** `eqx_trainer` (D4) makes the user-supplied training
-target a `TrainTask` Protocol (`loss_fn` + optional `eval_fn`).
-This is the cleanest interface for JAX where the loss function
-returns auxiliary metrics from inside the same `eqx.filter_grad`.
-Other backends have their own idioms (Lightning's
-`LightningModule.training_step`).
+**Context:** Two related issues. (1) `eqx_trainer` (D4) makes the
+user-supplied training target a `TrainTask` Protocol (`loss_fn` +
+optional `eval_fn`). This is the cleanest interface for JAX where
+the loss function returns auxiliary metrics from inside the same
+`eqx.filter_grad`. Other backends have their own idioms
+(Lightning's `LightningModule.training_step`). (2) The `Callback`
+surface defines five hooks but most callbacks only care about one
+or two; the adapter must tolerate partial implementations.
 
-**Decision:** Each adapter defines its own `TrainTask` Protocol or
-equivalent. For the Equinox adapter, this is the eqx_trainer
-`TrainTask` Protocol verbatim. For the Lightning adapter (v0.2),
-the equivalent is a `LightningModule` factory function. For Keras
-(v0.3), it's a `(loss, metrics)` tuple. The carrier-agnostic
-`Loss` from D4 is the *default* — if the user doesn't supply a
-backend `TrainTask`, the adapter synthesises one from the
-`Loss` Operator.
+**Decision:**
 
-**Consequences:** Power users see backend idioms; default users only
-see `Loss`. The synthesised path is what the worked examples in
-`examples/` use.
+1. Each adapter defines its own `TrainTask` Protocol or equivalent.
+   For the Equinox adapter, this is the eqx_trainer `TrainTask`
+   Protocol verbatim. For the Lightning adapter (v0.2), the
+   equivalent is a `LightningModule` factory function. For Keras
+   (v0.3), it's a `(loss, metrics)` tuple. The carrier-agnostic
+   `Loss` from D4 is the *default* — if the user doesn't supply a
+   backend `TrainTask`, the adapter synthesises one from the `Loss`
+   Operator.
+2. The `Callback` Protocol is **not** `@runtime_checkable`.
+   `runtime_checkable` would require every callback to implement
+   all five hooks (otherwise `isinstance(cb, Callback)` returns
+   False), which contradicts the partial-implementation model.
+   The Protocol stays as the static-typing contract for the *full*
+   hook surface; runtime dispatch in adapters uses `getattr(cb,
+   hook, None)`. `Loss` and `MetricWriter` *are* runtime-checkable
+   because every implementation has the same single-method surface.
+
+**Consequences:** Power users see backend idioms; default users
+only see `Loss`. The synthesised path is what the worked examples
+in `examples/` use. Partial `Callback` implementations (e.g. a
+metric logger that only cares about `on_step_end`) are valid by
+design, and the test suite encodes this contract structurally
+rather than via `isinstance`.
 
 ---
 

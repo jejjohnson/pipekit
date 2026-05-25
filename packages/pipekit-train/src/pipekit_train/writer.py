@@ -9,7 +9,8 @@ default; W&B, TensorBoard, and other writers are user-supplied per
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -38,24 +39,33 @@ class JSONLWriter:
 
         {"step": int, "metrics": {name: float, ...}, "timestamp": iso8601}
 
-    The file is opened lazily on the first ``write`` and flushed every
-    ``flush_every`` writes.
+    The file is opened lazily on the first ``write``. Records are
+    written into Python's text-IO buffer immediately and that buffer
+    is flushed to the OS every ``flush_every`` writes; flushing only
+    pushes data out of user space, it does **not** guarantee
+    durability against a kernel crash or power loss. Set
+    ``fsync_on_flush=True`` to additionally call ``os.fsync`` on each
+    flush — slower, but the data is on stable storage when it returns.
 
     Args:
-        path: Output file path. Parent directories are created if
-            missing.
+        path: Output file path. Parent directories are created on
+            first write if missing.
         flush_every: Number of writes between explicit ``flush()``
-            calls. Higher = fewer syscalls; lower = less data lost
-            on crash.
+            calls. Higher = fewer syscalls; lower = less data sitting
+            in Python's buffer if the process is killed.
+        fsync_on_flush: When True, ``os.fsync`` is invoked on each
+            flush in addition to the buffer flush — provides
+            durability against kernel/power loss at a cost.
 
     See ``docs/design/api/components.md``.
     """
 
     path: str | Path
     flush_every: int = 100
+    fsync_on_flush: bool = False
 
-    _file: Any = None
-    _writes_since_flush: int = 0
+    _file: Any = field(default=None, init=False, repr=False, compare=False)
+    _writes_since_flush: int = field(default=0, init=False, repr=False, compare=False)
 
     def write(self, step: int, metrics: dict[str, float]) -> None:
         """Append one record."""
@@ -71,13 +81,20 @@ class JSONLWriter:
         self._file.write(json.dumps(record) + "\n")
         self._writes_since_flush += 1
         if self._writes_since_flush >= self.flush_every:
-            self._file.flush()
+            self._flush()
             self._writes_since_flush = 0
 
     def close(self) -> None:
         """Close the underlying file."""
         if self._file is not None:
-            self._file.flush()
+            self._flush()
             self._file.close()
             self._file = None
             self._writes_since_flush = 0
+
+    def _flush(self) -> None:
+        """Flush the text-IO buffer and optionally fsync."""
+        assert self._file is not None
+        self._file.flush()
+        if self.fsync_on_flush:
+            os.fsync(self._file.fileno())
