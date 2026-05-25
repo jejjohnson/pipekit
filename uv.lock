@@ -13,6 +13,7 @@ members = [
     "pipekit-cycle",
     "pipekit-evaluate",
     "pipekit-experiment",
+    "pipekit-jax",
     "pipekit-monorepo",
     "pipekit-train",
 ]
@@ -3850,6 +3851,25 @@ requires-dist = [
 provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
+name = "pipekit-jax"
+version = "0.0.1"
+source = { editable = "packages/pipekit-jax" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "pipekit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "equinox", specifier = ">=0.11" },
+    { name = "jax", specifier = ">=0.4.30" },
+    { name = "jaxtyping", specifier = ">=0.2" },
+    { name = "pipekit", editable = "packages/pipekit" },
+]
+
+[[package]]
 name = "pipekit-monorepo"
 version = "0.0.0"
 source = { editable = "." }
@@ -3861,6 +3881,7 @@ dev = [
     { name = "pipekit-cycle" },
     { name = "pipekit-evaluate" },
     { name = "pipekit-experiment" },
+    { name = "pipekit-jax" },
     { name = "pipekit-train" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -3893,6 +3914,7 @@ dev = [
     { name = "pipekit-cycle", editable = "packages/pipekit-cycle" },
     { name = "pipekit-evaluate", editable = "packages/pipekit-evaluate" },
     { name = "pipekit-experiment", editable = "packages/pipekit-experiment" },
+    { name = "pipekit-jax", editable = "packages/pipekit-jax" },
     { name = "pipekit-train", editable = "packages/pipekit-train" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.3" },

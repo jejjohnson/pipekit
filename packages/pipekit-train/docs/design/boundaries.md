@@ -148,10 +148,16 @@ the design as written; logged here for honesty.
   the design used `lr` (the common shorthand); optax expects
   `learning_rate`. The Equinox adapter's `_build_optimizer`
   normalises `lr` → `learning_rate` at the boundary.
-- **`_EquinoxModelOp` ships in-package** as the v0.1 trained-model
-  wrapper. It's the drop-in replacement for the future
-  `pipekit-jax.JaxModelOp` — same constructor signature, same
-  `_apply` shape. Documented in `api/adapters.md`.
+- **`EquinoxModelOp` ships in-package** as the v0.1 trained-model
+  wrapper. Same constructor signature and `_apply` shape as the
+  full `pipekit_jax.JaxModelOp` that landed in v0.2 — users can
+  swap one for the other without code changes. The in-package
+  `EquinoxModelOp` doesn't expose `serialize_weights` /
+  `with_weights`, so byte-identical weight round-trip through a
+  `ModelRegistry` requires importing `pipekit_jax.JaxModelOp` (the
+  `Checkpoint` callback duck-types `serialize_weights` and passes
+  the blob through when present — no code changes on the
+  pipekit-train side). Documented in `api/adapters.md`.
 
 ## 14. Versioning targets
 

@@ -251,7 +251,17 @@ class Checkpoint(Operator):
                 "ModelRegistry (missing `.store`). Got "
                 f"{type(self.registry).__name__}."
             )
-        h = self.registry.store(model)
+        # If the model exposes `serialize_weights() -> bytes` (e.g.
+        # `pipekit_jax.JaxModelOp`), pass the weight blob through so
+        # the registry can store it alongside the operator state.
+        # That's the round-trip path that closes the v0.1 reproducibility
+        # caveat documented in `docs/design/boundaries.md §13.1` —
+        # duck-typed so pipekit-train doesn't import pipekit-jax.
+        serialize = getattr(model, "serialize_weights", None)
+        if callable(serialize):
+            h = self.registry.store(model, weights=serialize())
+        else:
+            h = self.registry.store(model)
         self.last_hash = h
         self.last_uri = f"registry://{h}"
 

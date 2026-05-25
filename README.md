@@ -13,8 +13,8 @@ Author: J. Emmanuel Johnson
 Repo: [https://github.com/jejjohnson/pipekit](https://github.com/jejjohnson/pipekit)
 
 A carrier-agnostic operator-graph framework for composable scientific
-pipelines. `pipekit` is a uv workspace of six Python packages —
-three implemented, three scaffolded for future work — that together
+pipelines. `pipekit` is a uv workspace of seven Python packages —
+five implemented, two scaffolded for future work — that together
 cover the L0–L4 spectrum: from raw I/O through data assimilation to
 trained-model deployment.
 
@@ -29,7 +29,8 @@ trained-model deployment.
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.            |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, tool adapters. |
 | `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units.                                  |
-| `pipekit-train`      | scaffolded    | Training pipelines — datasets, losses, loop, backend adapters.      |
+| `pipekit-train`      | implemented   | Training pipelines — datasets, losses, loop, Equinox adapter.       |
+| `pipekit-jax`        | implemented   | `JaxModelOp` — eqx.Module wrapper with weight-blob registry round-trip. |
 
 Each package has its own README under [`packages/`](packages/) with a
 module inventory and a quickstart.
@@ -74,7 +75,8 @@ pipekit/
 │   ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
 │   ├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
 │   ├── pipekit-evaluate/         # Scaffold — evaluation metrics (planned)
-│   └── pipekit-train/            # Scaffold — training pipelines (design only)
+│   ├── pipekit-train/            # Training pipelines + Equinox adapter
+│   └── pipekit-jax/              # JaxModelOp — eqx.Module ↔ ModelRegistry
 ├── docs/                         # MkDocs documentation source
 ├── notebooks/                    # Jupyter notebooks
 ├── .github/                      # Workflows, issue templates, dependabot, …
