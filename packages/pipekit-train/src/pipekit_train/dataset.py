@@ -434,13 +434,13 @@ class CachedDataset(TrainingDataset):
     def _materialised(self) -> bool:
         """Check whether the cache has already been written."""
         try:
-            import zarr
+            import zarr  # ty: ignore[unresolved-import]
         except ImportError:
             return False
         path = self._cache_path()
         # zarr's open auto-detects existing stores.
         try:
-            import zarr
+            import zarr  # ty: ignore[unresolved-import]
 
             root = zarr.open(path, mode="r")
         except (FileNotFoundError, KeyError, ValueError):
@@ -450,7 +450,7 @@ class CachedDataset(TrainingDataset):
     def _materialise(self) -> None:
         """Write the source into the zarr cache (first epoch)."""
         import numpy as np
-        import zarr
+        import zarr  # ty: ignore[unresolved-import]
 
         # `self.source` is typed as TrainingDataset; the indexability
         # guard in __init__ means it also implements __len__/__getitem__.
@@ -482,7 +482,7 @@ class CachedDataset(TrainingDataset):
             y_arr[i] = np.asarray(yi)
 
     def _open_cache(self) -> tuple[Any, Any]:
-        import zarr
+        import zarr  # ty: ignore[unresolved-import]
 
         root = cast(Any, zarr.open(self._cache_path(), mode="r"))
         return root["x"], root["y"]

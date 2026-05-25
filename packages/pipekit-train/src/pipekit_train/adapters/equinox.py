@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast, runtime_checkab
 import equinox as eqx  # ty: ignore[unresolved-import]
 import jax  # ty: ignore[unresolved-import]
 import jax.numpy as jnp  # ty: ignore[unresolved-import]
-import numpy as np  # ty: ignore[unresolved-import]
+import numpy as np
 import optax  # ty: ignore[unresolved-import]
 import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 from pipekit import Operator
