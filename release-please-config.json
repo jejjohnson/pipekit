@@ -70,6 +70,17 @@
       "extra-files": [
         "src/pipekit_evaluate/__init__.py"
       ]
+    },
+    "packages/pipekit-train": {
+      "release-type": "python",
+      "package-name": "pipekit-train",
+      "component": "pipekit-train",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_train/__init__.py"
+      ]
     }
   }
 }
