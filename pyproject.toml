@@ -20,6 +20,7 @@ pipekit-array = { workspace = true }
 pipekit-cycle = { workspace = true }
 pipekit-experiment = { workspace = true }
 pipekit-evaluate = { workspace = true }
+pipekit-train = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -40,6 +41,7 @@ dev = [
     "pipekit-cycle",
     "pipekit-experiment",
     "pipekit-evaluate",
+    "pipekit-train",
 ]
 lint = [
     "ruff>=0.15.11",
@@ -75,7 +77,7 @@ lines-after-imports = 2
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-testpaths = ["packages/pipekit/tests", "packages/pipekit-array/tests", "packages/pipekit-cycle/tests", "packages/pipekit-experiment/tests", "packages/pipekit-evaluate/tests"]
+testpaths = ["packages/pipekit/tests", "packages/pipekit-array/tests", "packages/pipekit-cycle/tests", "packages/pipekit-experiment/tests", "packages/pipekit-evaluate/tests", "packages/pipekit-train/tests"]
 addopts = "-q"
 
 [tool.coverage.run]
@@ -85,6 +87,7 @@ source = [
     "packages/pipekit-cycle/src",
     "packages/pipekit-experiment/src",
     "packages/pipekit-evaluate/src",
+    "packages/pipekit-train/src",
 ]
 omit = ["**/tests/*"]
 

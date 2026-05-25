@@ -24,11 +24,10 @@ equinox   = [
 lightning = ["lightning>=2.4", "torch>=2.0"]
 keras     = ["keras>=3.0"]
 
-# Data sources.
-catalog   = ["geocatalog>=0.1"]
+# Workspace-internal data sources / reproducibility integration.
+# `catalog` extra (geocatalog) lands once geocatalog publishes to PyPI;
+# see docs/design/api/datasets.md.
 cycle     = ["pipekit-cycle"]
-
-# Reproducibility + tracker integration.
 experiment = ["pipekit-experiment"]
 
 [build-system]
