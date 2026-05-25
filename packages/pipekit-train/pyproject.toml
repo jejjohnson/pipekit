@@ -30,12 +30,12 @@ keras     = ["keras>=3.0"]
 cycle     = ["pipekit-cycle"]
 experiment = ["pipekit-experiment"]
 
-# Disk-cache storage. Local-filesystem CachedDataset has no extra
-# requirements beyond `zarr` (lazy-imported on first cache hit).
-# fsspec URIs (s3://, gcs://, …) need `fsspec` + the relevant
-# protocol driver; pick the one that matches your storage.
-s3        = ["fsspec>=2024.0", "s3fs>=2024.0"]
-gcs       = ["fsspec>=2024.0", "gcsfs>=2024.0"]
+# Disk-cache storage. All cache backends need `zarr` (lazy-imported
+# on first hit). The cloud-cache extras also pull in `fsspec` + the
+# relevant protocol driver.
+cache     = ["zarr>=2.18"]
+s3        = ["zarr>=2.18", "fsspec>=2024.0", "s3fs>=2024.0"]
+gcs       = ["zarr>=2.18", "fsspec>=2024.0", "gcsfs>=2024.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -642,19 +642,27 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
                 save_interval_steps=every_n,
             ),
         )
-    # --- Data iterator -------------------------------------------------
-    # Built before checkpoint-restore so we can set_state(...) the
-    # iterator from the side-car JSON (Grain MapDataset path supports
-    # this; the streaming path silently no-ops). See #17.
-    train_iter = _BatchSource(loop.dataset, loop.batch_size, loop.seed)
-
     # Resume from the latest checkpoint if one exists. Restores both
     # TrainState (weights + opt_state) AND the iterator position.
+    # The data-iter state is saved aside for after we build the
+    # iterator below.
+    data_iter_state_to_restore: Any = None
     if mngr is not None:
         latest = mngr.latest_step()
         if latest is not None:
-            state, data_iter_state = restore_state(mngr, state, latest)
-            train_iter.set_state(data_iter_state)
+            state, data_iter_state_to_restore = restore_state(mngr, state, latest)
+
+    # --- Data iterator -------------------------------------------------
+    # Built only if we're actually going to consume batches. Skipping
+    # this for finished resumes (state.step >= max_steps) means
+    # users can reload a checkpointed model on a dataset smaller than
+    # batch_size without tripping `_BatchSource`'s indexable-min-size
+    # guard. See #17 / codex review on PR #24.
+    train_iter: _BatchSource | None = None
+    if int(state.step) < loop.max_steps:
+        train_iter = _BatchSource(loop.dataset, loop.batch_size, loop.seed)
+        if data_iter_state_to_restore is not None:
+            train_iter.set_state(data_iter_state_to_restore)
 
     # --- Initial-state callback dispatch -------------------------------
     initial_state = _carry_state(state, loop)
@@ -662,7 +670,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     # --- Main loop -----------------------------------------------------
     last_metrics: dict[str, float] = {}
+    # Inside the loop body, `train_iter` is guaranteed non-None because
+    # the loop condition matches the guard that built it.
     while int(state.step) < loop.max_steps:
+        assert train_iter is not None  # see iterator-build guard above
         rng, step_key = jax.random.split(rng)
         batch = train_iter.next_batch()
         state, metrics = train_step(state, batch, step_key, task, optimizer)

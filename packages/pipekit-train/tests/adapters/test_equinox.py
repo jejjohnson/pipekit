@@ -558,12 +558,18 @@ def test_run_carry_state_step_matches_actual_final_step():
 
 
 def test_iterator_state_checkpoint_round_trip(tmp_path):
-    """Regression: #17 — train N/2 steps with checkpoint_dir set, then
-    a fresh loop restores both weights and iterator position from
-    the side-car JSON, continues for N/2 more steps. The data stream
-    seen by the second run starts where the first left off — same
-    Grain seed wouldn't be enough if we restarted from step 0 of
-    the shuffled epoch.
+    """Regression: #17 — train half the steps, checkpoint, resume into
+    a loop that *continues* training to completion. The model produced
+    by the resumed pipeline must be byte-identical to a single
+    uninterrupted run from step 0 — equality requires the iterator
+    state to round-trip (otherwise the resumed run sees different
+    batches in steps 5-10 from the reference run, leading to
+    different weights).
+
+    PR #24 copilot review caught that the original version of this
+    test set ``loop2.max_steps == restored state.step``, so the
+    second run never advanced and would have passed even with
+    iterator state ignored. The fixed version actually advances.
     """
     import jax
     from pipekit_train import TrainingDataset
@@ -595,56 +601,140 @@ def test_iterator_state_checkpoint_round_trip(tmp_path):
             return f"indexed-n{self.n}"
 
     dataset = _IndexedDataset(n=64)
-    ckpt_dir = tmp_path / "ckpt"
 
-    # --- First half: train 10 steps with checkpoint --------------------
-    loop1 = TrainingLoop(
-        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+    common = dict(
         dataset=dataset,
         loss=MSE(),
         optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        batch_size=8,
+        backend="equinox",
+        seed=0,
+    )
+
+    # --- Reference: train 10 steps in one uninterrupted run --------
+    loop_ref = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
         max_steps=10,
+        **common,
+    )
+    trained_ref, _ = loop_ref.run()
+
+    # --- Phase 1: train 5 steps, save checkpoint --------------------
+    ckpt_dir = tmp_path / "ckpt"
+    loop_phase1 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        max_steps=5,
+        callbacks=(
+            __import__("pipekit_train").Checkpoint(
+                every_n_steps=5, keep_last=1, save_dir=str(ckpt_dir)
+            ),
+        ),
+        checkpoint_dir=str(ckpt_dir),
+        **common,
+    )
+    _, art_phase1 = loop_phase1.run()
+    assert art_phase1.backend_info["final_step"] == 5
+
+    # The iterator-state side-car must exist.
+    side_car = ckpt_dir / "5" / "data_iter.json"
+    assert side_car.exists(), (
+        "iterator-state side-car not written — see save_state extension"
+    )
+
+    # --- Phase 2: fresh loop, max_steps=10, restores at step 5 and
+    # actually runs 5 more steps to reach step 10. -------------------
+    fresh_op = EquinoxModelOp(_toy_mlp(jax.random.key(999)))  # different weights
+    loop_phase2 = TrainingLoop(
+        model_op=fresh_op,
+        max_steps=10,  # ← advances beyond restored step=5
+        checkpoint_dir=str(ckpt_dir),
+        **common,
+    )
+    trained_resumed, art_phase2 = loop_phase2.run()
+    # Phase 2 actually advanced from 5 → 10 (not a no-op).
+    assert art_phase2.backend_info["final_step"] == 10
+
+    # The headline claim: resumed model == reference model, byte-
+    # identically. This holds only if the iterator state was restored
+    # correctly — otherwise Phase 2's steps 5-10 would see different
+    # batches than the reference's, and the weights would diverge.
+    x = jnp.array([0.3], dtype=jnp.float32)
+    y = jnp.array([0.7], dtype=jnp.float32)
+    np.testing.assert_array_almost_equal(trained_ref(x), trained_resumed(x), decimal=5)
+    np.testing.assert_array_almost_equal(trained_ref(y), trained_resumed(y), decimal=5)
+
+
+def test_finished_resume_does_not_construct_iterator(tmp_path):
+    """Regression: PR #24 P2 — resuming a checkpoint whose state.step
+    is already at max_steps must not construct the data iterator
+    (so a dataset smaller than batch_size doesn't fail with
+    ValueError on a no-op resume).
+    """
+    import jax
+    from pipekit_train import TrainingDataset
+
+    class _TinyIndexed(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __len__(self) -> int:
+            return 3  # smaller than the batch_size below
+
+        def __getitem__(self, i: int):
+            return (
+                np.array([float(i)], dtype=np.float32),
+                np.array([float(i) * 2], dtype=np.float32),
+            )
+
+        def __iter__(self):
+            for i in range(3):
+                yield self[i]
+
+        def content_hash(self) -> str:
+            return "tiny-3"
+
+    ckpt_dir = tmp_path / "ckpt"
+
+    # Phase 1: build a checkpoint at step 4 (dataset has only 3
+    # samples; uses a different big dataset to write a checkpoint).
+    big_ds = _synthetic_regression(n=64, seed=0)
+    loop_phase1 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=big_ds,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=4,
         batch_size=8,
         backend="equinox",
         callbacks=(
-            # Force checkpoint cadence to fire on the last step.
             __import__("pipekit_train").Checkpoint(
-                every_n_steps=10, keep_last=1, save_dir=str(ckpt_dir)
+                every_n_steps=4, keep_last=1, save_dir=str(ckpt_dir)
             ),
         ),
         checkpoint_dir=str(ckpt_dir),
         seed=0,
     )
-    trained1, art1 = loop1.run()
-    assert art1.backend_info["final_step"] == 10
+    loop_phase1.run()
 
-    # The checkpoint side-car must exist.
-    side_car = ckpt_dir / "10" / "data_iter.json"
-    assert side_car.exists(), (
-        "iterator-state side-car not written — see save_state extension"
-    )
-
-    # --- Second half: fresh loop with same config + checkpoint_dir.
-    # restore_state should resurrect both weights and iterator pos. -----
-    fresh_op = EquinoxModelOp(_toy_mlp(jax.random.key(999)))  # different weights
-    loop2 = TrainingLoop(
-        model_op=fresh_op,
-        dataset=dataset,
+    # Phase 2: same checkpoint_dir, finishing-shaped state (max_steps
+    # equals restored step). Tiny dataset with batch_size > len — this
+    # would crash if we built the iterator unconditionally.
+    loop_phase2 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=_TinyIndexed(),
         loss=MSE(),
         optimizer_config={"name": "adam", "learning_rate": 1e-2},
-        max_steps=10,  # Same max_steps; restored state.step=10 → no-op loop
-        batch_size=8,
+        max_steps=4,  # restored step=4 → no-op loop
+        batch_size=8,  # > len(_TinyIndexed) = 3
         backend="equinox",
         checkpoint_dir=str(ckpt_dir),
         seed=0,
     )
-    trained2, _art2 = loop2.run()
-
-    # After restore, state.step is already 10 → outer loop doesn't enter.
-    # The weights from the fresh skeleton are REPLACED by the
-    # restored ones. So trained2 should match trained1 on the same input.
-    x = jnp.array([0.5], dtype=jnp.float32)
-    np.testing.assert_array_almost_equal(trained1(x), trained2(x))
+    # No exception even though len(dataset) < batch_size — the
+    # iterator is never constructed because state.step >= max_steps.
+    trained, artifact = loop_phase2.run()
+    assert artifact.backend_info["final_step"] == 4
+    assert isinstance(trained, EquinoxModelOp)
 
 
 def test_batch_source_streaming_get_state_is_none():
