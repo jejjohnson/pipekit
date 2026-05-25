@@ -14,7 +14,7 @@ Module surface:
   the eqx_trainer design.
 - `train_step` — pure function, ``@eqx.filter_jit`` wrapped.
 - `save_state` / `restore_state` — Orbax bridge via ``eqx.partition``.
-- `_EquinoxModelOp(Operator)` — wraps a trained ``eqx.Module`` as a
+- `EquinoxModelOp(Operator)` — wraps a trained ``eqx.Module`` as a
   `pipekit.Operator`. v0.1 in-package replacement for the future
   `pipekit-jax.JaxModelOp`.
 - `run(loop)` — full end-to-end training entry point.
@@ -43,17 +43,18 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------
-# _EquinoxModelOp — pipekit.Operator wrapper around an eqx.Module
+# EquinoxModelOp — pipekit.Operator wrapper around an eqx.Module
 # ---------------------------------------------------------------------
 
 
-class _EquinoxModelOp(Operator):
+class EquinoxModelOp(Operator):
     """Wrap an `eqx.Module` as a `pipekit.Operator`.
 
-    Drop-in replacement for the future ``pipekit-jax.JaxModelOp``.
-    Same constructor signature; same ``_apply`` shape (calls the
-    module on the input). When ``pipekit-jax`` ships, users swap the
-    import and everything still works.
+    Public surface used in notebooks and downstream packages. Drop-in
+    replacement for the future ``pipekit-jax.JaxModelOp`` — same
+    constructor signature; same ``_apply`` shape (calls the module on
+    the input). When ``pipekit-jax`` ships, users swap the import and
+    everything still works.
 
     The wrapper is marked ``forbid_in_yaml = True`` because an
     ``eqx.Module`` is a JAX PyTree of arrays — the round-trip path is
@@ -70,7 +71,7 @@ class _EquinoxModelOp(Operator):
     def __init__(self, module: eqx.Module) -> None:
         if not isinstance(module, eqx.Module):
             raise TypeError(
-                "_EquinoxModelOp.module must be an eqx.Module; got "
+                "EquinoxModelOp.module must be an eqx.Module; got "
                 f"{type(module).__name__}."
             )
         self.module = module
@@ -84,6 +85,11 @@ class _EquinoxModelOp(Operator):
         return {"module_class": type(self.module).__name__}
 
 
+# Backwards-compatible alias — the underscore form was used in earlier
+# PRs / external code that may still import from this path.
+_EquinoxModelOp = EquinoxModelOp
+
+
 # ---------------------------------------------------------------------
 # TrainState
 # ---------------------------------------------------------------------
@@ -93,7 +99,7 @@ class TrainState(eqx.Module):
     """Equinox-side training state.
 
     A PyTree-clean container holding the bare ``eqx.Module``
-    (without the ``_EquinoxModelOp`` wrapper), the Optax optimizer
+    (without the ``EquinoxModelOp`` wrapper), the Optax optimizer
     state, and the global step counter.
     """
 
@@ -448,17 +454,17 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """Train ``loop`` end-to-end. The entry point for the Equinox backend.
 
     Returns:
-        ``(trained_model_op, backend_info)`` where:
-        - ``trained_model_op`` is a `_EquinoxModelOp` wrapping the
-          trained ``eqx.Module``.
-        - ``backend_info`` is a dict with ``backend``, ``jax_version``,
-          ``equinox_version``, ``optax_version``, ``devices``, and
-          ``total_seconds`` for inclusion in the TrainingArtifact.
+        A pair ``(trained_model_op, backend_info)``. ``trained_model_op``
+        is a `EquinoxModelOp` wrapping the trained ``eqx.Module``;
+        ``backend_info`` is a dict with the keys ``backend``,
+        ``jax_version``, ``equinox_version``, ``optax_version``,
+        ``devices``, ``total_seconds``, ``final_step``, and
+        ``final_metrics`` for inclusion in the TrainingArtifact.
     """
     t0 = time.time()
     # --- Unwrap the model ----------------------------------------------
     model_op = loop.model_op
-    if isinstance(model_op, _EquinoxModelOp):
+    if isinstance(model_op, EquinoxModelOp):
         eqx_module = model_op.module
     elif isinstance(model_op, eqx.Module):
         eqx_module = model_op
@@ -468,7 +474,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     else:
         raise TypeError(
             "Equinox adapter expects loop.model_op to be a pipekit_train."
-            "adapters.equinox._EquinoxModelOp (or any operator exposing "
+            "adapters.equinox.EquinoxModelOp (or any operator exposing "
             ".module: eqx.Module). Got "
             f"{type(model_op).__name__}."
         )
@@ -581,7 +587,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         mngr.wait_until_finished()
 
     # --- Wrap the trained module + dispatch on_train_end -------------
-    trained_model_op = _EquinoxModelOp(state.model)
+    trained_model_op = EquinoxModelOp(state.model)
     final_carry = _carry_state(
         state, loop, last_metrics, model_override=trained_model_op
     )
@@ -625,7 +631,7 @@ def _carry_state(
     step = int(state.step)
     epoch = step // loop.steps_per_epoch if loop.steps_per_epoch else 0
     return TrainerCarryState(
-        model=model_override or _EquinoxModelOp(state.model),
+        model=model_override or EquinoxModelOp(state.model),
         opt_state=state.opt_state,
         step=step,
         epoch=epoch,
