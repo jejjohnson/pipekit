@@ -21,6 +21,7 @@ from pipekit_train.dataset import (
     SimulationDataset,
     TrainingDataset,
 )
+from pipekit_train.loop import TrainerCarryState, TrainingLoop, ValidationStep
 from pipekit_train.loss import KL, MSE, NLL, Composite, Loss
 from pipekit_train.writer import JSONLWriter, MetricWriter
 
@@ -40,7 +41,10 @@ __all__ = [
     "Loss",
     "MetricWriter",
     "SimulationDataset",
+    "TrainerCarryState",
     "TrainingDataset",
+    "TrainingLoop",
+    "ValidationStep",
 ]
 
 __version__ = "0.0.1"  # x-release-please-version
