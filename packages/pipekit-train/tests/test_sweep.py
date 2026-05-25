@@ -389,3 +389,66 @@ def test_hyper_sweep_is_stateful_operator():
     )
     assert isinstance(sweep, StatefulOperator)
     assert HyperSweep._is_stateful is True
+
+
+# ---------------------------------------------------------------------
+# Regressions
+# ---------------------------------------------------------------------
+
+
+def test_resumed_sweep_uses_global_trial_indices(monkeypatch):
+    """Regression: PR #22 P2 review — when `_apply` runs with an
+    incoming `SweepCarryState` (Sequential composition / coarse-fine
+    staging), the trial_index on each new SweepResult AND
+    state.best_trial_index must continue the global trial-stream
+    numbering (state.completed at entry), not restart at 0.
+    """
+    import pipekit_train.sweep as sweep_mod
+
+    monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
+
+    # Simulate that a prior sweep stage already completed 5 trials
+    # and found best_metric=0.4 at global index 3.
+    incoming = SweepCarryState(completed=5, best_metric=0.4, best_trial_index=3)
+
+    metrics = {"a": 0.9, "b": 0.1, "c": 0.5}
+    sweep = HyperSweep(
+        loop_template=_fake_loop_template(lambda p: metrics[p["v"]]),
+        search_space=ParameterGrid({"v": ["a", "b", "c"]}),
+        select_metric="loss",
+        select_mode="min",
+    )
+
+    results, state_out = sweep._apply(state=incoming)
+
+    # The 3 new trials should be globally indexed 5, 6, 7.
+    new_indices = sorted(r.trial_index for r in results)
+    assert new_indices == [5, 6, 7]
+
+    # state.completed accumulates: 5 + 3 = 8.
+    assert state_out.completed == 8
+
+    # The "b" trial scored 0.1, which beats the incoming best of 0.4.
+    # Its global index is 6 (1st new trial = 5, 2nd = 6 for "b"), so
+    # state.best_trial_index must be 6 — NOT 1 (the stage-local index).
+    assert state_out.best_metric == 0.1
+    assert state_out.best_trial_index == 6
+
+
+def test_fresh_sweep_trial_indices_start_at_zero(monkeypatch):
+    """Sanity: a fresh sweep (no incoming state) still numbers
+    0, 1, 2, … so the regression above hasn't broken the base case.
+    """
+    import pipekit_train.sweep as sweep_mod
+
+    monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
+
+    metrics = {"a": 0.5, "b": 0.2}
+    sweep = HyperSweep(
+        loop_template=_fake_loop_template(lambda p: metrics[p["v"]]),
+        search_space=ParameterGrid({"v": ["a", "b"]}),
+        select_metric="loss",
+        select_mode="min",
+    )
+    results = sweep.run()
+    assert sorted(r.trial_index for r in results) == [0, 1]

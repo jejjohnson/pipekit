@@ -232,8 +232,10 @@ built per-call via a user-supplied template).
 class ParameterGrid(Operator):
     """Cartesian product over named parameter axes.
 
-    Iterating yields {axis_name: value} dicts; `len(grid)` is the
-    product of axis lengths.
+    Iterating yields {axis_name: value} dicts. `len(grid)` is the
+    product of axis lengths for non-empty grids, and 0 for the
+    empty grid ({}) — the pragmatic "no axes ⇒ no trials"
+    departure from the math convention that ∏ over zero axes = 1.
     """
     grid: dict[str, list[Any]]
 

@@ -40,14 +40,18 @@ class ParameterGrid(Operator):
     """Cartesian product over named parameter axes.
 
     Args:
-        grid: Mapping ``axis_name → list of values``.
-            Empty mapping is allowed and yields zero combinations.
+        grid: Mapping ``axis_name → list of values``. Every axis
+            must have at least one value. An **empty mapping**
+            (``{}``) is also allowed and yields **zero** combinations
+            (``len(grid) == 0``, ``list(grid) == []``) — this
+            departs from the mathematical Cartesian-product
+            convention where ``∏ over zero axes == 1``, in favour
+            of the pragmatic "no axes ⇒ no trials to run" reading
+            that downstream `HyperSweep` consumers expect.
 
     Iteration yields one ``{axis_name: value, ...}`` dict per cell.
-    ``len(grid)`` is the product of axis lengths (0 for an empty
-    grid; 1 for a grid with zero axes — i.e. ``{}`` — by Cartesian-
-    product convention; we surface 0 in that case for the
-    pragmatic "no trials to run").
+    ``len(grid)`` is the product of axis lengths for non-empty
+    grids; 0 for the empty grid per the convention above.
 
     Example:
         >>> list(ParameterGrid({"lr": [1e-3, 1e-2], "width": [8, 16]}))
@@ -113,8 +117,13 @@ class SweepResult:
             this trial is ranked by.
         sweep_id: Stable identifier shared by every trial in this
             sweep (defaults to a uuid4 hex string).
-        trial_index: 0-based index of this trial within the sweep
-            iteration order.
+        trial_index: **Global** 0-based index across the cumulative
+            trial stream represented by the carry-state. For a fresh
+            sweep it starts at 0; when a `HyperSweep` is composed in
+            `Sequential` and resumes a `SweepCarryState`, this index
+            continues from `state.completed` at entry — so
+            `trial_index` always identifies the trial unambiguously
+            regardless of staging.
     """
 
     params: dict[str, Any]
@@ -138,11 +147,17 @@ class SweepCarryState(CarryState):
     best-so-far progress).
 
     Attributes:
-        completed: Number of trials run so far.
+        completed: Cumulative number of trials run across all
+            `_apply` calls that have consumed this state.
         best_metric: Best metric value observed (None until the
             first trial completes).
-        best_trial_index: Index of the trial that produced
-            ``best_metric``.
+        best_trial_index: **Global** index (in the same coordinate
+            system as ``completed``) of the trial that produced
+            ``best_metric``. When `_apply` is called with an
+            incoming `SweepCarryState`, trials in the new stage
+            are numbered ``state.completed, state.completed + 1, …``
+            so ``best_trial_index`` always identifies the best trial
+            unambiguously across coarse → fine sweep stages.
     """
 
     def __init__(
@@ -258,9 +273,18 @@ class HyperSweep(StatefulOperator):
         """
         del carrier
         state = state or SweepCarryState()
+        # Trial indices are GLOBAL across the cumulative trial stream
+        # (state.completed at entry), not stage-local. That keeps
+        # `SweepResult.trial_index` and `state.best_trial_index`
+        # meaningful when a HyperSweep is composed in Sequential and
+        # resumes from a non-zero `state.completed` (e.g. coarse →
+        # fine sweep stages). Fresh sweeps (state.completed == 0)
+        # see indices 0, 1, 2, … as before.
+        starting_count = state.completed
 
         results: list[SweepResult] = []
-        for trial_index, params in enumerate(self._iter_trials()):
+        for local_index, params in enumerate(self._iter_trials()):
+            global_index = starting_count + local_index
             loop = self.loop_template(dict(params))
             if not isinstance(loop, TrainingLoop):
                 raise TypeError(
@@ -268,7 +292,7 @@ class HyperSweep(StatefulOperator):
                     f"TrainingLoop; got {type(loop).__name__}."
                 )
             trained_model_op, artifact = loop.run()
-            metric_value = self._extract_metric(artifact, trial_index, params)
+            metric_value = self._extract_metric(artifact, global_index, params)
 
             result = SweepResult(
                 params=dict(params),
@@ -276,7 +300,7 @@ class HyperSweep(StatefulOperator):
                 artifact=artifact,
                 final_metric=metric_value,
                 sweep_id=self.sweep_id,
-                trial_index=trial_index,
+                trial_index=global_index,
             )
             results.append(result)
 
@@ -286,7 +310,7 @@ class HyperSweep(StatefulOperator):
                 metric_value, state.best_metric
             ):
                 state.best_metric = metric_value
-                state.best_trial_index = trial_index
+                state.best_trial_index = global_index
 
             if self.on_trial is not None:
                 self.on_trial(result, state)
