@@ -76,7 +76,10 @@ def array_namespace(*xs: Any) -> Any:
     for x in xs:
         ns = getattr(x, "__array_namespace__", None)
         if ns is None:
-            continue
+            raise TypeError(
+                f"Input of type {type(x).__name__!r} does not implement "
+                f"the Array API (`__array_namespace__` missing). " + _NO_BACKEND_MSG
+            )
         namespaces.add(ns())
     if len(namespaces) == 0:
         raise TypeError(_NO_BACKEND_MSG)

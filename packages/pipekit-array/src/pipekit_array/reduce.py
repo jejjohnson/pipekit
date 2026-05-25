@@ -54,12 +54,22 @@ class MeanScalar(Operator):
 
         input_sig: Signature = input_signature
         n_dims = len(input_sig.dims)
+
+        def _validate(axis: int) -> int:
+            """Return positive axis index; raise on out-of-range."""
+            if n_dims == 0 or axis < -n_dims or axis >= n_dims:
+                raise ValueError(
+                    f"MeanScalar.axis={axis!r} is out of range for input "
+                    f"signature with {n_dims} dim(s); xp.mean would raise."
+                )
+            return axis % n_dims
+
         if self.axis is None:
             axes_to_reduce: tuple[int, ...] = tuple(range(n_dims))
         elif isinstance(self.axis, int):
-            axes_to_reduce = (self.axis % n_dims,) if n_dims else ()
+            axes_to_reduce = (_validate(self.axis),)
         else:
-            axes_to_reduce = tuple(a % n_dims for a in self.axis) if n_dims else ()
+            axes_to_reduce = tuple(_validate(a) for a in self.axis)
 
         if self.keepdims:
             new_dims = tuple(

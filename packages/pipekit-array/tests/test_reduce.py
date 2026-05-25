@@ -80,3 +80,21 @@ def test_mean_scalar_compute_output_signature_keepdims():
 
 def test_mean_scalar_compute_output_signature_none_input():
     assert MeanScalar().compute_output_signature(None) is None
+
+
+def test_mean_scalar_compute_output_signature_out_of_range_int_axis():
+    sig = Signature(dims=(("y", 256), ("x", 256)), dtype="float32")
+    with pytest.raises(ValueError, match="out of range"):
+        MeanScalar(axis=3).compute_output_signature(sig)
+
+
+def test_mean_scalar_compute_output_signature_out_of_range_negative_axis():
+    sig = Signature(dims=(("band", 3), ("y", 256), ("x", 256)), dtype="float32")
+    with pytest.raises(ValueError, match="out of range"):
+        MeanScalar(axis=-4).compute_output_signature(sig)
+
+
+def test_mean_scalar_compute_output_signature_out_of_range_tuple_axis():
+    sig = Signature(dims=(("y", 256), ("x", 256)), dtype="float32")
+    with pytest.raises(ValueError, match="out of range"):
+        MeanScalar(axis=(0, 5)).compute_output_signature(sig)

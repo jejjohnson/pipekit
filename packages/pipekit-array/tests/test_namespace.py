@@ -35,3 +35,14 @@ def test_array_namespace_mixed_backends_raises():
     x_jax = jnp.array([1.0, 2.0])
     with pytest.raises(TypeError, match="multiple Array API backends"):
         array_namespace(x_np, x_jax)
+
+
+def test_array_namespace_non_array_among_arrays_raises(backend, make_array):
+    """A non-array input alongside a real array must raise, not be ignored.
+
+    Regression: the non-compat fallback used to silently skip inputs
+    without `__array_namespace__`, masking type bugs at the boundary.
+    """
+    x = make_array(backend, shape=(4,), seed=0)
+    with pytest.raises(TypeError):
+        array_namespace(x, "not an array")
