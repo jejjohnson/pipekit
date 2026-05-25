@@ -34,10 +34,10 @@ from pipekit_train import (
     TrainingLoop,
 )
 from pipekit_train.adapters.equinox import (
+    EquinoxModelOp,
     TrainState,
     TrainTask,
     _build_optimizer,
-    _EquinoxModelOp,
     _SynthesisedTask,
     restore_state,
     save_state,
@@ -173,12 +173,12 @@ def test_save_restore_round_trip(tmp_path):
         np.testing.assert_array_almost_equal(a, b)
 
 
-# --- _EquinoxModelOp ------------------------------------------------------
+# --- EquinoxModelOp ------------------------------------------------------
 
 
 def test_equinox_model_op_wraps_and_forwards():
     module = _toy_mlp(jax.random.key(0))
-    op = _EquinoxModelOp(module)
+    op = EquinoxModelOp(module)
     x = jnp.array([0.5], dtype=jnp.float32)
     out = op(x)
     expected = module(x)
@@ -189,7 +189,7 @@ def test_equinox_model_op_wraps_and_forwards():
 
 def test_equinox_model_op_rejects_non_module():
     with pytest.raises(TypeError, match=r"eqx\.Module"):
-        _EquinoxModelOp(module="not an eqx.Module")  # type: ignore[arg-type]
+        EquinoxModelOp(module="not an eqx.Module")  # type: ignore[arg-type]
 
 
 # --- End-to-end run() — the headline test --------------------------------
@@ -203,7 +203,7 @@ def test_run_end_to_end_loss_decreases():
     """
     dataset = _synthetic_regression(n=128, seed=0)
     val_dataset = _synthetic_regression(n=32, seed=1)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
 
     written: list[tuple[int, dict[str, float]]] = []
 
@@ -231,7 +231,7 @@ def test_run_end_to_end_loss_decreases():
 
     trained_op, artifact = loop.run()
 
-    assert isinstance(trained_op, _EquinoxModelOp)
+    assert isinstance(trained_op, EquinoxModelOp)
 
     # The metric writer captured per-step metrics; verify the loss
     # decreased.
@@ -257,7 +257,7 @@ def test_run_with_early_stopping_breaks_early():
     """EarlyStopping with patience=1 and a fixed val_loss → stops on 2nd eval."""
     dataset = _synthetic_regression(n=64, seed=0)
     val_dataset = _synthetic_regression(n=16, seed=1)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
 
     es = EarlyStopping(metric="mse", patience=1, mode="min", min_delta=10.0)
 
@@ -308,7 +308,7 @@ def test_run_with_callbacks_dispatches_lifecycle():
     """A custom recording callback receives all five hooks at the right times."""
     dataset = _synthetic_regression(n=32, seed=0)
     val_dataset = _synthetic_regression(n=8, seed=1)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
 
     events: list[str] = []
 
@@ -362,7 +362,7 @@ def test_run_with_callbacks_dispatches_lifecycle():
 def test_run_requires_loss_or_task():
     """No `loss` and no `task` → adapter raises a clear ValueError."""
     dataset = _synthetic_regression(n=8, seed=0)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
     loop = TrainingLoop(
         model_op=model_op,
         dataset=dataset,
@@ -380,21 +380,21 @@ def test_run_rejects_non_eqx_model_op():
 
     dataset = _synthetic_regression(n=8, seed=0)
     loop = TrainingLoop(
-        model_op=Const(7),  # Not an _EquinoxModelOp; no .module
+        model_op=Const(7),  # Not an EquinoxModelOp; no .module
         dataset=dataset,
         loss=MSE(),
         max_steps=2,
         batch_size=2,
         backend="equinox",
     )
-    with pytest.raises(TypeError, match="_EquinoxModelOp"):
+    with pytest.raises(TypeError, match="EquinoxModelOp"):
         loop.run()
 
 
 def test_run_user_supplied_task():
     """A custom TrainTask bypasses the auto-synthesised path."""
     dataset = _synthetic_regression(n=32, seed=0)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
 
     class _MyTask:
         def loss_fn(self, model: eqx.Module, batch: Any, key: jax.Array):
@@ -424,7 +424,7 @@ def test_run_user_supplied_task():
 
 def test_run_does_not_produce_nan():
     dataset = _synthetic_regression(n=32, seed=0)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
     loop = TrainingLoop(
         model_op=model_op,
         dataset=dataset,
@@ -446,7 +446,7 @@ def test_run_does_not_produce_nan():
 
 def test_run_with_jsonl_writer_writes_records(tmp_path):
     dataset = _synthetic_regression(n=32, seed=0)
-    model_op = _EquinoxModelOp(_toy_mlp(jax.random.key(0)))
+    model_op = EquinoxModelOp(_toy_mlp(jax.random.key(0)))
     out = tmp_path / "metrics.jsonl"
     loop = TrainingLoop(
         model_op=model_op,
@@ -501,7 +501,7 @@ def test_indexable_dataset_smaller_than_batch_size_raises():
 
     tiny = _TinyIndexed()
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
         dataset=tiny,
         loss=MSE(),
         max_steps=5,
@@ -520,7 +520,7 @@ def test_synthesised_task_reduces_non_scalar_loss():
     """
     dataset = _synthetic_regression(n=32, seed=0)
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
         dataset=dataset,
         loss=MSE(reduction="none"),  # returns per-element squared error
         optimizer_config={"name": "adam", "learning_rate": 1e-2},
@@ -541,7 +541,7 @@ def test_run_carry_state_step_matches_actual_final_step():
     """
     dataset = _synthetic_regression(n=32, seed=0)
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
         dataset=dataset,
         loss=MSE(),
         optimizer_config={"name": "adam", "learning_rate": 1e-2},

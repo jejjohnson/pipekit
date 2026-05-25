@@ -28,7 +28,7 @@ import jax
 from pipekit import Operator
 from pipekit_cycle import Cycle, NeuralForward
 from pipekit_train import MSE, SimulationDataset, TrainingLoop
-from pipekit_train.adapters.equinox import _EquinoxModelOp
+from pipekit_train.adapters.equinox import EquinoxModelOp
 
 
 # ---------------------------------------------------------------------
@@ -101,7 +101,7 @@ def test_simulation_dataset_train_emulator_handoff_into_cycle():
         depth=2,
         key=jax.random.key(0),
     )
-    emulator_op = _EquinoxModelOp(mlp)
+    emulator_op = EquinoxModelOp(mlp)
 
     # 4. Train.
     loop = TrainingLoop(
@@ -156,7 +156,7 @@ def test_trained_emulator_round_trips_through_neural_forward_dt():
         n_samples=64,
         seed=0,
     )
-    emulator_op = _EquinoxModelOp(
+    emulator_op = EquinoxModelOp(
         eqx.nn.MLP(2, 2, width_size=8, depth=2, key=jax.random.key(0))
     )
     loop = TrainingLoop(

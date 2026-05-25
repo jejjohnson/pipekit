@@ -46,7 +46,7 @@ from pipekit_train import (
     SimulationDataset,
     TrainingLoop,
 )
-from pipekit_train.adapters.equinox import _EquinoxModelOp
+from pipekit_train.adapters.equinox import EquinoxModelOp
 
 
 # ---------------------------------------------------------------------
@@ -87,8 +87,15 @@ def _toy_mlp(in_size: int, out_size: int, key: int = 0) -> eqx.nn.MLP:
     )
 
 
-def _first_and_last_loss(loop: TrainingLoop) -> tuple[float, float]:
-    """Run loop with a capturing writer, return (first, last) MSE values."""
+def _run_with_captured_losses(
+    loop: TrainingLoop,
+) -> tuple[float, float, Operator, Any]:
+    """Run loop once with a capturing writer.
+
+    Returns ``(first_mse, last_mse, trained_op, artifact)`` so each
+    smoke test trains exactly once — JAX compilation is expensive
+    enough that we don't want to pay for it twice per test.
+    """
     written: list[dict[str, float]] = []
 
     class _Capture:
@@ -99,9 +106,9 @@ def _first_and_last_loss(loop: TrainingLoop) -> tuple[float, float]:
             pass
 
     loop.metric_writer = _Capture()
-    loop.run()
+    trained_op, artifact = loop.run()
     assert written, "no metrics were captured — loop didn't log"
-    return written[0]["mse"], written[-1]["mse"]
+    return written[0]["mse"], written[-1]["mse"], trained_op, artifact
 
 
 # ---------------------------------------------------------------------
@@ -123,7 +130,7 @@ def test_direct_supervised_smoke():
     )
 
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(in_size=4, out_size=1)),
+        model_op=EquinoxModelOp(_toy_mlp(in_size=4, out_size=1)),
         dataset=dataset,
         loss=MSE(),
         optimizer_config={"name": "adam", "lr": 1e-2},
@@ -133,7 +140,7 @@ def test_direct_supervised_smoke():
         backend="equinox",
         seed=42,
     )
-    first, last = _first_and_last_loss(loop)
+    first, last, _, _ = _run_with_captured_losses(loop)
     assert last < first * 0.5, (
         f"direct-supervised loss should drop ≥50%; first={first}, last={last}"
     )
@@ -157,7 +164,7 @@ def test_emulator_training_smoke():
     )
 
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(in_size=2, out_size=2)),
+        model_op=EquinoxModelOp(_toy_mlp(in_size=2, out_size=2)),
         dataset=sim_ds,
         loss=MSE(),
         optimizer_config={"name": "adam", "lr": 1e-2},
@@ -167,13 +174,13 @@ def test_emulator_training_smoke():
         backend="equinox",
         seed=0,
     )
-    first, last = _first_and_last_loss(loop)
+    first, last, trained_op, _ = _run_with_captured_losses(loop)
     assert last < first * 0.5, (
         f"emulator MSE should drop ≥50%; first={first}, last={last}"
     )
 
-    # Drop the trained emulator into NeuralForward.
-    trained_op, _ = loop.run()
+    # Drop the trained emulator into NeuralForward (single run; no
+    # need to re-train just to retrieve the operator).
     fwd = NeuralForward(model_op=trained_op, dt=_ToyForward.dt)
     state0 = np.array([1.0, 0.0], dtype=np.float32)
     state1 = fwd.step(state0, dt=_ToyForward.dt)
@@ -226,7 +233,7 @@ def test_amortized_inference_smoke():
     inverse_ds = _Flipped(sbi_ds)
 
     loop = TrainingLoop(
-        model_op=_EquinoxModelOp(_toy_mlp(in_size=2, out_size=2)),
+        model_op=EquinoxModelOp(_toy_mlp(in_size=2, out_size=2)),
         dataset=inverse_ds,
         loss=MSE(),
         optimizer_config={"name": "adam", "lr": 1e-2},
@@ -236,7 +243,7 @@ def test_amortized_inference_smoke():
         backend="equinox",
         seed=0,
     )
-    first, last = _first_and_last_loss(loop)
+    first, last, trained_op, _ = _run_with_captured_losses(loop)
     # SBI-shape inverse problem; assert improvement (not the strong
     # 50% drop — inverse problems are harder).
     assert last < first, (
@@ -244,8 +251,8 @@ def test_amortized_inference_smoke():
     )
 
     # Pull a posterior sample: the trained inverse network maps
-    # an observation to predicted params.
-    trained_op, _ = loop.run()
+    # an observation to predicted params. Reuse the single-run
+    # trained_op rather than retraining.
     obs = jnp.array([1.0, 0.0], dtype=jnp.float32)
     params_pred = trained_op(obs)
     assert params_pred.shape == (2,)
