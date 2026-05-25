@@ -1,0 +1,39 @@
+[project]
+name = "pipekit-train"
+version = "0.0.1"
+description = "Training pipelines for emulators and amortized inference — thin orchestration over Lightning, Equinox+Optax, and Keras 3."
+authors = [
+    {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
+]
+license = { file = "../../LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = ["Development Status :: 1 - Planning"]
+dependencies = ["pipekit"]
+
+[project.optional-dependencies]
+# Backend training tools — pick one per training run.
+equinox   = [
+    "equinox>=0.11",
+    "optax>=0.2",
+    "jax>=0.4.30",
+    "grain>=0.2",
+    "orbax-checkpoint>=0.6",
+    "jaxtyping>=0.2",
+]
+lightning = ["lightning>=2.4", "torch>=2.0"]
+keras     = ["keras>=3.0"]
+
+# Data sources.
+catalog   = ["geocatalog>=0.1"]
+cycle     = ["pipekit-cycle"]
+
+# Reproducibility + tracker integration.
+experiment = ["pipekit-experiment"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pipekit_train"]
