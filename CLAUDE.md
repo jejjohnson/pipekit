@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pipekit` is a uv workspace of six Python packages that together
+`pipekit` is a uv workspace of seven Python packages that together
 provide a carrier-agnostic operator-graph framework for composable
 scientific pipelines. Built with Python 3.12+, uv, pytest, and MkDocs.
 
@@ -17,7 +17,8 @@ The packages, in dependency order:
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
 | `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units. Planned, not implemented.                  |
-| `pipekit-train`      | scaffolded    | Training pipelines + backend adapters. Design at `packages/pipekit-train/docs/design/`. |
+| `pipekit-train`      | implemented   | Training pipelines + Equinox adapter. Design at `packages/pipekit-train/docs/design/`. |
+| `pipekit-jax`        | implemented   | `JaxModelOp` — eqx.Module wrapper with weight-blob round-trip through `ModelRegistry`. |
 
 The master plan lives in
 [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):

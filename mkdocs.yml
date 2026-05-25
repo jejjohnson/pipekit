@@ -38,6 +38,7 @@ plugins:
             - packages/pipekit-experiment/src
             - packages/pipekit-evaluate/src
             - packages/pipekit-train/src
+            - packages/pipekit-jax/src
           options:
             docstring_style: google
             show_source: true
@@ -53,6 +54,7 @@ nav:
       - pipekit-cycle: api/pipekit-cycle.md
       - pipekit-experiment: api/pipekit-experiment.md
       - pipekit-train: api/pipekit-train.md
+      - pipekit-jax: api/pipekit-jax.md
   - Notebooks:
       - Quickstart (MLP regression): notebooks/pipekit_train_quickstart.ipynb
       - Cycle handoff (emulator → forecast): notebooks/pipekit_train_cycle_handoff.ipynb

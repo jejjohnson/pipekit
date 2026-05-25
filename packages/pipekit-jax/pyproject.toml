@@ -1,0 +1,24 @@
+[project]
+name = "pipekit-jax"
+version = "0.0.1"
+description = "JAX / Equinox carrier integration for pipekit — JaxModelOp with weight-blob round-trip through ModelRegistry."
+authors = [
+    {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
+]
+license = { file = "../../LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = ["Development Status :: 3 - Alpha"]
+dependencies = [
+    "pipekit",
+    "equinox>=0.11",
+    "jax>=0.4.30",
+    "jaxtyping>=0.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pipekit_jax"]

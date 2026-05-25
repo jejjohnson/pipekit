@@ -81,6 +81,17 @@
       "extra-files": [
         "src/pipekit_train/__init__.py"
       ]
+    },
+    "packages/pipekit-jax": {
+      "release-type": "python",
+      "package-name": "pipekit-jax",
+      "component": "pipekit-jax",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_jax/__init__.py"
+      ]
     }
   }
 }
