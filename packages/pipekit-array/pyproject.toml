@@ -17,6 +17,9 @@ jax = ["jax>=0.4.20"]
 torch = ["torch>=2.0"]
 cupy = ["cupy>=13"]
 dask = ["dask[array]>=2024"]
+compat = [
+    "array-api-compat>=1.4",
+]
 
 [build-system]
 requires = ["hatchling"]
