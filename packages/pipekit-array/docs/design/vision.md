@@ -42,8 +42,12 @@ is the thing on the other side.
 A thin, dependency-light library: **pipekit-array depends on pipekit
 and nothing else by default.** Backends are extras-gated
 (`pipekit-array[numpy]`, `[jax]`, `[torch]`, `[cupy]`, `[dask]`).
-Operators raise a clear `ImportError` at construction time if no
-Array-API-conforming backend is installed.
+Backend availability is determined at *call* time from the input:
+`array_namespace(x)` raises `TypeError` if `x` doesn't implement
+`__array_namespace__` (i.e. no Array-API-conforming backend is
+installed for the input's type). Operators themselves construct
+without needing any backend — that's the whole point of dispatching
+on the input.
 
 Three conceptual layers, all on top of `pipekit.Operator`:
 

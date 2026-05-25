@@ -224,10 +224,23 @@ They inherit:
 - **Composition** — `|` operator chains them into `Sequential`;
   `Graph` nodes accept them; `Fanout` parallel-maps them.
 - **YAML round-trip** — `dumps(op)` / `loads(yaml)` serialises via
-  `get_config()`. Same content-hashing as the core. No
-  `forbid_in_yaml: ClassVar[bool] = True` needed for the v0.1
-  operators — none carry user closures (the closest, `ApplyToBands`,
-  takes an `inner: Operator` which is itself round-trippable).
+  `get_config()`. Same content-hashing as the core. Most v0.1
+  operators round-trip cleanly because they don't carry user state;
+  the two exceptions are flagged with
+  `forbid_in_yaml: ClassVar[bool] = True`:
+  - `ModelOp` — wraps an opaque trained-model object that isn't
+    YAML-serialisable. The model is the artifact; the config
+    captures only the call shape (see `api/inference.md`).
+  - The per-tap operators returned by `Histogram.at(key)` — they
+    close over the controller instance, which is interactive state.
+    The captures dict is the artifact, not the config.
+
+  All other v0.1 operators (`ApplyToBands`, `StackAlong`,
+  `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchedMap`, and
+  the QC family) round-trip cleanly. `ApplyToBands` and `BatchedMap`
+  take an `inner: Operator` which is itself round-trippable, so the
+  recursion bottoms out cleanly unless `inner` is a flagged
+  operator.
 - **Signatures** — operators may override
   `compute_output_signature(input_sig: Signature) -> Signature | None`
   for `Sequential.summary` to print shape info. Operators that

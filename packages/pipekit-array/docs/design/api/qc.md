@@ -44,10 +44,15 @@ out = pipe | checked  # raises if pipe(x) drifts from gold
 **Contract:**
 
 - `_apply(x)`:
-  1. `xp = array_namespace(x, self.reference)` (asserts same backend
-     and converts mismatches to errors).
-  2. Compute `delta = xp.abs(x - self.reference)`.
-  3. Compute `tol = self.atol + self.rtol * xp.abs(self.reference)`.
+  1. `xp = array_namespace(x)` — dispatch on the *input's* backend.
+     The stored `self.reference` is always rehydrated as a numpy
+     array (see `get_config()` below); we adapt it to the input's
+     backend on every call via `ref = xp.asarray(self.reference)`.
+     This handles the asymmetry where the operator is YAML-loaded
+     with a numpy reference but applied to JAX / torch / CuPy
+     inputs.
+  2. Compute `delta = xp.abs(x - ref)`.
+  3. Compute `tol = self.atol + self.rtol * xp.abs(ref)`.
   4. If `xp.any(delta > tol)`: dispatch per `on_fail`.
   5. Return `x` unchanged.
 
@@ -55,16 +60,23 @@ out = pipe | checked  # raises if pipe(x) drifts from gold
 
 ```python
 {
-    # The reference array is a numpy-shaped artifact. We serialise
-    # it as base64 of the array's bytes, plus shape/dtype, so YAML
-    # round-trips. Same pattern as TrainingDataset's content-hash
-    # serialisation; spelled out in implementation phase C.
+    # The reference is always a numpy-shaped artifact in the
+    # serialised form, regardless of what backend produced it at
+    # capture time. We base64-encode the array's bytes plus shape /
+    # dtype so YAML round-trips. At load time the reference is
+    # reconstructed as a numpy array; `_apply` then converts it to
+    # the input's backend via `xp.asarray` on every call.
     "reference": {"data": b64, "shape": list(ref.shape), "dtype": str(ref.dtype)},
     "atol": self.atol,
     "rtol": self.rtol,
     "on_fail": self.on_fail,
 }
 ```
+
+The cross-backend conversion via `xp.asarray(numpy_ref)` is a
+documented zero-copy fast path on every supported backend (JAX,
+torch, CuPy all consume numpy in `asarray` without copying when the
+dtypes match and the data is host-resident).
 
 **Use case:** regression tests for pipelines. The reference is
 captured once (during the trusted run); subsequent runs diff against

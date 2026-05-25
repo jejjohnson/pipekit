@@ -83,7 +83,11 @@ out = StackAlong(axis=0)([arr_a, arr_b, arr_c])  # shape (3, H, W)
 ## `ConcatenateAlong(axis: int = 0)`
 
 Concatenate a list-of-arrays along an existing axis. Thin wrapper
-over `xp.concatenate`.
+over `xp.concat` (the [Array API standard][api-concat] name; numpy
+also exposes it as `concat` from 2.0+ alongside the legacy
+`concatenate` alias).
+
+[api-concat]: https://data-apis.org/array-api/latest/API_specification/generated/array_api.concat.html
 
 ```python
 out = ConcatenateAlong(axis=0)([arr_a, arr_b])  # shape (2*N, H, W) if axis=0
@@ -93,13 +97,13 @@ out = ConcatenateAlong(axis=0)([arr_a, arr_b])  # shape (2*N, H, W) if axis=0
 
 - Input: a `list`/`tuple` of arrays; all the same shape *except*
   along `axis`; all the same backend.
-- Output: a single array; `xp.concatenate(xs, axis=axis)`.
+- Output: a single array; `xp.concat(xs, axis=axis)`.
 
 **`get_config()`:** `{"axis": self.axis}`.
 
 **Distinction from `StackAlong`:** `StackAlong` *adds* a new axis;
 `ConcatenateAlong` joins along an *existing* axis. Same as numpy's
-`stack` vs `concatenate`.
+`stack` vs `concat`.
 
 ---
 
@@ -151,45 +155,68 @@ hist.report()  # {"post_subsample": (counts, edges)}
   returns a small `_HistAt(Operator)` that:
   1. Calls `array_namespace(x)`, gets `xp`.
   2. Flattens via `xp.reshape(x, (-1,))`.
-  3. Computes `xp.histogram(flat, bins=self.bins, range=self.range)`.
+  3. Computes bin counts via `xp.searchsorted(edges, flat) - 1`
+     followed by a per-bin `xp.sum(indices == i)`. Edges are
+     pre-computed once per `Histogram` controller from `bins` and
+     `range`. Both `xp.searchsorted` and `xp.sum` are in the
+     [Array API standard][api-search]; no histogram primitive is
+     needed.
   4. Stores `(counts, edges)` under `key` in the controller's
-     `captures` dict.
+     `captures` dict. Counts and edges are stored as whatever the
+     backend produced (e.g. `jax.Array` from a JAX input); the user
+     calls `np.asarray(counts)` at inspection time if they want
+     plain numpy.
   5. Returns `x` unchanged (it's a `Tap`-shaped operator).
 - `Histogram.report()` returns the captures dict (a shallow copy).
 
-**`get_config()`** (on `_HistAt`): `{"key": self.key}`. The
-controller itself isn't serialised — it's an interactive object.
+[api-search]: https://data-apis.org/array-api/latest/API_specification/generated/array_api.searchsorted.html
 
-**Per-backend note:** `xp.histogram` is in the Array API spec.
-torch's `torch.histogram` has a subtly different signature
-(separate `density=` kwarg vs return-shape); use
-`array-api-compat`'s wrapper if running on torch < 2.4. Documented
-in the operator's docstring.
+**`get_config()`** (on `_HistAt`): `{"key": self.key}`. The
+controller itself isn't serialised — it's an interactive object,
+and `_HistAt` carries `forbid_in_yaml = True` because it closes over
+the controller (see `architecture.md` §5).
+
+**Per-backend note:** `xp.histogram` is **not** in the Array API
+spec, so the implementation uses `xp.searchsorted` + `xp.sum` per
+bin (both spec-conformant). The performance is O(n_bins) bin passes
+over the array instead of one optimised numpy `np.histogram` call;
+acceptable for the inspection / debugging use case the controller
+serves. If the use case grows beyond inspection (large-N online
+statistics), see Q4 in `boundaries.md` for the streaming-counters
+upgrade path.
 
 ---
 
-## `MeanScalar(axis: int | tuple[int, ...] | None = None, dtype: str | None = None)`
+## `MeanScalar(axis: int | tuple[int, ...] | None = None, keepdims: bool = False)`
 
 Reduce via `xp.mean`. Defaults to a full reduction (`axis=None`)
-yielding a scalar (`ndim == 0`). `dtype=None` preserves the input
-dtype.
+yielding a scalar (`ndim == 0`). Output dtype matches the input's
+floating dtype per the Array API `mean` contract — see the
+[spec][api-mean].
+
+[api-mean]: https://data-apis.org/array-api/latest/API_specification/generated/array_api.mean.html
 
 ```python
-out = MeanScalar()(image)             # scalar
+out = MeanScalar()(image)               # scalar
 out = MeanScalar(axis=(-2, -1))(image)  # per-band mean: shape (B,)
-out = MeanScalar(dtype="float64")(image)  # upcast
+out = MeanScalar(axis=0, keepdims=True)(image)  # shape (1, H, W)
 ```
 
 **Contract:**
 
 - `_apply(x)`: `xp = array_namespace(x); return xp.mean(x,
-  axis=self.axis)` (with `dtype=` if set, else `dtype=x.dtype`).
+  axis=self.axis, keepdims=self.keepdims)`. No `dtype=` kwarg — the
+  Array API `mean` signature only accepts `axis` and `keepdims`. To
+  upcast before reduction, compose with an `xp.astype` step in user
+  code or wait for a v0.2 `Astype` operator (Q7 of `boundaries.md`).
 - Returns the backend's scalar / reduced-shape array.
 
-**`get_config()`:** `{"axis": self.axis, "dtype": self.dtype}`.
+**`get_config()`:** `{"axis": self.axis, "keepdims": self.keepdims}`.
 
 **`compute_output_signature(sig)`** : drops the reduced axes from
-`sig.dims`; if `axis=None`, returns `Signature(dims=(), dtype=...)`.
+`sig.dims` (or sets their size to 1 if `keepdims=True`); if
+`axis=None` and `keepdims=False`, returns `Signature(dims=(),
+dtype=sig.dtype)`.
 
 ---
 
@@ -209,7 +236,8 @@ out = BatchedMap(model_op, batch_size=32)(x)  # x.shape = (N, ...)
 - `_apply(x)`: compute `n = x.shape[axis]`; for each chunk
   `start, end` in `range(0, n, batch_size)`:
   `chunks.append(inner(xp.take(x, range(start, end), axis=axis)))`.
-  Return `xp.concatenate(chunks, axis=axis)`.
+  Return `xp.concat(chunks, axis=axis)` (the [Array API standard][api-concat]
+  name; see `ConcatenateAlong` above).
 - `inner` must return arrays of the same shape minus the split-axis
   size (i.e. `inner` may change axis-0 length per chunk only via
   the chunk slice; `concatenate` re-aligns).

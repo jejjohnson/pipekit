@@ -126,8 +126,11 @@ The v0.1 implementation PR(s) close on:
   conftest `_make_array(backend, ...)` fixture).
 - [ ] `cupy` and `dask` exercised by opt-in `make test-cupy` /
   `make test-dask` targets — not in the core CI matrix.
-- [ ] All operators YAML round-trip (`dumps(op) → loads`); content
-  hash stable across runs.
+- [ ] All YAML-eligible operators round-trip (`dumps(op) → loads`);
+  content hash stable across runs. `ModelOp` and the per-tap
+  operators returned by `Histogram.at(key)` are flagged with
+  `forbid_in_yaml = True` and are excluded from this check — see
+  `architecture.md` §5 for the rationale.
 - [ ] Workspace pre-commit gates pass with `[numpy]` installed
   (the default-CI shape).
 - [ ] API docs published at `docs/api/pipekit-array.md` next to the

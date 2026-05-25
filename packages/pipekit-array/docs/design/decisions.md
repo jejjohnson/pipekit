@@ -193,16 +193,22 @@ class differs by backend.
 
 For reference, the extras shape that drops out of these decisions:
 
-| Extra      | Pins                              | Why                                          |
-| ---------- | --------------------------------- | -------------------------------------------- |
-| `[numpy]`  | `numpy>=2.0`                      | Array API conformance landed in numpy 2.0    |
-| `[jax]`    | `jax>=0.4.20`                     | Array API conformance landed in jax 0.4.20   |
-| `[torch]`  | `torch>=2.0`                      | Array API namespace in torch 2.0+            |
-| `[cupy]`   | `cupy>=13`                        | Array API conformance from cupy 13           |
-| `[dask]`   | `dask[array]>=2024`               | Partial conformance; lazy                    |
-| `[compat]` | `array-api-compat>=1.4`           | Optional shim for older / partial backends   |
+| Extra        | Pins                    | Why                                                   |
+| ------------ | ----------------------- | ----------------------------------------------------- |
+| `[numpy]`    | `numpy>=2.0`            | Array API conformance landed in numpy 2.0             |
+| `[jax]`      | `jax>=0.4.20`           | Array API conformance landed in jax 0.4.20            |
+| `[torch]`    | `torch>=2.0`            | Array API namespace in torch 2.0+                     |
+| `[cupy]`     | `cupy>=13`              | Array API conformance from cupy 13                    |
+| `[dask]`     | `dask[array]>=2024`     | Partial conformance; lazy                             |
+| `[compat]` *(proposed, v0.2)* | `array-api-compat>=1.4` | Optional shim for older / partial backends — not yet wired in `pyproject.toml`; lands with the v0.1 impl PRs |
 
-The default install (`pip install pipekit-array`) brings nothing —
-operators raise `ImportError` until at least one backend is
-installed. The recommended user install is
-`pipekit-array[numpy]`.
+The first five extras already exist in `packages/pipekit-array/pyproject.toml`.
+The `[compat]` extra is a v0.2-proposed addition that the v0.1
+implementation PRs will introduce alongside the `_namespace.py`
+shim's `array_api_compat` fallback (see `architecture.md` §4).
+
+The default install (`pip install pipekit-array`) brings nothing.
+Backend availability is determined at call time via
+`array_namespace(x)`: if the input doesn't implement the Array API,
+`TypeError` is raised at call time, *not* at construction. The
+recommended user install is `pipekit-array[numpy]`.
