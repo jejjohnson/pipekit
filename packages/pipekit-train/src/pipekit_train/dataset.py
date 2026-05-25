@@ -344,12 +344,13 @@ class SimulationDataset(TrainingDataset):
 
 
 class CachedDataset(TrainingDataset):
-    """Disk-backed cache around any `TrainingDataset`.
+    """Disk- or cloud-backed cache around any `TrainingDataset`.
 
     First epoch hits the source and writes to ``cache_dir``. Subsequent
-    epochs read from disk. Cache is keyed on ``source.content_hash()``
-    so cache files are reused across runs as long as the source's
-    config and seed haven't changed.
+    epochs read from the cache. Cache is keyed on ``source.content_hash()``
+    so cache files are reused across runs (and across machines when
+    ``cache_dir`` is an fsspec URI) as long as the source's config and
+    seed haven't changed.
 
     Args:
         source: The wrapped `TrainingDataset`. Must be indexable
@@ -357,19 +358,22 @@ class CachedDataset(TrainingDataset):
             into a fixed-shape zarr store, which requires up-front
             knowledge of the dataset length. `IterableDataset` is not
             cacheable.
-        cache_dir: Local filesystem directory. Created on first write.
-            v0.1 supports local paths only; fsspec URIs (``s3://``,
-            ``gcs://``) are scheduled for v0.2 alongside an
-            ``fsspec``-backed zarr store.
-        format: Storage format. v0.1 ships ``"zarr"`` only;
+        cache_dir: Either a local filesystem directory **or** an
+            fsspec URI (``s3://bucket/prefix``, ``gcs://...``,
+            ``memory://...``, etc.). fsspec backends require the
+            optional ``[s3]`` extra (which pulls in ``fsspec`` and
+            ``s3fs``); other backends need their own fsspec drivers
+            (``gcsfs``, ``adlfs``, …). Created on first write.
+        format: Storage format. v0.2 ships ``"zarr"`` only;
             ``"parquet"`` and ``"tfrecord"`` raise NotImplementedError
-            and are scheduled for v0.2.
+            and are scheduled for v0.3.
 
     Raises:
         TypeError: if ``source`` doesn't provide ``__len__`` + ``__getitem__``.
-        NotImplementedError: if ``format`` is not ``"zarr"`` in v0.1.
+        NotImplementedError: if ``format`` is not ``"zarr"``.
         ImportError: lazily, if ``zarr`` is not installed when the
-            cache is first read or written.
+            cache is first read or written. fsspec backends also raise
+            ImportError lazily if their driver isn't installed.
 
     Notes:
         - The cache writes raw NumPy-compatible arrays. Non-array
@@ -406,8 +410,8 @@ class CachedDataset(TrainingDataset):
             )
         if format != "zarr":
             raise NotImplementedError(
-                f"CachedDataset format={format!r} is scheduled for v0.2. "
-                "Use format='zarr' for v0.1; see docs/design/api/datasets.md."
+                f"CachedDataset format={format!r} is scheduled for v0.3. "
+                "Use format='zarr'; see docs/design/api/datasets.md."
             )
         super().__init__(seed=source.seed, split=cast(Split, source.split))
         self.source = source
@@ -428,29 +432,73 @@ class CachedDataset(TrainingDataset):
 
     # --- cache layout --------------------------------------------------
 
+    @staticmethod
+    def _is_fsspec_uri(cache_dir: str) -> bool:
+        """Detect an fsspec URI (anything with a ``<scheme>://`` prefix).
+
+        Local paths return False even when prefixed with ``file://``
+        (we still route those through the local-store path; zarr's
+        LocalStore handles both shapes).
+        """
+        # ``re`` is in the stdlib; safer than parsing manually.
+        import re
+
+        match = re.match(r"^([a-zA-Z][a-zA-Z0-9+\-.]*)://", cache_dir)
+        if match is None:
+            return False
+        scheme = match.group(1)
+        return scheme != "file"
+
     def _cache_path(self) -> str:
-        return os.path.join(self.cache_dir, self.content_hash())
+        """Cache path for the current content hash.
+
+        Returns a string suitable for either ``os.path``-style local
+        operations OR fsspec URI routing — the latter case never
+        touches `os.path.join` (which would mangle the scheme).
+        """
+        h = self.content_hash()
+        if self._is_fsspec_uri(self.cache_dir):
+            # fsspec URIs use '/' separators universally regardless of OS.
+            base = self.cache_dir.rstrip("/")
+            return f"{base}/{h}"
+        return os.path.join(self.cache_dir, h)
+
+    def _open_zarr_root(self, mode: str) -> Any:
+        """Open the zarr root for the cache, picking the right store.
+
+        Local paths use zarr's default open (which auto-picks
+        `LocalStore`). fsspec URIs route through `zarr.storage.FsspecStore.from_url`,
+        which requires the relevant fsspec driver (`fsspec` for memory,
+        `s3fs` for s3, etc.) to be importable. ImportError is raised
+        lazily by zarr/fsspec if the driver isn't installed.
+        """
+        import zarr  # ty: ignore[unresolved-import]
+
+        path = self._cache_path()
+        if self._is_fsspec_uri(self.cache_dir):
+            store = zarr.storage.FsspecStore.from_url(path, read_only=(mode == "r"))
+            return cast(Any, zarr.open(store, mode=mode))
+        return cast(Any, zarr.open(path, mode=mode))
 
     def _materialised(self) -> bool:
         """Check whether the cache has already been written."""
         try:
-            import zarr  # ty: ignore[unresolved-import]
+            import zarr  # noqa: F401  # ty: ignore[unresolved-import]
         except ImportError:
             return False
-        path = self._cache_path()
-        # zarr's open auto-detects existing stores.
         try:
-            import zarr  # ty: ignore[unresolved-import]
-
-            root = zarr.open(path, mode="r")
+            root = self._open_zarr_root(mode="r")
         except (FileNotFoundError, KeyError, ValueError):
             return False
         return "x" in root and "y" in root
 
     def _materialise(self) -> None:
-        """Write the source into the zarr cache (first epoch)."""
+        """Write the source into the zarr cache (first epoch).
+
+        Works for both local paths and fsspec URIs — the zarr store
+        backend is chosen in `_open_zarr_root`.
+        """
         import numpy as np
-        import zarr  # ty: ignore[unresolved-import]
 
         # `self.source` is typed as TrainingDataset; the indexability
         # guard in __init__ means it also implements __len__/__getitem__.
@@ -469,9 +517,12 @@ class CachedDataset(TrainingDataset):
         first_x = np.asarray(first_x)
         first_y = np.asarray(first_y)
 
-        path = self._cache_path()
-        os.makedirs(path, exist_ok=True)
-        root = cast(Any, zarr.open(path, mode="w"))
+        # Local paths need the directory created on disk; fsspec
+        # backends create implicit "directories" on key write.
+        if not self._is_fsspec_uri(self.cache_dir):
+            os.makedirs(self._cache_path(), exist_ok=True)
+
+        root = self._open_zarr_root(mode="w")
         x_arr = root.create_array("x", shape=(n, *first_x.shape), dtype=first_x.dtype)
         y_arr = root.create_array("y", shape=(n, *first_y.shape), dtype=first_y.dtype)
         x_arr[0] = first_x
@@ -482,9 +533,7 @@ class CachedDataset(TrainingDataset):
             y_arr[i] = np.asarray(yi)
 
     def _open_cache(self) -> tuple[Any, Any]:
-        import zarr  # ty: ignore[unresolved-import]
-
-        root = cast(Any, zarr.open(self._cache_path(), mode="r"))
+        root = self._open_zarr_root(mode="r")
         return root["x"], root["y"]
 
     # --- iteration / indexing -----------------------------------------
@@ -509,17 +558,25 @@ class CachedDataset(TrainingDataset):
     # --- explicit invalidation ----------------------------------------
 
     def invalidate(self) -> None:
-        """Delete the cache directory (for the current content hash).
+        """Delete the cache for the current content hash.
 
         After calling this, the next iteration re-materialises from
         the source. Useful when the cache becomes corrupt or when
         you want to force a re-bake without changing source config.
+        Works for both local paths and fsspec URIs.
         """
-        import shutil
-
         path = self._cache_path()
-        if os.path.exists(path):
-            shutil.rmtree(path)
+        if self._is_fsspec_uri(self.cache_dir):
+            import fsspec  # ty: ignore[unresolved-import]
+
+            fs, fs_path = fsspec.core.url_to_fs(path)
+            if fs.exists(fs_path):
+                fs.rm(fs_path, recursive=True)
+        else:
+            import shutil
+
+            if os.path.exists(path):
+                shutil.rmtree(path)
 
     def get_config(self) -> dict[str, Any]:
         return {

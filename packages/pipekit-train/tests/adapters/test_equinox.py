@@ -160,7 +160,9 @@ def test_save_restore_round_trip(tmp_path):
     # Build a fresh state with the same structure (different weights),
     # restore the saved weights into it, verify equality.
     fresh = TrainState.create(_toy_mlp(jax.random.key(1)), optimizer)
-    restored = restore_state(mngr, fresh, step=0)
+    restored, data_iter_state = restore_state(mngr, fresh, step=0)
+    # No iterator side-car was written → data_iter_state is None.
+    assert data_iter_state is None
 
     # The restored model's weights should match the saved ones, not
     # the fresh template's weights.
@@ -553,3 +555,247 @@ def test_run_carry_state_step_matches_actual_final_step():
     _, final_state = loop._apply()
     backend_info = loop._last_backend_info
     assert final_state.step == int(backend_info["final_step"])
+
+
+def test_iterator_state_checkpoint_round_trip(tmp_path):
+    """Regression: #17 — train half the steps, checkpoint, resume into
+    a loop that *continues* training to completion. The model produced
+    by the resumed pipeline must be byte-identical to a single
+    uninterrupted run from step 0 — equality requires the iterator
+    state to round-trip (otherwise the resumed run sees different
+    batches in steps 5-10 from the reference run, leading to
+    different weights).
+
+    PR #24 copilot review caught that the original version of this
+    test set ``loop2.max_steps == restored state.step``, so the
+    second run never advanced and would have passed even with
+    iterator state ignored. The fixed version actually advances.
+    """
+    import jax
+    from pipekit_train import TrainingDataset
+
+    # Build a synthetic indexable dataset whose elements are tiny
+    # but each sample's value uniquely identifies it.
+    class _IndexedDataset(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __init__(self, n: int):
+            super().__init__()
+            self.n = n
+            # Identity inputs — easy to spot which samples were seen.
+            self.xs = np.arange(n, dtype=np.float32).reshape(-1, 1)
+            self.ys = (2.0 * self.xs + 1.0).astype(np.float32)
+
+        def __len__(self) -> int:
+            return self.n
+
+        def __getitem__(self, i: int):
+            return self.xs[i], self.ys[i]
+
+        def __iter__(self):
+            for i in range(self.n):
+                yield self.xs[i], self.ys[i]
+
+        def content_hash(self) -> str:
+            return f"indexed-n{self.n}"
+
+    dataset = _IndexedDataset(n=64)
+
+    common = dict(
+        dataset=dataset,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        batch_size=8,
+        backend="equinox",
+        seed=0,
+    )
+
+    # --- Reference: train 10 steps in one uninterrupted run --------
+    loop_ref = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        max_steps=10,
+        **common,
+    )
+    trained_ref, _ = loop_ref.run()
+
+    # --- Phase 1: train 5 steps, save checkpoint --------------------
+    ckpt_dir = tmp_path / "ckpt"
+    loop_phase1 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        max_steps=5,
+        callbacks=(
+            __import__("pipekit_train").Checkpoint(
+                every_n_steps=5, keep_last=1, save_dir=str(ckpt_dir)
+            ),
+        ),
+        checkpoint_dir=str(ckpt_dir),
+        **common,
+    )
+    _, art_phase1 = loop_phase1.run()
+    assert art_phase1.backend_info["final_step"] == 5
+
+    # The iterator-state side-car must exist.
+    side_car = ckpt_dir / "5" / "data_iter.json"
+    assert side_car.exists(), (
+        "iterator-state side-car not written — see save_state extension"
+    )
+
+    # --- Phase 2: fresh loop, max_steps=10, restores at step 5 and
+    # actually runs 5 more steps to reach step 10. -------------------
+    fresh_op = EquinoxModelOp(_toy_mlp(jax.random.key(999)))  # different weights
+    loop_phase2 = TrainingLoop(
+        model_op=fresh_op,
+        max_steps=10,  # ← advances beyond restored step=5
+        checkpoint_dir=str(ckpt_dir),
+        **common,
+    )
+    trained_resumed, art_phase2 = loop_phase2.run()
+    # Phase 2 actually advanced from 5 → 10 (not a no-op).
+    assert art_phase2.backend_info["final_step"] == 10
+
+    # The headline claim: resumed model == reference model, byte-
+    # identically. This holds only if the iterator state was restored
+    # correctly — otherwise Phase 2's steps 5-10 would see different
+    # batches than the reference's, and the weights would diverge.
+    x = jnp.array([0.3], dtype=jnp.float32)
+    y = jnp.array([0.7], dtype=jnp.float32)
+    np.testing.assert_array_almost_equal(trained_ref(x), trained_resumed(x), decimal=5)
+    np.testing.assert_array_almost_equal(trained_ref(y), trained_resumed(y), decimal=5)
+
+
+def test_finished_resume_does_not_construct_iterator(tmp_path):
+    """Regression: PR #24 P2 — resuming a checkpoint whose state.step
+    is already at max_steps must not construct the data iterator
+    (so a dataset smaller than batch_size doesn't fail with
+    ValueError on a no-op resume).
+    """
+    import jax
+    from pipekit_train import TrainingDataset
+
+    class _TinyIndexed(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __len__(self) -> int:
+            return 3  # smaller than the batch_size below
+
+        def __getitem__(self, i: int):
+            return (
+                np.array([float(i)], dtype=np.float32),
+                np.array([float(i) * 2], dtype=np.float32),
+            )
+
+        def __iter__(self):
+            for i in range(3):
+                yield self[i]
+
+        def content_hash(self) -> str:
+            return "tiny-3"
+
+    ckpt_dir = tmp_path / "ckpt"
+
+    # Phase 1: build a checkpoint at step 4 (dataset has only 3
+    # samples; uses a different big dataset to write a checkpoint).
+    big_ds = _synthetic_regression(n=64, seed=0)
+    loop_phase1 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=big_ds,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=4,
+        batch_size=8,
+        backend="equinox",
+        callbacks=(
+            __import__("pipekit_train").Checkpoint(
+                every_n_steps=4, keep_last=1, save_dir=str(ckpt_dir)
+            ),
+        ),
+        checkpoint_dir=str(ckpt_dir),
+        seed=0,
+    )
+    loop_phase1.run()
+
+    # Phase 2: same checkpoint_dir, finishing-shaped state (max_steps
+    # equals restored step). Tiny dataset with batch_size > len — this
+    # would crash if we built the iterator unconditionally.
+    loop_phase2 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=_TinyIndexed(),
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=4,  # restored step=4 → no-op loop
+        batch_size=8,  # > len(_TinyIndexed) = 3
+        backend="equinox",
+        checkpoint_dir=str(ckpt_dir),
+        seed=0,
+    )
+    # No exception even though len(dataset) < batch_size — the
+    # iterator is never constructed because state.step >= max_steps.
+    trained, artifact = loop_phase2.run()
+    assert artifact.backend_info["final_step"] == 4
+    assert isinstance(trained, EquinoxModelOp)
+
+
+def test_batch_source_streaming_get_state_is_none():
+    """BatchSource over an IterableDataset (no random access) has no
+    iterator state — get_state() returns None; set_state(None) no-ops."""
+    from pipekit_train.adapters.equinox import _BatchSource
+
+    streaming_ds = IterableDataset(
+        source=[(np.zeros(1), np.zeros(1))] * 4,
+        content_hash="streaming-smoke",
+    )
+    src = _BatchSource(streaming_ds, batch_size=2, seed=0)
+    assert src.get_state() is None
+    src.set_state(None)  # no-op
+    # And it still produces batches.
+    x, _y = src.next_batch()
+    assert x.shape == (2, 1)
+
+
+def test_batch_source_grain_get_state_is_dict():
+    """BatchSource over an indexable dataset returns a Grain state
+    dict from get_state() and round-trips through set_state()."""
+    from pipekit_train import TrainingDataset
+    from pipekit_train.adapters.equinox import _BatchSource
+
+    class _Tiny(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __init__(self):
+            super().__init__()
+
+        def __len__(self) -> int:
+            return 4
+
+        def __getitem__(self, i: int):
+            return np.array([i], dtype=np.float32), np.array([i * 2], dtype=np.float32)
+
+        def __iter__(self):
+            for i in range(4):
+                yield self[i]
+
+        def content_hash(self) -> str:
+            return "tiny"
+
+    src = _BatchSource(_Tiny(), batch_size=2, seed=0)
+    src.next_batch()
+    state = src.get_state()
+    assert isinstance(state, dict)
+    # Round-trip through json+base64 (mirrors the side-car path).
+    from pipekit_train.adapters.equinox import (
+        _jsonify_grain_state,
+        _unjsonify_grain_state,
+    )
+
+    serialized = _jsonify_grain_state(state)
+    deserialized = _unjsonify_grain_state(serialized)
+    src2 = _BatchSource(_Tiny(), batch_size=2, seed=0)
+    src2.set_state(deserialized)
+    # Both iterators should now yield identical batches.
+    a = src.next_batch()
+    b = src2.next_batch()
+    np.testing.assert_array_equal(np.asarray(a[0]), np.asarray(b[0]))
+    np.testing.assert_array_equal(np.asarray(a[1]), np.asarray(b[1]))
