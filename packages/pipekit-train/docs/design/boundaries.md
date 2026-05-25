@@ -134,10 +134,21 @@ the design as written; logged here for honesty.
   still satisfies the contract. The Protocol exists for static
   typing of the full hook surface; adapters dispatch via
   `getattr(cb, hook, None)`. See ADR D9.
-- **`CachedDataset` is local-filesystem only in v0.1.** Fsspec URIs
-  (`s3://`, `gcs://`) remain documented as the target, but the
-  v0.1 implementation rejects them — fsspec-backed zarr stores
-  land in v0.2 alongside the rest of the cache work.
+- **`CachedDataset` was local-filesystem only in v0.1.** Resolved
+  in v0.2 — `CachedDataset` now detects fsspec URIs (`s3://`,
+  `gcs://`, `memory://`, …) and routes through
+  `zarr.storage.FsspecStore`. The corresponding `[s3]` / `[gcs]`
+  extras pin `fsspec` + the relevant protocol driver. Other
+  backends (HTTP, ADLS, …) work with any installed fsspec driver.
+- **Iterator-state checkpointing** — v0.2 ships a JSON side-car
+  written next to each Orbax checkpoint
+  (`<checkpoint_dir>/<step>/data_iter.json`) carrying the Grain
+  iterator's `get_state()`. `restore_state` reads it; the data
+  stream resumes byte-identically. The full Orbax
+  `CompositeCheckpointHandler` integration (using
+  `grain.checkpoint.CheckpointHandler`) is a v0.3 polish — the
+  side-car is simpler, compatible with Orbax's `StandardSave` /
+  `StandardRestore`, and equally byte-identical.
 - **Indexable iterator constraint** — `Equinox.run()` fails fast
   with a clear `ValueError` when `len(dataset) < batch_size` for
   the indexable path. With a fixed batch_size the JIT'd

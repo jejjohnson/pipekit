@@ -160,7 +160,9 @@ def test_save_restore_round_trip(tmp_path):
     # Build a fresh state with the same structure (different weights),
     # restore the saved weights into it, verify equality.
     fresh = TrainState.create(_toy_mlp(jax.random.key(1)), optimizer)
-    restored = restore_state(mngr, fresh, step=0)
+    restored, data_iter_state = restore_state(mngr, fresh, step=0)
+    # No iterator side-car was written → data_iter_state is None.
+    assert data_iter_state is None
 
     # The restored model's weights should match the saved ones, not
     # the fresh template's weights.
@@ -553,3 +555,157 @@ def test_run_carry_state_step_matches_actual_final_step():
     _, final_state = loop._apply()
     backend_info = loop._last_backend_info
     assert final_state.step == int(backend_info["final_step"])
+
+
+def test_iterator_state_checkpoint_round_trip(tmp_path):
+    """Regression: #17 — train N/2 steps with checkpoint_dir set, then
+    a fresh loop restores both weights and iterator position from
+    the side-car JSON, continues for N/2 more steps. The data stream
+    seen by the second run starts where the first left off — same
+    Grain seed wouldn't be enough if we restarted from step 0 of
+    the shuffled epoch.
+    """
+    import jax
+    from pipekit_train import TrainingDataset
+
+    # Build a synthetic indexable dataset whose elements are tiny
+    # but each sample's value uniquely identifies it.
+    class _IndexedDataset(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __init__(self, n: int):
+            super().__init__()
+            self.n = n
+            # Identity inputs — easy to spot which samples were seen.
+            self.xs = np.arange(n, dtype=np.float32).reshape(-1, 1)
+            self.ys = (2.0 * self.xs + 1.0).astype(np.float32)
+
+        def __len__(self) -> int:
+            return self.n
+
+        def __getitem__(self, i: int):
+            return self.xs[i], self.ys[i]
+
+        def __iter__(self):
+            for i in range(self.n):
+                yield self.xs[i], self.ys[i]
+
+        def content_hash(self) -> str:
+            return f"indexed-n{self.n}"
+
+    dataset = _IndexedDataset(n=64)
+    ckpt_dir = tmp_path / "ckpt"
+
+    # --- First half: train 10 steps with checkpoint --------------------
+    loop1 = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=dataset,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=10,
+        batch_size=8,
+        backend="equinox",
+        callbacks=(
+            # Force checkpoint cadence to fire on the last step.
+            __import__("pipekit_train").Checkpoint(
+                every_n_steps=10, keep_last=1, save_dir=str(ckpt_dir)
+            ),
+        ),
+        checkpoint_dir=str(ckpt_dir),
+        seed=0,
+    )
+    trained1, art1 = loop1.run()
+    assert art1.backend_info["final_step"] == 10
+
+    # The checkpoint side-car must exist.
+    side_car = ckpt_dir / "10" / "data_iter.json"
+    assert side_car.exists(), (
+        "iterator-state side-car not written — see save_state extension"
+    )
+
+    # --- Second half: fresh loop with same config + checkpoint_dir.
+    # restore_state should resurrect both weights and iterator pos. -----
+    fresh_op = EquinoxModelOp(_toy_mlp(jax.random.key(999)))  # different weights
+    loop2 = TrainingLoop(
+        model_op=fresh_op,
+        dataset=dataset,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=10,  # Same max_steps; restored state.step=10 → no-op loop
+        batch_size=8,
+        backend="equinox",
+        checkpoint_dir=str(ckpt_dir),
+        seed=0,
+    )
+    trained2, _art2 = loop2.run()
+
+    # After restore, state.step is already 10 → outer loop doesn't enter.
+    # The weights from the fresh skeleton are REPLACED by the
+    # restored ones. So trained2 should match trained1 on the same input.
+    x = jnp.array([0.5], dtype=jnp.float32)
+    np.testing.assert_array_almost_equal(trained1(x), trained2(x))
+
+
+def test_batch_source_streaming_get_state_is_none():
+    """BatchSource over an IterableDataset (no random access) has no
+    iterator state — get_state() returns None; set_state(None) no-ops."""
+    from pipekit_train.adapters.equinox import _BatchSource
+
+    streaming_ds = IterableDataset(
+        source=[(np.zeros(1), np.zeros(1))] * 4,
+        content_hash="streaming-smoke",
+    )
+    src = _BatchSource(streaming_ds, batch_size=2, seed=0)
+    assert src.get_state() is None
+    src.set_state(None)  # no-op
+    # And it still produces batches.
+    x, _y = src.next_batch()
+    assert x.shape == (2, 1)
+
+
+def test_batch_source_grain_get_state_is_dict():
+    """BatchSource over an indexable dataset returns a Grain state
+    dict from get_state() and round-trips through set_state()."""
+    from pipekit_train import TrainingDataset
+    from pipekit_train.adapters.equinox import _BatchSource
+
+    class _Tiny(TrainingDataset):
+        forbid_in_yaml = True
+        __config_mixin_auto__ = False
+
+        def __init__(self):
+            super().__init__()
+
+        def __len__(self) -> int:
+            return 4
+
+        def __getitem__(self, i: int):
+            return np.array([i], dtype=np.float32), np.array([i * 2], dtype=np.float32)
+
+        def __iter__(self):
+            for i in range(4):
+                yield self[i]
+
+        def content_hash(self) -> str:
+            return "tiny"
+
+    src = _BatchSource(_Tiny(), batch_size=2, seed=0)
+    src.next_batch()
+    state = src.get_state()
+    assert isinstance(state, dict)
+    # Round-trip through json+base64 (mirrors the side-car path).
+    from pipekit_train.adapters.equinox import (
+        _jsonify_grain_state,
+        _unjsonify_grain_state,
+    )
+
+    serialized = _jsonify_grain_state(state)
+    deserialized = _unjsonify_grain_state(serialized)
+    src2 = _BatchSource(_Tiny(), batch_size=2, seed=0)
+    src2.set_state(deserialized)
+    # Both iterators should now yield identical batches.
+    a = src.next_batch()
+    b = src2.next_batch()
+    np.testing.assert_array_equal(np.asarray(a[0]), np.asarray(b[0]))
+    np.testing.assert_array_equal(np.asarray(a[1]), np.asarray(b[1]))

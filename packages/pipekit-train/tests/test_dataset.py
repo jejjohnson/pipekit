@@ -324,5 +324,83 @@ def test_cached_dataset_unimplemented_formats(tmp_path):
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
     )
-    with pytest.raises(NotImplementedError, match=r"v0\.2"):
+    with pytest.raises(NotImplementedError, match=r"v0\.3"):
         CachedDataset(source=sim, cache_dir=str(tmp_path), format="parquet")
+
+
+# --- fsspec-backed CachedDataset (#18 — v0.2) -----------------------------
+
+
+def test_cached_dataset_is_fsspec_uri_detection():
+    """URI detection: scheme-prefixed paths route through fsspec;
+    bare local paths and file:// don't."""
+    assert CachedDataset._is_fsspec_uri("s3://bucket/path") is True
+    assert CachedDataset._is_fsspec_uri("gcs://bucket/path") is True
+    assert CachedDataset._is_fsspec_uri("memory://tmp") is True
+    assert CachedDataset._is_fsspec_uri("/tmp/cache") is False
+    assert CachedDataset._is_fsspec_uri("relative/cache") is False
+    # file:// is treated as local, not fsspec, because zarr's
+    # LocalStore handles it natively.
+    assert CachedDataset._is_fsspec_uri("file:///tmp/cache") is False
+
+
+def test_cached_dataset_cache_path_for_fsspec_uri_uses_forward_slash():
+    """The cache_path for an fsspec URI never goes through os.path.join
+    (which would mangle the scheme on Windows or strip slashes)."""
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    cached = CachedDataset(source=sim, cache_dir="s3://bucket/prefix")
+    path = cached._cache_path()
+    assert path.startswith("s3://bucket/prefix/")
+    # Hash suffix present.
+    assert path == f"s3://bucket/prefix/{sim.content_hash()}"
+
+
+def test_cached_dataset_round_trip_via_fsspec_memory_filesystem():
+    """End-to-end fsspec path via fsspec's in-memory filesystem.
+
+    No real S3 / GCS — uses `memory://` which doesn't require any
+    cloud creds and is in fsspec's default backend set.
+    """
+    pytest.importorskip("zarr")
+    pytest.importorskip("fsspec")
+    # Memory filesystem is built into fsspec; no extra import needed
+    # to register it (fsspec auto-registers on first url_to_fs call).
+
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(dim=3), n_samples=10
+    )
+
+    import uuid
+
+    # Unique memory:// URI per test so we don't collide across runs.
+    cached = CachedDataset(source=sim, cache_dir=f"memory://test-{uuid.uuid4().hex}")
+    assert not cached._materialised()
+
+    pairs_first = list(cached)
+    assert cached._materialised()
+
+    pairs_second = list(cached)
+    assert len(pairs_first) == len(pairs_second) == 8  # 80% of 10
+    for (x1, y1), (x2, y2) in zip(pairs_first, pairs_second, strict=True):
+        np.testing.assert_array_almost_equal(np.asarray(x1), np.asarray(x2))
+        np.testing.assert_array_almost_equal(np.asarray(y1), np.asarray(y2))
+
+
+def test_cached_dataset_invalidate_via_fsspec_memory_filesystem():
+    """`invalidate()` correctly removes the cache directory on fsspec."""
+    pytest.importorskip("zarr")
+    pytest.importorskip("fsspec")
+    import uuid
+
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(dim=3), n_samples=10
+    )
+    cached = CachedDataset(
+        source=sim, cache_dir=f"memory://invalidate-{uuid.uuid4().hex}"
+    )
+    _ = list(cached)  # materialise
+    assert cached._materialised()
+    cached.invalidate()
+    assert not cached._materialised()

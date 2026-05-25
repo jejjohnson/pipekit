@@ -142,10 +142,14 @@ def restore_state(
 
 The pipekit-train extension on top of these is:
 
-- The Grain iterator is also checkpointed, via
-  `grain.PyGrainCheckpointHandler`, alongside the `TrainState` in a
-  `CompositeCheckpointHandler`. Preemption recovery restores both
-  the weights and the data-iter position.
+- The Grain iterator is also checkpointed. v0.2 ships a JSON
+  side-car (`<directory>/<step>/data_iter.json`) written next to
+  the Orbax checkpoint, capturing the iterator's `get_state()`
+  return value (base64-encoded for bytes leaves). Preemption
+  recovery restores both the weights AND the data-iter position
+  via the side-car on `restore_state` → `train_iter.set_state(state)`.
+  A full Orbax `CompositeCheckpointHandler` integration (using
+  `grain.checkpoint.CheckpointHandler` natively) is a v0.3 polish.
 - The `CheckpointManager.save_interval_steps` is wired to the
   pipekit-train `Checkpoint` callback's `every_n_steps` (Layer 2),
   so users configure cadence in one place.

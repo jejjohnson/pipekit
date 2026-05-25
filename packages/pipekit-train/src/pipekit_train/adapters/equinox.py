@@ -246,30 +246,116 @@ def save_state(
     mngr: ocp.CheckpointManager,
     state: TrainState,
     step: int,
+    *,
+    data_iter_state: Any = None,
 ) -> None:
     """Persist the array leaves of ``state`` at ``step``.
 
     Static (non-array) leaves are reconstructed on restore from the
     in-memory template; see ``restore_state``.
+
+    Args:
+        mngr: Orbax checkpoint manager.
+        state: Current ``TrainState``.
+        step: Step number.
+        data_iter_state: Optional state dict from
+            ``grain_iterator.get_state()``. When provided, it's
+            persisted as a JSON side-car next to the Orbax checkpoint
+            (``<directory>/<step>/data_iter.json``) so resume-from-
+            checkpoint restores byte-identical data-iter position
+            alongside the weights. See #17.
     """
+    import json
+    import os
+    from pathlib import Path
+
     import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 
     arrays, _ = eqx.partition(state, eqx.is_array)
     mngr.save(step, args=ocp.args.StandardSave(arrays))
+
+    if data_iter_state is not None:
+        # Orbax writes the checkpoint asynchronously; the per-step dir
+        # exists after wait_until_finished. For correctness, write the
+        # side-car eagerly into the same path. Orbax exposes
+        # `mngr.directory / str(step)` as the per-step layout.
+        mngr.wait_until_finished()
+        step_dir = Path(os.fspath(mngr.directory)) / str(step)
+        step_dir.mkdir(parents=True, exist_ok=True)
+        (step_dir / "data_iter.json").write_text(
+            json.dumps(_jsonify_grain_state(data_iter_state), sort_keys=True)
+        )
 
 
 def restore_state(
     mngr: ocp.CheckpointManager,
     template: TrainState,
     step: int,
-) -> TrainState:
-    """Restore array leaves into the static skeleton of ``template``."""
+) -> tuple[TrainState, Any | None]:
+    """Restore array leaves into the static skeleton of ``template``.
+
+    Returns:
+        ``(restored_state, data_iter_state)``. ``data_iter_state`` is
+        ``None`` when no side-car was written at the checkpoint step
+        (e.g. a checkpoint written by an earlier pipekit-train
+        without the iterator-state extension). When non-``None`` the
+        caller passes it to ``grain_iterator.set_state(state)`` to
+        resume the data stream byte-identically. See #17.
+    """
+    import json
+    import os
+    from pathlib import Path
+
     import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 
     arrays, static = eqx.partition(template, eqx.is_array)
     abstract = jax.tree.map(ocp.utils.to_shape_dtype_struct, arrays)
     restored = mngr.restore(step, args=ocp.args.StandardRestore(abstract))
-    return cast(TrainState, eqx.combine(restored, static))
+
+    side_car = Path(os.fspath(mngr.directory)) / str(step) / "data_iter.json"
+    data_iter_state: Any | None = None
+    if side_car.exists():
+        data_iter_state = _unjsonify_grain_state(json.loads(side_car.read_text()))
+
+    return (
+        cast(TrainState, eqx.combine(restored, static)),
+        data_iter_state,
+    )
+
+
+def _jsonify_grain_state(state: Any) -> Any:
+    """Make a Grain iterator state dict JSON-serialisable.
+
+    Grain's `iterator.get_state()` may include bytes (np serialised
+    integers, prefetch buffer markers). We base64-encode bytes leaves
+    and tag them so `_unjsonify_grain_state` can round-trip back.
+    """
+    import base64
+
+    if isinstance(state, dict):
+        return {k: _jsonify_grain_state(v) for k, v in state.items()}
+    if isinstance(state, list):
+        return [_jsonify_grain_state(v) for v in state]
+    if isinstance(state, tuple):
+        return {"__tuple__": [_jsonify_grain_state(v) for v in state]}
+    if isinstance(state, bytes):
+        return {"__bytes_b64__": base64.b64encode(state).decode("ascii")}
+    return state
+
+
+def _unjsonify_grain_state(state: Any) -> Any:
+    """Inverse of `_jsonify_grain_state`."""
+    import base64
+
+    if isinstance(state, dict):
+        if "__bytes_b64__" in state:
+            return base64.b64decode(state["__bytes_b64__"])
+        if "__tuple__" in state:
+            return tuple(_unjsonify_grain_state(v) for v in state["__tuple__"])
+        return {k: _unjsonify_grain_state(v) for k, v in state.items()}
+    if isinstance(state, list):
+        return [_unjsonify_grain_state(v) for v in state]
+    return state
 
 
 # ---------------------------------------------------------------------
@@ -322,63 +408,84 @@ def _stack_pair(samples: list[tuple[Any, Any]]) -> tuple[jax.Array, jax.Array]:
     return xs, ys
 
 
-def _iter_batches(
-    dataset: Any,
-    batch_size: int,
-    seed: int,
-) -> Iterator[tuple[jax.Array, jax.Array]]:
-    """Yield (stacked_x, stacked_y) batches, infinite-loop with reshuffle.
+class _BatchSource:
+    """Iterator-with-state wrapper used by the Equinox `run()` loop.
 
-    Uses Grain's MapDataset when the dataset is indexable, otherwise
-    falls back to direct Python iteration with manual batching
-    (single epoch then re-iteration).
+    Exposes `next_batch()` + optional `get_state()` / `set_state()`
+    so the loop can checkpoint and resume iterator position.
+    Indexable datasets use Grain's `MapDataset` chain (state methods
+    work); streaming datasets fall back to direct Python iteration
+    (state methods return / accept ``None``).
     """
-    if _is_indexable(dataset):
-        yield from _iter_indexable(dataset, batch_size, seed)
-    else:
-        yield from _iter_streaming(dataset, batch_size)
 
+    def __init__(self, dataset: Any, batch_size: int, seed: int) -> None:
+        self._batch_size = batch_size
+        self._seed = seed
+        if _is_indexable(dataset):
+            self._inner = self._build_grain_iter(dataset, batch_size, seed)
+            self._kind = "grain"
+        else:
+            self._inner = self._build_streaming_iter(dataset, batch_size)
+            self._kind = "streaming"
 
-def _iter_indexable(
-    dataset: Any,
-    batch_size: int,
-    seed: int,
-) -> Iterator[tuple[jax.Array, jax.Array]]:
-    """Sequence-based iteration with epoch shuffle.
+    @staticmethod
+    def _build_grain_iter(dataset: Any, batch_size: int, seed: int) -> Any:
+        """Build the Grain iterator.
 
-    Grain's MapDataset.source(seq) imports the heavy data loader; for
-    v0.1 with toy-scale datasets we just shuffle indices via numpy and
-    iterate. (Grain's worker_count / prefetch are v0.2 — see Q7 in
-    boundaries.md.)
+        Pipeline: ``MapDataset.source(dataset) → .shuffle(seed) →
+        .repeat(num_epochs=None) → .batch(batch_size, drop_remainder=True)
+        → .to_iter_dataset() → iter(...)``. ``drop_remainder=True``
+        matches the v0.1 numpy fallback's behaviour of dropping
+        trailing partial batches so `train_step` doesn't recompile
+        per epoch boundary.
 
-    Raises:
-        ValueError: when ``len(dataset) < batch_size``. With a fixed
-            batch_size we drop trailing partials so the JIT'd
-            train_step doesn't recompile per epoch boundary; if the
-            dataset is smaller than one batch the iterator would
-            yield nothing and the training loop would hang waiting
-            for ``next(train_iter)``. Fail fast instead.
-    """
-    rng = np.random.default_rng(seed)
-    n = len(dataset)
-    if n < batch_size:
-        raise ValueError(
-            f"Dataset has {n} samples but batch_size={batch_size}. "
-            "Reduce batch_size, grow the dataset, or wrap as "
-            "IterableDataset for streaming (which doesn't have this "
-            "constraint)."
+        Raises:
+            ValueError: when ``len(dataset) < batch_size``. With a
+                fixed batch_size we drop trailing partials; if the
+                dataset is smaller than one batch the iterator would
+                yield nothing and training would hang.
+        """
+        import grain  # ty: ignore[unresolved-import]
+
+        n = len(dataset)
+        if n < batch_size:
+            raise ValueError(
+                f"Dataset has {n} samples but batch_size={batch_size}. "
+                "Reduce batch_size, grow the dataset, or wrap as "
+                "IterableDataset for streaming (which doesn't have this "
+                "constraint)."
+            )
+        map_ds = (
+            grain.MapDataset.source(dataset)
+            .shuffle(seed=seed)
+            .repeat(num_epochs=None)
+            .batch(batch_size=batch_size, drop_remainder=True)
         )
-    indices = np.arange(n)
-    while True:
-        rng.shuffle(indices)
-        batch: list[tuple[Any, Any]] = []
-        for idx in indices:
-            batch.append(dataset[int(idx)])
-            if len(batch) == batch_size:
-                yield _stack_pair(batch)
-                batch = []
-        # Drop the partial trailing batch — keeps batch_size constant
-        # so train_step doesn't recompile per epoch boundary.
+        return iter(map_ds.to_iter_dataset())
+
+    @staticmethod
+    def _build_streaming_iter(
+        dataset: Any, batch_size: int
+    ) -> Iterator[tuple[jax.Array, jax.Array]]:
+        return _iter_streaming(dataset, batch_size)
+
+    def next_batch(self) -> tuple[jax.Array, jax.Array]:
+        batch = next(self._inner)
+        return jnp.asarray(batch[0]), jnp.asarray(batch[1])
+
+    def get_state(self) -> Any | None:
+        """Return the inner iterator's state, or ``None`` for streaming."""
+        if self._kind == "grain":
+            return cast(Any, self._inner).get_state()
+        return None
+
+    def set_state(self, state: Any) -> None:
+        """Restore the inner iterator's state.
+
+        No-op for streaming iterators (which have no notion of state).
+        """
+        if self._kind == "grain" and state is not None:
+            cast(Any, self._inner).set_state(state)
 
 
 def _iter_streaming(
@@ -535,13 +642,19 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
                 save_interval_steps=every_n,
             ),
         )
-        # Resume from latest checkpoint if one exists.
+    # --- Data iterator -------------------------------------------------
+    # Built before checkpoint-restore so we can set_state(...) the
+    # iterator from the side-car JSON (Grain MapDataset path supports
+    # this; the streaming path silently no-ops). See #17.
+    train_iter = _BatchSource(loop.dataset, loop.batch_size, loop.seed)
+
+    # Resume from the latest checkpoint if one exists. Restores both
+    # TrainState (weights + opt_state) AND the iterator position.
+    if mngr is not None:
         latest = mngr.latest_step()
         if latest is not None:
-            state = restore_state(mngr, state, latest)
-
-    # --- Data iterator -------------------------------------------------
-    train_iter = _iter_batches(loop.dataset, loop.batch_size, loop.seed)
+            state, data_iter_state = restore_state(mngr, state, latest)
+            train_iter.set_state(data_iter_state)
 
     # --- Initial-state callback dispatch -------------------------------
     initial_state = _carry_state(state, loop)
@@ -551,7 +664,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     last_metrics: dict[str, float] = {}
     while int(state.step) < loop.max_steps:
         rng, step_key = jax.random.split(rng)
-        batch = next(train_iter)
+        batch = train_iter.next_batch()
         state, metrics = train_step(state, batch, step_key, task, optimizer)
         last_metrics = {k: float(np.asarray(v)) for k, v in metrics.items()}
 
@@ -586,7 +699,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         # step would defeat the configured cadence and add I/O on
         # the fast path.
         if mngr is not None and step > 0 and mngr.should_save(step):
-            save_state(mngr, state, step)
+            save_state(mngr, state, step, data_iter_state=train_iter.get_state())
 
         # Early-stopping check — break before next step.
         if _any_should_stop(loop.callbacks):
