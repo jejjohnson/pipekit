@@ -18,6 +18,8 @@ import pytest
 
 pytest.importorskip("equinox")
 pytest.importorskip("jax")
+pytest.importorskip("optax")
+pytest.importorskip("orbax.checkpoint")
 
 import equinox as eqx
 import jax

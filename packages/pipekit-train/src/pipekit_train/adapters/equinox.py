@@ -33,12 +33,19 @@ import equinox as eqx  # ty: ignore[unresolved-import]
 import jax  # ty: ignore[unresolved-import]
 import jax.numpy as jnp  # ty: ignore[unresolved-import]
 import numpy as np
-import optax  # ty: ignore[unresolved-import]
-import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 from pipekit import Operator
 
 
+# `optax` and `orbax.checkpoint` are lazy-imported inside the
+# functions that need them so this module loads cleanly on systems
+# that have equinox/jax but not the full [equinox] extra (e.g. the
+# `uv sync --group dev` env that runs the rest of the test suite).
+# All references below are wrapped in TYPE_CHECKING for static
+# annotations.
 if TYPE_CHECKING:
+    import optax  # ty: ignore[unresolved-import]
+    import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+
     from pipekit_train.loop import TrainingLoop
 
 
@@ -245,6 +252,8 @@ def save_state(
     Static (non-array) leaves are reconstructed on restore from the
     in-memory template; see ``restore_state``.
     """
+    import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+
     arrays, _ = eqx.partition(state, eqx.is_array)
     mngr.save(step, args=ocp.args.StandardSave(arrays))
 
@@ -255,6 +264,8 @@ def restore_state(
     step: int,
 ) -> TrainState:
     """Restore array leaves into the static skeleton of ``template``."""
+    import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+
     arrays, static = eqx.partition(template, eqx.is_array)
     abstract = jax.tree.map(ocp.utils.to_shape_dtype_struct, arrays)
     restored = mngr.restore(step, args=ocp.args.StandardRestore(abstract))
@@ -266,12 +277,11 @@ def restore_state(
 # ---------------------------------------------------------------------
 
 
-_OPTIMIZER_CONSTRUCTORS: dict[str, Any] = {
-    "adam": optax.adam,
-    "adamw": optax.adamw,
-    "sgd": optax.sgd,
-    "rmsprop": optax.rmsprop,
-}
+# Optimizer constructors are resolved lazily inside `_build_optimizer`
+# so this module imports without optax installed (optax stays a
+# `pipekit-train[equinox]` extra; the surrounding module's
+# `EquinoxModelOp` only needs equinox itself).
+_OPTIMIZER_NAMES: tuple[str, ...] = ("adam", "adamw", "sgd", "rmsprop")
 
 
 def _build_optimizer(config: dict[str, Any]) -> optax.GradientTransformation:
@@ -284,16 +294,17 @@ def _build_optimizer(config: dict[str, Any]) -> optax.GradientTransformation:
     - ``lr`` is normalised to ``learning_rate`` (the design uses the
       shorter form; optax uses the longer one).
     """
+    import optax  # ty: ignore[unresolved-import]
+
     config = dict(config)
     name = config.pop("name", "adamw")
     if "lr" in config and "learning_rate" not in config:
         config["learning_rate"] = config.pop("lr")
-    if name not in _OPTIMIZER_CONSTRUCTORS:
+    if name not in _OPTIMIZER_NAMES:
         raise ValueError(
-            f"Unknown optimizer {name!r}. v0.1 supports "
-            f"{sorted(_OPTIMIZER_CONSTRUCTORS)}."
+            f"Unknown optimizer {name!r}. v0.1 supports {sorted(_OPTIMIZER_NAMES)}."
         )
-    return _OPTIMIZER_CONSTRUCTORS[name](**config)
+    return getattr(optax, name)(**config)
 
 
 # ---------------------------------------------------------------------
@@ -461,6 +472,11 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         ``devices``, ``total_seconds``, ``final_step``, and
         ``final_metrics`` for inclusion in the TrainingArtifact.
     """
+    # Lazy imports — keep this module loadable without the full
+    # [equinox] extra installed (see module docstring).
+    import optax  # ty: ignore[unresolved-import]
+    import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+
     t0 = time.time()
     # --- Unwrap the model ----------------------------------------------
     model_op = loop.model_op
