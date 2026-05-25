@@ -140,12 +140,17 @@ class ValidationStep(Operator):
             predicted = self.model_op(x)
             for metric in self.metrics:
                 result = metric(predicted, y)
+                name = type(metric).__name__
                 if isinstance(result, tuple):
-                    _, aux = result
+                    scalar, aux = result
+                    # Aggregate the primary scalar under the metric
+                    # class name (in addition to the aux dict) so a
+                    # metric that doesn't repeat its scalar in aux
+                    # still has a recoverable headline value.
+                    sums[name] = sums.get(name, 0.0) + float(scalar)
                     for k, v in aux.items():
                         sums[k] = sums.get(k, 0.0) + float(v)
                 else:
-                    name = type(metric).__name__
                     sums[name] = sums.get(name, 0.0) + float(result)
             count += 1
         if count == 0:
@@ -331,14 +336,17 @@ class TrainingLoop(StatefulOperator):
         """
         del carrier, state
         trained_model_op, backend_info = self._run_adapter()
+        # Honour the adapter's actual final_step — the loop may have
+        # terminated early (EarlyStopping) and self.max_steps would
+        # otherwise inflate step/epoch in the returned carry-state.
+        final_step = int(backend_info.get("final_step", self.max_steps))
+        final_epoch = final_step // self.steps_per_epoch if self.steps_per_epoch else 0
         final_state = TrainerCarryState(
             model=trained_model_op,
             opt_state=None,
-            step=self.max_steps,
-            epoch=(
-                self.max_steps // self.steps_per_epoch if self.steps_per_epoch else 0
-            ),
-            metrics={},
+            step=final_step,
+            epoch=final_epoch,
+            metrics=dict(backend_info.get("final_metrics", {})),
             rng=None,
         )
         # The artifact build path uses _run_adapter's backend_info too.
@@ -406,8 +414,12 @@ class TrainingLoop(StatefulOperator):
         except ImportError:
             artifact_cls = _LocalArtifact
 
+        # `pipekit.dumps` already returns a JSON string; don't re-encode it.
+        # Pretty-print by round-tripping through json.loads for readability.
         try:
-            training_pipeline_yaml = json.dumps(dumps(self), indent=2, default=repr)
+            training_pipeline_yaml = json.dumps(
+                json.loads(dumps(self)), indent=2, sort_keys=True
+            )
         except Exception:
             # forbid_in_yaml means we may not round-trip cleanly;
             # surface a JSON repr of get_config() instead.

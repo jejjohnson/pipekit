@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 import numpy as np
@@ -181,9 +180,3 @@ def test_losses_are_operators():
     assert isinstance(NLL(), Operator)
     assert isinstance(KL(), Operator)
     assert isinstance(Composite(components=((1.0, MSE()),)), Operator)
-
-
-# --- Pi constant used nowhere; keep math import live for future use -----
-
-
-_ = math.pi

@@ -348,9 +348,8 @@ class CachedDataset(TrainingDataset):
 
     First epoch hits the source and writes to ``cache_dir``. Subsequent
     epochs read from disk. Cache is keyed on ``source.content_hash()``
-    so cache files are reused across runs (and across machines when
-    ``cache_dir`` is an fsspec URI) as long as the source's config and
-    seed haven't changed.
+    so cache files are reused across runs as long as the source's
+    config and seed haven't changed.
 
     Args:
         source: The wrapped `TrainingDataset`. Must be indexable
@@ -358,8 +357,10 @@ class CachedDataset(TrainingDataset):
             into a fixed-shape zarr store, which requires up-front
             knowledge of the dataset length. `IterableDataset` is not
             cacheable.
-        cache_dir: Local directory or fsspec URI (``s3://``, ``gcs://``,
-            …). Created on first write.
+        cache_dir: Local filesystem directory. Created on first write.
+            v0.1 supports local paths only; fsspec URIs (``s3://``,
+            ``gcs://``) are scheduled for v0.2 alongside an
+            ``fsspec``-backed zarr store.
         format: Storage format. v0.1 ships ``"zarr"`` only;
             ``"parquet"`` and ``"tfrecord"`` raise NotImplementedError
             and are scheduled for v0.2.
@@ -457,6 +458,13 @@ class CachedDataset(TrainingDataset):
         # we cast at the boundary.
         source = cast(Any, self.source)
         n = len(source)
+        if n == 0:
+            raise ValueError(
+                "CachedDataset cannot materialise an empty source — "
+                "we need at least one sample to infer the array "
+                "shapes / dtypes for the zarr store. Check the source "
+                "dataset's split sizes or content_hash."
+            )
         first_x, first_y = source[0]
         first_x = np.asarray(first_x)
         first_y = np.asarray(first_y)

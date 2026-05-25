@@ -232,8 +232,14 @@ def test_simulation_dataset_obs_op_applied_to_output():
 
 # --- CachedDataset --------------------------------------------------------
 
+# zarr is only needed for the CachedDataset path. Each test starts with
+# `pytest.importorskip("zarr")` so environments without it (e.g. the CI
+# job that runs `uv sync --group dev` only) skip the cache tests
+# cleanly without crashing the rest of the suite.
+
 
 def test_cached_dataset_round_trip(tmp_path):
+    pytest.importorskip("zarr")
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(dim=3), n_samples=10
     )
@@ -256,6 +262,7 @@ def test_cached_dataset_inherits_source_content_hash(tmp_path):
 
 
 def test_cached_dataset_indexable_after_materialise(tmp_path):
+    pytest.importorskip("zarr")
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
     )
@@ -265,6 +272,7 @@ def test_cached_dataset_indexable_after_materialise(tmp_path):
 
 
 def test_cached_dataset_invalidate_re_materialises(tmp_path):
+    pytest.importorskip("zarr")
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
     )
@@ -273,6 +281,23 @@ def test_cached_dataset_invalidate_re_materialises(tmp_path):
     assert cached._materialised()
     cached.invalidate()
     assert not cached._materialised()
+
+
+def test_cached_dataset_empty_source_raises_clear_error(tmp_path):
+    """A 0-length indexable source can't be materialised — we need at
+    least one sample to infer shape/dtype for the zarr arrays."""
+    pytest.importorskip("zarr")
+
+    class _EmptyDataset(SimulationDataset):
+        # n_samples=10 with split="test" + 90/10 slice = 1 sample;
+        # we force 0 by overriding __len__.
+        def __len__(self) -> int:
+            return 0
+
+    sim = _EmptyDataset(forward_model=_MockForward(), prior=_MockPrior(), n_samples=10)
+    cached = CachedDataset(source=sim, cache_dir=str(tmp_path))
+    with pytest.raises(ValueError, match="empty source"):
+        cached._materialise()
 
 
 def test_cached_dataset_with_split_uses_different_cache_path(tmp_path):

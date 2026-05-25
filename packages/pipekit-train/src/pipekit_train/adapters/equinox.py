@@ -29,12 +29,12 @@ import time
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast, runtime_checkable
 
-import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import optax
-import orbax.checkpoint as ocp
+import equinox as eqx  # ty: ignore[unresolved-import]
+import jax  # ty: ignore[unresolved-import]
+import jax.numpy as jnp  # ty: ignore[unresolved-import]
+import numpy as np  # ty: ignore[unresolved-import]
+import optax  # ty: ignore[unresolved-import]
+import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 from pipekit import Operator
 
 
@@ -164,8 +164,26 @@ class _SynthesisedTask:
         result = self.loss(pred, y)
         if isinstance(result, tuple):
             scalar, aux = result
-            return scalar, dict(aux)
-        return result, {"loss": result}
+            aux = dict(aux)
+        else:
+            scalar, aux = result, {"loss": result}
+        # JAX grad requires a 0-D scalar, and the outer training loop
+        # calls float() on every aux entry; both will crash if a
+        # `Loss` configured with ``reduction='none'`` (or otherwise
+        # returning a non-scalar array) flows through. Reduce
+        # everything to a scalar here so the synthesised path is
+        # robust for all common Loss shapes.
+        scalar = _reduce_to_scalar(scalar)
+        aux = {k: _reduce_to_scalar(v) for k, v in aux.items()}
+        return scalar, aux
+
+
+def _reduce_to_scalar(x: Any) -> jax.Array:
+    """Cast to jax.Array and average down to a 0-D scalar if needed."""
+    x = jnp.asarray(x)
+    if x.ndim > 0:
+        x = jnp.mean(x)
+    return x
 
 
 # ---------------------------------------------------------------------
@@ -315,9 +333,24 @@ def _iter_indexable(
     v0.1 with toy-scale datasets we just shuffle indices via numpy and
     iterate. (Grain's worker_count / prefetch are v0.2 — see Q7 in
     boundaries.md.)
+
+    Raises:
+        ValueError: when ``len(dataset) < batch_size``. With a fixed
+            batch_size we drop trailing partials so the JIT'd
+            train_step doesn't recompile per epoch boundary; if the
+            dataset is smaller than one batch the iterator would
+            yield nothing and the training loop would hang waiting
+            for ``next(train_iter)``. Fail fast instead.
     """
     rng = np.random.default_rng(seed)
     n = len(dataset)
+    if n < batch_size:
+        raise ValueError(
+            f"Dataset has {n} samples but batch_size={batch_size}. "
+            "Reduce batch_size, grow the dataset, or wrap as "
+            "IterableDataset for streaming (which doesn't have this "
+            "constraint)."
+        )
     indices = np.arange(n)
     while True:
         rng.shuffle(indices)
@@ -525,8 +558,12 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             )
             _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
 
-        # Checkpoint (if manager configured).
-        if mngr is not None and step > 0:
+        # Checkpoint — gated on the manager's configured cadence
+        # (CheckpointManager.save_interval_steps, derived from the
+        # Checkpoint callback's every_n_steps). Calling save() every
+        # step would defeat the configured cadence and add I/O on
+        # the fast path.
+        if mngr is not None and step > 0 and mngr.should_save(step):
             save_state(mngr, state, step)
 
         # Early-stopping check — break before next step.

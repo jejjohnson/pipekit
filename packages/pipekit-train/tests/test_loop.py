@@ -88,7 +88,12 @@ def test_validation_step_averages_metrics():
         metrics=(MSE(),),
     )
     metrics = step()
+    # Both the aux key ("mse") AND the class name ("MSE") are present —
+    # ValidationStep surfaces the primary scalar under the metric class
+    # name so that aux-less or differently-named metrics don't lose
+    # their headline value (regression: PR #11 review).
     assert metrics["mse"] == pytest.approx(0.0)
+    assert metrics["MSE"] == pytest.approx(0.0)
 
 
 def test_validation_step_aggregates_aux_metrics():
@@ -102,6 +107,36 @@ def test_validation_step_aggregates_aux_metrics():
     )
     metrics = step()
     assert metrics["mse"] == pytest.approx(3.5)
+    assert metrics["MSE"] == pytest.approx(3.5)
+
+
+def test_validation_step_surfaces_class_name_without_aux():
+    """A metric that returns aux without echoing its primary scalar
+    must still have a recoverable headline value under its class name.
+    """
+
+    class _ScalarOnlyMetric(Operator):
+        """Returns (scalar, aux) where aux is differently named."""
+
+        def _apply(self, predicted: Any, target: Any) -> tuple[Any, dict[str, Any]]:
+            err = predicted - target
+            mse = float((err * err).mean())
+            # Aux uses a different key than 'mse' — this is the case
+            # the regression test pins: the primary scalar must still
+            # be recoverable under the class name.
+            return mse, {"renamed_key": mse * 2}
+
+    dataset = _toy_dataset(n=4)
+    step = ValidationStep(
+        model_op=_ScaleModel(factor=2.0),
+        dataset=dataset,
+        metrics=(_ScalarOnlyMetric(),),
+    )
+    metrics = step()
+    # Primary scalar accessible under the class name.
+    assert metrics["_ScalarOnlyMetric"] == pytest.approx(0.0)
+    # Aux key also aggregated.
+    assert metrics["renamed_key"] == pytest.approx(0.0)
 
 
 def test_validation_step_empty_dataset_returns_empty():

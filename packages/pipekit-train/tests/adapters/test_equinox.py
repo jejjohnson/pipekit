@@ -280,7 +280,28 @@ def test_run_with_early_stopping_breaks_early():
     # min_delta=10 and a regression loss of order 1, no improvement
     # is "good enough", so wait reaches patience after the first
     # eval round.
-    assert artifact.backend_info["final_step"] < 1000
+    final_step = artifact.backend_info["final_step"]
+    assert final_step < 1000
+    # Regression: PR #11 review — TrainerCarryState.step must reflect
+    # the actual final step (from backend_info), not the configured
+    # max_steps. final_state isn't returned from run(); construct one
+    # the same way _apply does and verify the shape.
+    from pipekit_train import TrainerCarryState
+
+    expected_step = int(loop._last_backend_info["final_step"])
+    assert expected_step == final_step
+    assert expected_step < loop.max_steps
+    # Sanity: TrainerCarryState API accepts the shape _apply uses.
+    from pipekit import Const
+
+    cs = TrainerCarryState(
+        model=Const(0),
+        opt_state=None,
+        step=expected_step,
+        epoch=0,
+        metrics=dict(loop._last_backend_info.get("final_metrics", {})),
+    )
+    assert cs.step == expected_step
 
 
 def test_run_with_callbacks_dispatches_lifecycle():
@@ -442,3 +463,93 @@ def test_run_with_jsonl_writer_writes_records(tmp_path):
     loop.run()
     contents = out.read_text().splitlines()
     assert len(contents) >= 3  # steps 5, 10, 15, 20
+
+
+# --- Regressions / robustness ---------------------------------------------
+
+
+def test_indexable_dataset_smaller_than_batch_size_raises():
+    """Regression: PR #11 review — small indexable dataset would hang
+    the trainer (iterator yields nothing). Now fails fast with a
+    clear error.
+
+    We need an indexable dataset (`__len__`/`__getitem__`) because the
+    streaming `IterableDataset` doesn't have this constraint. Build one
+    by wrapping a tiny sequence in a custom TrainingDataset subclass.
+    """
+    from pipekit_train import TrainingDataset
+
+    class _TinyIndexed(TrainingDataset):
+        def __init__(self):
+            super().__init__()
+            self.pairs = [
+                (np.array([0.0], dtype=np.float32), np.array([0.0], dtype=np.float32)),
+                (np.array([1.0], dtype=np.float32), np.array([2.0], dtype=np.float32)),
+            ]
+
+        def __len__(self):
+            return len(self.pairs)
+
+        def __getitem__(self, i):
+            return self.pairs[i]
+
+        def __iter__(self):
+            return iter(self.pairs)
+
+        def content_hash(self):
+            return "tiny-2"
+
+    tiny = _TinyIndexed()
+    loop = TrainingLoop(
+        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=tiny,
+        loss=MSE(),
+        max_steps=5,
+        batch_size=32,  # > len(tiny) == 2
+        backend="equinox",
+    )
+    with pytest.raises(ValueError, match="batch_size"):
+        loop.run()
+
+
+def test_synthesised_task_reduces_non_scalar_loss():
+    """Regression: PR #11 review — MSE(reduction='none') would crash
+    inside eqx.filter_grad because the loss isn't a scalar. The
+    synthesised task now reduces non-scalar outputs with jnp.mean
+    so common Loss reductions don't break the gradient path.
+    """
+    dataset = _synthetic_regression(n=32, seed=0)
+    loop = TrainingLoop(
+        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=dataset,
+        loss=MSE(reduction="none"),  # returns per-element squared error
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=10,
+        batch_size=8,
+        backend="equinox",
+        seed=0,
+    )
+    _, artifact = loop.run()
+    final_loss = artifact.backend_info["final_metrics"].get("mse")
+    assert final_loss is not None and math.isfinite(final_loss)
+
+
+def test_run_carry_state_step_matches_actual_final_step():
+    """Regression: PR #11 review — final_state.step must come from
+    the adapter's actual final_step (so early-stopped runs report
+    the truth, not the configured max_steps).
+    """
+    dataset = _synthetic_regression(n=32, seed=0)
+    loop = TrainingLoop(
+        model_op=_EquinoxModelOp(_toy_mlp(jax.random.key(0))),
+        dataset=dataset,
+        loss=MSE(),
+        optimizer_config={"name": "adam", "learning_rate": 1e-2},
+        max_steps=20,
+        batch_size=8,
+        backend="equinox",
+        seed=0,
+    )
+    _, final_state = loop._apply()
+    backend_info = loop._last_backend_info
+    assert final_state.step == int(backend_info["final_step"])
