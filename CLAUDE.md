@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pipekit` is a uv workspace of five Python packages that together
+`pipekit` is a uv workspace of six Python packages that together
 provide a carrier-agnostic operator-graph framework for composable
 scientific pipelines. Built with Python 3.12+, uv, pytest, and MkDocs.
 
@@ -17,11 +17,12 @@ The packages, in dependency order:
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
 | `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units. Planned, not implemented.                  |
+| `pipekit-train`      | scaffolded    | Training pipelines + backend adapters. Design at `packages/pipekit-train/docs/design/`. |
 
 The master plan lives in
 [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):
-report 2 covers pipekit core, 10 covers pipekit-cycle, 12 covers
-pipekit-experiment.
+report 2 covers pipekit core, 10 covers pipekit-cycle, 11 covers
+pipekit-train, 12 covers pipekit-experiment.
 
 ## Common Commands
 
@@ -94,7 +95,17 @@ packages/
 │   │   ├── artifacts.py      # TrainingArtifact, InferenceArtifact
 │   │   └── adapters/         # dvc, hydra, metaflow (one module per tool)
 │   └── tests/
-└── pipekit-evaluate/         # SCAFFOLD ONLY (no implementation yet)
+├── pipekit-evaluate/         # SCAFFOLD ONLY (no implementation yet)
+└── pipekit-train/            # SCAFFOLD — Lightning/Keras adapter stubs +
+                              # Protocols + JSONLWriter. Full design at
+                              # packages/pipekit-train/docs/design/.
+    └── src/pipekit_train/
+        ├── loss.py           # Loss Protocol (carrier-agnostic)
+        ├── callbacks.py      # Callback Protocol
+        ├── writer.py         # MetricWriter Protocol + JSONLWriter
+        └── adapters/
+            ├── lightning.py  # v0.2 — raises NotImplementedError
+            └── keras.py      # v0.3 — raises NotImplementedError
 ```
 
 Each package's public API is re-exported through its
@@ -108,6 +119,11 @@ top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
 - `pipekit-experiment` depends on `pipekit` only; tool integrations
   are gated behind optional extras (`[dvc]`, `[hydra]`, `[metaflow]`,
   `[s3]`).
+- `pipekit-train` depends on `pipekit` only; backend tools
+  (Lightning, Equinox+Optax, Keras 3) and data sources (geocatalog,
+  pipekit-cycle) are gated behind optional extras
+  (`[equinox]`, `[lightning]`, `[keras]`, `[catalog]`, `[cycle]`,
+  `[experiment]`).
 - Algorithm libraries (filterx, vardax, plumax, …) are *not* internal
   deps; they plug in by satisfying the runtime-checkable Protocols
   defined in `pipekit_cycle.protocols` and `pipekit_experiment.protocols`.

@@ -37,6 +37,7 @@ plugins:
             - packages/pipekit-cycle/src
             - packages/pipekit-experiment/src
             - packages/pipekit-evaluate/src
+            - packages/pipekit-train/src
           options:
             docstring_style: google
             show_source: true

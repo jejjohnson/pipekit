@@ -13,8 +13,8 @@ Author: J. Emmanuel Johnson
 Repo: [https://github.com/jejjohnson/pipekit](https://github.com/jejjohnson/pipekit)
 
 A carrier-agnostic operator-graph framework for composable scientific
-pipelines. `pipekit` is a uv workspace of five Python packages —
-three implemented, two scaffolded for future work — that together
+pipelines. `pipekit` is a uv workspace of six Python packages —
+three implemented, three scaffolded for future work — that together
 cover the L0–L4 spectrum: from raw I/O through data assimilation to
 trained-model deployment.
 
@@ -29,6 +29,7 @@ trained-model deployment.
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.            |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, tool adapters. |
 | `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units.                                  |
+| `pipekit-train`      | scaffolded    | Training pipelines — datasets, losses, loop, backend adapters.      |
 
 Each package has its own README under [`packages/`](packages/) with a
 module inventory and a quickstart.
@@ -36,7 +37,7 @@ module inventory and a quickstart.
 The master plan lives in
 [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):
 Report 2 covers pipekit core, Report 10 covers pipekit-cycle,
-Report 12 covers pipekit-experiment.
+Report 11 covers pipekit-train, Report 12 covers pipekit-experiment.
 
 ---
 
@@ -72,7 +73,8 @@ pipekit/
 │   ├── pipekit-array/            # Scaffold — array-API operators (planned)
 │   ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
 │   ├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
-│   └── pipekit-evaluate/         # Scaffold — evaluation metrics (planned)
+│   ├── pipekit-evaluate/         # Scaffold — evaluation metrics (planned)
+│   └── pipekit-train/            # Scaffold — training pipelines (design only)
 ├── docs/                         # MkDocs documentation source
 ├── notebooks/                    # Jupyter notebooks
 ├── .github/                      # Workflows, issue templates, dependabot, …
