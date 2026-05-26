@@ -13,7 +13,7 @@ The packages, in dependency order:
 | Package              | Status        | Purpose                                                                       |
 |----------------------|---------------|-------------------------------------------------------------------------------|
 | `pipekit`            | implemented   | Carrier-agnostic core: `Operator`, `Sequential`, `Graph`, control, observe, … |
-| `pipekit-array`      | scaffolded    | Array-API operators (numpy/JAX/torch backends). Planned, not implemented.     |
+| `pipekit-array`      | partial       | Array-API operators (Phase A: namespace dispatch + MeanScalar + Stack/Concat). Phases B-D pending. |
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
 | `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units. Planned, not implemented.                  |
@@ -78,7 +78,7 @@ packages/
 │   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
 │   │   └── state.py          # StatefulOperator, CarryState
 │   └── tests/
-├── pipekit-array/            # SCAFFOLD ONLY (no implementation yet)
+├── pipekit-array/            # Array-API operators (Phase A landed; B-D pending)
 ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
 │   ├── src/pipekit_cycle/
 │   │   ├── cycle.py          # Cycle, EnsembleCycle, WindowedCycle, Recurrence

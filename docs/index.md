@@ -1,88 +1,90 @@
 # pipekit
 
-A carrier-agnostic operator-graph framework for composable scientific pipelines.
+**Composable scientific pipelines. Train, register, deploy — one
+operator interface end-to-end.**
 
-`pipekit` is a uv workspace of five Python packages. Three are
-implemented; two are scaffolded for future work.
-
-| Package              | Status        | Purpose                                                            |
-|----------------------|---------------|--------------------------------------------------------------------|
-| `pipekit`            | implemented   | Core: `Operator`, `Sequential`, `Graph`, control, observe, …       |
-| `pipekit-array`      | scaffolded    | Array-API operators (numpy/JAX/torch backends).                    |
-| `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.           |
-| `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, tool adapters.|
-| `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units.                                 |
-
-## Installation
-
-The packages are not yet published to PyPI; install from the
-workspace checkout:
-
-```bash
-git clone https://github.com/jejjohnson/pipekit.git
-cd pipekit
-uv sync --all-groups
-```
-
-Once published, each package will be installable independently:
-
-```bash
-uv add pipekit                            # core only
-uv add pipekit-cycle                      # adds time-stepping / DA
-uv add pipekit-experiment                 # adds registry + tracker protocols
-uv add 'pipekit-experiment[hydra]'        # plus Hydra + hydra-zen adapter
-uv add 'pipekit-experiment[dvc,metaflow]' # plus DVC and Metaflow adapters
-```
-
-## Quickstart
-
-A pipeline is a chain of `Operator`s. Compose them with `|`:
+`pipekit` is a uv workspace of seven Python packages that together
+turn the pieces of a scientific ML workflow into composable
+`Operator`s: data loading, QC, training, data assimilation, model
+registry, reproducibility. The same operator that returns a trained
+emulator drops into a forecast `Cycle` as a step function. One mental
+model, one composition surface, end to end.
 
 ```python
-from pipekit import Operator, Sequential, ShapeTrace
+from pipekit import Sequential
+from pipekit_array import AssertNoNaN, MeanScalar
+from pipekit_cycle import Cycle, NeuralForward
+from pipekit_experiment import LocalModelRegistry
 
+clean = AssertNoNaN() | MeanScalar(axis=-1)
+out = clean(arr)
 
-class Scale(Operator):
-    def __init__(self, factor: float) -> None:
-        self.factor = factor
-
-    def _apply(self, x):
-        return x * self.factor
-
-
-pipe = Scale(2.0) | ShapeTrace(mode="diff_only") | Scale(3.0)
-result = pipe(5.0)  # → 30.0; ShapeTrace logs the carrier shape between Scales
+op = LocalModelRegistry("/models").load("methane_emulator_v3")
+forecast = Cycle(step_op=NeuralForward(op, dt=3600.0), n_steps=24)
+trajectory, _ = forecast(x0, state)
 ```
 
-Add data assimilation:
+## Three doors
 
-```python
-import pipekit_cycle as pc
+<div class="grid cards" markdown>
 
-forecast = pc.Cycle(
-    step_op=pc.CallableForward(my_model, dt=3600.0),
-    n_steps=24,
-    save_history=True,
-)
-final_carrier, final_state = forecast(initial_carrier, initial_state)
-trajectory = forecast.history  # list of (carrier, state) per saved step
-```
+-   :material-rocket-launch: **[Getting Started](getting-started.md)**
 
-Register a trained model by content hash:
+    ---
 
-```python
-import pipekit_experiment as pe
+    From `git clone` to your first pipeline, first DA cycle, and
+    first registered model. 5 minutes of copy-paste.
 
-registry = pe.LocalModelRegistry("/tmp/models")
-h = registry.store(trained_op, name="methane_emulator_v3")
-loaded = registry.load("methane_emulator_v3")  # resolves the tag
-```
+-   :material-book-open-page-variant: **[Concepts](concepts.md)**
+
+    ---
+
+    The 10-minute mental model. What's an `Operator`? Why
+    carrier-agnostic? How does dispatch work?
+
+-   :material-toolbox: **[Tutorials](tutorials/train-emulator.md)**
+
+    ---
+
+    End-to-end walkthroughs. Train an emulator. Run a DA cycle.
+    Persist via the registry.
+
+-   :material-package-variant: **[Installation](installation.md)**
+
+    ---
+
+    Per-package install matrix. Every extra spelled out.
+
+-   :material-api: **[API Reference](api/pipekit.md)**
+
+    ---
+
+    `mkdocstrings`-generated reference, kept in sync with source.
+
+-   :material-notebook: **[Notebooks](notebooks/pipekit_train_quickstart.ipynb)**
+
+    ---
+
+    Executed Jupyter notebooks — MLP quickstart, train → forecast
+    handoff on a toy oscillator.
+
+</div>
+
+## The packages
+
+| Package              | Status        | Purpose                                                              |
+|----------------------|---------------|----------------------------------------------------------------------|
+| `pipekit`            | ✅ implemented | Core: `Operator`, `Sequential`, `Graph`, control, observe, …         |
+| `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A landed; B-D pending).                   |
+| `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
+| `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |
+| `pipekit-evaluate`   | 📋 scaffolded | Evaluation metrics, lenses, units (planned).                         |
+| `pipekit-train`      | ✅ implemented | Training pipelines — datasets, losses, loop, Equinox adapter.        |
+| `pipekit-jax`        | ✅ implemented | `JaxModelOp` — `eqx.Module` wrapper with registry weight round-trip. |
 
 ## Links
 
-- [pipekit API](api/pipekit.md)
-- [pipekit-cycle API](api/pipekit-cycle.md)
-- [pipekit-experiment API](api/pipekit-experiment.md)
-- [Contributing](contributing.md)
-- [GitHub](https://github.com/jejjohnson/pipekit)
+- [GitHub repository](https://github.com/jejjohnson/pipekit)
 - [Changelog](https://github.com/jejjohnson/pipekit/blob/main/CHANGELOG.md)
+- [Contributing](contributing.md)
+- Master plan: [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan)
