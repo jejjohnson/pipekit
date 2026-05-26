@@ -37,20 +37,27 @@ carry.
 
 ## Step 1 — Forecast-only `Cycle`
 
-Pick or write a step function. For the toy case we use a damped
-oscillator:
+Pick or write a step function. `CallableForward` expects a callable
+shaped like `fn(state, dt) -> new_state` — the physical state is the
+carrier flowing through the `Cycle`, and `dt` is supplied by the
+`CallableForward` wrapper at every step.
 
 ```python
 import numpy as np
 import pipekit_cycle as pc
 
 
-def damped_oscillator_step(x, state):
-    """One Euler step of dx/dt = v; dv/dt = -kx - cv."""
-    new_x = x + state.dt * state.v
-    new_v = state.v + state.dt * (-state.k * x - state.c * state.v)
-    new_state = state.replace(v=new_v)
-    return new_x, new_state
+def damped_oscillator_step(state: np.ndarray, dt: float) -> np.ndarray:
+    """One Euler step of dx/dt = v; dv/dt = -kx - cv.
+
+    State layout: ``np.array([x, v])``. k and c are hard-coded for the
+    toy example; real models close over them via partial / a class.
+    """
+    k, c = 1.0, 0.1
+    x, v = state[0], state[1]
+    new_x = x + dt * v
+    new_v = v + dt * (-k * x - c * v)
+    return np.array([new_x, new_v], dtype=state.dtype)
 ```
 
 (Real users use a `numpy`-flavoured stepper from their domain
@@ -62,11 +69,14 @@ Wrap it as a `ForwardModel`:
 step_op = pc.CallableForward(damped_oscillator_step, dt=0.1)
 ```
 
-Build the `Cycle` and run it:
+Build the `Cycle` and run it. The `Cycle.__call__` signature is
+`(carrier, state) -> (carrier, state)`; passing `state=None` is fine
+for a forecast-only run with no algorithm-level bookkeeping:
 
 ```python
+x0 = np.array([1.0, 0.0], dtype=np.float32)
 forecast = pc.Cycle(step_op=step_op, n_steps=100, save_history=True)
-x_final, state_final = forecast(x0, initial_state)
+x_final, _ = forecast(x0, None)
 
 trajectory = forecast.history  # list of (carrier, state) per saved step
 ```

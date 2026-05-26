@@ -141,7 +141,7 @@ forecast = pc.Cycle(
 )
 
 x0 = np.array([0.0], dtype=np.float32)
-final, state = forecast(x0, pc.IterationState(step=0))
+final, _ = forecast(x0, None)  # state=None is fine for a forecast-only run
 print(forecast.history)  # trajectory of (carrier, state) per step
 ```
 

@@ -81,13 +81,16 @@ uv add pipekit-train                    # core training surface (no backend)
 uv add 'pipekit-train[equinox]'         # Equinox + Optax + Grain + Orbax adapter
 uv add 'pipekit-train[lightning]'       # Lightning adapter (v0.2 — pending)
 uv add 'pipekit-train[keras]'           # Keras 3 adapter (v0.3 — pending)
-uv add 'pipekit-train[catalog]'         # geocatalog CatalogDataset support
 uv add 'pipekit-train[cycle]'           # SimulationDataset over pipekit-cycle
 uv add 'pipekit-train[experiment]'      # LogToExperiment callback
 uv add 'pipekit-train[cache]'           # local-fs CachedDataset (zarr)
 uv add 'pipekit-train[s3]'              # cloud-fs CachedDataset (zarr + fsspec)
 uv add 'pipekit-train[gcs]'             # GCS variant
 ```
+
+(A `[catalog]` extra for geocatalog `CatalogDataset` support is
+documented in the pipekit-train design but lands only once geocatalog
+publishes to PyPI; it isn't declared in `pyproject.toml` today.)
 
 Typical combo for a JAX user shipping reproducible training:
 

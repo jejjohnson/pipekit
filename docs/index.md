@@ -11,17 +11,16 @@ emulator drops into a forecast `Cycle` as a step function. One mental
 model, one composition surface, end to end.
 
 ```python
-from pipekit import Sequential
-from pipekit_array import AssertNoNaN, MeanScalar
 from pipekit_cycle import Cycle, NeuralForward
 from pipekit_experiment import LocalModelRegistry
 
-clean = AssertNoNaN() | MeanScalar(axis=-1)
-out = clean(arr)
+# Reload a trained model by name and forecast 24 steps with it
+# as the forward model — same Operator interface as inference.
+registry = LocalModelRegistry("/models")
+op = registry.load("methane_emulator_v3")
 
-op = LocalModelRegistry("/models").load("methane_emulator_v3")
 forecast = Cycle(step_op=NeuralForward(op, dt=3600.0), n_steps=24)
-trajectory, _ = forecast(x0, state)
+final_state, _ = forecast(x0, None)
 ```
 
 ## Three doors

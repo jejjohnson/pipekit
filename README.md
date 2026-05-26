@@ -22,19 +22,16 @@ registry. No glue scripts, no separate "train" and "serve" codebases
 — one mental model, one composition surface.
 
 ```python
-from pipekit import Sequential
-from pipekit_array import AssertNoNaN, MeanScalar          # array QC + reduction
-from pipekit_cycle import Cycle, NeuralForward             # time-stepping
-from pipekit_experiment import LocalModelRegistry           # registry
+from pipekit_cycle import Cycle, NeuralForward
+from pipekit_experiment import LocalModelRegistry
 
-# Build a pipeline:
-clean = AssertNoNaN() | MeanScalar(axis=-1)
-out = clean(arr)
+# Reload a trained model by name and forecast 24 steps with it
+# as the forward model — same Operator interface as inference.
+registry = LocalModelRegistry("/models")
+op = registry.load("methane_emulator_v3")
 
-# Reload a trained model and forecast 24 steps:
-op = LocalModelRegistry("/models").load("methane_emulator_v3")
 forecast = Cycle(step_op=NeuralForward(op, dt=3600.0), n_steps=24)
-trajectory, _ = forecast(x0, state)
+final_state, _ = forecast(x0, None)
 ```
 
 ---
