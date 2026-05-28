@@ -113,15 +113,15 @@ LatentDACycle(
     analysis_step: AnalysisStep,
     forecast_space: Literal["x", "z"] = "z",   # strong=z, hybrid=x
     update_space:   Literal["x", "z"] = "z",   # prior-only=x, strong=z, hybrid=z
-    re_encode_every: int = 1,
+    re_encode_every: int | None = 1,           # None=never, 0=unused, k>=1=every k
     ...
 )
 ```
 
 | Flavour | `forecast_space` | `update_space` | `re_encode_every` |
 |---|---|---|---|
-| Strong-latent | `z` | `z` | `inf` (z is canonical) |
-| Prior-only | `x` | `x` | `0` (encode used inside cost only) |
+| Strong-latent | `z` | `z` | `None` (never re-encode; z is canonical) |
+| Prior-only | `x` | `x` | `0` (encode unused; AE used inside cost only) |
 | Hybrid | `x` | `z` | `1` (encode after every forecast) |
 
 The orchestrator owns the bookkeeping; algorithm libraries supply
@@ -136,6 +136,13 @@ All four are `runtime_checkable` and live in a new module
 plumax) satisfy them structurally — no inheritance, no pipekit import
 required.
 
+**Naming convention.** All three AE protocols use explicit
+`.encode` / `.decode` method names — *not* `__call__`. A typical
+autoencoder exposes `.encode` and `.decode` already; making the
+protocols match means any AE satisfies them out of the box, and
+`LatentMap` reduces to "object that exposes both methods" rather than
+"object that is itself callable as a decoder".
+
 ```python
 # pipekit_cycle/latent.py
 from __future__ import annotations
@@ -146,7 +153,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 class Encoder(Protocol):
     """Map full state to latent code.  φ: x ↦ z."""
 
-    def __call__(self, state: Any) -> Any: ...
+    def encode(self, state: Any) -> Any: ...
 
     @property
     def latent_dim(self) -> int | None: ...
@@ -156,40 +163,41 @@ class Encoder(Protocol):
 class Decoder(Protocol):
     """Map latent code to full state.  ψ: z ↦ x_hat."""
 
-    def __call__(self, latent: Any) -> Any: ...
+    def decode(self, latent: Any) -> Any: ...
 
     @property
     def state_signature(self) -> Any: ...
 
 
 @runtime_checkable
-class LatentMap(Protocol):
-    """Bundle of (Encoder, Decoder) — the autoencoder side of latent DA.
+class LatentMap(Encoder, Decoder, Protocol):
+    """An object that is both an Encoder and a Decoder.
 
-    The two halves are separated by Protocol so an algorithm can declare
-    "I only need to decode" (e.g. when the analysis ensemble already
-    lives in z and we never re-encode).  ``LatentMap`` is the union when
-    both halves are needed.
+    A typical autoencoder is the canonical example.  ``LatentMap`` is
+    the union when an algorithm needs to round-trip (encode then
+    decode, or vice versa); ``Encoder`` and ``Decoder`` alone are kept
+    for the asymmetric cases (e.g., amortised posterior code paths
+    that only need ``encode``, lifted observation operators that only
+    need ``decode``).
     """
 
-    def encode(self, state: Any) -> Any: ...
-    def decode(self, latent: Any) -> Any: ...
-
-    @property
-    def latent_dim(self) -> int | None: ...
-
-    @property
-    def state_signature(self) -> Any: ...
+    # All four members are inherited from Encoder and Decoder:
+    #   encode(self, state) -> Any
+    #   decode(self, latent) -> Any
+    #   @property latent_dim -> int | None
+    #   @property state_signature -> Any
 
 
 @runtime_checkable
 class LatentForwardModel(Protocol):
     """Forward dynamics in latent space.  M_z: z ↦ z.
 
-    Marker protocol — structurally identical to ``ForwardModel`` but
-    with the semantic claim that ``state`` is a latent code, not a full
-    physical state.  Used so ``LatentDACycle`` can refuse a plain
-    ``ForwardModel`` in ``forecast_space="z"`` mode and vice versa.
+    Marker protocol — same shape as ``ForwardModel.step`` but with
+    ``latent_signature`` in place of ``state_signature`` to carry the
+    semantic claim that the argument is a latent code, not a full
+    physical state.  ``LatentDACycle`` uses isinstance gates against
+    this protocol to refuse a plain ``ForwardModel`` in
+    ``forecast_space="z"`` mode (and vice versa).
     """
 
     def step(self, latent: Any, dt: float) -> Any: ...
@@ -241,17 +249,19 @@ class LiftedObservationOperator(Operator):
     inner: ObservationOperator
 
     def __call__(self, latent):
-        return self.inner(self.decoder(latent))
+        return self.inner(self.decoder.decode(latent))
 
     def linearize(self, latent):
-        x_hat = self.decoder(latent)
+        x_hat = self.decoder.decode(latent)
         H_lin = self.inner.linearize(x_hat)         # x-space tangent
-        psi_lin = _jacobian_of(self.decoder, latent)
+        psi_lin = _jacobian_of(self.decoder.decode, latent)
         return _compose_linops(H_lin, psi_lin)
 ```
 
-The `_jacobian_of` helper is library-specific — for an `eqx.Module`
-decoder it is `jax.jacfwd` / `jax.jacrev` wrapped as a
+Because `LatentMap` is a subtype of `Decoder`, callers pass either a
+bare `Decoder` or a full `LatentMap` directly — no `.decode` extraction
+at the call site. The `_jacobian_of` helper is library-specific — for
+an `eqx.Module` decoder it is `jax.jacfwd` / `jax.jacrev` wrapped as a
 `lineax.AbstractLinearOperator`; for symbolic decoders it can be a
 materialised matrix. Implementations live in `pipekit-jax` or
 algorithm libraries, not in `pipekit-cycle`.
@@ -293,30 +303,50 @@ helper and supply a `LatentForwardModel` directly.
 
 ## 6  Carry state — `LatentDAState`
 
-The existing `DAState` tracks model time, cycle count, and an
-`obs_err_cov`. Latent cycling needs three more fields, encapsulated in
-a subclass that satisfies `CarryState`:
+The existing `DAState` is a plain mutable `CarryState` subclass with an
+explicit `__init__` — `_advance_da_state` in
+`pipekit_cycle/da.py` mutates `t` and `cycle_count` in place.
+`LatentDAState` must preserve that contract:
 
 ```python
-@dataclass(frozen=True)
 class LatentDAState(DAState):
     """DAState + latent bookkeeping.
 
-    Fields:
-        latent_state: current z (None until first encode).
-        last_encoded_t: model time at which latent_state was last
+    Extends the parent constructor with three latent fields.  Mutable,
+    matching ``DAState``, so ``_advance_da_state`` and friends keep
+    working.
+
+    Attributes:
+        latent_state: current z (``None`` until the first encode).
+        last_encoded_t: model time at which ``latent_state`` was last
             synchronised with the x-space state.  Used by the
             re-encode policy.
         latent_signature: shape / dtype hint for the latent space.
     """
 
-    latent_state: Any = None
-    last_encoded_t: float | None = None
-    latent_signature: Any = None
+    def __init__(
+        self,
+        t: float = 0.0,
+        cycle_count: int = 0,
+        obs_err_cov: Any = None,
+        extras: dict[str, Any] | None = None,
+        *,
+        latent_state: Any = None,
+        last_encoded_t: float | None = None,
+        latent_signature: Any = None,
+    ) -> None:
+        super().__init__(
+            t=t, cycle_count=cycle_count,
+            obs_err_cov=obs_err_cov, extras=extras,
+        )
+        self.latent_state = latent_state
+        self.last_encoded_t = last_encoded_t
+        self.latent_signature = latent_signature
 ```
 
 Subclassing `DAState` (not replacing it) keeps every existing
-`AnalysisStep` consumer compatible — they read only the parent fields.
+`AnalysisStep` consumer compatible — they read only the parent
+fields — and keeps `_advance_da_state`'s in-place mutation valid.
 
 ---
 
@@ -333,39 +363,57 @@ The orchestrator. Builds on `DACycle`; differs in three places:
    $z$ from $x$ (hybrid mode), or $\psi$ to resynchronise $x$ from $z$
    (strong mode).
 
+Calling convention notes (matching the existing `DACycle` in
+`pipekit_cycle/da.py`):
+
+* `forward_model.step(state, dt)` takes the model's integration
+  timestep, *not* the clock time. We read it from
+  `self.forward_model.dt`.
+* `obs_source(i)` is an `Operator` invoked with the **step index**
+  inside the cycle (zero-based), matching `DACycle.obs_source(i)`.
+* `re_encode_every: int | None` — `None` means "never re-encode"
+  (strong-latent: `z` is canonical), `0` means "encode is unused"
+  (prior-only: x is canonical), `k >= 1` means "encode every `k`
+  cycles" (hybrid).
+
 ```python
 class LatentDACycle(StatefulOperator):
     forward_model: ForwardModel | LatentForwardModel
     latent_map: LatentMap
     obs_op: ObservationOperator             # x-space, always
     analysis_step: AnalysisStep
-    obs_source: Callable | None = None
+    obs_source: Operator | None = None
 
     forecast_space: Literal["x", "z"] = "z"
     update_space: Literal["x", "z"] = "z"
-    re_encode_every: int = 1                # 0 = never; inf = strong
+    re_encode_every: int | None = 1         # None = never; 0 = unused; k>=1 = every k
     n_steps: int = 1
     save_history: bool = False
 
     def _apply(self, carrier, state: LatentDAState):
+        dt = self.forward_model.dt          # integration timestep
+
         # 1. Forecast
         if self.forecast_space == "z":
             z = state.latent_state
-            z = self.forward_model.step(z, state.t)  # LatentForwardModel
-            x = None  # lazily decoded if needed by obs_source / save
+            z = self.forward_model.step(z, dt)       # LatentForwardModel
+            x = None  # lazily decoded if needed by save_history
         else:
-            x = self.forward_model.step(carrier, state.t)  # ForwardModel
+            x = self.forward_model.step(carrier, dt) # ForwardModel
             z = None
 
-        # 2. Get observations (in y-space, never lifted)
-        y = self.obs_source(state) if self.obs_source else None
+        # 2. Get observations (in y-space, never lifted).
+        #    obs_source is called with the step index — same convention
+        #    as DACycle.  The cycle's outer loop (not shown) passes `i`.
+        y = self.obs_source(i) if self.obs_source is not None else None
 
         # 3. Analysis
         if y is not None:
             if self.update_space == "z":
                 z = z if z is not None else self.latent_map.encode(x)
+                # LatentMap is a subtype of Decoder — pass it directly.
                 lifted_H = LiftedObservationOperator(
-                    decoder=self.latent_map, inner=self.obs_op
+                    decoder=self.latent_map, inner=self.obs_op,
                 )
                 z = self.analysis_step(
                     forecast=z, obs=y,
@@ -437,7 +485,7 @@ cycle = pc.LatentDACycle(
     analysis_step=flx.LatentETKF(ae=ae),   # filterax wrapper, see below
     obs_source=satellite_obs,
     forecast_space="z", update_space="z",
-    re_encode_every=10**9,                 # never re-encode
+    re_encode_every=None,                  # never re-encode (strong-latent)
     n_steps=24,
 )
 
