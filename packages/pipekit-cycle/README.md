@@ -62,6 +62,13 @@ adapter classes that satisfy the runtime-checkable Protocols in
 algorithm core; the conventional location is
 `<libname>.adapters.pipekit`.
 
+## Design docs
+
+- [Latent Data Assimilation](docs/design/latent.md) — adds `Encoder`,
+  `Decoder`, `LatentMap`, `LatentForwardModel` protocols and a
+  `LatentDACycle` orchestrator that supports strong-latent / hybrid /
+  prior-only flavours. Status: draft v0.1.
+
 ## References
 
 Master plan: [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md).
