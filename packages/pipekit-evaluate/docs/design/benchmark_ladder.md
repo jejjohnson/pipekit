@@ -1,11 +1,15 @@
 # Design — The Benchmark Ladder
 
-> **Status — draft v0.1 (design only, no code).** A proposal for the
-> *orchestration* layer of `pipekit-evaluate`: how we turn the staggered
+> **Status — draft v0.1 (design only, no code).** The *orchestration*
+> layer of `pipekit-evaluate`: how we turn the staggered
 > simulation-based-inference (SBI) workflow into a reproducible,
-> cross-domain benchmark. This document does **not** change the planned
-> `Unit × Lens × Stage` scorer taxonomy in the package README — it sits
-> on top of it.
+> cross-domain benchmark. This document is **domain-independent** — it
+> does **not** change the planned `Unit × Lens × Stage` scorer taxonomy in
+> the package README (it sits on top of it), and it does not hard-code any
+> single domain. Concrete per-domain instances live in the pilot docs:
+> [`plume_pilot.md`](plume_pilot.md), [`ocean_pilot.md`](ocean_pilot.md),
+> [`land_extremes_pilot.md`](land_extremes_pilot.md), and
+> [`fusion_pilot.md`](fusion_pilot.md).
 
 ---
 
@@ -13,16 +17,16 @@
 
 Across our favourite problems — methane plumes, ocean state, atmosphere,
 land extremes — we keep re-deriving the same staircase. We have a
-generative physical story, an expensive-but-exact way to invert it, and a
-desire to replace that expensive inversion with something fast (an
-emulator, then a direct predictor). Each rung is only trustworthy if it
-reproduces the rung below it.
+generative story, an expensive-but-exact way to invert it, and a desire to
+replace that expensive inversion with something fast (an emulator, then a
+direct predictor). Each rung is only trustworthy if it reproduces the rung
+below it.
 
 That staircase is the benchmark. The framework's job is to make *"rung
-N's output is the ground truth for rung N+1"* a first-class,
-reproducible, domain-agnostic object — and to score each rung with the
-right critique (point error is not enough; we care about calibrated
-posteriors and physical consistency).
+N's output is the ground truth for rung N+1"* a first-class, reproducible,
+domain-agnostic object — and to score each rung with the right critique
+(point error is not enough; we care about calibrated posteriors and
+physical consistency).
 
 The differentiator here is **not** any single model. It is the
 **validation protocol and the framework** that make the comparison fair,
@@ -62,7 +66,7 @@ This maps onto packages we already have: discovery/index at L0–L1
 A benchmark *cell* is a `(data level, inference rung)` pair. A
 **benchmark run** fills cells and scores each against its designated
 reference. This `level × rung` matrix is the single mental model that
-generalises across all four domains.
+generalises across every domain.
 
 ---
 
@@ -89,9 +93,9 @@ Benchmark (this doc)         orchestration: tasks, rungs, references, runs
 
 Concretely: the ladder's "score rung 4 against the oracle's posterior"
 is implemented as a **Probabilistic Lens** over a **Statistic Unit**;
-"check the plume conserves mass" is a **Physical-constraint Lens** over a
+"check a conservation law holds" is a **Physical-constraint Lens** over a
 **Budget Unit**. The ladder picks *which* `(Unit, Lens)` pairs are
-mandatory for each cell.
+mandatory for each cell; the pilot docs say which apply per domain.
 
 ---
 
@@ -120,7 +124,7 @@ protocols, so a benchmark task is assembled from the same parts a
 class Task(Protocol):
     """One scenario: prior + simulator + obs operator + reference data."""
     name: str
-    domain: str                      # "plume" | "ocean" | "atmosphere" | ...
+    domain: str                      # "plume" | "ocean" | "land" | "fusion" | ...
 
     def prior(self) -> Distribution: ...
     def simulator(self) -> ForwardModel: ...        # rung 1 (pipekit-cycle)
@@ -170,7 +174,8 @@ The single invariant that makes this a benchmark and not five scripts:
 
 This table is data, not code branches — it lives on the `Task` so each
 domain can override it (e.g. a domain with no tractable oracle falls back
-to known-θ coverage only).
+to known-θ coverage only; see `land_extremes_pilot.md` and
+`fusion_pilot.md`).
 
 ---
 
@@ -192,12 +197,11 @@ the existing **Lens** axis; we are specifying *which* are non-optional.
      thing", and almost nobody reports it.
 
 2. **Physical consistency (Physical-constraint Lens over Budget Unit).**
-   We can check conservation because the operators already exist:
-   mass/flux budgets for plumes, geostrophic balance / streamfunction
-   for ocean (`xrtoolz.ocn`), column-averaging-kernel consistency for
-   CH₄ (`xrtoolz.atm.gas.ch4`). A prediction that fits the data but
-   violates a conservation law should score badly — most ML benchmarks
-   never check this.
+   Check conservation/balance laws where the operators exist: mass/flux
+   budgets, geostrophic/hydrostatic balance (`xrtoolz.ocn`), column
+   averaging kernels (`xrtoolz.atm.gas.ch4`). A prediction that fits the
+   data but violates a physical law should score badly — most ML
+   benchmarks never check this. Each pilot doc lists its constraints.
 
 3. **Point + spectral (Point-wise / Spectral Lens).** RMSE/bias plus
    power-spectral and structural metrics (`xrtoolz.geo` spectral/metrics)
@@ -209,34 +213,7 @@ the SBC/coverage/posterior-distance pieces are the genuinely new code.
 
 ---
 
-## 6. Pilot vertical slice — plume / methane
-
-The pilot is chosen because every rung already has an implementation in
-`research_notebook/projects/plume_simulation` — we are wiring existing
-parts into the protocol, not writing physics.
-
-| Rung | Plume realisation (existing symbols)                                            |
-|------|--------------------------------------------------------------------------------|
-| (1)  | `gauss_plume.simulate_plume` / `gauss_puff.simulate_puff` (forward `ForwardModel`) |
-| obs  | `radtran` SRF + matched-filter retrieval (L1 radiance → L2 enhancement)         |
-| (2)  | `gauss_plume.infer_emission_rate` (NumPyro NUTS) — the **oracle** posterior over Q |
-| (3)  | emulator of the forward model via `pipekit-train` + `pipekit-jax` (`JaxModelOp`) |
-| (4)  | rung-2 inference with the emulator swapped in as `ForwardModel`                 |
-| (5)  | amortized net: retrieved scene → posterior over (Q, stability class)           |
-| (6)  | swap `gauss_puff` → `les_fvm` (higher-fidelity Eulerian truth) and re-score     |
-
-Headline pilot question: *how well do rungs 4 and 5 recover the rung-2
-NUTS posterior over emission rate Q (and the categorical stability
-class), and do their plumes still conserve mass?*
-
-Higher-fidelity truth is already available: `les_fvm` (finitevolX
-Eulerian advection–diffusion) is the L2/L3 reference for the rung-6
-"improve" step, and `gauss_puff` already has a cross-check notebook
-against it.
-
----
-
-## 7. Where code lives
+## 6. Where code lives
 
 | Concern                                   | Home                                            |
 |-------------------------------------------|-------------------------------------------------|
@@ -245,7 +222,7 @@ against it.
 | Simulator / obs / analysis protocols      | `pipekit-cycle` (reused, not duplicated)        |
 | Runs, registry, reproducibility artifacts | `pipekit-experiment` (`Run`, `LocalModelRegistry`) |
 | Domain physics + per-domain `Task` impls  | `xrtoolz` (`ocn`/`atm`/`rs`) + project packages |
-| Pilot `Task` (plume) + run driver         | `research_notebook/projects/plume_simulation` (Hydra + DVC) |
+| Per-domain `Task` + run driver            | `research_notebook/projects/*` (Hydra + DVC) — see the pilot docs |
 
 Rationale: the framework stays carrier-agnostic and reusable; physics and
 runnable experiments stay in their existing homes. A domain joins the
@@ -254,34 +231,38 @@ benchmark by shipping one `Task` implementation — nothing in
 
 ---
 
-## 8. Build order (vertical slice first)
+## 7. Build order (vertical slice first)
 
-Per `AGENTS.md` (Simplicity First, Goal-Driven): build the plume slice
-end-to-end, then *extract* the abstraction. Do not design the protocols
-in the abstract first.
+Per `AGENTS.md` (Simplicity First, Goal-Driven): build **one** pilot
+vertical slice end-to-end, then *extract* the abstraction. Do not design
+the protocols in the abstract first.
 
 ```
-1. Protocol stubs + a plume Task wrapping existing forward/oracle
+1. Protocol stubs + one pilot Task wrapping an existing forward + oracle
    -> verify: Benchmark.run() executes rung 2 vs known-θ on a toy scene
 2. Probabilistic scorers (SBC ranks, coverage, CRPS via properscoring)
    -> verify: SBC on the oracle is ~uniform on a well-specified toy
 3. Posterior-distance scorers (C2ST / MMD / sliced-Wasserstein)
    -> verify: identical posteriors score ~0; shifted posteriors score >0
-4. Emulator rung (3) + emulator-inference rung (4) via pipekit-train/jax
+4. Emulator rung (3) + emulator-inference rung (4)
    -> verify: rung-4 posterior-distance to oracle below a set threshold
-5. Physical-constraint scorer (mass budget)
-   -> verify: a deliberately mass-violating field is flagged
+5. Domain physical-constraint scorer
+   -> verify: a deliberately constraint-violating field is flagged
 6. Amortized rung (5) + the level × rung BenchmarkReport + DVC wiring
    -> verify: reproducible report regenerates byte-stable metrics
 ```
 
-Only after rungs 1–6 work for plume do we add a second domain (ocean is
-the natural next, given `xrtoolz.ocn` + `somax`) — and the only new code
-should be its `Task`.
+The recommended first slice is the **plume** pilot (every rung already
+exists). Each pilot doc carries its own domain-specific build order —
+[`plume_pilot.md`](plume_pilot.md), [`ocean_pilot.md`](ocean_pilot.md),
+[`land_extremes_pilot.md`](land_extremes_pilot.md),
+[`fusion_pilot.md`](fusion_pilot.md). Only once a slice works end-to-end
+do we add the next domain — the only new code per domain should be its
+`Task`.
 
 ---
 
-## 9. Open questions / decisions for review
+## 8. Open questions / decisions for review
 
 1. **Posterior representation.** Standardise on samples (works for NUTS
    + most amortized nets) and treat density-returning estimators as
@@ -291,7 +272,7 @@ should be its `Task`.
    thin protocol vs reuse NumPyro/`distrax`. Proposed: a minimal local
    `Prior` protocol (`sample`, optional `log_prob`) to avoid a hard SBI
    dependency in `pipekit-evaluate` core.
-3. **Oracle-less domains.** Land extremes may have no tractable oracle.
+3. **Oracle-less domains.** Some domains may have no tractable oracle.
    The reference table (§4.3) already allows a known-θ-only fallback —
    confirm that is acceptable, or do we require a designated oracle per
    domain?
@@ -304,12 +285,15 @@ should be its `Task`.
 
 ---
 
-## 10. References
+## 9. References
 
 - Package taxonomy: `packages/pipekit-evaluate/README.md`
   (Unit × Lens × Stage).
 - Reused protocols: `packages/pipekit-cycle/README.md`
   (`ForwardModel`, `ObservationOperator`, `AnalysisStep`).
 - Registry / runs: `packages/pipekit-experiment/README.md`.
-- Pilot physics: `research_notebook/projects/plume_simulation/README.md`.
+- Per-domain pilots: [`plume_pilot.md`](plume_pilot.md),
+  [`ocean_pilot.md`](ocean_pilot.md),
+  [`land_extremes_pilot.md`](land_extremes_pilot.md),
+  [`fusion_pilot.md`](fusion_pilot.md).
 - Master plan: Report 11 — pipekit-evaluate.
