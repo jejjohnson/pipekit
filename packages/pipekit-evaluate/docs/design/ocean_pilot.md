@@ -1,9 +1,12 @@
 # Design — Ocean Pilot (a second `Task`)
 
 > **Status — draft v0.1 (design only, no code).** A companion to
-> [`benchmark_ladder.md`](benchmark_ladder.md). It works the same staggered
-> ladder for a sea-surface ocean problem (SSH / SST / SSS / ocean colour)
-> to show that **a new domain joins the benchmark by shipping one `Task`
+> [`benchmark_ladder.md`](benchmark_ladder.md), alongside
+> [`plume_pilot.md`](plume_pilot.md),
+> [`land_extremes_pilot.md`](land_extremes_pilot.md) and
+> [`fusion_pilot.md`](fusion_pilot.md). It works the same staggered ladder
+> for a sea-surface ocean problem (SSH / SST / SSS / ocean colour) to show
+> that **a new domain joins the benchmark by shipping one `Task`
 > implementation** — every protocol, scorer, and runner is reused.
 
 ---
@@ -63,11 +66,67 @@ several already exist as `xrtoolz.ocn` operators:
 | ocean colour C | advection–reaction tracer, non-negative + cloud mask | `Advection` |
 
 So the SSH/SST/SSS/OC observation operators are *compositions of operators
-that already ship*; the `Task` wires them, it doesn't invent physics.
+that already ship*; the `Task` wires them, it doesn't invent physics. The
+physical basis of each observable — what generates it and what constrains
+it — is set out in §3.
 
 ---
 
-## 3. L0–L4, instantiated for the ocean
+## 3. Physical basis for the measured variables
+
+The pilot already uses physical observation operators (§2) and
+physical-constraint Lenses (§7); this section makes the physical basis
+explicit and adds models likely **not yet exploited**. Each can play up to
+three roles: **(G)** generative rung-1, **(P)** physically-informed prior,
+**(C)** physical-constraint Lens.
+
+### 3.1 Per-variable physical models
+
+| Variable | Physical model / relation | Role | Builds on |
+|----------|---------------------------|------|-----------|
+| **SSH** | **Geostrophic balance** — SSH gradient ↔ surface current | obs op, C | `xrtoolz.ocn.GeostrophicVelocities` (shipped) |
+| | **Surface Quasi-Geostrophy (SQG)** — surface buoyancy ↔ interior; reconstruct subsurface/eddies from SSH (SQG spectral prior) | P, G | `interpolation` project; `gaussx` kernel |
+| | **Steric + mass SSH budget** — η = thermosteric + halosteric + barotropic; links SSH to the T/S column + bottom pressure | C | `xrtoolz.ocn` density ops |
+| **SST** | **Surface heat budget** — ρcₚh ∂T/∂t = Q_net − ∇·(advective heat); net air–sea flux drives SST tendency | G, C | `finitevolX`, `xrtoolz` |
+| | **COARE bulk-flux + diurnal warm layer + cool skin** (Fairall et al.) — skin vs bulk SST; matches satellite IR SST to model/in-situ | obs op | *new* flux op |
+| | tracer **advection–diffusion** | G, C | `xrtoolz.ocn.Advection` (shipped) |
+| **SSS** | **Salinity / freshwater budget** — ∂S/∂t from (E−P−R) + advection + mixing | G, C | `finitevolX`, `xrtoolz` |
+| | **T–S / water-mass relationship** — physically links S to T | C | `xrtoolz.ocn` |
+| **Ocean colour** | **Bio-optical model** — Chl ↔ remote-sensing reflectance R_rs (case-1 algorithms); inherent optical properties | obs op | *new*; `geonnax` for learned R_rs↔Chl |
+| | **NPZD biogeochemistry** (nutrient–phytoplankton–zooplankton–detritus) — dynamical basis for Chl; advection–reaction | G | `finitevolX` reaction–advection |
+| | **In-water light attenuation** (Beer–Lambert) / euphotic depth | C (≥0) | *new* |
+
+### 3.2 Cross-variable couplings
+
+The same physics couples the four channels (so they are not independent) —
+the basis for multivariate constraint Lenses:
+
+- **Thermal-wind balance** — vertical shear of the geostrophic velocity ↔
+  horizontal density (T, S) gradients; ties SSH/velocity to subsurface
+  T/S structure. (C)
+- **Ekman pumping** — wind-stress curl → vertical velocity → upwelling →
+  SST cooling + ocean-colour blooms; couples *all four* channels. (G, C)
+- **Mixed-layer dynamics** — sets the surface expression of SST/SSS/Chl. (C)
+  Builds on `xrtoolz.ocn.MixedLayerDepth`, `BruntVaisalaFrequency`.
+
+### 3.3 What this changes in the pilot
+
+- **Rung 1 gains physical generative options** beyond a bare `somax` QG
+  tracer advection: NPZD for ocean colour, surface heat/freshwater budgets
+  for SST/SSS, SQG to generate a physically-consistent subsurface from SSH.
+- **Physically-informed priors** — the SQG spectral prior on SSH (already
+  noted in the `interpolation` project) is a physics-based kernel for the
+  GP/static-prior analysis.
+- **New constraint Lenses** (added to §7): thermal-wind consistency,
+  steric-SSH closure, Ekman-pumping/upwelling consistency, T–S
+  relationship, ocean-colour non-negativity.
+- **Heavy reuse**: `somax` (dynamics), `finitevolX` (advection–reaction,
+  budgets), `xrtoolz.ocn` (geostrophy, MLD, stratification — shipped),
+  `geonnax` (bio-optical / spatial bases).
+
+---
+
+## 4. L0–L4, instantiated for the ocean
 
 | Level | Ocean instantiation | Tooling |
 |-------|---------------------|---------|
@@ -80,14 +139,14 @@ that already ship*; the `Task` wires them, it doesn't invent physics.
 The two arrows that the ladder scores hardest:
 
 - **L2 → L3 (analysis / interpolation).** Sparse, multi-channel,
-  gappy obs → dense gridded state. Two estimator families (§5).
+  gappy obs → dense gridded state. Two estimator families (§6).
 - **L3 → L4 (forecast).** Initial analysed state → future state; scored
   by lead-time skill against a `somax` truth run (Lyapunov-clock view,
   exactly as the `assimilation` project already plots).
 
 ---
 
-## 4. The six rungs, mapped to real symbols
+## 5. The six rungs, mapped to real symbols
 
 | Rung | Ocean realisation | Package / symbol |
 |------|-------------------|------------------|
@@ -105,7 +164,7 @@ per-variable scorer selection.
 
 ---
 
-## 5. Two analysis flavours — both are `Estimator`s
+## 6. Two analysis flavours — both are `Estimator`s
 
 The `interpolation` project already lays out the two stacks for L2→L3 SSH
 mapping; in the benchmark they are simply two `Estimator` implementations
@@ -126,7 +185,7 @@ against the known `somax` truth.
 
 ---
 
-## 6. Multi-channel scoring (where the ocean moat is)
+## 7. Multi-channel scoring (where the ocean moat is)
 
 Each observable gets its own scorers, drawn from the existing
 `Unit × Lens` taxonomy. The ocean adds **physical-constraint** and
@@ -137,7 +196,7 @@ Each observable gets its own scorers, drawn from the existing
 | Point-wise (Field) | per-variable RMSE/bias for SSH/SST/SSS/OC | `xrtoolz.geo` metrics, `xskillscore` |
 | Spectral (Statistic) | SSH / KE wavenumber spectra — catch over-smoothing | `xrtoolz.geo` spectral; `KineticEnergy`, `EddyKineticEnergy` |
 | Probabilistic (Statistic) | coverage / CRPS / SBC; posterior-distance to Strong-4DVar oracle | `properscoring`, `vardax.simulation_based_calibration`, `vardax.assert_posterior_agreement` |
-| **Physical-constraint (Budget)** | geostrophic balance residual; near-zero surface divergence; PV consistency; tracer mass conservation; ocean-colour non-negativity | `GeostrophicVelocities`, `Divergence`, `PotentialVorticityBarotropic`, `Advection` |
+| **Physical-constraint (Budget)** | geostrophic balance residual; near-zero surface divergence; PV consistency; tracer mass conservation; ocean-colour non-negativity; **thermal-wind consistency; steric-SSH closure; Ekman-pumping/upwelling** (§3) | `GeostrophicVelocities`, `Divergence`, `PotentialVorticityBarotropic`, `Advection`, `MixedLayerDepth` |
 | **Detection (Event)** | eddy detection (Okubo–Weiss), front detection (frontogenesis) — hit/miss on coherent structures | `OkuboWeiss`, `Frontogenesis` |
 
 The headline ocean question: *does a fast estimator (rung 4/5) reconstruct
@@ -148,7 +207,7 @@ lenses are precisely what a pure-RMSE leaderboard misses.
 
 ---
 
-## 7. Ocean-specific benchmark axes
+## 8. Ocean-specific benchmark axes
 
 Beyond the `level × rung` matrix, the ocean `Task` exposes three sweep
 axes that the report should stratify over:
@@ -166,15 +225,16 @@ axes that the report should stratify over:
 
 ---
 
-## 8. Where code lives (ocean specifics)
+## 9. Where code lives (ocean specifics)
 
-Same split as `benchmark_ladder.md §7`; the ocean-specific homes:
+Same split as `benchmark_ladder.md §6`; the ocean-specific homes:
 
 | Concern | Home |
 |---------|------|
 | Ocean `Task` (state, obs operators, datasets, reference table) | `research_notebook/projects/` (new `ocean_benchmark`, sibling to `assimilation`/`interpolation`) |
 | Dynamics (rung 1) | `somax` |
 | Observation operators + physical-constraint / detection lenses | `xrtoolz.ocn` (reused) |
+| Physical generators / budgets (NPZD, heat/freshwater, SQG) | *new* ops on `finitevolX`; `somax` |
 | Oracle + amortized estimators | `vardax` adapters satisfying `pipekit_cycle.AnalysisStep` |
 | Emulator (rung 3) | `geonnax` + `pipekit-train`/`pipekit-jax` |
 | Static-prior analysis estimator | `gaussx` + `pyrox` |
@@ -186,7 +246,7 @@ concrete prototype to generalise into `pipekit-evaluate`'s `Benchmark`.
 
 ---
 
-## 9. Build order (ocean slice)
+## 10. Build order (ocean slice)
 
 ```
 1. Ocean Task: somax barotropic-QG truth + SSH-only obs operator (along-track)
@@ -208,7 +268,7 @@ existing `gaussx`/`geonnax`/`vardax` code through the protocols.
 
 ---
 
-## 10. Open questions (ocean-specific)
+## 11. Open questions (ocean-specific)
 
 1. **State representation for the oracle.** 4DVar over ψ/q vs over (h,u,v)
    — pick per `somax` model, or standardise on ψ for QG? Proposed: follow
@@ -218,17 +278,20 @@ existing `gaussx`/`geonnax`/`vardax` code through the protocols.
    variable-f? Proposed: reference f0 for the pilot, document the
    approximation.
 3. **Ocean-colour reaction term.** Pure advection (conservative tracer) for
-   the pilot, or a minimal NPZ-style source? Proposed: advection-only
-   first; reaction is a rung-6 "improve" upgrade.
+   the pilot, or a minimal NPZD-style source (§3)? Proposed: advection-only
+   first; NPZD reaction is a rung-6 "improve" upgrade.
 4. **Shared truth catalogue.** Should `somax` truth runs be registered once
    in `pipekit-experiment` and reused across rungs (content-addressed), so
    every estimator sees byte-identical truth? Proposed: yes.
 
 ---
 
-## 11. References
+## 12. References
 
-- Sibling design: [`benchmark_ladder.md`](benchmark_ladder.md).
+- Framework: [`benchmark_ladder.md`](benchmark_ladder.md). Siblings:
+  [`plume_pilot.md`](plume_pilot.md),
+  [`land_extremes_pilot.md`](land_extremes_pilot.md),
+  [`fusion_pilot.md`](fusion_pilot.md).
 - Dynamics: `somax` README (QG / SWM model zoo, `somax-sim`).
 - Observation operators + physical lenses: `xrtoolz/src/xrtoolz/ocn/operators.py`.
 - Oracle + amortized + SBC: `research_notebook/projects/assimilation/README.md`
@@ -237,3 +300,13 @@ existing `gaussx`/`geonnax`/`vardax` code through the protocols.
 - Static-prior analysis: `research_notebook/projects/interpolation/README.md`
   (`gaussx`/`pyrox` pathwise SSH).
 - Emulators: `geonnax` README (`FNO`, `SFNO`, `UNet`).
+
+### Physical-model literature (for the §3 generators / constraints)
+
+- Surface quasi-geostrophy & SSH→interior — Lapeyre & Klein (2006);
+  Held et al. (1995).
+- Air–sea flux / cool-skin & warm-layer — Fairall et al. (1996, COARE).
+- Bio-optical ocean colour — Morel & Prieur (1977); O'Reilly et al. (1998,
+  OC4); NPZD models — Fasham et al. (1990).
+- Thermal wind, Ekman pumping, mixed-layer dynamics — any GFD text
+  (Vallis 2017).
