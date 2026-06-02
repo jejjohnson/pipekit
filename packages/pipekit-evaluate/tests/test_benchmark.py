@@ -255,3 +255,68 @@ def test_improve_skips_unvalidated_lower_rung() -> None:
     assert r6.reference is ReferenceSource.BEST_VALIDATED_BELOW
     assert r6.scores == {}
     assert "no validated rung below" in r6.note
+
+
+def test_improve_stays_on_its_own_complexity_slice() -> None:
+    # a validated lower rung at a DIFFERENT complexity must not be used.
+    task = FakeTask()
+    oracle_c1 = FakeEstimator(rung=2, complexity=1, value=9.0)
+    improve_c0 = FakeEstimator(rung=6, complexity=0, value=7.0)
+    report = Benchmark(
+        task=task, estimators=[oracle_c1, improve_c0], scorers=[AbsError()]
+    ).run()
+    by_label = {r.cell.label: r for r in report.results}
+    r6 = by_label["L4/r6/c0"]
+    assert r6.reference is ReferenceSource.BEST_VALIDATED_BELOW
+    assert r6.scores == {}
+    assert "same complexity" in r6.note
+
+
+def test_inferred_oracle_is_the_richest_rung2() -> None:
+    # the inferred oracle is the highest-complexity rung-2 (NUTS), not the
+    # cheap baseline at complexity 0.
+    task = FakeTask()
+    baseline = FakeEstimator(rung=2, complexity=0, value=9.0)
+    nuts = FakeEstimator(rung=2, complexity=1, value=9.8)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    report = Benchmark(
+        task=task, estimators=[baseline, nuts, amortized], scorers=[AbsError()]
+    ).run()
+    by_label = {r.cell.label: r for r in report.results}
+    # rung 5 scored against the richest rung-2 (point 9.8): |8 - 9.8| = 1.8
+    assert by_label["L4/r5/c0"].scores["abs.err"] == pytest.approx(1.8)
+
+
+class CountingEstimator:
+    """A stochastic rung-2 oracle that returns a different value each call."""
+
+    rung = 2
+    complexity = 0
+
+    def __init__(self, base: float) -> None:
+        self.base = base
+        self.calls = 0
+
+    def fit(self, task: Task) -> CountingEstimator:
+        return self
+
+    def __call__(self, obs: Any) -> FakeEstimate:
+        self.calls += 1
+        return FakeEstimate(self.base + (self.calls - 1))
+
+
+def test_explicit_oracle_in_estimators_is_not_run_twice() -> None:
+    task = FakeTask()
+    oracle = CountingEstimator(9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    report = Benchmark(
+        task=task,
+        estimators=[oracle, amortized],
+        scorers=[AbsError()],
+        reference=oracle,
+    ).run()
+    # fitted/called exactly once (in pass 1), reused as the oracle reference
+    assert oracle.calls == 1
+    by_label = {r.cell.label: r for r in report.results}
+    # rung 5 scored against the *same* oracle prediction (point 9.0): |8-9| = 1
+    assert by_label["L4/r5/c0"].scores["abs.err"] == pytest.approx(1.0)

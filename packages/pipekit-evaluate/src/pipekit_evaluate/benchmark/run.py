@@ -164,14 +164,21 @@ class Benchmark:
     ) -> Estimate | None:
         """The rung-2 reference posterior, explicit or inferred."""
         if self.reference is not None:
+            # If the explicit oracle is itself one of the estimators, reuse its
+            # already-fitted prediction rather than running it a second time —
+            # a slow/stochastic oracle (MCMC, 4D-Var) would otherwise yield a
+            # different posterior than the one reported for its own cell.
+            for est in self.estimators:
+                if est is self.reference:
+                    return predictions[(est.rung, est.complexity)]
             return self.reference.fit(self.task)(obs)
-        rung2 = sorted(
-            (e for e in self.estimators if e.rung == 2),
-            key=lambda e: e.complexity,
-        )
+        # No explicit oracle: the inferred oracle is the *most* sophisticated
+        # rung-2 kernel (highest complexity) — e.g. NUTS / Strong-4D-Var, not
+        # the cheap OI/MAP baseline at the bottom of the rung-2 ladder.
+        rung2 = [e for e in self.estimators if e.rung == 2]
         if rung2:
-            first = rung2[0]
-            return predictions[(first.rung, first.complexity)]
+            best = max(rung2, key=lambda e: e.complexity)
+            return predictions[(best.rung, best.complexity)]
         return None
 
     def _resolve(
@@ -204,10 +211,15 @@ class Benchmark:
         if source is ReferenceSource.SIMPLER_STEP:
             return self._lookup(predictions, est.rung, est.complexity - 1)
         if source is ReferenceSource.BEST_VALIDATED_BELOW:
-            below = [rc for rc in validated if rc[0] < est.rung]
+            # Stay on the estimator's own complexity slice: comparing rung 6 to
+            # a lower rung at a *different* complexity would co-vary both axes
+            # at once (the framework walks one axis at a time).
+            below = [
+                rc for rc in validated if rc[0] < est.rung and rc[1] == est.complexity
+            ]
             if not below:
-                return None, "no validated rung below this one"
-            best = max(below)
+                return None, "no validated rung below this one on the same complexity"
+            best = max(below)  # highest validated rung on this complexity slice
             return validated[best], ""
         return None, f"unhandled reference source {source!r}"
 
