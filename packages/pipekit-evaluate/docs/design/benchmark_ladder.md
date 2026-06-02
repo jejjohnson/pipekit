@@ -34,7 +34,7 @@ reproducible, and probabilistically honest.
 
 ---
 
-## 2. Two axes that already exist in the ecosystem
+## 2. Three axes that already exist in the ecosystem
 
 ### 2.1 The L0–L4 data hierarchy (the *vertical* axis)
 
@@ -50,7 +50,7 @@ This maps onto packages we already have: discovery/index at L0–L1
 (`geocatalog`), locality at L1–L2 (`geopatcher`), gridded operators
 (`xrtoolz`), DA cycles at L3–L4 (`pipekit-cycle`).
 
-### 2.2 The inference ladder (the *horizontal* axis)
+### 2.2 The inference ladder (the *staged* axis)
 
 ```
 (1) Simple model            generative story; physics you can simulate
@@ -61,12 +61,48 @@ This maps onto packages we already have: discovery/index at L0–L1
 (6) Improve                   upgrade any rung, previous rung as truth
 ```
 
-### 2.3 The benchmark is the product of the two
+### 2.3 The complexity axis (the *per-rung depth* axis)
 
-A benchmark *cell* is a `(data level, inference rung)` pair. A
-**benchmark run** fills cells and scores each against its designated
-reference. This `level × rung` matrix is the single mental model that
-generalises across every domain.
+The inference ladder above is not a chain of single methods — **each rung
+is itself a ladder** of increasing sophistication. "Model → … → amortized
+predictor" describes the *stages*; orthogonal to it, every stage can be
+made richer without changing its role. The forward model can climb a
+fidelity ladder (analytical → stochastic-ODE → PDE → coupled
+multi-physics); the inference kernel can climb from a point estimate to a
+full posterior; the emulator can climb in capacity; the amortized
+predictor can climb from a point map to a density. The benchmark question
+*"does the fast/rich thing reproduce the slow/simple thing?"* applies
+along **this** axis as much as along the staged one.
+
+```
+            COMPLEXITY  →  (richer model / sharper posterior / higher capacity, per rung)
+            ┌──────────────────────────────────────────────────────────────────────────┐
+ (1) model  │ analytical  →  stochastic-ODE  →  PDE          →  coupled multi-physics    │
+ (2) model- │ MLE         →  MAP / Laplace   →  MCMC (NUTS)  →  SMC / gradient 4D-Var    │
+     -based │                                                                            │
+ (3) emul.  │ linear/POD  →  CNN             →  FNO          →  wavelet / transformer NO  │
+ (4) emul.- │ (the rung-2 ladder again, now driven by the surrogate forward)             │
+     -based │                                                                            │
+ (5) amort. │ point regressor → mixture-density net → normalizing flow → diffusion post. │
+            └──────────────────────────────────────────────────────────────────────────┘
+ STAGE ↓     (6) improve = one step along EITHER axis — a higher rung, or a deeper
+ (§2.2)          rung-internal method — with the simpler choice as its ground truth.
+```
+
+Each cell of that grid is a concrete method choice. Climbing *down* the
+left margin is the staged ladder of §2.2; climbing *right* within a row is
+the complexity axis. A domain instantiates the grid with its own methods —
+the plume pilot fills row (1) with the `plumax` tier ladder (Gaussian →
+puff/Lagrangian → Eulerian FV → coupled RTM) and row (2) with
+MAP → Laplace-around-4D-Var → NUTS; see [`plume_pilot.md`](plume_pilot.md).
+
+### 2.4 The benchmark is the product of the three
+
+A benchmark *cell* is a `(data level, inference rung, complexity step)`
+triple. A **benchmark run** fills cells and scores each against its
+designated reference. This `level × rung × complexity` cube is the single
+mental model that generalises across every domain — the earlier
+`level × rung` matrix is one face of it, read at a fixed complexity step.
 
 ---
 
@@ -151,7 +187,7 @@ class Oracle(Protocol):
 
 @dataclass
 class Benchmark:
-    """Runs the level × rung matrix and scores each cell vs its reference."""
+    """Runs the level × rung × complexity cube and scores each cell vs its reference."""
     task: Task
     estimators: Sequence[Estimator]
     scorers: Sequence["Scorer"]      # from the Unit × Lens taxonomy
@@ -160,9 +196,12 @@ class Benchmark:
     def run(self) -> "BenchmarkReport": ...
 ```
 
-### 4.3 The "previous rung is ground truth" rule
+### 4.3 The "simpler thing is ground truth" rule
 
-The single invariant that makes this a benchmark and not five scripts:
+The single invariant that makes this a benchmark and not five scripts.
+It runs along **both** axes of §2.
+
+*Along the staged axis (§2.2) — the previous rung is the reference:*
 
 | Rung being scored | Reference (ground truth)                         |
 |-------------------|--------------------------------------------------|
@@ -172,9 +211,24 @@ The single invariant that makes this a benchmark and not five scripts:
 | (5) amortized     | **rung-2 oracle posterior** (and known θ)        |
 | (6) improve       | the best validated rung below it                 |
 
-This table is data, not code branches — it lives on the `Task` so each
-domain can override it (e.g. a domain with no tractable oracle falls back
-to known-θ coverage only; see `land_extremes_pilot.md` and
+*Along the complexity axis (§2.3) — the adjacent (simpler) step is the
+reference:*
+
+| Complexity step being scored | Reference (ground truth)                |
+|------------------------------|-----------------------------------------|
+| richer forward model         | the lower-fidelity model on shared cases (and known θ where it exists) |
+| sharper inference kernel      | the simpler kernel's posterior (e.g. NUTS validates Laplace, which validates MAP) |
+| higher-capacity emulator      | the lower-capacity emulator + the rung-1 simulator |
+| richer amortized head         | the rung-2 oracle posterior (the point map's calibrated upgrade) |
+
+The intuition is symmetric: a step is trustworthy only if it *reproduces*
+the simpler thing it claims to improve on, then *beats* it where the
+simpler thing is known to be wrong (the higher-fidelity model becomes the
+new reference on the cases where it is the better physics).
+
+Both tables are data, not code branches — they live on the `Task` so each
+domain can override them (e.g. a domain with no tractable oracle falls
+back to known-θ coverage only; see `land_extremes_pilot.md` and
 `fusion_pilot.md`).
 
 ---
@@ -248,9 +302,16 @@ the protocols in the abstract first.
    -> verify: rung-4 posterior-distance to oracle below a set threshold
 5. Domain physical-constraint scorer
    -> verify: a deliberately constraint-violating field is flagged
-6. Amortized rung (5) + the level × rung BenchmarkReport + DVC wiring
+6. Amortized rung (5) + the level × rung × complexity BenchmarkReport + DVC wiring
    -> verify: reproducible report regenerates byte-stable metrics
 ```
+
+Fix the complexity step (§2.3) at its *simplest* setting for this first
+slice — the cheapest forward model, a point/MAP kernel, a low-capacity
+emulator. Climbing the complexity axis (a higher-fidelity model, a NUTS
+kernel, an FNO emulator) is a **separate, later pass** that reuses the same
+`Task` and is scored against the simpler step it replaces (§4.3). Walk one
+axis at a time; never co-vary stage and complexity in the same comparison.
 
 The recommended first slice is the **plume** pilot (every rung already
 exists). Each pilot doc carries its own domain-specific build order —
