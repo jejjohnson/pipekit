@@ -21,10 +21,17 @@ problem. The ocean stresses the parts plume did not:
   constraint. (Plume was essentially one channel.)
 - **Strongly dynamical** — the "world right now" (L3) is the analysis of
   a chaotic dynamical system, so the forecast (L4) and its lead-time
-  skill matter. This is where `somax` lives.
-- **Discretization as a first-class axis** — fields live on Arakawa
-  C-grids at a chosen resolution; a credible emulator must be
-  resolution-aware. This adds a benchmark axis plume didn't have.
+  skill matter. This is where `somax` lives (its `SomaxModel` zoo:
+  `BarotropicQG`, `BaroclinicQG`, `ReparameterizedQG`, the
+  `…ShallowWater…` family).
+- **A long complexity axis** — `somax`'s model zoo *is* the §2.3
+  complexity axis of [`benchmark_ladder.md`](benchmark_ladder.md) made
+  concrete: the rung-1 forward model climbs `BarotropicQG → BaroclinicQG →
+  ReparameterizedQG → MultilayerShallowWater2D`, the rung-2 kernel climbs
+  3D-Var → 4D-Var → Strong-4D-Var/En4D-Var, and discretization
+  (Arakawa-C resolution) is its own sweep. A credible emulator must be
+  resolution-aware. This fills a much taller slab of the
+  `level × rung × complexity` cube than plume did (§8).
 
 Crucially, almost none of this needs new framework code: the
 `research_notebook/projects/assimilation` project already runs the ladder
@@ -150,17 +157,21 @@ The two arrows that the ladder scores hardest:
 
 | Rung | Ocean realisation | Package / symbol |
 |------|-------------------|------------------|
-| (1) simple model | QG / SWM forward run = the truth GCM-lite | `somax` (Barotropic/Baroclinic QG, SWM); `somax-sim run` |
-| obs operator | ψ→SSH, advected SST/SSS/OC, geostrophic (u,v); add gaps + noise | `xrtoolz.ocn` ops as `ObservationOperator`s |
-| (2) model-based inference (**oracle**) | Strong-4DVar with the `somax` model as the dynamical constraint; or exact GP for the static-prior analysis sub-task | `vardax` `Strong4DVar` via `pipekit_cycle.AnalysisStep`; `gaussx`/`pyrox` exact GP |
+| (1) simple model | QG / SWM forward run = the truth GCM-lite (`.integrate()` / `.step()`); built and run from a scenario | `somax.models.BarotropicQG` (state `q`, `.diagnose()→psi,u,v`); `somax-sim run` with a scenario (`double_gyre`, `gulf_stream`, …) |
+| forward bridge | the `somax` model as a `pipekit_cycle.ForwardModel` / `pipekit.Operator` | `somax.da.SomaxForwardModel`, `somax.operators.SomaxModelOp` |
+| obs operator | ψ→SSH (`η=f0/g·ψ`), advected SST/SSS/OC, geostrophic (u,v); sparse sampling + gaps + noise | `xrtoolz.ocn` ops + `somax.da.SubsampleObs` as `ObservationOperator`s |
+| (2) model-based inference (**oracle**) | Strong-4DVar with the `somax` model as the dynamical constraint; or exact GP for the static-prior analysis sub-task | `vardax` `Strong4DVar` via `pipekit_cycle.AnalysisStep` (fed by `somax.da.SomaxForwardModel`); `gaussx`/`pyrox` exact GP |
 | (3) emulator | resolution-invariant neural surrogate of the `somax` forward | `geonnax.FNO` / `geonnax.SFNO`, trained via `pipekit-train` + `pipekit-jax` (`JaxModelOp`); wrap as `pipekit_cycle.NeuralForward` |
 | (4) emulator-based inference | rung-2 4DVar with the emulator swapped in as `ForwardModel` | `pipekit_cycle.DACycle` + emulator |
 | (5) amortized predictor | gappy multi-channel obs → analysed state (+ uncertainty), direct | `vardax.AmortizedPosterior` / `FourDVarNet`; `geonnax.UNet`/`FNO` backbone |
-| (6) improve | barotropic QG → baroclinic multi-layer QG (higher fidelity), or QG → SWM; re-score | `somax` model swap; previous rung as truth |
+| (6) improve | climb the `somax` fidelity ladder: `BarotropicQG → BaroclinicQG → ReparameterizedQG → MultilayerShallowWater2D`; re-score | `somax` model swap (same `SomaxModel` API); previous rung as truth |
 
 The same `Estimator` protocol covers rungs 2/4/5; the only ocean-specific
 code is the `Task` (state, observation operators, datasets) and the
-per-variable scorer selection.
+per-variable scorer selection. Because every `somax` model implements the
+same `SomaxModel` contract (`.integrate`/`.step`/`.diagnose`), climbing the
+rung-6 fidelity ladder is a model swap, not a rewrite — exactly the
+complexity axis (§8).
 
 ---
 
@@ -196,7 +207,7 @@ Each observable gets its own scorers, drawn from the existing
 | Point-wise (Field) | per-variable RMSE/bias for SSH/SST/SSS/OC | `xrtoolz.geo` metrics, `xskillscore` |
 | Spectral (Statistic) | SSH / KE wavenumber spectra — catch over-smoothing | `xrtoolz.geo` spectral; `KineticEnergy`, `EddyKineticEnergy` |
 | Probabilistic (Statistic) | coverage / CRPS / SBC; posterior-distance to Strong-4DVar oracle | `properscoring`, `vardax.simulation_based_calibration`, `vardax.assert_posterior_agreement` |
-| **Physical-constraint (Budget)** | geostrophic balance residual; near-zero surface divergence; PV consistency; tracer mass conservation; ocean-colour non-negativity; **thermal-wind consistency; steric-SSH closure; Ekman-pumping/upwelling** (§3) | `GeostrophicVelocities`, `Divergence`, `PotentialVorticityBarotropic`, `Advection`, `MixedLayerDepth` |
+| **Physical-constraint (Budget)** | geostrophic balance residual; near-zero surface divergence; PV consistency; tracer mass conservation; ocean-colour non-negativity; **thermal-wind consistency; steric-SSH closure; Ekman-pumping/upwelling** (§3) | `somax.eval` (`geostrophic_imbalance`, `rms_divergence`, `total_enstrophy`, `kinetic_energy`) on the truth/analysis; `xrtoolz.ocn` (`GeostrophicVelocities`, `Divergence`, `PotentialVorticityBarotropic`, `Advection`, `MixedLayerDepth`) |
 | **Detection (Event)** | eddy detection (Okubo–Weiss), front detection (frontogenesis) — hit/miss on coherent structures | `OkuboWeiss`, `Frontogenesis` |
 
 The headline ocean question: *does a fast estimator (rung 4/5) reconstruct
@@ -207,18 +218,40 @@ lenses are precisely what a pure-RMSE leaderboard misses.
 
 ---
 
-## 8. Ocean-specific benchmark axes
+## 8. The complexity axis + ocean-specific sweeps
 
-Beyond the `level × rung` matrix, the ocean `Task` exposes three sweep
-axes that the report should stratify over:
+### 8.1 The per-rung complexity ladder (the §2.3 axis, ocean instance)
+
+Each rung is its own ladder of increasing sophistication; climbing right is
+a richer method in the *same* role, scored against the simpler step it
+replaces (§4.3 of [`benchmark_ladder.md`](benchmark_ladder.md)):
+
+| Rung | Complexity ladder (simple → rich) | home |
+|------|-----------------------------------|------|
+| (1) forward model | `BarotropicQG` → `BaroclinicQG` → `ReparameterizedQG` → `MultilayerShallowWater2D` | `somax.models` |
+| (2) inference kernel | OI/3D-Var → 4D-Var → **Strong-4D-Var** (oracle) → En4D-Var | `vardax` (+ `filterax` ensemble via `somax.da.SomaxDynamics`) |
+| (3) emulator | linear/POD → `UNet` → `FNO` → `SFNO` (resolution-invariant) | `geonnax` |
+| (4) emu-inference | the rung-2 ladder again, surrogate as `ForwardModel` | `pipekit_cycle.DACycle` |
+| (5) amortized | point map → `AmortizedPosterior` → `FourDVarNet` | `vardax` |
+
+The forward-model row is a model swap behind the fixed `SomaxModel` API;
+the inference row is the same `pipekit_cycle.AnalysisStep` with a different
+`vardax` solver. Walk one axis at a time (§7 of the framework doc): pin the
+forward at `BarotropicQG` while you climb the kernel, then climb the
+forward at a fixed kernel.
+
+### 8.2 Ocean-specific sweep axes
+
+Beyond the `level × rung × complexity` cube, the ocean `Task` exposes three
+sweeps the report should stratify over:
 
 1. **Discretization / resolution invariance.** Train the emulator (rung 3)
    at 64², evaluate at 128² (and vice-versa). `geonnax.FNO`/`SFNO` are
    resolution-invariant by construction, so this is a *measurable claim*,
-   not an assumption — a first-class benchmark axis.
-2. **Forecast lead-time skill.** Free-forecast from the analysed state and
-   plot RMSE(t) over many Lyapunov times — the exact view the
-   `assimilation` project already produces; reused verbatim.
+   not an assumption — the cleanest face of the complexity axis.
+2. **Forecast lead-time skill.** Free-forecast (`somax` `.integrate()`)
+   from the analysed state and plot RMSE(t) over many Lyapunov times — the
+   exact view the `assimilation` project already produces; reused verbatim.
 3. **Gappy-obs robustness.** Sweep cloud-cover fraction / along-track
    density / SWOT-vs-nadir sampling and watch each rung degrade. The
    amortized rung's robustness here is its main selling point.
@@ -232,10 +265,11 @@ Same split as `benchmark_ladder.md §6`; the ocean-specific homes:
 | Concern | Home |
 |---------|------|
 | Ocean `Task` (state, obs operators, datasets, reference table) | `research_notebook/projects/` (new `ocean_benchmark`, sibling to `assimilation`/`interpolation`) |
-| Dynamics (rung 1) | `somax` |
-| Observation operators + physical-constraint / detection lenses | `xrtoolz.ocn` (reused) |
+| Dynamics (rung 1) + truth runs | `somax.models` (`BarotropicQG`/`BaroclinicQG`/`ReparameterizedQG`/SWM); `somax-sim run` (scenarios) |
+| Forward / DA bridges (pipekit-cycle / pipekit) | `somax.da.SomaxForwardModel`, `somax.da.SomaxDynamics`, `somax.operators.SomaxModelOp` |
+| Observation operators + physical-constraint / detection lenses | `xrtoolz.ocn` (reused); `somax.da.SubsampleObs`; `somax.eval` (budget metrics) |
 | Physical generators / budgets (NPZD, heat/freshwater, SQG) | *new* ops on `finitevolX`; `somax` |
-| Oracle + amortized estimators | `vardax` adapters satisfying `pipekit_cycle.AnalysisStep` |
+| Oracle + amortized estimators | `vardax` adapters satisfying `pipekit_cycle.AnalysisStep` (fed by `somax.da.SomaxForwardModel`) |
 | Emulator (rung 3) | `geonnax` + `pipekit-train`/`pipekit-jax` |
 | Static-prior analysis estimator | `gaussx` + `pyrox` |
 | Protocols, scorers, runner | `pipekit-evaluate` (unchanged — this is the point) |
@@ -292,7 +326,13 @@ existing `gaussx`/`geonnax`/`vardax` code through the protocols.
   [`plume_pilot.md`](plume_pilot.md),
   [`land_extremes_pilot.md`](land_extremes_pilot.md),
   [`fusion_pilot.md`](fusion_pilot.md).
-- Dynamics: `somax` README (QG / SWM model zoo, `somax-sim`).
+- Dynamics: `somax` README + `content/` (QG / SWM model zoo — `SomaxModel`,
+  `BarotropicQG`/`BaroclinicQG`/`ReparameterizedQG`/`MultilayerShallowWater2D`;
+  `somax-sim run/spinup/restart`; scenarios `double_gyre`/`gulf_stream`/…).
+- Forward / DA bridges + budget metrics: `somax.da` (`SomaxForwardModel`,
+  `SomaxDynamics`, `SubsampleObs`), `somax.operators.SomaxModelOp`,
+  `somax.eval` (`geostrophic_imbalance`, `rms_divergence`, `total_enstrophy`,
+  `kinetic_energy`).
 - Observation operators + physical lenses: `xrtoolz/src/xrtoolz/ocn/operators.py`.
 - Oracle + amortized + SBC: `research_notebook/projects/assimilation/README.md`
   (`vardax`, `benchmark.py`, `simulation_based_calibration`,

@@ -29,44 +29,63 @@ the physical pilots barely touched: **events** (threshold exceedances are
 points, not fields) and **extrapolation** (the policy question is the
 return level at a GMST we have never observed).
 
-**Honesty up front (green-field):** unlike plume/ocean, there is no
-existing EVT or point-process package in the ecosystem. `pyrox`,
-`gaussx`, and `geonnax` supply the inference and basis building blocks,
-and `somax`/`finitevolX` supply the physical generators of §4, but the
-EVT likelihoods, the thinning simulator, and the EVT/PP scorers are **new
-code**. `xrtoolz.events` (which the `pipekit-evaluate` plan relies on for
-the Event Unit) is **not yet in the tree** — this pilot is what would
-drive it. Treat the symbols below as *proposed* unless a package is named.
+**What already exists:** the EVT and point-process machinery this pilot
+needs is [`xtremax`](https://github.com/jejjohnson/xtremax) — a
+JAX/NumPyro-native extreme-value library. It already ships the
+**distributions** (`GeneralizedExtremeValueDistribution`,
+`GeneralizedParetoDistribution`, `GumbelType1GEVD`, `FrechetType2GEVD`,
+`WeibullType3GEVD`), the **extraction** layer (`temporal_block_maxima`,
+`quantile_threshold`/`temporal_threshold`, `decluster_runs`,
+`estimate_extremal_index`), the **point-process** zoo
+(`InhomogeneousPoissonProcess`, `MarkedTemporalPointProcess`,
+`ThinningProcess`, `ExponentialHawkes`, `SpatioTemporalHawkes`, …) with its
+own goodness-of-fit primitives (`time_rescaling_residuals`,
+`csr_ripleys_k`, `ks_statistic_exp1`), and the **simulations** layer
+(`generate_gmst_trajectory`, `simulate_temp_extremes`,
+`simulate_precip_extremes`, `simulate_wind_extremes`). `pyrox`, `gaussx`,
+and `geonnax` supply complementary inference/basis blocks; `somax` /
+`finitevolX` supply the §4 physical generators. The **only genuinely new
+code** is the NumPyro model zoo wiring (`xtremax`'s designed
+`stationary_gev`/`nonstationary_gev`/`spatial_gev`/`pot_gpd`/
+`point_process_extreme`) and the tail/event **scorers** in
+`pipekit-evaluate`. `xrtoolz.events` (the Event Unit) is still not in the
+tree, but `xtremax.point_processes` covers most of the residual-diagnostic
+surface. Symbols below are real `xtremax` unless flagged *proposed*.
 
 ---
 
 ## 2. Two ladders that line up
 
-You described a **modelling-fidelity** ladder; it maps cleanly onto the
-**inference** ladder. The fidelity ladder is the rung-6 "improve" axis.
+The two benchmark axes of [`benchmark_ladder.md`](benchmark_ladder.md) map
+cleanly onto land extremes: the **staged** ladder (§2.2) is the
+inference workflow below; the **complexity** axis (§2.3) is `xtremax`'s
+model-fidelity ladder, which *is* a real progression of shipped/designed
+models, not just the rung-6 "improve" arrow.
 
 ```
-modelling fidelity (rung-6 "improve" axis)
-  GWR  ──▶  spatial hierarchical EVT  ──▶  marked spatio-temporal
-  (local                (GEV/GPD with         thinned point process
-   varying-              covariate params      (LGCP intensity λ(s,t|x);
-   coefficient           + spatial GP field)    marks ~ GPD; declustered)
-   regression)
+complexity axis (xtremax model fidelity; §2.3 — climb at a fixed rung)
+  stationary_gev  ─▶  nonstationary_gev   ─▶  spatial_gev        ─▶  point_process_extreme
+  (iid GEV/GPD       (μ,σ,ξ vary with        (μ(s),σ(s),ξ(s)        (marked spatio-temporal
+   block maxima)      GMST/covariates)        as GP fields)          thinned PP; Hawkes marks)
 ```
 
 ```
-inference ladder (per fidelity level)
-  (1) simulate points/marks from the model         <- generative story
-  (2) full-Bayes MCMC recover params (oracle)       <- slow, exact
+staged ladder (§2.2 — per fixed complexity step)
+  (1) simulate points/marks from the model         <- generative story (xtremax.simulations)
+  (2) full-Bayes MCMC recover params (oracle)       <- slow, exact (NumPyro NUTS)
   (3) emulate the expensive piece (intensity ∫λ)    <- surrogate
   (4) MCMC/SVI with the cheap likelihood            <- fast
   (5) amortized: point pattern -> posterior params  <- NPE / SBI
-  (6) climb the fidelity ladder, prev rung as truth
+  (6) improve: a step along EITHER axis, prev step as truth
 ```
 
-GWR is the **cheap baseline estimator to beat** (and a sanity oracle in
-the dense-data limit); the spatial hierarchical Bayesian model is the
-**oracle**; amortized neural posterior estimation is rung 5.
+The kernel itself also has a complexity sub-ladder at rung 2: **GWR**
+(local varying-coefficient regression via `quantile_regression_threshold`)
+is the cheap frequentist baseline to beat (and a sanity oracle in the
+dense-data limit); MAP → **full-Bayes NUTS** is the oracle; amortized
+neural posterior estimation is rung 5. Walk one axis at a time (§7 of the
+framework doc): climb the kernel at `stationary_gev`, then climb the model
+complexity at a fixed kernel.
 
 ---
 
@@ -83,15 +102,27 @@ separately.
 | Surface pressure | low-pressure minima | GPD (negated) | doubles as a covariate (storm proxy) |
 | Precipitation | POT, zero-inflated | GPD amount × Bernoulli occurrence | occurrence *is* the point process |
 
-Covariates feed the intensity λ(s, t | **x**) and the GEV/GPD parameters:
+The mark distributions are `xtremax.distributions`
+(`GeneralizedExtremeValueDistribution` / `GeneralizedParetoDistribution` /
+`WeibullType3GEVD`), and the synthetic marks/covariates come from
+`xtremax.simulations` (`simulate_temp_extremes`, `simulate_precip_extremes`,
+`simulate_wind_extremes`, driven by `generate_gmst_trajectory` and
+`compute_climate_signal`). Covariates feed the intensity λ(s, t | **x**)
+and the GEV/GPD parameters:
 
-- **GMST** — the non-stationarity driver; the headline coefficient.
-- **space** (lon/lat, elevation) — via `geonnax` spatial bases:
-  `SphericalHarmonicEncoder`, `SlepianEncoder`, `OrthogonalRandomFeatures`.
-- **time / seasonality** — via `geonnax.CyclicEncoder`, `FourierNet`.
-- the spatially-varying coefficient field itself — a GP (`gaussx`) or a
-  basis field (`geonnax.vssgp` / RFF), which is precisely **GWR
-  generalised to a Bayesian spatial prior**.
+- **GMST** — the non-stationarity driver; the headline coefficient
+  (`generate_gmst_trajectory` / `generate_physical_gmst`).
+- **space** (lon/lat, elevation) — `xtremax.simulations`
+  (`generate_spatial_field`, `SpatialFeatureExtractor`,
+  `create_iberian_domain`, `generate_fractal_terrain`), with richer bases
+  from `geonnax` (`SphericalHarmonicEncoder`, `SlepianEncoder`,
+  `OrthogonalRandomFeatures`).
+- **time / seasonality** — `xtremax.extraction.seasonal_threshold`;
+  `geonnax.CyclicEncoder`, `FourierNet`.
+- the spatially-varying coefficient field itself — `xtremax`'s designed
+  `spatial_gev` (GP fields over μ/σ/ξ), or a GP (`gaussx`) / basis field
+  (`geonnax.vssgp` / RFF), which is precisely **GWR generalised to a
+  Bayesian spatial prior**.
 
 > The four variables are not statistically independent marks — they share
 > a physical basis (§4) that both supplies a physically-grounded rung-1
@@ -188,7 +219,7 @@ than a generic LGCP:
 |-------|-----------------------------|---------|
 | L0 | raw station records / gridded reanalysis cells | `geocatalog` discovery |
 | L1 | QC'd, gap-flagged station / grid series | `xrtoolz` validation |
-| L2 | **declustered threshold exceedances** = the marked point pattern | *new* declustering op (→ `xrtoolz.events`) |
+| L2 | **declustered threshold exceedances** = the marked point pattern | `xtremax.extraction` (`quantile_threshold`/`temporal_threshold`, `decluster_runs`, `estimate_extremal_index`) |
 | L3 | **analysis**: covariate-conditioned return-level / intensity field | rung-2/4/5 estimators |
 | L4 | **projection**: return-level field at a *future* GMST | the simulator at shifted covariates |
 
@@ -202,18 +233,18 @@ The two arrows the ladder scores hardest:
 
 ---
 
-## 6. The six rungs, mapped to (proposed) symbols
+## 6. The six rungs, mapped to `xtremax` symbols
 
 | Rung | Land-extremes realisation | Package / symbol |
 |------|---------------------------|------------------|
-| (1) simple model | simulate a marked STPP (thinned LGCP intensity λ(s,t\|x); marks ~ GPD) **or** a physical generator (§4: NSRP/BLRP rainfall, `somax` QG synoptic driver, SEB + force-restore) | *new* `stpp` simulator (JAX); `somax`; `finitevolX`; GP field via `gaussx`; basis via `geonnax` |
-| obs operator | threshold + decluster into an event pattern; station masks / missingness | *new* declustering op (→ `xrtoolz.events`) |
-| (2) model-based inference (**oracle**) | full-Bayes NUTS over the hierarchical EVT/LGCP model | `pyrox` `PyroxModule`/`Parameterized` + NumPyro `NUTS` |
-| baseline | GWR — local varying-coefficient fit (fast, frequentist) | *new* GWR on `gaussx` weighted least squares |
-| (3) emulator | surrogate for the intensity integral ∫λ ds dt, or a neural log-intensity field | `geonnax` (RFF/VSSGP/SIREN basis) + `pipekit-train`/`pipekit-jax` |
-| (4) emulator-based inference | NUTS/SVI with the cheap likelihood | `pyrox` SVI `AutoGuide` + emulator |
-| (5) amortized predictor | point pattern → posterior over (covariate coeffs, GPD params); DeepSets/set-encoder backbone | `geonnax` encoder + amortized head; SBI-style |
-| (6) improve | GWR → spatial hierarchical → marked STPP; statistical ↔ physical generator; add space–time interaction; prev rung as truth | fidelity climb (§2, §4) |
+| (1) simple model | simulate a marked thinned point process (intensity λ(s,t\|x); marks ~ GEV/GPD) **or** a physical generator (§4: NSRP/BLRP rainfall, `somax` QG synoptic driver, SEB + force-restore) | `xtremax.simulations` (`generate_gmst_trajectory`, `compute_climate_signal`, `simulate_{temp,precip,wind}_extremes`); `xtremax.point_processes` (`InhomogeneousPoissonProcess`, `MarkedTemporalPointProcess`/`MarkedSpatioTemporalPP`, `ThinningProcess`); `somax`/`finitevolX` for the physical generators |
+| obs operator | threshold + decluster into an event pattern; station masks / missingness | `xtremax.extraction` (`quantile_threshold`/`temporal_threshold`, `decluster_runs`/`decluster_separation`, `estimate_extremal_index`, `temporal_block_maxima`) |
+| (2) model-based inference (**oracle**) | full-Bayes NUTS over the hierarchical EVT/PP model | NumPyro `NUTS` over `xtremax` models (`stationary_gev`→`nonstationary_gev`→`spatial_gev`, `pot_gpd`, `point_process_extreme`); `pyrox` `PyroxModule` for the spatial-GP plumbing |
+| baseline | GWR — local varying-coefficient fit (fast, frequentist) | `xtremax.extraction.quantile_regression_threshold` / `XarrayQuantileRegressor` |
+| (3) emulator | surrogate for the intensity integral ∫λ ds dt, or a neural log-intensity field | `geonnax` (RFF/VSSGP/SIREN basis) feeding `xtremax.point_processes` (`PiecewiseConstantLogIntensity`, `integrate_log_intensity`) + `pipekit-train`/`pipekit-jax` |
+| (4) emulator-based inference | NUTS/SVI with the cheap likelihood | NumPyro SVI `AutoGuide` over the `xtremax` model + emulator |
+| (5) amortized predictor | point pattern → posterior over (covariate coeffs, GEV/GPD params); DeepSets/set-encoder backbone | `geonnax` encoder + amortized head; SBI-style |
+| (6) improve | climb the `xtremax` model complexity (`stationary → nonstationary → spatial → point_process_extreme`) and/or add a Hawkes kernel (`ExponentialHawkes`/`SpatioTemporalHawkes`); statistical ↔ physical generator; prev step as truth | complexity climb (§2, §4) |
 
 Only the protocol wiring is shared with the other pilots; the EVT/PP
 *content* (rows marked *new*) is what this pilot builds.
@@ -227,9 +258,9 @@ families, drawn from the existing `Unit × Lens` taxonomy:
 
 | Lens (existing axis) | Land-extremes scorer | Status |
 |----------------------|----------------------|--------|
-| **Probabilistic (Statistic)** — *tail* | return-level coverage at high quantiles; threshold-weighted CRPS (twCRPS); quantile loss at τ→1; SBC of the **GMST coefficient** vs the oracle | *new* (twCRPS extends `properscoring`) |
-| **Detection (Event)** | exceedance hit/miss/false-alarm (POD / FAR / CSI / extremal dependence index) on the event pattern | *new* (→ `xrtoolz.events`) |
-| **Point-process residuals (Event)** | time-rescaling theorem → inter-event uniformity (KS); spatial K-function / pair-correlation vs theoretical; Voronoi/intensity reliability | *new* |
+| **Probabilistic (Statistic)** — *tail* | return-level coverage at high quantiles (`xtremax` `*_return_level`); threshold-weighted CRPS (twCRPS); quantile loss at τ→1; SBC of the **GMST coefficient** vs the oracle | return levels from `xtremax`; twCRPS *new* (extends `properscoring`) |
+| **Detection (Event)** | exceedance hit/miss/false-alarm (POD / FAR / CSI / extremal dependence index) on the event pattern | *new* scorer (→ `xrtoolz.events`); exceedances from `xtremax.extraction` |
+| **Point-process residuals (Event)** | time-rescaling theorem → inter-event uniformity (KS); spatial K-function / pair-correlation vs theoretical | `xtremax.point_processes` (`time_rescaling_residuals`, `ks_statistic_exp1`, `csr_ripleys_k`/`csr_l_function`/`csr_pair_correlation`, `GoodnessOfFit`) |
 | **Physical-constraint (Budget)** | CC-scaling monotonicity (precip tail ↑ ~7 %/°C); geostrophic/hydrostatic balance residuals; moisture-budget closure; soil-moisture–temperature consistency (§4) | *new*; reuse `xrtoolz` balance ops |
 | **Covariate attribution (Statistic)** | posterior recovery + coverage of the true β_GMST (Δ return level per °C) | *new* |
 | **Extrapolation (Statistic)** | predicted return levels at GMST+ΔT vs simulator truth; degradation curve in ΔT | *new* |
@@ -271,39 +302,43 @@ The `Task` declares which protocol is active; the `reference` table from
 | Concern | Home |
 |---------|------|
 | Land-extremes `Task` (simulator, declustering, datasets, reference table) | `research_notebook/projects/` (new `land_extremes`, sibling to `assimilation`) |
-| Marked-STPP simulator + EVT likelihoods (GEV/GPD/LGCP) | *new* `stpp`/`evtx` module — start inside the project, promote to a package if it grows |
+| Marked-PP simulators + EVT distributions (GEV/GPD/Weibull) + extraction | `xtremax` (`simulations`, `point_processes`, `distributions`, `extraction`) |
+| EVT/PP NumPyro model zoo (stationary/nonstationary/spatial/POT/PP) | `xtremax` models (designed; NumPyro NUTS/SVI), `pyrox` for GP plumbing |
 | Physical generators (§4): NSRP/BLRP, SEB + force-restore LSM, moisture/orographic | *new* ops on `finitevolX`; synoptic driver from `somax` |
-| Covariate encoders + basis intensity fields | `geonnax` (reused) |
-| Spatially-varying-coefficient prior (GWR generalised) | `gaussx` GP (reused) |
-| MCMC oracle + SVI fast inference + amortized head | `pyrox` (reused) |
+| Covariate encoders + basis intensity fields | `xtremax.simulations` (spatial features) + `geonnax` (reused) |
+| Spatially-varying-coefficient prior (GWR generalised) | `xtremax` `spatial_gev` (GP fields); `gaussx` GP (reused) |
+| MCMC oracle + SVI fast inference + amortized head | NumPyro NUTS/SVI on `xtremax` models; `pyrox` (reused) |
 | Physical-balance constraint scorers (geostrophic, hydrostatic, lapse) | reuse `xrtoolz.ocn`/`atm` operators |
-| Declustering + event Detection scorers | *new* → land in `xrtoolz.events` |
-| EVT/PP probabilistic scorers (return-level coverage, twCRPS, residuals) | *new* → `pipekit-evaluate` `metrics/` (Event + tail-Probabilistic) |
+| Point-process residual + Detection scorers | `xtremax.point_processes` residual primitives; Detection *new* → `xrtoolz.events` |
+| EVT/PP probabilistic scorers (return-level coverage, twCRPS) | return levels from `xtremax`; twCRPS *new* → `pipekit-evaluate` `metrics/` |
 | Protocols + runner | `pipekit-evaluate` (unchanged) |
 
-This pilot is the natural driver to finally populate `xrtoolz.events` and
-the Event-unit corner of `pipekit-evaluate` that the package README
-already anticipates.
+The genuinely new code is narrow: the `pipekit-evaluate` tail/Detection
+scorers (twCRPS, return-level coverage wiring) and the `xrtoolz.events`
+Event-unit corner the package README anticipates — most EVT/PP content is
+`xtremax`.
 
 ---
 
 ## 10. Build order (land-extremes slice)
 
 ```
-1. 1-D non-stationary GPD simulator (Q exceedances, scale = a + b·GMST)
-   + NUTS oracle in pyrox
+1. xtremax.simulations 1-D non-stationary GPD (scale = a + b·GMST)
+   + NUTS oracle over xtremax nonstationary_gev/pot_gpd
    -> verify: oracle recovers (a, b); SBC of b ~ uniform on synthetic
-2. GWR baseline estimator + return-level coverage + twCRPS scorers
+2. GWR baseline (xtremax.quantile_regression_threshold) + return-level
+   coverage (xtremax *_return_level) + twCRPS scorers
    -> verify: tail coverage ~ nominal for the oracle; GWR is worse (sanity)
-3. Spatial field: varying-coefficient GP prior (gaussx) + geonnax space/time bases
+3. Spatial field: xtremax spatial_gev (GP μ/σ/ξ) + geonnax space/time bases
    -> verify: recovered coefficient field tracks the simulated field
-4. Detection + point-process residual scorers (POD/FAR; time-rescaling KS)
+4. Detection + PP residual scorers (POD/FAR; xtremax time_rescaling_residuals)
    -> verify: a mis-specified intensity fails the residual test
 5. Physical generator + constraint Lens: Clausius-Clapeyron precip scaling
    -> verify: CC-informed prior recovered; a non-physical scaling is flagged
 6. Amortized rung (geonnax DeepSets head) + posterior-distance to oracle
    -> verify: posterior over b within tolerance of NUTS; seconds not hours
-7. Marked STPP (NSRP/BLRP) + extrapolation axis (return levels at GMST+ΔT)
+7. Marked STPP (xtremax MarkedSpatioTemporalPP / Hawkes) + extrapolation
+   axis (return levels at GMST+ΔT)
    -> verify: extrapolation degradation curve reproduces under DVC
 ```
 
@@ -330,10 +365,13 @@ and physical generators only enter at step 5+.
    Proposed: statistical (clean known-θ) for v0.1; add the §4 physical
    generators as a second truth source for cross-model robustness once the
    scorers are trusted.
-5. **Where the EVT/PP code lives long-term.** Inside `land_extremes`
-   first; promote to a standalone `evtx`/`stppx` package only if a second
-   consumer appears (per the ecosystem's "no abstraction for single use"
-   rule). Flag for decision.
+5. **Where the EVT/PP code lives long-term.** Settled: `xtremax` is the
+   home for distributions, extraction, point processes, simulations, and
+   the NumPyro model zoo. The pilot's `land_extremes` project holds only
+   the `Task` wiring; the tail/Detection **scorers** land in
+   `pipekit-evaluate`. Open sub-question: do the EVT/PP residual scorers
+   wrap `xtremax.point_processes` primitives directly, or re-expose them
+   through `pipekit-evaluate`'s Event-Unit metrics?
 6. **Real-data inclusion in the pilot.** Synthetic-only first (clean
    calibration story), or wire one real dataset (e.g. station temperature)
    to exercise the oracle-less protocol? Proposed: synthetic-only for v0.1.
@@ -343,7 +381,13 @@ and physical generators only enter at step 5+.
 ## 12. References
 
 - Sibling designs: [`benchmark_ladder.md`](benchmark_ladder.md),
-  [`ocean_pilot.md`](ocean_pilot.md).
+  [`ocean_pilot.md`](ocean_pilot.md), [`plume_pilot.md`](plume_pilot.md).
+- EVT / point-process engine: `xtremax` —
+  [vision](https://github.com/jejjohnson/xtremax/blob/main/docs/design_docs/vision.md),
+  [architecture](https://github.com/jejjohnson/xtremax/blob/main/docs/design_docs/architecture.md),
+  [model zoo](https://github.com/jejjohnson/xtremax/blob/main/docs/design_docs/api/models.md)
+  (`distributions`, `extraction`, `point_processes`, `simulations`,
+  `primitives`; stationary/nonstationary/spatial/POT/PP models).
 - Inference engine: `pyrox` README (`PyroxModule`, `Parameterized`,
   NumPyro NUTS/SVI bridge).
 - Covariate bases / encoders: `geonnax` README (`CyclicEncoder`,
