@@ -93,6 +93,7 @@ class Benchmark:
 
     def run(self) -> BenchmarkReport:
         """Fit every estimator, resolve each cell's reference, and score it."""
+        self._check_unique_cells()
         data = dict(self.task.datasets())
         obs = data[self.obs_key]
 
@@ -103,30 +104,60 @@ class Benchmark:
 
         oracle = self._oracle_prediction(obs, predictions)
 
-        # Pass 2 — resolve the reference for each cell and score it.
-        results: list[CellResult] = []
-        for est in self.estimators:
+        # Pass 2 — resolve the reference for each cell and score it. Process in
+        # ascending cell order so a cell is only considered "validated" (and
+        # thus usable as a BEST_VALIDATED_BELOW reference) once it has itself
+        # resolved a reference. ``validated`` maps a cell to its prediction.
+        validated: dict[tuple[int, int], Estimate] = {}
+        by_cell: dict[tuple[int, int], CellResult] = {}
+        for est in sorted(self.estimators, key=lambda e: (e.rung, e.complexity)):
+            key = (est.rung, est.complexity)
             cell = Cell(self.level, est.rung, est.complexity)
             source = self.reference_rule.source(
                 est.rung, axis=self.axis, complexity=est.complexity
             )
-            reference, note = self._resolve(source, est, data, predictions, oracle)
+            reference, note = self._resolve(
+                source, est, data, predictions, oracle, validated
+            )
             if reference is None:
-                results.append(CellResult(cell, source, note=note))
+                by_cell[key] = CellResult(cell, source, note=note)
                 continue
-            prediction = predictions[(est.rung, est.complexity)]
+            prediction = predictions[key]
             scores: dict[str, float] = {}
             for scorer in self.scorers:
                 for name, value in scorer(prediction, reference).items():
                     scores[f"{scorer.name}.{name}"] = value
-            results.append(CellResult(cell, source, scores=scores))
+            by_cell[key] = CellResult(cell, source, scores=scores)
+            validated[key] = prediction
 
+        # Emit one result per estimator, preserving the caller's order.
+        results = [by_cell[(est.rung, est.complexity)] for est in self.estimators]
         return BenchmarkReport(
             task=self.task.name,
             domain=self.task.domain,
             axis=self.axis,
             results=results,
         )
+
+    def _check_unique_cells(self) -> None:
+        """Reject two estimators occupying the same cube cell.
+
+        Each ``(rung, complexity)`` cell must be filled by exactly one
+        estimator; otherwise predictions would silently overwrite and
+        results would collide (including in :meth:`BenchmarkReport.to_dict`).
+        """
+        seen: set[tuple[int, int]] = set()
+        dups: set[tuple[int, int]] = set()
+        for est in self.estimators:
+            key = (est.rung, est.complexity)
+            if key in seen:
+                dups.add(key)
+            seen.add(key)
+        if dups:
+            raise ValueError(
+                "duplicate benchmark cells (rung, complexity): "
+                f"{sorted(dups)}; each cell must be filled by exactly one estimator"
+            )
 
     def _oracle_prediction(
         self, obs: object, predictions: Mapping[tuple[int, int], Estimate]
@@ -150,11 +181,13 @@ class Benchmark:
         data: Mapping[str, object],
         predictions: Mapping[tuple[int, int], Estimate],
         oracle: Estimate | None,
+        validated: Mapping[tuple[int, int], Estimate],
     ) -> tuple[object | None, str]:
         """Map a :class:`ReferenceSource` to a concrete reference object.
 
         Returns ``(reference, note)``; a ``None`` reference means the cell
-        is not scored, with ``note`` explaining why.
+        is not scored, with ``note`` explaining why. ``validated`` holds the
+        cells resolved so far, used by ``BEST_VALIDATED_BELOW``.
         """
         if source is ReferenceSource.NONE:
             return None, "generative rung: not scored against a reference"
@@ -171,11 +204,11 @@ class Benchmark:
         if source is ReferenceSource.SIMPLER_STEP:
             return self._lookup(predictions, est.rung, est.complexity - 1)
         if source is ReferenceSource.BEST_VALIDATED_BELOW:
-            below = [rc for rc in predictions if rc[0] < est.rung]
+            below = [rc for rc in validated if rc[0] < est.rung]
             if not below:
                 return None, "no validated rung below this one"
             best = max(below)
-            return predictions[best], ""
+            return validated[best], ""
         return None, f"unhandled reference source {source!r}"
 
     @staticmethod

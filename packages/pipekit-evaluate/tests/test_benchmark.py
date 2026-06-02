@@ -217,3 +217,41 @@ def test_explicit_reference_estimator_used_as_oracle() -> None:
     (result,) = report.results
     # scored against the explicit oracle's point (7.0): |8 - 7| = 1
     assert result.scores["abs.err"] == pytest.approx(1.0)
+
+
+def test_duplicate_cells_are_rejected() -> None:
+    task = FakeTask()
+    a = FakeEstimator(rung=2, complexity=0, value=9.0)
+    b = FakeEstimator(rung=2, complexity=0, value=8.0)
+    with pytest.raises(ValueError, match="duplicate benchmark cells"):
+        Benchmark(task=task, estimators=[a, b], scorers=[AbsError()]).run()
+
+
+def test_improve_uses_validated_lower_rung_as_reference() -> None:
+    task = FakeTask()
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    improve = FakeEstimator(rung=6, complexity=0, value=8.5)
+    report = Benchmark(
+        task=task, estimators=[oracle, improve], scorers=[AbsError()]
+    ).run()
+    by_label = {r.cell.label: r for r in report.results}
+    r6 = by_label["L4/r6/c0"]
+    assert r6.reference is ReferenceSource.BEST_VALIDATED_BELOW
+    # rung 2 validated (point=9); |8.5 - 9| = 0.5
+    assert r6.scores["abs.err"] == pytest.approx(0.5)
+
+
+def test_improve_skips_unvalidated_lower_rung() -> None:
+    # rung 5 cannot validate (no oracle), so rung 6 must NOT score against it.
+    task = FakeTask()
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    improve = FakeEstimator(rung=6, complexity=0, value=7.0)
+    report = Benchmark(
+        task=task, estimators=[amortized, improve], scorers=[AbsError()]
+    ).run()
+    by_label = {r.cell.label: r for r in report.results}
+    assert by_label["L4/r5/c0"].scores == {}  # unvalidated
+    r6 = by_label["L4/r6/c0"]
+    assert r6.reference is ReferenceSource.BEST_VALIDATED_BELOW
+    assert r6.scores == {}
+    assert "no validated rung below" in r6.note
