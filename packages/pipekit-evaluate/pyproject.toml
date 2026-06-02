@@ -8,7 +8,7 @@ authors = [
 license = { file = "../../LICENSE" }
 readme = "README.md"
 requires-python = ">=3.12"
-classifiers = ["Development Status :: 1 - Planning"]
+classifiers = ["Development Status :: 2 - Pre-Alpha"]
 dependencies = [
     "pipekit",
     "numpy>=2.0",
@@ -16,6 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The benchmark Task reuses pipekit-cycle's ForwardModel / ObservationOperator
+# (referenced under TYPE_CHECKING only); install this extra to type-check or
+# build tasks against the concrete protocol types.
+cycle = ["pipekit-cycle"]
 xskill = ["xskillscore>=0.0.26"]
 proper = ["properscoring>=0.1"]
 

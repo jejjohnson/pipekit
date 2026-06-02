@@ -4073,6 +4073,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+cycle = [
+    { name = "pipekit-cycle" },
+]
 proper = [
     { name = "properscoring" },
 ]
@@ -4084,11 +4087,12 @@ xskill = [
 requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
     { name = "pipekit", editable = "packages/pipekit" },
+    { name = "pipekit-cycle", marker = "extra == 'cycle'", editable = "packages/pipekit-cycle" },
     { name = "properscoring", marker = "extra == 'proper'", specifier = ">=0.1" },
     { name = "scipy", specifier = ">=1.10" },
     { name = "xskillscore", marker = "extra == 'xskill'", specifier = ">=0.0.26" },
 ]
-provides-extras = ["xskill", "proper"]
+provides-extras = ["cycle", "xskill", "proper"]
 
 [[package]]
 name = "pipekit-experiment"
