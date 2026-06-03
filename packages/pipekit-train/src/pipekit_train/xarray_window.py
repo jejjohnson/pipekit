@@ -281,9 +281,7 @@ class XarrayWindowDataset(TrainingDataset):
             shard_count=shard_count,
             seed=seed,
         )
-        iter_ds = iter_ds.map(self._collate_pair).batch(
-            batch_size, drop_remainder=True
-        )
+        iter_ds = iter_ds.map(self._collate_pair).batch(batch_size, drop_remainder=True)
         return iter(iter_ds)
 
     # --- split handling -----------------------------------------------------

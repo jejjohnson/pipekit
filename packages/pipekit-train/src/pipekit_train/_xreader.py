@@ -97,9 +97,7 @@ def _drop_static_vars(dataset: xarray.Dataset, sample_dim: str) -> xarray.Datase
     return dataset.drop_vars(vars_to_drop)
 
 
-def _prepare_xarray_source(
-    source: xarray.Dataset, sample_dim: str
-) -> xarray.Dataset:
+def _prepare_xarray_source(source: xarray.Dataset, sample_dim: str) -> xarray.Dataset:
     """Prepare a single ``xarray.Dataset`` for reading.
 
     Drops static variables and transposes ``sample_dim`` to the front so every
@@ -312,7 +310,9 @@ def _window_shuffle_cls(grain: Any) -> Any:
     """
     if hasattr(grain.experimental, "WindowShuffleIterDataset"):
         return grain.experimental.WindowShuffleIterDataset
-    from grain._src.python.dataset.transformations import shuffle  # ty: ignore[unresolved-import]
+    from grain._src.python.dataset.transformations import (
+        shuffle,  # ty: ignore[unresolved-import]
+    )
 
     return shuffle.WindowShuffleIterDataset
 
@@ -350,7 +350,6 @@ def training_iterator(
         seed: RNG seed.
     """
     import grain  # ty: ignore[unresolved-import]
-
     from geopatcher.time import build_sampling_slices  # ty: ignore[unresolved-import]
 
     if shard_index is None and shard_count is None:

@@ -27,7 +27,7 @@ from pipekit_train.sweep import HyperSweep, ParameterGrid, SweepCarryState, Swee
 from pipekit_train.writer import JSONLWriter, MetricWriter
 
 
-def __getattr__(name: str):  # noqa: D401
+def __getattr__(name: str):
     # `XarrayWindowDataset` is re-exported lazily: importing it eagerly would
     # pull `xarray` + `geopatcher` (the `[xreader]` extra) into every
     # `import pipekit_train`, breaking the base install. PEP 562 defers it
