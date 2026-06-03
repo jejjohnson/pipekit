@@ -290,6 +290,46 @@ are the caller's responsibility". Resolved by saying: pipekit-train
 
 ---
 
+## D12: Sharding is an optional `ShardingSpec`, not a new code path
+
+**Status:** accepted (resolves boundaries.md Q1, issue #15)
+
+**Context:** The v0.1 Equinox adapter was single-host, single-device.
+Multi-GPU (model parallelism, larger batches) and multi-host (training
+across nodes) are the most-requested extension. The risk was forking the
+adapter into a parallel "distributed" code path.
+
+**Decision:** Add one optional, frozen `ShardingSpec(mesh, model_pspec,
+data_pspec)` and thread it through the *existing* path rather than
+branching:
+
+- `TrainState.create(..., sharding=spec)` places model + optimiser array
+  leaves on `spec.model_sharding`; the step counter is replicated.
+- `train_step` is unchanged — `eqx.filter_jit` compiles sharding-aware
+  automatically once its inputs are sharded (replicated model + a batch
+  sharded along `data_pspec` gives data-parallel SPMD with XLA inserting
+  the collectives). No explicit `pjit` wrapper is needed for the
+  data-parallel case.
+- The data iterator places each batch on `spec.data_sharding`; for
+  multi-host it first reads a disjoint **process-shard** of the `grain`
+  `MapDataset` (`map_ds[process_index::process_count]`, the modern
+  equivalent of `grain.ShardByJaxProcess`) and assembles the global array
+  with `jax.make_array_from_process_local_data`.
+- Orbax restore is sharding-aware *for free*: the restore template is the
+  already-sharded `TrainState`, so `to_shape_dtype_struct` carries each
+  leaf's sharding into `StandardRestore`.
+- `TrainingLoop.sharding` is typed `Any | None` so the carrier-agnostic
+  core never imports JAX (the spec lives in `adapters.equinox`).
+
+**Consequences:** `sharding=None` is byte-for-byte the old single-device
+path. The default (data-parallel) spec is `model_pspec=PartitionSpec()`
+(replicated) + `data_pspec=PartitionSpec("data")`; uniform model-parallel
+specs work when leaf ranks are compatible. Verified on a CPU-simulated
+2-device mesh and a scripted 2-process `jax.distributed` smoke. The
+Lightning adapter keeps its own native distributed support (D5).
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |

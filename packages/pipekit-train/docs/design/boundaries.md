@@ -7,14 +7,25 @@ version: 0.1.0
 
 ## 11. Open Questions & Future Work
 
-### Q1: Multi-device / sharding (Equinox adapter)
+### Q1: Multi-device / sharding (Equinox adapter) — **resolved (v0.2)**
 
-The v0.1 Equinox adapter assumes single-host, single-device for
-simplicity. Supporting `jax.sharding.Mesh` and multi-host Grain
-sharding (`grain.ShardByJaxProcess`) requires threading shardings
-through `TrainState` and adjusting the Orbax restore path. This is
-the most likely first extension. The Lightning adapter inherits its
-distributed support from Lightning itself (`Trainer(devices=N)`).
+**Implemented** (issue #15, ADR D12). The Equinox adapter accepts an
+optional `ShardingSpec(mesh, model_pspec, data_pspec)`, threaded through
+`TrainState` (model + optimiser leaves placed per `model_pspec`), the data
+iterator (each batch placed per `data_pspec`; multi-host reads a disjoint
+process-shard of the `grain` `MapDataset` and assembles the global array
+via `jax.make_array_from_process_local_data` — the modern equivalent of
+`grain.ShardByJaxProcess`), and the Orbax restore path (sharding-aware: a
+sharded template yields a sharding-aware `restore`). `TrainingLoop` gains
+`sharding=...`; `None` keeps single-device behaviour. The default
+(data-parallel) case is `model_pspec=PartitionSpec()` (replicated) and
+`data_pspec=PartitionSpec("data")`.
+
+Verified on a CPU-simulated 2-device mesh
+(`tests/adapters/test_equinox_sharding.py`) and a scripted 2-process
+`jax.distributed` smoke (`scripts/multihost_sharding_smoke.py`). The
+Lightning adapter still inherits its distributed support from Lightning
+itself (`Trainer(devices=N)`).
 
 ### Q2: Gradient accumulation
 

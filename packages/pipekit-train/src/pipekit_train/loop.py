@@ -240,6 +240,11 @@ class TrainingLoop(StatefulOperator):
         log_every_n_steps: Metric logging cadence.
         checkpoint_dir: Optional. When set, the adapter wires up its
             native checkpoint machinery here.
+        sharding: Optional backend-specific sharding configuration for
+            multi-device / multi-host training. For the Equinox backend
+            this is a ``pipekit_train.adapters.equinox.ShardingSpec``;
+            ``None`` keeps single-device behaviour. Typed loosely here so
+            the carrier-agnostic core never imports JAX.
         seed: Master PRNG seed.
 
     Raises (at run-time):
@@ -269,6 +274,7 @@ class TrainingLoop(StatefulOperator):
         eval_every_n_steps: int = 500,
         log_every_n_steps: int = 100,
         checkpoint_dir: str | None = None,
+        sharding: Any | None = None,
         seed: int = 0,
     ) -> None:
         if not isinstance(model_op, Operator):
@@ -317,6 +323,7 @@ class TrainingLoop(StatefulOperator):
         self.eval_every_n_steps = int(eval_every_n_steps)
         self.log_every_n_steps = int(log_every_n_steps)
         self.checkpoint_dir = checkpoint_dir
+        self.sharding = sharding
         self.seed = int(seed)
 
     # --- StatefulOperator hook ----------------------------------------
@@ -461,6 +468,7 @@ class TrainingLoop(StatefulOperator):
             "eval_every_n_steps": self.eval_every_n_steps,
             "log_every_n_steps": self.log_every_n_steps,
             "checkpoint_dir": self.checkpoint_dir,
+            "sharding": repr(self.sharding) if self.sharding is not None else None,
             "seed": self.seed,
         }
 
