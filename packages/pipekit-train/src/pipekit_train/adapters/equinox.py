@@ -421,7 +421,17 @@ class _BatchSource:
     def __init__(self, dataset: Any, batch_size: int, seed: int) -> None:
         self._batch_size = batch_size
         self._seed = seed
-        if _is_indexable(dataset):
+        # Additive hook: a dataset may build its own Grain iterator (e.g.
+        # `XarrayWindowDataset`'s block reader — coalesced reads, window
+        # shuffle, multi-host sharding). It returns a checkpointable Grain
+        # iterator, or None to decline (then we fall through to the generic
+        # branches). Datasets without the method are unaffected.
+        build = getattr(dataset, "build_batch_iter", None)
+        custom = build(batch_size, seed) if build is not None else None
+        if custom is not None:
+            self._inner = custom
+            self._kind = "grain"
+        elif _is_indexable(dataset):
             self._inner = self._build_grain_iter(dataset, batch_size, seed)
             self._kind = "grain"
         else:
