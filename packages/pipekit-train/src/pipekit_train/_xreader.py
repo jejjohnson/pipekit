@@ -49,7 +49,7 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from typing import Any
 
 import numpy as np
@@ -64,7 +64,7 @@ PyTree = Any
 # ---------------------------------------------------------------------
 
 
-def collate(dataset: xarray.Dataset, var_order: list[str]) -> np.ndarray:
+def collate(dataset: xarray.Dataset, var_order: list[Hashable]) -> np.ndarray:
     """Stack a loaded sample's data variables into one ndarray.
 
     The pipekit Equinox adapter (`adapters/equinox.py`) is not xarray-aware:
@@ -256,7 +256,10 @@ def group_slices(
 
     Each group is ``(block_slice, sub_slices)``: one contiguous super-slice to
     read once, plus the per-example sub-slices (relative to the block start) to
-    carve it back up in memory.
+    carve it back up in memory. The block reads every point in its span; the
+    sub-slices preserve each window's original ``step`` so a strided stencil
+    (e.g. 3-hourly windows on hourly data) yields the same points as the
+    per-example ``isel`` path rather than every point in the span.
     """
     groups = []
     for i in range(0, len(slices), group_size):
@@ -267,7 +270,7 @@ def group_slices(
         block = slice(block_start, block_stop)
 
         sub_slices = [
-            slice(s.start - block_start, s.stop - block_start)
+            slice(s.start - block_start, s.stop - block_start, s.step)
             for s in slices_to_consolidate
         ]
         groups.append((block, sub_slices))
@@ -306,14 +309,16 @@ def _split_block(
 def _window_shuffle_cls(grain: Any) -> Any:
     """Resolve ``WindowShuffleIterDataset`` across Grain versions.
 
-    Old Grain (0.2.3) didn't expose it as a public API.
+    Old Grain (0.2.3) didn't expose it as a public API. The fallback reaches
+    into a private module via ``import_module`` (a string import) so static
+    type checkers don't try to resolve the private path.
     """
-    if hasattr(grain.experimental, "WindowShuffleIterDataset"):
-        return grain.experimental.WindowShuffleIterDataset
-    from grain._src.python.dataset.transformations import (
-        shuffle,  # ty: ignore[unresolved-import]
-    )
+    cls = getattr(grain.experimental, "WindowShuffleIterDataset", None)
+    if cls is not None:
+        return cls
+    import importlib
 
+    shuffle = importlib.import_module("grain._src.python.dataset.transformations")
     return shuffle.WindowShuffleIterDataset
 
 

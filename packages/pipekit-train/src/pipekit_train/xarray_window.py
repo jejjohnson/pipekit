@@ -54,11 +54,17 @@ _SPLIT_TENTHS: dict[Split, tuple[int, int]] = {
 
 
 def _sha(array: np.typing.ArrayLike) -> str:
-    """Stable sha256 of an array's bytes + dtype (no data read involved)."""
+    """Stable sha256 of an array's values + dtype (no data read involved)."""
     arr = np.ascontiguousarray(array)
     h = hashlib.sha256()
     h.update(str(arr.dtype).encode("utf-8"))
-    h.update(arr.tobytes())
+    if arr.dtype == object:
+        # Object dtype (e.g. cftime calendars, caller-supplied object origins):
+        # tobytes() would hash PyObject* pointers, which vary across processes
+        # and break the stable-identity promise. Hash a value-stable repr.
+        h.update(repr(arr.tolist()).encode("utf-8"))
+    else:
+        h.update(arr.tobytes())
     return h.hexdigest()
 
 
@@ -83,23 +89,26 @@ def _default_guard(
     stencils: dict[str, Any],
     sample_dim: str,
 ) -> int:
-    """Widest stencil span expressed in source-steps.
+    """Widest stencil *reach* from the origin, expressed in source-steps.
 
     Dropping this many origins on the interior side of each split boundary
     guarantees no window straddles a train/val/test boundary, since origins sit
-    at source resolution.
+    at source resolution. The reach is the furthest a window extends from its
+    origin in *either* direction — ``max(|points[0]|, |points[-1]|)`` — not the
+    span ``points[-1] - points[0]``: a single-point offset stencil (e.g. a
+    target at ``+24h``) has zero span but reaches 24 steps across the boundary.
     """
     guard = 0
     for name, ds in source.items():
         points = stencils[name].points
         if points.size == 0:
             continue
-        span = points[-1] - points[0]
+        reach = max(abs(points[0]), abs(points[-1]))
         steps = np.diff(ds[sample_dim].values)
         if steps.size == 0:
             continue
         source_step = steps[0]
-        guard = max(guard, int(np.ceil(span / source_step)))
+        guard = max(guard, int(np.ceil(reach / source_step)))
     return guard
 
 
@@ -211,16 +220,20 @@ class XarrayWindowDataset(TrainingDataset):
     # --- construction helpers ----------------------------------------------
 
     def _build_grain_source(self) -> _xreader._PytreeSource:
+        def _slices(ds: xarray.Dataset, stencil: Any) -> list[slice]:
+            # A degenerate split (e.g. a guard band wider than a narrow band)
+            # yields no origins; build_sampling_slices indexes origins[0], so
+            # short-circuit to a length-0 source instead of crashing.
+            if len(self.sample_origins) == 0:
+                return []
+            return build_sampling_slices(
+                ds[self.sample_dim].values, self.sample_origins, stencil
+            )
+
         return _xreader._PytreeSource(
             {
                 name: _xreader._XarraySliceSource(
-                    ds,
-                    build_sampling_slices(
-                        ds[self.sample_dim].values,
-                        self.sample_origins,
-                        self.stencils[name],
-                    ),
-                    self.sample_dim,
+                    ds, _slices(ds, self.stencils[name]), self.sample_dim
                 )
                 for name, ds in self.source.items()
             }

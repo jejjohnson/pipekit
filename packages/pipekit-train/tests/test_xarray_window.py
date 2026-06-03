@@ -275,3 +275,86 @@ def test_block_reader_shards_are_disjoint():
         return np.asarray(next(d.build_batch_iter(2, 0))[0])
 
     assert not np.array_equal(first_batch(0), first_batch(1))
+
+
+# --- Regression: strided stencils, single-point guard, object hashing -----
+
+
+def test_group_slices_preserves_step():
+    """Block sub-slices must keep each window's stride, else the block path
+    yields every point in the span instead of the strided points."""
+    from pipekit_train._xreader import group_slices
+
+    slices = [slice(0, 10, 3), slice(1, 11, 3)]
+    (_block, subs) = group_slices(slices, 2)[0]
+    assert [s.step for s in subs] == [3, 3]
+
+
+def test_block_reader_matches_strided_window_length():
+    """A 3-hourly window over hourly data has 4 points on BOTH read paths."""
+    pytest.importorskip("grain")
+    ds = _store(n_time=200)
+    stencils = {
+        "input": TimeStencil("-9h", "0h", "3h", closed="both"),  # 4 strided pts
+        "target": TimeStencil("3h", "3h", "0h", closed="both"),
+    }
+    d = XarrayWindowDataset(
+        source={"input": ds[["t2m"]], "target": ds[["t2m"]]},
+        stencils=stencils,
+        store_version="v1",
+        block_reader=True,
+        buffer_size_in_bytes=5e3,
+        buffer_diversity=4,
+    )
+    # per-example path: 4 strided points (not 10 contiguous)
+    assert d[0][0].shape == (1, 4, 2)
+    # block path must agree
+    xb, _ = next(d.build_batch_iter(2, 0))
+    assert np.asarray(xb).shape == (2, 1, 4, 2)
+
+
+def test_guard_accounts_for_single_point_offset():
+    """A +24h single-point target has zero span but reaches 24 steps; the
+    guard must use reach, not span, or train targets leak into val."""
+    ds = _store(n_time=600)
+    stencils = {
+        "input": TimeStencil("0h", "0h", "0h", closed="both"),  # point at origin
+        "target": TimeStencil("24h", "24h", "0h", closed="both"),  # +24h
+    }
+    d = XarrayWindowDataset(
+        source={"input": ds[["t2m"]], "target": ds[["t2m"]]},
+        stencils=stencils,
+        store_version="v1",
+    )
+    assert d._split_guard == 24
+    train_max = d.sample_origins.max()
+    val_min = d.with_split("val").sample_origins.min()
+    # the +24h target window of the last train origin must not reach val.
+    assert val_min - train_max > np.timedelta64(24, "h")
+
+
+def test_empty_split_builds_length_zero():
+    """A guard band wider than a band empties it; construction must not crash."""
+    ds = _store()
+    d = XarrayWindowDataset(
+        source={"input": ds[["t2m"]], "target": ds[["t2m"]]},
+        stencils=_stencils(),
+        store_version="v1",
+        split="val",
+        split_guard=999,  # far wider than the val band
+    )
+    assert len(d) == 0
+    assert list(d) == []
+
+
+def test_object_dtype_origins_hash_by_value():
+    """Object-typed origins (e.g. cftime) must hash by value, not pointer."""
+    import datetime
+
+    from pipekit_train.xarray_window import _sha
+
+    a = np.array([datetime.datetime(2020, 1, 1), datetime.datetime(2020, 1, 2)], object)
+    b = np.array([datetime.datetime(2020, 1, 1), datetime.datetime(2020, 1, 2)], object)
+    c = np.array([datetime.datetime(2020, 1, 1), datetime.datetime(2020, 1, 3)], object)
+    assert _sha(a) == _sha(b)  # equal values, distinct objects → equal hash
+    assert _sha(a) != _sha(c)  # different value → different hash
