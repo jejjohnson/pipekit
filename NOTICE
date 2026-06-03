@@ -1,0 +1,27 @@
+pipekit
+Copyright 2025-2026 J. Emmanuel Johnson
+
+This product is licensed under the MIT License (see LICENSE).
+
+------------------------------------------------------------------------
+Third-party code
+------------------------------------------------------------------------
+
+packages/pipekit-train/src/pipekit_train/_xreader.py is a derivative work
+of the xarray windowed-Zarr reader from:
+
+    neuralgcm/terrax — terrax/xreader/iterators.py
+    Copyright 2025 Google LLC
+    Original author: Stephan Hoyer
+    Licensed under the Apache License, Version 2.0
+    https://github.com/neuralgcm/terrax
+
+The original Apache-2.0 header is retained at the top of that file, along
+with a note describing the modifications made for pipekit. A copy of the
+Apache License, Version 2.0 is available at:
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+The temporal sampling math this reader consumes (`geopatcher.time`) is a
+separate Apache-2.0 derivative of the same upstream, attributed within the
+`geopatcher` project.

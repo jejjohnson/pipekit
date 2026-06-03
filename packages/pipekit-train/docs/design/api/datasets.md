@@ -178,6 +178,85 @@ exposes an `invalidate()` method that deletes the cache directory
 keyed on the current content hash; full re-cache happens on the
 next `__iter__`.
 
+## `XarrayWindowDataset`
+
+A lazy, **indexable** dataset that samples `(input, target)` windows
+along a dimension (default `"time"`) from one or more lazy
+`xarray.Dataset`/Zarr stores — never materialising the whole store. This
+is the dataset for ERA5-scale data that is far larger than local disk, so
+`CachedDataset` is not an option.
+
+A window is `source.isel({dim: slice})` — random access — so the dataset
+is indexable (`__len__` + `__getitem__`) and rides the Equinox adapter's
+Grain path, inheriting shuffle and checkpoint/resume **for free**. The read
+machinery is ported from [`neuralgcm/terrax`][terrax]
+(`terrax/xreader/iterators.py`, Apache-2.0, © Google LLC; original author
+Stephan Hoyer); the temporal sampling math lives in `geopatcher`'s
+`TimeStencil`. Both are optional: `pip install "pipekit-train[xreader]"`
+plus a `geopatcher` install (not on PyPI — `uv pip install -e ../geopatcher`).
+
+```python
+import xarray as xr
+from pipekit_train import TrainingLoop, XarrayWindowDataset
+from geopatcher.time import TimeStencil
+
+ds = xr.open_zarr("gs://…/era5.zarr", chunks=None)
+
+dataset = XarrayWindowDataset(
+    source={"input": ds[["t2m", "u10", "v10"]], "target": ds[["t2m"]]},
+    stencils={"input":  TimeStencil("-9h", "0h", "3h", closed="both"),
+              "target": TimeStencil("3h",  "3h", "0h", closed="both")},  # +3h
+    sample_dim="time",
+    store_version=ds.attrs.get("version", "era5-2024.1"),
+    split="train", seed=0,
+)
+
+# Indexable → the Equinox adapter uses Grain's MapDataset: shuffle + resume.
+loop = TrainingLoop(dataset=dataset, model=model, task=task, batch_size=32)
+```
+
+**Collation.** Each `__getitem__` reads one window per leaf and *collates*
+it into a stacked ndarray of shape `(n_vars, *window_shape)`, stacking the
+data variables along a leading **channel axis** in a fixed order recorded at
+construction (`var_order`). This is required because the adapter is not
+xarray-aware (Grain `.batch()` stacks, the synthesised loss does
+`jax.vmap(model)(x)`); it also pins channel identity into `content_hash`, so
+reordering input variables changes the hash.
+
+**Content addressing.** `content_hash` is *recipe*-addressed, never
+byte-addressed: it folds in `store_version` (a Zarr metadata token or an
+explicit string), the per-leaf stencil configs and `var_order`, a hash of
+the origin coordinates, `sample_dim`, `seed`, and `split`. It is stable
+across re-runs and flips when the recipe changes. Block-reader and shard
+parameters are deliberately excluded — they change iteration order, not the
+logical `(x, y)` set.
+
+**Splits.** Origins are split into contiguous tenths (80/10/10, mirroring
+`SimulationDataset`), **not** random, so train/val/test don't temporally
+interleave. A `split_guard` band (auto-derived from the widest stencil span)
+drops origins on the interior side of each boundary so a window near a
+boundary can't leak across splits.
+
+**Cloud-scale block reader.** For data too large or remote for efficient
+per-example random access, `block_reader=True` flips the dataset onto a
+byte-budgeted, coalesced block reader with window shuffle and multi-host
+sharding — reached through the **same** `TrainingLoop`. The adapter calls the
+dataset's `build_batch_iter(batch_size, seed)` hook (see
+[adapters.md](adapters.md)); it returns a checkpointable Grain iterator, so
+shuffle + sharding + resume all work through the loop. Shards are
+auto-detected from JAX (`process_index` / `process_count`) unless passed
+explicitly.
+
+```python
+cloud = XarrayWindowDataset(
+    source=…, stencils=…, store_version="era5-2024.1",
+    block_reader=True, buffer_size_in_bytes=2e10, buffer_diversity=64,
+)
+loop = TrainingLoop(dataset=cloud, model=model, task=task, batch_size=32)
+```
+
+[terrax]: https://github.com/neuralgcm/terrax
+
 ## Backend handoff
 
 Each backend adapter translates `TrainingDataset` into its native
