@@ -18,7 +18,10 @@ docs/design/
 ├── architecture.md        # The layered design + integration with
 │                          # pipekit, pipekit-cycle, pipekit-experiment.
 ├── boundaries.md          # Non-goals, open questions, future work.
-├── decisions.md           # ADRs D1–D11 (carrier-agnostic + Equinox).
+├── decisions.md           # ADRs D1–D13 (carrier-agnostic + Equinox +
+│                          # sharding + NumPyro).
+├── numpyro_adapter.md     # Full design — the NumPyro inference backend
+│                          # (SVI + NUTS). Companion to api/adapters.md.
 ├── api/
 │   ├── README.md          # Core abstractions (TrainingDataset,
 │   │                      # Loss, TrainingLoop, Callback, MetricWriter).

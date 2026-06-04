@@ -357,15 +357,18 @@ gradient loop, NUTS is a single blocking sampler.
   (begin/end callbacks only; `max_steps` → `num_samples`).
 - **Artifact is a posterior predictive, not point weights.** The trained
   `model_op` is a `NumpyroPredictiveOp` wrapping
-  `Predictive(model, guide=…, params=…)` (SVI) or
-  `Predictive(model, posterior_samples=…)` (NUTS); its registry weight-blob
-  is the params / samples PyTree, analogous to `pipekit-jax.JaxModelOp`
-  (D7).
+  `Predictive(model, guide=…, params=…, num_samples=…)` (SVI) or
+  `Predictive(model, posterior_samples=…)` (NUTS), returning the mean of a
+  configured `predictive_site`; its registry weight-blob is the params /
+  samples PyTree, analogous to `pipekit-jax.JaxModelOp` (D7).
 
 **Consequences:** No mismatch is a blocker — the only structural change is
 "task-first instead of loss-first," already allowed by D9. The adapter adds
-no hard dependency (gated behind `[numpyro]`). Full design in
-`docs/design/api/adapters.md` (NumPyro section); scope agreed as SVI + NUTS.
+no hard dependency (gated behind `[numpyro]`). Full design (user story,
+mathematical + CS background, current/target state, API, examples, build
+order, references) in [`numpyro_adapter.md`](numpyro_adapter.md); the
+concise per-backend entry is in `api/adapters.md`. Scope agreed as SVI +
+NUTS.
 
 ---
 
