@@ -110,6 +110,62 @@ def test_rejects_non_numpyro_task(backend: str) -> None:
         loop.run()
 
 
+class _RecordCallback:
+    """Records the args each lifecycle hook receives."""
+
+    def __init__(self) -> None:
+        self.begin_states: list[Any] = []
+        self.epoch_ends = 0
+        self.step_ends = 0
+
+    def on_train_begin(self, loop: Any, state: Any) -> None:
+        self.begin_states.append(state)
+
+    def on_step_end(self, loop: Any, state: Any, metrics: dict[str, float]) -> None:
+        self.step_ends += 1
+
+    def on_epoch_end(self, loop: Any, state: Any, metrics: dict[str, float]) -> None:
+        self.epoch_ends += 1
+
+    def on_train_end(self, loop: Any, state: Any) -> None:
+        pass
+
+
+def test_predictive_op_serialize_weights_roundtrips() -> None:
+    import pickle
+
+    posterior = {"w": np.array([2.0, 1.0], dtype=np.float32), "b": np.array(0.5)}
+    op = NumpyroPredictiveOp(
+        predictive=None, predictive_site="obs", posterior=posterior
+    )
+    blob = op.serialize_weights()
+    assert isinstance(blob, bytes) and blob
+    restored = pickle.loads(blob)
+    assert set(restored) == {"w", "b"}
+    np.testing.assert_allclose(restored["w"], posterior["w"])
+
+
+def test_svi_dispatches_train_begin_state_and_epoch_end() -> None:
+    # regression: on_train_begin must receive (loop, state); on_epoch_end
+    # must fire when steps_per_epoch is set.
+    cb = _RecordCallback()
+    TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_linreg_dataset(),
+        task=NumpyroTask(_model, predictive_site="obs", predictive_samples=8),
+        backend="numpyro-svi",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        max_steps=3,
+        steps_per_epoch=1,
+        callbacks=(cb,),
+        seed=0,
+    ).run()
+    assert len(cb.begin_states) == 1
+    assert cb.begin_states[0].step == 0  # a TrainerCarryState was passed
+    assert cb.step_ends == 3
+    assert cb.epoch_ends == 3
+
+
 # --- numpyro-svi ----------------------------------------------------------
 
 

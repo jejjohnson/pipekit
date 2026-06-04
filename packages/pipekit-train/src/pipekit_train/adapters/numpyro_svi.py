@@ -50,7 +50,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     svi = SVI(task.model, guide, optimizer, loss=elbo)
     state = svi.init(init_key, x_train, y_train)
 
-    _bayes.dispatch(loop.callbacks, "on_train_begin", loop)
+    initial = _bayes.carry_state(loop, loop.model_op, 0, {})
+    _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     last_loss = float("nan")
     for step in range(1, loop.max_steps + 1):
@@ -63,6 +64,9 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
         carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
         _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
+
+        if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
+            _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
 
         if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
             x_val, y_val = _bayes.materialize(loop.val_dataset)
@@ -79,7 +83,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         task.model, guide=guide, params=params, num_samples=task.predictive_samples
     )
     model_op = _bayes.NumpyroPredictiveOp(
-        predictive, predictive_site=task.predictive_site, seed=loop.seed
+        predictive,
+        predictive_site=task.predictive_site,
+        seed=loop.seed,
+        posterior=dict(params),
     )
 
     final = _bayes.carry_state(

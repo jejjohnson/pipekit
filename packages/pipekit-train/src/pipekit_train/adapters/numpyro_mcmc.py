@@ -34,7 +34,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     x_train, y_train = _bayes.materialize(loop.dataset)
     rng = jax.random.key(loop.seed)
 
-    _bayes.dispatch(loop.callbacks, "on_train_begin", loop)
+    initial = _bayes.carry_state(loop, loop.model_op, 0, {})
+    _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     mcmc = MCMC(
         NUTS(task.model),
@@ -50,7 +51,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     predictive = Predictive(task.model, posterior_samples=samples)
     model_op = _bayes.NumpyroPredictiveOp(
-        predictive, predictive_site=task.predictive_site, seed=loop.seed
+        predictive,
+        predictive_site=task.predictive_site,
+        seed=loop.seed,
+        posterior=dict(samples),
     )
 
     final_step = task.num_samples * task.num_chains

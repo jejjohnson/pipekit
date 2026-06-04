@@ -85,11 +85,19 @@ class NumpyroPredictiveOp(Operator):
     __config_mixin_auto__ = False
 
     def __init__(
-        self, predictive: Any, predictive_site: str = "obs", seed: int = 0
+        self,
+        predictive: Any,
+        predictive_site: str = "obs",
+        seed: int = 0,
+        posterior: dict[str, Any] | None = None,
     ) -> None:
         self.predictive = predictive
         self.predictive_site = predictive_site
         self.seed = int(seed)
+        # The variational params (SVI) or posterior samples (MCMC) — the
+        # meaningful "weights" of this operator, persisted via
+        # ``serialize_weights`` for the model-registry round-trip.
+        self.posterior = posterior
 
     def _apply(self, x: Any) -> Any:
         import jax  # ty: ignore[unresolved-import]
@@ -102,6 +110,20 @@ class NumpyroPredictiveOp(Operator):
                 f"predictive sites {sorted(draws)}."
             )
         return jnp.mean(draws[self.predictive_site], axis=0)
+
+    def serialize_weights(self) -> bytes:
+        """Return the posterior PyTree as a portable weight blob.
+
+        This is the model-registry round-trip path (see the Equinox
+        adapter's ``JaxModelOp`` analogue): ``Checkpoint(registry=…)`` stores
+        these bytes alongside the operator state. The model/guide closures
+        are *not* serialised — like ``EquinoxModelOp``, a full reload
+        re-attaches the persisted posterior to a re-supplied model.
+        """
+        import pickle
+
+        payload = {k: np.asarray(v) for k, v in (self.posterior or {}).items()}
+        return pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
 
     def get_config(self) -> dict[str, Any]:
         return {"predictive_site": self.predictive_site, "seed": self.seed}
@@ -137,8 +159,13 @@ def materialize(dataset: TrainingDataset) -> tuple[Any, Any]:
     """
     import jax.numpy as jnp  # ty: ignore[unresolved-import]
 
-    xs = [np.asarray(x) for x, _ in dataset]
-    ys = [np.asarray(y) for _, y in dataset]
+    # Single pass: a streaming/stateful dataset would be exhausted by a
+    # second iteration, so collect both halves of each pair together.
+    xs: list[Any] = []
+    ys: list[Any] = []
+    for x, y in dataset:
+        xs.append(np.asarray(x))
+        ys.append(np.asarray(y))
     if not xs:
         raise ValueError("dataset yielded no (x, y) pairs.")
     return jnp.asarray(np.stack(xs)), jnp.asarray(np.stack(ys))
