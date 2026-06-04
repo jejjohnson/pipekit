@@ -9,12 +9,12 @@ version: 0.1.0
 > (NUTS, MCLMC, stochastic-gradient MCMC, SMC, variational) as a
 > `TrainingLoop` target. Sibling to [`numpyro_adapter.md`](numpyro_adapter.md)
 > and ADR **D14** in `decisions.md`. **Design only — no code yet.** Scope:
-> a **separate** backend that **interoperates** with the NumPyro adapter
-> through a shared Bayesian seam.
+> a **separate** backend that **interoperates** with the NumPyro adapters
+> (`numpyro-svi` / `numpyro-mcmc`) through a shared Bayesian seam.
 
 ---
 
-## 0. Relationship to the NumPyro adapter (read this first)
+## 0. Relationship to the NumPyro adapters (read this first)
 
 BlackJAX and NumPyro sit at **different layers**:
 
@@ -45,7 +45,7 @@ posterior-predictive `Operator`) and both can start from a NumPyro model.
 The **model→logdensity bridge + `Predictive` wrapping** is factored into a
 shared helper (proposed `pipekit_train.adapters._bayes`); a `NumpyroTask`
 is *one accepted task source* for this adapter. Net UX: **write a NumPyro
-model once, switch the engine by flipping `backend="numpyro"` ↔
+model once, switch the MCMC engine by flipping `backend="numpyro-mcmc"` ↔
 `backend="blackjax"`** — without bundling.
 
 ---
@@ -66,7 +66,7 @@ Two personas:
   doesn't expose (MCLMC for high dimensions; `sgld`/`sghmc` for large-data
   minibatch MCMC; tempered SMC for multimodal posteriors).
 - **The "same model, different engine" user** who wrote a NumPyro model for
-  the NumPyro adapter and wants to A/B it against a BlackJAX sampler without
+  a NumPyro adapter and wants to A/B it against a BlackJAX sampler without
   rewriting anything — flip the backend.
 
 ---
@@ -77,11 +77,11 @@ Two personas:
   `kernel.step` is literally one transition; the loop's per-step machinery
   (callbacks, `metric_writer`, checkpoint cadence, early-stop) applies
   *unchanged* and *per sample* — a cleaner fit than the NumPyro MCMC oracle,
-  which the NumPyro adapter has to run as a single opaque `fit`.
+  which the `numpyro-mcmc` adapter has to run as a single opaque `fit`.
 - **Minibatch MCMC.** `sgld` / `sghmc` consume a *minibatch* gradient of the
   log-density per step — so the existing `_BatchSource` Grain iterator feeds
   them directly. This is large-data Bayesian inference that neither the
-  Equinox nor the NumPyro adapter offers.
+  Equinox nor the NumPyro adapters offer.
 - **Engine choice without lock-in.** Reusing the NumPyro model→logdensity
   bridge makes BlackJAX a drop-in alternative engine for an existing model,
   strengthening the benchmark ladder's rung-2/rung-4 story (a second,
@@ -162,9 +162,10 @@ as in the Equinox and NumPyro adapters.
 ## 5. Current state
 
 - `pipekit-train` ships the **Equinox** backend (implemented) and
-  **Lightning / Keras** scaffolds; **NumPyro** is designed
-  ([`numpyro_adapter.md`](numpyro_adapter.md), ADR D13) — a PPL backend whose
-  MCMC oracle runs as a single blocking `mcmc.run`.
+  **Lightning / Keras** scaffolds; the **NumPyro** adapters
+  (`numpyro-svi` / `numpyro-mcmc`) are designed
+  ([`numpyro_adapter.md`](numpyro_adapter.md), ADR D13) — `numpyro-mcmc`'s
+  oracle runs as a single blocking `mcmc.run`.
 - There is **no sampler-library backend**: no way to choose a specific
   BlackJAX algorithm, no per-step MCMC diagnostics through the loop, and **no
   minibatch MCMC** (SG-MCMC) at all.
@@ -181,7 +182,7 @@ as in the Equinox and NumPyro adapters.
   NumPyro model (bridged to a logdensity), plus a `sampler` choice and warmup
   config.
 - `run()` returns `(predictive_op, backend_info)` — the **same**
-  posterior-predictive `Operator` the NumPyro adapter returns (shared
+  posterior-predictive `Operator` the NumPyro adapters return (shared
   `_bayes` seam) plus per-run diagnostics (acceptance, divergences, ESS).
 - **Per-step sampling** drives the existing loop: each `kernel.step` is a
   loop step, so diagnostics stream to the `metric_writer`, the sampler state
@@ -292,7 +293,7 @@ BlackJAX — once from a NumPyro model, once from a raw log-density.
 ```python
 import jax, jax.numpy as jnp, numpyro, numpyro.distributions as dist
 from pipekit_train import TrainingLoop, IterableDataset
-from pipekit_train.adapters.numpyro import NumpyroTask
+from pipekit_train.adapters._bayes import NumpyroTask
 from pipekit_train.adapters.blackjax import BlackjaxTask
 
 def model(x, y=None):
@@ -334,7 +335,7 @@ samples_op, _ = loop_sgld.run()
 
 Both ops are ordinary `pipekit.Operator`s — they compose into inference
 pipelines and round-trip through the model registry like any trained model
-(D7), identically to the NumPyro adapter's outputs.
+(D7), identically to the NumPyro adapters' outputs.
 
 ---
 
@@ -344,7 +345,7 @@ pipelines and round-trip through the model registry like any trained model
 1. [blackjax] extra + registry/Literal entry + scaffold run() raising
    NotImplementedError (matches the lightning/keras scaffolds).
 2. Factor the shared _bayes seam (model->logdensity bridge + Predictive
-   wrapping) out of the NumPyro adapter; BlackjaxTask + predictive op.
+   wrapping) shared with the NumPyro adapters; BlackjaxTask + predictive op.
 3. Full-batch per-step path: window_adaptation warmup + kernel.step loop
    (NUTS), per-sample diagnostics to the writer, Orbax checkpoint of
    sampler state.
@@ -386,6 +387,6 @@ Tests gate on `importorskip("blackjax")`, like the Equinox / NumPyro suites.
   the shared Bayesian seam.
 - `api/adapters.md` — the per-backend reference (concise BlackJAX entry).
 - `decisions.md` — ADRs D5 (adapter pattern), D6/D7 (artifact / Operator),
-  D9 (per-backend task), D13 (NumPyro adapter), **D14** (this adapter).
+  D9 (per-backend task), D13 (NumPyro adapters), **D14** (this adapter).
 - `pipekit-evaluate` `benchmark_ladder.md` — NUTS / SG-MCMC as rung-2/rung-4
   estimators.
