@@ -148,10 +148,14 @@ modelling DSL. The pieces the adapter touches:
   sampling loop with `jax.lax.scan` (the fast path); the adapter uses the
   explicit `step` form when it needs per-step callbacks, and the scan form
   for tight inner loops.
-- **PPL bridge** — from a NumPyro model:
-  `init_params, potential_fn, *_ = numpyro.infer.util.initialize_model(key,
-  model, model_args=(x, y))`; then
-  `logdensity_fn = lambda position: -potential_fn(position)`.
+- **PPL bridge** — `numpyro.infer.util.initialize_model(key, model,
+  model_args=(x, y))` returns the initial (**unconstrained**) params, the
+  `potential_fn`, and a **`postprocess_fn`** (the constrain / transform map).
+  The shared `_bayes` seam builds `logdensity_fn = lambda z: -potential_fn(z)`
+  *and keeps `postprocess_fn`* — sampled positions are in unconstrained
+  space, so they must be mapped back to the model's constrained sites before
+  `Predictive` (essential for transformed latents such as a `HalfNormal`
+  scale).
 - **PRNG** — `jax.random.key(loop.seed)`, split per step.
 
 Everything is JAX, so `jit` / `vmap` (for multiple chains) / sharding behave
@@ -209,50 +213,71 @@ as in the Equinox and NumPyro adapters.
 @dataclass
 class BlackjaxTask:
     """A BlackJAX inference target (loop.task for backend='blackjax')."""
-    # Either supply a raw log-density + initial position …
-    logdensity_fn: Callable | None = None    # position -> log p(position)
+    # Either supply a raw target + initial position …
+    logdensity_fn: Callable | None = None    # position -> log p(position)  (full-batch)
     init_position: Any = None
-    # … or derive both from a NumPyro model (the shared bridge).
-    numpyro_task: NumpyroTask | None = None   # initialize_model -> logdensity
+    predict_fn: Callable | None = None       # (params, x) -> prediction (raw path)
+    # … or derive everything from a NumPyro model (the shared bridge):
+    # logdensity_fn, init_position, the constrain map, a grad estimator,
+    # and the Predictive op are all built from the model.
+    numpyro_task: NumpyroTask | None = None
 
     sampler: Literal["nuts", "mclmc", "hmc", "sgld", "sghmc"] = "nuts"
-    num_warmup: int = 1000                    # window_adaptation steps
+    num_warmup: int = 1000                    # window_adaptation steps (full-batch)
     num_chains: int = 1                       # vmapped chains
+    # SG-MCMC (sgld / sghmc): the gradient is a *minibatch* estimate, not a
+    # full logdensity_fn. Supply a grad estimator + a step size (BlackJAX's
+    # sgld/sghmc are built from these, and each step takes the minibatch).
+    grad_estimator: Callable | None = None    # (position, (x, y)) -> grad logpost
+    step_size: float | Callable[[int], float] = 1e-3   # constant or schedule
     predictive_site: str = "obs"              # for the NumPyro-model path
     predictive_samples: int = 200             # thinned posterior draws used
 ```
 
-Exactly one of (`logdensity_fn` + `init_position`) or `numpyro_task` must be
-set; otherwise a clean error. The `numpyro_task` path reuses the NumPyro
-adapter's model and `Predictive` machinery via the shared `_bayes` seam.
+Exactly one task **source** must be set: `numpyro_task` (which derives all of
+the above from the model), or a raw target. The raw target is
+`logdensity_fn` + `init_position` for the full-batch samplers, or
+`grad_estimator` + `init_position` + `step_size` for SG-MCMC (BlackJAX's
+`sgld`/`sghmc` are constructed from a `grad_estimator(position, minibatch)`,
+not from a full `logdensity_fn`). `predict_fn` is needed only to build a
+predictive `Operator` from a raw task (see §7.5). The `numpyro_task` path
+reuses the model, the constrain map, and `Predictive` via the shared
+`_bayes` seam.
 
 ### 7.3 `run(loop)` flow
 
-1. **Resolve the log-density.** If `numpyro_task` is set, bridge via
-   `initialize_model` → `logdensity_fn` + `init_position`; else use the
-   supplied pair. (Error if neither / both.)
+1. **Resolve the target.** If `numpyro_task` is set, bridge via
+   `initialize_model` → `logdensity_fn` (+ a minibatch `grad_estimator` for
+   SG-MCMC) + `init_position` + `postprocess_fn` (the constrain map); else
+   use the raw fields. (Error if neither / both.)
 2. **Prepare data — sampler-dependent.**
    - Full-batch samplers (`nuts`, `mclmc`, `hmc`) materialise the dataset
      into the closure of `logdensity_fn` (one pass).
-   - **SG-MCMC** (`sgld`, `sghmc`) reuse **`_BatchSource`** — each step gets
-     a fresh minibatch gradient estimate.
-3. **Warmup.** `state, tuned = window_adaptation(algorithm, logdensity_fn,
-   num_warmup).run(key, init_position)` (or the sampler's own tuner for
-   MCLMC). Build the tuned `kernel`.
+   - **SG-MCMC** (`sgld`, `sghmc`) reuse **`_BatchSource`** — each `step`
+     takes a fresh minibatch and uses `grad_estimator(position, minibatch)`.
+3. **Warmup / tuning.**
+   - Full-batch: `adapt = blackjax.window_adaptation(algorithm,
+     logdensity_fn)`; `(last_state, tuned_parameters), _ = adapt.run(key,
+     init_position, num_warmup)`; build the tuned `kernel` from
+     `tuned_parameters` (MCLMC uses `mclmc_find_L_and_step_size`).
+   - SG-MCMC: no `window_adaptation`; the `kernel` is built from
+     `grad_estimator` and the `step_size` (schedule).
 4. **Per-step sampling loop** (the heart). For each step up to `max_steps`
    (= number of posterior draws): `state, info = kernel.step(step_key,
-   state)`; record `θ` from `state.position`; log `info` (acceptance,
-   energy, `is_divergent`) to the `metric_writer`; fire callbacks;
-   checkpoint the sampler state (Orbax). `num_chains>1` is a `vmap` over the
-   step. (A `jax.lax.scan` fast path via `run_inference_algorithm` is used
-   when no per-step callback is active.)
-5. **Wrap the artifact.** Collect `{θ^(s)}` → `posterior_samples`. Return a
-   posterior-predictive `Operator` from the shared `_bayes` seam:
-   `NumpyroPredictiveOp(Predictive(model, posterior_samples=samples))` for
-   the NumPyro-model path, or a `BlackjaxPredictiveOp(predict_fn,
-   posterior_samples)` for a raw-logdensity task (the user supplies a
-   `predict_fn(params, x)`; `_apply(x)` averages over samples). `_apply`
-   returns the mean of `predictive_site` (NumPyro path).
+   state[, minibatch])`; record `θ` from `state.position`; log `info`
+   (acceptance, energy, `is_divergent`) to the `metric_writer`; fire
+   callbacks; checkpoint the sampler state (Orbax). `num_chains>1` is a
+   `vmap` over the step. (A `jax.lax.scan` fast path via
+   `run_inference_algorithm` is used when no per-step callback is active.)
+5. **Constrain + wrap the artifact.** Collect the unconstrained positions
+   `{z^(s)}`. **NumPyro path:** map them through `postprocess_fn` to
+   constrained samples `{θ^(s)}` (required — `Predictive` expects the
+   model's constrained sites), then
+   `NumpyroPredictiveOp(Predictive(model, posterior_samples=θ))`, returning
+   the mean of `predictive_site`. **Raw path:** if `task.predict_fn` is set,
+   `BlackjaxPredictiveOp(predict_fn, posterior_samples)` whose `_apply(x)`
+   averages `predict_fn(θ^(s), x)`; otherwise the op returns the posterior
+   samples only (no predictive map available).
 
 ### 7.4 `TrainingLoop`-field mapping
 
@@ -260,7 +285,7 @@ adapter's model and `Predictive` machinery via the shared `_bayes` seam.
 |----------------------|-----------------------------------|-------------------------------|
 | `task` (required) | `BlackjaxTask(..., sampler="nuts")` | `BlackjaxTask(..., sampler="sgld")` |
 | `loss` | N/A — target is the log-density | N/A |
-| `optimizer_config` | ignored (step size from warmup) | step-size schedule (sgld) |
+| `optimizer_config` | not used (step size from warmup) | not used (`step_size` is a task field) |
 | `max_steps` | number of posterior draws | number of minibatch draws |
 | `batch_size` | ignored — full-batch log-density | **`_BatchSource` minibatch** |
 | per-step loop / callbacks | `kernel.step`; per-sample diagnostics | `kernel.step` on a minibatch |
@@ -273,10 +298,10 @@ adapter's model and `Predictive` machinery via the shared `_bayes` seam.
 1. **Per-step vs scan.** Per-step `kernel.step` enables callbacks but is
    slower than `run_inference_algorithm`'s `scan`. Proposed: per-step when a
    callback/writer is attached, scan otherwise (chosen automatically).
-2. **Raw-logdensity predictive.** For non-NumPyro tasks, require a
-   `predict_fn` to build the predictive op, or return samples only?
-   Proposed: optional `predict_fn`; without it the op returns posterior
-   samples.
+2. **Raw-logdensity predictive.** Resolved: `predict_fn(params, x)` is an
+   optional `BlackjaxTask` field; with it the op returns posterior-predictive
+   means, without it the raw path returns posterior samples only. (The
+   `numpyro_task` path always has a predictive via the model.)
 3. **Shared seam location.** `pipekit_train.adapters._bayes` (model→logdensity
    + `Predictive` wrapping), imported by both `numpyro` and `blackjax`
    adapters. Confirm the factoring.
@@ -318,14 +343,17 @@ predictive_op, artifact = loop.run()
 artifact.backend_info["mean_acceptance"], artifact.backend_info["num_divergences"]
 y_hat = predictive_op(x_new)            # posterior-predictive mean of "obs"
 
-# --- BlackJAX SGLD on a raw log-density (minibatch MCMC) -------------------
-def logdensity_fn(theta):               # unnormalised log-posterior of `theta`
+# --- BlackJAX SGLD on a raw target (minibatch MCMC) -----------------------
+def grad_estimator(theta, batch):       # minibatch grad of the log-posterior
+    x, y = batch
     ...
 loop_sgld = TrainingLoop(
+    model_op=...,                       # ignored; the task carries the target
     dataset=dataset,
     backend="blackjax",
-    task=BlackjaxTask(logdensity_fn=logdensity_fn, init_position=theta0,
-                      sampler="sgld"),
+    task=BlackjaxTask(grad_estimator=grad_estimator, init_position=theta0,
+                      sampler="sgld", step_size=1e-4,
+                      predict_fn=lambda th, x: th["w"] * x[..., 0] + th["b"]),
     max_steps=5000,
     batch_size=128,                     # _BatchSource feeds the minibatch grad
     seed=0,
