@@ -122,6 +122,21 @@ def test_over_specified_task_raises() -> None:
         loop.run()
 
 
+def test_num_chains_gt_one_raises() -> None:
+    # v1 runs a single chain; num_chains>1 must raise rather than silently
+    # return single-chain diagnostics.
+    loop = TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_linreg_dataset(),
+        task=BlackjaxTask(numpyro_task=NumpyroTask(_model), num_chains=2),
+        backend="blackjax",
+        max_steps=1,
+        seed=0,
+    )
+    with pytest.raises(NotImplementedError, match="num_chains"):
+        loop.run()
+
+
 def test_raw_predictive_op_without_predict_fn_errors() -> None:
     op = BlackjaxPredictiveOp(None, {"w": np.array([1.0, 2.0])})
     with pytest.raises(RuntimeError, match="no predict_fn"):
@@ -154,6 +169,40 @@ def test_nuts_on_numpyro_recovers_line() -> None:
     assert info["backend"] == "blackjax" and info["sampler"] == "nuts"
     assert isinstance(info["num_divergences"], int)
     assert _truth_mse(model_op, dataset) < 0.2
+
+
+@pytest.mark.slow
+@pytest.mark.integration
+def test_raw_logdensity_path_skips_materialization() -> None:
+    # the raw target carries its own logdensity, so it must run without
+    # touching loop.dataset (here an empty placeholder) and must round-trip an
+    # array-valued init_position through the predictive op as a pytree.
+    import jax.numpy as jnp
+
+    empty = IterableDataset(source=[], content_hash="empty")
+
+    def logdensity_fn(theta: Any) -> Any:
+        return -0.5 * jnp.sum((theta - 3.0) ** 2)
+
+    model_op, artifact = TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=empty,
+        task=BlackjaxTask(
+            logdensity_fn=logdensity_fn,
+            init_position=jnp.zeros((1,)),
+            predict_fn=lambda theta, x: theta,
+            sampler="nuts",
+            num_warmup=200,
+        ),
+        backend="blackjax",
+        max_steps=300,
+        seed=0,
+    ).run()
+
+    assert isinstance(model_op, BlackjaxPredictiveOp)
+    assert artifact.backend_info["backend"] == "blackjax"
+    # posterior mean of an N(3, 1) target recovered by the raw NUTS path
+    assert abs(float(np.asarray(model_op(np.zeros((1, 1))))[0] - 3.0)) < 0.5
 
 
 @pytest.mark.slow

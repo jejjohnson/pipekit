@@ -153,8 +153,16 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         )
     if task.sampler not in _SUPPORTED_SAMPLERS:
         raise ValueError(f"Unknown sampler {task.sampler!r}.")
+    if task.num_chains != 1:
+        # v1 runs a single chain; unlike numpyro-mcmc the per-step loop below
+        # does not vmap/iterate chains, so accepting num_chains>1 would silently
+        # return single-chain diagnostics. Multi-chain (vmap) is a follow-on.
+        raise NotImplementedError(
+            f"num_chains={task.num_chains} is unsupported; v1 of the BlackJAX "
+            "backend runs a single chain. Multi-chain (vmap) sampling is a "
+            "planned follow-on — see docs/design/blackjax_adapter.md."
+        )
 
-    x_train, y_train = _bayes.materialize(loop.dataset)
     rng = jax.random.key(loop.seed)
     rng, init_key, warm_key = jax.random.split(rng, 3)
 
@@ -175,6 +183,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         # The bridged NumpyroTask is the source of truth for the model's
         # observation site, so honour its predictive_site for the engine swap.
         predictive_site = task.numpyro_task.predictive_site
+        # Materialise the dataset only on the numpyro path — the raw target
+        # carries its own logdensity, so it needn't touch loop.dataset (and
+        # should work with an empty placeholder dataset).
+        x_train, y_train = _bayes.materialize(loop.dataset)
         logdensity_fn, init_position, constrain_fn = _bayes.numpyro_logdensity(
             model, x_train, y_train, init_key
         )
