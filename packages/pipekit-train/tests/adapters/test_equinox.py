@@ -635,8 +635,9 @@ def test_iterator_state_checkpoint_round_trip(tmp_path):
     _, art_phase1 = loop_phase1.run()
     assert art_phase1.backend_info["final_step"] == 5
 
-    # The iterator-state side-car must exist.
-    side_car = ckpt_dir / "5" / "data_iter.json"
+    # The iterator-state side-car must exist (per-process name; index 0 in a
+    # single-process run).
+    side_car = ckpt_dir / "5" / "data_iter_0.json"
     assert side_car.exists(), (
         "iterator-state side-car not written — see save_state extension"
     )

@@ -386,7 +386,11 @@ def save_state(
         mngr.wait_until_finished()
         step_dir = Path(os.fspath(mngr.directory)) / str(step)
         step_dir.mkdir(parents=True, exist_ok=True)
-        (step_dir / "data_iter.json").write_text(
+        # Per-process side-car: under multi-host sharding each process owns a
+        # distinct data shard and so a distinct Grain iterator state. A single
+        # shared file would let the last writer win and every process would
+        # then resume from the wrong position. Key it by process index.
+        (step_dir / f"data_iter_{jax.process_index()}.json").write_text(
             json.dumps(_jsonify_grain_state(data_iter_state), sort_keys=True)
         )
 
@@ -416,7 +420,13 @@ def restore_state(
     abstract = jax.tree.map(ocp.utils.to_shape_dtype_struct, arrays)
     restored = mngr.restore(step, args=ocp.args.StandardRestore(abstract))
 
-    side_car = Path(os.fspath(mngr.directory)) / str(step) / "data_iter.json"
+    # Read this process's own iterator-state side-car (see save_state). Fall
+    # back to the legacy shared name for checkpoints written before the
+    # per-process split.
+    step_dir = Path(os.fspath(mngr.directory)) / str(step)
+    side_car = step_dir / f"data_iter_{jax.process_index()}.json"
+    if not side_car.exists():
+        side_car = step_dir / "data_iter.json"
     data_iter_state: Any | None = None
     if side_car.exists():
         data_iter_state = _unjsonify_grain_state(json.loads(side_car.read_text()))
@@ -536,7 +546,17 @@ class _BatchSource:
         # the documented single-device behaviour is preserved even if JAX was
         # distributed-initialised (process_count > 1).
         sharded = sharding is not None
-        if _is_indexable(dataset):
+        # Additive hook: a dataset may build its own Grain iterator (e.g.
+        # `XarrayWindowDataset`'s block reader — coalesced reads, window
+        # shuffle, multi-host sharding). It returns a checkpointable Grain
+        # iterator, or None to decline (then we fall through to the generic
+        # branches). Datasets without the method are unaffected.
+        build = getattr(dataset, "build_batch_iter", None)
+        custom = build(batch_size, seed) if build is not None else None
+        if custom is not None:
+            self._inner = custom
+            self._kind = "grain"
+        elif _is_indexable(dataset):
             self._inner = self._build_grain_iter(dataset, batch_size, seed, sharded)
             self._kind = "grain"
         else:

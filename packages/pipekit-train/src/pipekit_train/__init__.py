@@ -27,6 +27,18 @@ from pipekit_train.sweep import HyperSweep, ParameterGrid, SweepCarryState, Swee
 from pipekit_train.writer import JSONLWriter, MetricWriter
 
 
+def __getattr__(name: str):
+    # `XarrayWindowDataset` is re-exported lazily: importing it eagerly would
+    # pull `xarray` + `geopatcher` (the `[xreader]` extra) into every
+    # `import pipekit_train`, breaking the base install. PEP 562 defers it
+    # until first access.
+    if name == "XarrayWindowDataset":
+        from pipekit_train.xarray_window import XarrayWindowDataset
+
+        return XarrayWindowDataset
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "KL",
     "MSE",
@@ -50,6 +62,7 @@ __all__ = [
     "TrainingDataset",
     "TrainingLoop",
     "ValidationStep",
+    "XarrayWindowDataset",
 ]
 
 __version__ = "0.0.1"  # x-release-please-version

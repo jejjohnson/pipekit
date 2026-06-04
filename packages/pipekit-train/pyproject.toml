@@ -37,6 +37,15 @@ cache     = ["zarr>=2.18"]
 s3        = ["zarr>=2.18", "fsspec>=2024.0", "s3fs>=2024.0"]
 gcs       = ["zarr>=2.18", "fsspec>=2024.0", "gcsfs>=2024.0"]
 
+# Lazy, indexable windowed-Zarr datasets (`XarrayWindowDataset`). The
+# block-reader / shuffle path rides Grain (already pulled by `[equinox]`).
+# NOTE: `geopatcher` supplies the temporal stencils but is not on PyPI and
+# is not a pipekit workspace member, so it is NOT pinned here — it is a
+# lazy import raising an actionable ImportError, and must be installed
+# alongside (e.g. `uv pip install -e ../geopatcher`). See
+# docs/design/api/datasets.md.
+xreader   = ["xarray>=2024.0", "zarr>=2.18", "grain>=0.2"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
