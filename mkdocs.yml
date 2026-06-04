@@ -65,6 +65,9 @@ nav:
   - Notebooks:
       - Quickstart (MLP regression): notebooks/pipekit_train_quickstart.ipynb
       - Cycle handoff (emulator → forecast): notebooks/pipekit_train_cycle_handoff.ipynb
+      - Bayesian — NumPyro SVI: notebooks/pipekit_train_numpyro_svi.ipynb
+      - Bayesian — NumPyro NUTS: notebooks/pipekit_train_numpyro_mcmc.ipynb
+      - Bayesian — BlackJAX NUTS: notebooks/pipekit_train_blackjax.ipynb
   - Design:
       - pipekit-train:
           - Overview: design-train/README.md
