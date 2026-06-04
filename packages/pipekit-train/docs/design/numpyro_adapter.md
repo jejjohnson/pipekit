@@ -9,8 +9,11 @@ version: 0.1.0
 > first-class `TrainingLoop` target, split by paradigm:
 > **`numpyro-svi`** (variational — a per-step optimizer) and
 > **`numpyro-mcmc`** (sampling — a single blocking run). Companion to
-> `api/adapters.md` and ADR **D13** in `decisions.md`. **Design only — no
-> code yet.**
+> `api/adapters.md` and ADR **D13** in `decisions.md`. **Status: implemented
+> (v1)** — both backends + the shared `adapters._bayes` seam ship; SVI
+> minibatching (a `numpyro.plate` subsample hook) remains the documented
+> follow-on. Tests are gated behind the `[numpyro]` extra and the
+> `slow`/`integration` markers (CI runs the fast subset).
 >
 > **Why two adapters, not one?** SVI and MCMC only *look* alike. SVI's
 > `svi.update` returns `(state, loss)` per step, so it genuinely *is* the

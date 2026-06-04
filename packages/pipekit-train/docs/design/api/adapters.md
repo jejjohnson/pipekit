@@ -262,7 +262,7 @@ projects that already standardise on Keras layers.
 
 ---
 
-## NumPyro (planned) — two Bayesian backends: `numpyro-svi` + `numpyro-mcmc`
+## NumPyro (implemented) — two Bayesian backends: `numpyro-svi` + `numpyro-mcmc`
 
 `pipekit_train.adapters.numpyro_svi` and `…numpyro_mcmc`. Extras:
 `pipekit-train[numpyro]` (`numpyro>=0.15`, `optax`, `grain`; JAX via

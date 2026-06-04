@@ -80,7 +80,14 @@ python-version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["packages/pipekit/tests", "packages/pipekit-array/tests", "packages/pipekit-cycle/tests", "packages/pipekit-experiment/tests", "packages/pipekit-evaluate/tests", "packages/pipekit-train/tests", "packages/pipekit-jax/tests"]
-addopts = "-q"
+# Deselect slow / integration tests by default so the CI run is the fast
+# subset. Run the heavy ones explicitly: `pytest -m slow` / `-m integration`
+# (or override entirely with `-o addopts=`).
+addopts = "-q -m 'not slow and not integration'"
+markers = [
+    "slow: long-running test (e.g. MCMC/SVI convergence); deselected by default.",
+    "integration: end-to-end across a backend's real stack; deselected by default.",
+]
 
 [tool.coverage.run]
 source = [
