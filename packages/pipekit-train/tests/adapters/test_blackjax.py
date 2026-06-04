@@ -103,6 +103,25 @@ def test_raw_task_needs_target() -> None:
         loop.run()
 
 
+def test_over_specified_task_raises() -> None:
+    # supplying both a numpyro_task and a raw target is ambiguous → reject
+    loop = TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_linreg_dataset(),
+        task=BlackjaxTask(
+            numpyro_task=NumpyroTask(_model),
+            logdensity_fn=lambda p: 0.0,
+            init_position={"w": np.array(0.0)},
+            sampler="nuts",
+        ),
+        backend="blackjax",
+        max_steps=1,
+        seed=0,
+    )
+    with pytest.raises(ValueError, match="over-specified"):
+        loop.run()
+
+
 def test_raw_predictive_op_without_predict_fn_errors() -> None:
     op = BlackjaxPredictiveOp(None, {"w": np.array([1.0, 2.0])})
     with pytest.raises(RuntimeError, match="no predict_fn"):

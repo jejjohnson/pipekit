@@ -53,7 +53,9 @@ class BlackjaxTask:
         num_chains: Reserved for multi-chain (vmap); v1 uses 1.
         num_integration_steps: Required for ``hmc``/``sghmc`` (planned).
         grad_estimator, step_size: Reserved for SG-MCMC (planned).
-        predictive_site: Model site the trained operator returns.
+        predictive_site: Model site the trained operator returns (raw path
+            only; the ``numpyro_task`` path honours that task's
+            ``predictive_site``).
     """
 
     logdensity_fn: Callable[..., Any] | None = None
@@ -83,7 +85,7 @@ class BlackjaxPredictiveOp(Operator):
     def __init__(
         self,
         predict_fn: Callable[..., Any] | None,
-        posterior: dict[str, Any],
+        posterior: Any,
         predictive_site: str = "obs",
     ) -> None:
         self.predict_fn = predict_fn
@@ -91,15 +93,16 @@ class BlackjaxPredictiveOp(Operator):
         self.predictive_site = predictive_site
 
     def _apply(self, x: Any) -> Any:
-        import jax  # ty: ignore[unresolved-import]
-        import jax.numpy as jnp  # ty: ignore[unresolved-import]
+        import jax
+        import jax.numpy as jnp
 
         if self.predict_fn is None:
             raise RuntimeError(
                 "BlackjaxPredictiveOp has no predict_fn; pass predict_fn to "
                 "BlackjaxTask to get a predictive operator, or read .posterior."
             )
-        preds = jax.vmap(lambda theta: self.predict_fn(theta, jnp.asarray(x)))(
+        predict_fn = self.predict_fn
+        preds = jax.vmap(lambda theta: predict_fn(theta, jnp.asarray(x)))(
             self.posterior
         )
         return jnp.mean(preds, axis=0)
@@ -107,7 +110,12 @@ class BlackjaxPredictiveOp(Operator):
     def serialize_weights(self) -> bytes:
         import pickle
 
-        payload = {k: np.asarray(v) for k, v in self.posterior.items()}
+        import jax
+
+        # ``posterior`` is the raw sample pytree (mirrors ``init_position`` —
+        # an array, dict, or nested container), so flatten leaves to numpy
+        # rather than assuming a mapping.
+        payload = jax.tree.map(np.asarray, self.posterior)
         return pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
 
     def get_config(self) -> dict[str, Any]:
@@ -132,8 +140,8 @@ def _validate_task(loop: Any) -> BlackjaxTask:
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """Sample ``loop.task`` with BlackJAX (NUTS); return ``(op, info)``."""
     import blackjax  # ty: ignore[unresolved-import]
-    import jax  # ty: ignore[unresolved-import]
-    import jax.numpy as jnp  # ty: ignore[unresolved-import]
+    import jax
+    import jax.numpy as jnp
 
     t0 = time.time()
     task = _validate_task(loop)
@@ -151,14 +159,27 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     rng, init_key, warm_key = jax.random.split(rng, 3)
 
     # --- resolve the target (numpyro model or raw logdensity) -------------
+    # Exactly one source: silently sampling the wrong target would yield a
+    # valid-looking but incorrect posterior, so an over-specified task raises.
+    has_numpyro = task.numpyro_task is not None
+    has_raw = task.logdensity_fn is not None or task.init_position is not None
+    if has_numpyro and has_raw:
+        raise ValueError(
+            "BlackjaxTask is over-specified: pass either numpyro_task, or "
+            "logdensity_fn + init_position (a raw target), not both."
+        )
     model = None
     constrain_fn = None
     if task.numpyro_task is not None:
         model = task.numpyro_task.model
+        # The bridged NumpyroTask is the source of truth for the model's
+        # observation site, so honour its predictive_site for the engine swap.
+        predictive_site = task.numpyro_task.predictive_site
         logdensity_fn, init_position, constrain_fn = _bayes.numpyro_logdensity(
             model, x_train, y_train, init_key
         )
     elif task.logdensity_fn is not None and task.init_position is not None:
+        predictive_site = task.predictive_site
         logdensity_fn, init_position = task.logdensity_fn, task.init_position
     else:
         raise ValueError(
@@ -211,13 +232,16 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         predictive = Predictive(model, posterior_samples=constrained)
         model_op: Operator = _bayes.NumpyroPredictiveOp(
             predictive,
-            predictive_site=task.predictive_site,
+            predictive_site=predictive_site,
             seed=loop.seed,
             posterior=dict(constrained),
         )
     else:
+        # ``samples`` mirrors ``init_position`` (an arbitrary pytree, not
+        # necessarily a mapping); pass it through unchanged so the predictive
+        # op handles pytrees rather than corrupting non-dict positions.
         model_op = BlackjaxPredictiveOp(
-            task.predict_fn, dict(samples), predictive_site=task.predictive_site
+            task.predict_fn, samples, predictive_site=predictive_site
         )
 
     final = _bayes.carry_state(loop, model_op, int(step), {})

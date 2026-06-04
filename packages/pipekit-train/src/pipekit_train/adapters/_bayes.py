@@ -100,8 +100,8 @@ class NumpyroPredictiveOp(Operator):
         self.posterior = posterior
 
     def _apply(self, x: Any) -> Any:
-        import jax  # ty: ignore[unresolved-import]
-        import jax.numpy as jnp  # ty: ignore[unresolved-import]
+        import jax
+        import jax.numpy as jnp
 
         draws = self.predictive(jax.random.key(self.seed), jnp.asarray(x))
         if self.predictive_site not in draws:
@@ -157,7 +157,7 @@ def materialize(dataset: TrainingDataset) -> tuple[Any, Any]:
     ``numpyro.plate(subsample_size=…)`` is a follow-on), so a single pass
     over ``dataset`` materialises the whole likelihood.
     """
-    import jax.numpy as jnp  # ty: ignore[unresolved-import]
+    import jax.numpy as jnp
 
     # Single pass: a streaming/stateful dataset would be exhausted by a
     # second iteration, so collect both halves of each pair together.

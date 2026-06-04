@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """Fit ``loop.task`` with NumPyro NUTS; return ``(predictive_op, info)``."""
-    import jax  # ty: ignore[unresolved-import]
+    import jax
     import numpy as np
     import numpyro  # ty: ignore[unresolved-import]
     from numpyro.infer import MCMC, NUTS, Predictive  # ty: ignore[unresolved-import]

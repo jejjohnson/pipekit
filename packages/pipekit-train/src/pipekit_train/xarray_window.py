@@ -251,7 +251,7 @@ class XarrayWindowDataset(TrainingDataset):
         if self.shard_index is not None or self.shard_count is not None:
             raise ValueError("set both or neither of shard_index and shard_count")
         try:  # auto-detect a multi-host JAX setup
-            import jax  # ty: ignore[unresolved-import]
+            import jax
 
             return jax.process_index(), jax.process_count()
         except Exception:

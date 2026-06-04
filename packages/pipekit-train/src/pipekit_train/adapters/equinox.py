@@ -33,9 +33,9 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast, runtime_checkable
 
-import equinox as eqx  # ty: ignore[unresolved-import]
-import jax  # ty: ignore[unresolved-import]
-import jax.numpy as jnp  # ty: ignore[unresolved-import]
+import equinox as eqx
+import jax
+import jax.numpy as jnp
 import numpy as np
 from pipekit import Operator
 
