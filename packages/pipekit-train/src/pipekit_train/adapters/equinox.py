@@ -9,6 +9,9 @@ callbacks through the loop.
 
 Module surface:
 
+- `ShardingSpec` — optional multi-device / multi-host sharding config
+  (`mesh`, `model_pspec`, `data_pspec`); threaded through `TrainState`,
+  the data iterator, and the Orbax restore path. See issue #15, ADR D12.
 - `TrainState(eqx.Module)` — model + opt_state + step.
 - `TrainTask` (Protocol) — user-defined training target, ported from
   the eqx_trainer design.
@@ -27,6 +30,7 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast, runtime_checkable
 
 import equinox as eqx  # ty: ignore[unresolved-import]
@@ -98,6 +102,83 @@ _EquinoxModelOp = EquinoxModelOp
 
 
 # ---------------------------------------------------------------------
+# ShardingSpec — multi-device / multi-host configuration (issue #15)
+# ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ShardingSpec:
+    """Sharding configuration for the Equinox adapter.
+
+    Threaded through `TrainState` (model + optimiser leaves placed per
+    ``model_pspec``), the data iterator (each batch placed per
+    ``data_pspec``, with multi-host process sharding), and the Orbax
+    restore path (sharding-aware). See ADR D12.
+
+    The common case is **data parallelism**: ``model_pspec =
+    PartitionSpec()`` (the model is replicated on every device) and
+    ``data_pspec = PartitionSpec("data")`` (each batch is split along its
+    leading axis across the mesh's ``"data"`` dimension). A uniform
+    model-parallel ``model_pspec`` is also honoured when every sharded
+    array leaf has a compatible rank.
+
+    Attributes:
+        mesh: The device mesh.
+        model_pspec: PartitionSpec applied to every model / optimiser
+            array leaf. ``PartitionSpec()`` replicates.
+        data_pspec: PartitionSpec applied to each batch (the leading axis
+            is the batch axis).
+    """
+
+    mesh: jax.sharding.Mesh
+    model_pspec: jax.sharding.PartitionSpec
+    data_pspec: jax.sharding.PartitionSpec
+
+    @property
+    def model_sharding(self) -> jax.sharding.NamedSharding:
+        """`NamedSharding` for model / optimiser leaves."""
+        return jax.sharding.NamedSharding(self.mesh, self.model_pspec)
+
+    @property
+    def data_sharding(self) -> jax.sharding.NamedSharding:
+        """`NamedSharding` for data batches."""
+        return jax.sharding.NamedSharding(self.mesh, self.data_pspec)
+
+    @property
+    def replicated(self) -> jax.sharding.NamedSharding:
+        """`NamedSharding` that replicates a value on every device."""
+        return jax.sharding.NamedSharding(self.mesh, jax.sharding.PartitionSpec())
+
+
+def _shard_pytree(tree: Any, sharding: Any, replicated: Any) -> Any:
+    """Place the array leaves of ``tree`` on ``sharding`` (static leaves untouched).
+
+    Rank-0 (scalar) leaves are always replicated: a non-trivial
+    ``PartitionSpec`` cannot shard a scalar, and optimiser state carries
+    scalar bookkeeping (e.g. Adam's update count) that would otherwise make
+    ``jax.device_put`` fail under a model-parallel ``model_pspec``.
+    """
+    arrays, static = eqx.partition(tree, eqx.is_array)
+    shardings = jax.tree.map(
+        lambda x: replicated if jnp.ndim(x) == 0 else sharding, arrays
+    )
+    placed = jax.device_put(arrays, shardings)
+    return eqx.combine(placed, static)
+
+
+def _place_batch(x: jax.Array, sharding: Any) -> jax.Array:
+    """Place a batch array on ``sharding``.
+
+    Single-process: a straight ``jax.device_put``. Multi-process: assemble
+    the global array from each process's local shard via
+    ``jax.make_array_from_process_local_data`` (the multi-host path).
+    """
+    if jax.process_count() > 1:
+        return jax.make_array_from_process_local_data(sharding, np.asarray(x))
+    return jax.device_put(x, sharding)
+
+
+# ---------------------------------------------------------------------
 # TrainState
 # ---------------------------------------------------------------------
 
@@ -118,13 +199,36 @@ class TrainState(eqx.Module):
     def create(
         model: eqx.Module,
         optimizer: optax.GradientTransformation,
+        sharding: ShardingSpec | None = None,
     ) -> TrainState:
+        """Build the initial training state, optionally placed on a mesh.
+
+        When ``sharding`` is given, the model and optimiser array leaves are
+        placed on ``sharding.model_sharding`` and the step counter is
+        replicated, so the very first ``train_step`` already runs sharded.
+        """
         opt_state = optimizer.init(eqx.filter(model, eqx.is_array))
-        return TrainState(
+        state = TrainState(
             model=model,
             opt_state=opt_state,
             step=jnp.asarray(0, dtype=jnp.int32),
         )
+        if sharding is not None:
+            state = shard_train_state(state, sharding)
+        return state
+
+
+def shard_train_state(state: TrainState, spec: ShardingSpec) -> TrainState:
+    """Return ``state`` with its model + optimiser leaves placed on ``spec``.
+
+    The model and optimiser arrays go to ``spec.model_sharding``; the scalar
+    step is replicated across the mesh.
+    """
+    return TrainState(
+        model=_shard_pytree(state.model, spec.model_sharding, spec.replicated),
+        opt_state=_shard_pytree(state.opt_state, spec.model_sharding, spec.replicated),
+        step=jax.device_put(state.step, spec.replicated),
+    )
 
 
 # ---------------------------------------------------------------------
@@ -282,7 +386,11 @@ def save_state(
         mngr.wait_until_finished()
         step_dir = Path(os.fspath(mngr.directory)) / str(step)
         step_dir.mkdir(parents=True, exist_ok=True)
-        (step_dir / "data_iter.json").write_text(
+        # Per-process side-car: under multi-host sharding each process owns a
+        # distinct data shard and so a distinct Grain iterator state. A single
+        # shared file would let the last writer win and every process would
+        # then resume from the wrong position. Key it by process index.
+        (step_dir / f"data_iter_{jax.process_index()}.json").write_text(
             json.dumps(_jsonify_grain_state(data_iter_state), sort_keys=True)
         )
 
@@ -312,7 +420,13 @@ def restore_state(
     abstract = jax.tree.map(ocp.utils.to_shape_dtype_struct, arrays)
     restored = mngr.restore(step, args=ocp.args.StandardRestore(abstract))
 
-    side_car = Path(os.fspath(mngr.directory)) / str(step) / "data_iter.json"
+    # Read this process's own iterator-state side-car (see save_state). Fall
+    # back to the legacy shared name for checkpoints written before the
+    # per-process split.
+    step_dir = Path(os.fspath(mngr.directory)) / str(step)
+    side_car = step_dir / f"data_iter_{jax.process_index()}.json"
+    if not side_car.exists():
+        side_car = step_dir / "data_iter.json"
     data_iter_state: Any | None = None
     if side_car.exists():
         data_iter_state = _unjsonify_grain_state(json.loads(side_car.read_text()))
@@ -418,9 +532,20 @@ class _BatchSource:
     (state methods return / accept ``None``).
     """
 
-    def __init__(self, dataset: Any, batch_size: int, seed: int) -> None:
+    def __init__(
+        self,
+        dataset: Any,
+        batch_size: int,
+        seed: int,
+        sharding: ShardingSpec | None = None,
+    ) -> None:
         self._batch_size = batch_size
         self._seed = seed
+        self._sharding = sharding
+        # Process-sharding only kicks in for an *explicit* spec; without one
+        # the documented single-device behaviour is preserved even if JAX was
+        # distributed-initialised (process_count > 1).
+        sharded = sharding is not None
         # Additive hook: a dataset may build its own Grain iterator (e.g.
         # `XarrayWindowDataset`'s block reader — coalesced reads, window
         # shuffle, multi-host sharding). It returns a checkpointable Grain
@@ -432,28 +557,43 @@ class _BatchSource:
             self._inner = custom
             self._kind = "grain"
         elif _is_indexable(dataset):
-            self._inner = self._build_grain_iter(dataset, batch_size, seed)
+            self._inner = self._build_grain_iter(dataset, batch_size, seed, sharded)
             self._kind = "grain"
         else:
+            if sharded and jax.process_count() > 1:
+                raise NotImplementedError(
+                    "Multi-host sharding needs an indexable dataset (the Grain "
+                    "process-shard path); streaming IterableDatasets are "
+                    "single-process. Materialise the dataset or wrap it as an "
+                    "indexable TrainingDataset."
+                )
             self._inner = self._build_streaming_iter(dataset, batch_size)
             self._kind = "streaming"
 
     @staticmethod
-    def _build_grain_iter(dataset: Any, batch_size: int, seed: int) -> Any:
+    def _build_grain_iter(
+        dataset: Any, batch_size: int, seed: int, sharded: bool
+    ) -> Any:
         """Build the Grain iterator.
 
         Pipeline: ``MapDataset.source(dataset) → .shuffle(seed) →
-        .repeat(num_epochs=None) → .batch(batch_size, drop_remainder=True)
+        .repeat(num_epochs=None) → .batch(local_batch, drop_remainder=True)
         → .to_iter_dataset() → iter(...)``. ``drop_remainder=True``
         matches the v0.1 numpy fallback's behaviour of dropping
         trailing partial batches so `train_step` doesn't recompile
         per epoch boundary.
 
+        ``batch_size`` is the **global** per-step batch. With an explicit
+        sharding spec on multiple processes, each process reads a disjoint
+        shard (the MapDataset-API equivalent of
+        ``grain.python.ShardByJaxProcess``) and batches the *local* size
+        ``batch_size // process_count`` so the per-process batches assemble
+        back into a global batch of exactly ``batch_size``.
+
         Raises:
-            ValueError: when ``len(dataset) < batch_size``. With a
-                fixed batch_size we drop trailing partials; if the
-                dataset is smaller than one batch the iterator would
-                yield nothing and training would hang.
+            ValueError: when ``len(dataset) < batch_size``, or when a
+                multi-host ``batch_size`` is not divisible by
+                ``process_count``.
         """
         import grain  # ty: ignore[unresolved-import]
 
@@ -465,11 +605,22 @@ class _BatchSource:
                 "IterableDataset for streaming (which doesn't have this "
                 "constraint)."
             )
+        map_ds = grain.MapDataset.source(dataset)
+        n_proc = jax.process_count()
+        local_batch = batch_size
+        if sharded and n_proc > 1:
+            if batch_size % n_proc != 0:
+                raise ValueError(
+                    f"Multi-host batch_size={batch_size} must be divisible by "
+                    f"process_count={n_proc} so the global batch stays "
+                    f"{batch_size}."
+                )
+            map_ds = map_ds[jax.process_index() :: n_proc]
+            local_batch = batch_size // n_proc
         map_ds = (
-            grain.MapDataset.source(dataset)
-            .shuffle(seed=seed)
+            map_ds.shuffle(seed=seed)
             .repeat(num_epochs=None)
-            .batch(batch_size=batch_size, drop_remainder=True)
+            .batch(batch_size=local_batch, drop_remainder=True)
         )
         return iter(map_ds.to_iter_dataset())
 
@@ -481,7 +632,12 @@ class _BatchSource:
 
     def next_batch(self) -> tuple[jax.Array, jax.Array]:
         batch = next(self._inner)
-        return jnp.asarray(batch[0]), jnp.asarray(batch[1])
+        xs, ys = jnp.asarray(batch[0]), jnp.asarray(batch[1])
+        if self._sharding is not None:
+            data_sharding = self._sharding.data_sharding
+            xs = _place_batch(xs, data_sharding)
+            ys = _place_batch(ys, data_sharding)
+        return xs, ys
 
     def get_state(self) -> Any | None:
         """Return the inner iterator's state, or ``None`` for streaming."""
@@ -628,10 +784,18 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             f"(missing `loss_fn`); got {type(task).__name__}."
         )
 
+    # --- Sharding (optional; issue #15) --------------------------------
+    sharding: ShardingSpec | None = getattr(loop, "sharding", None)
+    if sharding is not None and not isinstance(sharding, ShardingSpec):
+        raise TypeError(
+            "Equinox adapter: loop.sharding must be a pipekit_train.adapters."
+            f"equinox.ShardingSpec or None; got {type(sharding).__name__}."
+        )
+
     # --- Optimiser, RNG -------------------------------------------------
     optimizer = _build_optimizer(loop.optimizer_config)
 
-    state = TrainState.create(eqx_module, optimizer)
+    state = TrainState.create(eqx_module, optimizer, sharding=sharding)
     rng = jax.random.key(loop.seed)
 
     # --- Checkpoint manager (if checkpoint_dir set) --------------------
@@ -670,7 +834,9 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # guard. See #17 / codex review on PR #24.
     train_iter: _BatchSource | None = None
     if int(state.step) < loop.max_steps:
-        train_iter = _BatchSource(loop.dataset, loop.batch_size, loop.seed)
+        train_iter = _BatchSource(
+            loop.dataset, loop.batch_size, loop.seed, sharding=sharding
+        )
         if data_iter_state_to_restore is not None:
             train_iter.set_state(data_iter_state_to_restore)
 
@@ -756,8 +922,21 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "total_seconds": time.time() - t0,
         "final_step": int(state.step),
         "final_metrics": last_metrics,
+        "sharding": _sharding_info(sharding),
     }
     return trained_model_op, backend_info
+
+
+def _sharding_info(spec: ShardingSpec | None) -> dict[str, Any] | None:
+    """A JSON-safe summary of the sharding configuration for the artifact."""
+    if spec is None:
+        return None
+    return {
+        "mesh_shape": {str(k): int(v) for k, v in spec.mesh.shape.items()},
+        "model_pspec": str(spec.model_pspec),
+        "data_pspec": str(spec.data_pspec),
+        "num_processes": jax.process_count(),
+    }
 
 
 # ---------------------------------------------------------------------

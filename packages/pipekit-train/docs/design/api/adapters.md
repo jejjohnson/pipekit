@@ -128,12 +128,65 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
    back into a `JaxModelOp` (or the original `model_op`'s class) and
    return it together with `backend_info`.
 
+### Sharding (multi-device / multi-host) — v0.2
+
+Pass an optional `ShardingSpec` to enable data-parallel (and uniform
+model-parallel) training (issue #15, ADR D12):
+
+```python
+import jax
+from jax.sharding import Mesh, PartitionSpec
+from pipekit_train import TrainingLoop
+from pipekit_train.adapters.equinox import ShardingSpec
+
+mesh = Mesh(jax.devices(), axis_names=("data",))
+spec = ShardingSpec(
+    mesh=mesh,
+    model_pspec=PartitionSpec(),        # replicate the model on every device
+    data_pspec=PartitionSpec("data"),   # shard each batch along its leading axis
+)
+
+loop = TrainingLoop(
+    model_op=model_op,
+    dataset=dataset,
+    loss=loss,
+    batch_size=256,                     # must be divisible by the "data" axis size
+    sharding=spec,                      # None => single-device (the default)
+)
+trained_op, artifact = loop.run()
+```
+
+How it threads through `run`:
+
+- **`TrainState`** — model + optimiser array leaves are placed on
+  `spec.model_sharding`; the step counter is replicated.
+- **`train_step`** — unchanged; `eqx.filter_jit` compiles sharding-aware
+  once its inputs are sharded (replicated model + a `data`-sharded batch
+  give data-parallel SPMD, XLA inserting the collectives).
+- **Data iterator** — each batch is placed on `spec.data_sharding`. For
+  multi-host (an explicit spec **and** `process_count > 1`), each process
+  reads a disjoint shard of the `grain` `MapDataset`
+  (`map_ds[process_index::process_count]`, the modern equivalent of
+  `grain.ShardByJaxProcess`) and batches the *local* size
+  `batch_size // process_count`, so the per-process batches assemble via
+  `jax.make_array_from_process_local_data` into a global batch of exactly
+  `batch_size`. Without a spec the single-device path is preserved even
+  under a distributed-initialised JAX. (`batch_size` must divide
+  `process_count`; multi-host needs an indexable dataset, not a streaming
+  one.)
+- **Checkpointing** — Orbax restore is sharding-aware automatically: the
+  restore template is the already-sharded `TrainState`.
+- **`backend_info["sharding"]`** records the mesh shape and partition
+  specs for the artifact.
+
+Verified on a CPU-simulated 2-device mesh (`tests/adapters/
+test_equinox_sharding.py`) and a scripted 2-process `jax.distributed` smoke
+(`scripts/multihost_sharding_smoke.py`).
+
 ### Notes
 
-- The adapter assumes single-host, single-device for v0.1. Multi-host
-  / multi-device is Q1 in [boundaries.md](../boundaries.md). The Grain
-  data pipeline does carry the sharding hooks (`ShardByJaxProcess`)
-  ready for when that lands.
+- `sharding=None` (the default) is the original single-host, single-device
+  path, unchanged.
 - The adapter does not require the user to install `pipekit-jax`. If
   it isn't installed, the adapter returns a minimal `JaxModelOp`-like
   wrapper defined inline (the wrapper just calls the `eqx.Module`'s
