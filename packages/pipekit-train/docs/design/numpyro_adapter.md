@@ -15,8 +15,9 @@ version: 0.1.0
 > **Why two adapters, not one?** SVI and MCMC only *look* alike. SVI's
 > `svi.update` returns `(state, loss)` per step, so it genuinely *is* the
 > per-step `TrainingLoop` — `max_steps`, `optimizer_config`, per-step
-> eval/checkpoint and the `_BatchSource` minibatch iterator all apply. MCMC's
-> `mcmc.run` is one blocking call — none of those fields apply. A single
+> eval/checkpoint all apply (and the `_BatchSource` minibatch iterator once a
+> subsample plate is added; v1 is full-batch). MCMC's `mcmc.run` is one
+> blocking call — none of those fields apply. A single
 > method-dispatched module forced awkward "ignored for nuts" caveats;
 > splitting removes them and lines NumPyro up cleanly with BlackJAX:
 > **`numpyro-mcmc` and `blackjax` are sibling *sampler* backends**, while
@@ -293,7 +294,7 @@ analogous to `pipekit-jax.JaxModelOp`.
 | `loss` | N/A — objective is the model's ELBO | N/A — joint log-density |
 | `optimizer_config` | → optax → `SVI(optim=...)` | not used |
 | `max_steps` | SVI steps | not used (→ `num_samples`) |
-| `batch_size` | `_BatchSource` minibatch (`plate(subsample_size=…)`) | not used — full dataset materialised |
+| `batch_size` | full-batch in v1; minibatch needs a `plate(subsample_size=…)` (follow-on) | not used — full dataset materialised |
 | per-step loop / callbacks | `svi.update` + `svi.evaluate`, full per-step loop | one `mcmc.run`, begin/end only |
 | `checkpoint_dir` | `SVIState` params (Orbax) | posterior samples |
 | trained `model_op` | `NumpyroPredictiveOp` → `predictive_site` mean | `NumpyroPredictiveOp` → `predictive_site` mean |
@@ -338,6 +339,10 @@ task = NumpyroTask(model, guide=AutoNormal(model), predictive_site="obs",
                    num_warmup=1000, num_samples=1000)   # used by either backend
 
 # --- numpyro-svi: fast variational posterior (per-step; reuses the loop) --
+# v1 is FULL-BATCH: the model above has no `numpyro.plate(..., subsample_size=)`,
+# so each step uses the whole dataset (correctly scaled ELBO). Minibatch SVI
+# (batch_size < N) requires wrapping the likelihood in a subsample plate so the
+# ELBO is rescaled — a documented follow-on (build order step 5).
 svi_op, svi_artifact = TrainingLoop(
     model_op=...,                       # ignored; the task carries the model
     dataset=dataset,
@@ -345,7 +350,6 @@ svi_op, svi_artifact = TrainingLoop(
     task=task,
     optimizer_config={"name": "adam", "lr": 1e-2},   # → optax → SVI(optim=...)
     max_steps=2000,
-    batch_size=32,
     seed=0,
 ).run()
 y_hat = svi_op(x_new)                    # posterior-predictive mean of "obs"

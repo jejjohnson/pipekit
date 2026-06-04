@@ -223,11 +223,14 @@ class BlackjaxTask:
     numpyro_task: NumpyroTask | None = None
 
     sampler: Literal["nuts", "mclmc", "hmc", "sgld", "sghmc"] = "nuts"
-    num_warmup: int = 1000                    # window_adaptation steps (full-batch)
+    num_warmup: int = 1000                    # full-batch: window_adaptation steps;
+                                              # SG-MCMC: burn-in transitions to discard
     num_chains: int = 1                       # vmapped chains
+    num_integration_steps: int | None = None  # required for hmc + sghmc
     # SG-MCMC (sgld / sghmc): the gradient is a *minibatch* estimate, not a
     # full logdensity_fn. Supply a grad estimator + a step size (BlackJAX's
-    # sgld/sghmc are built from these, and each step takes the minibatch).
+    # sgld/sghmc are built from the estimator; the step takes the minibatch
+    # and the step size per transition).
     grad_estimator: Callable | None = None    # (position, (x, y)) -> grad logpost
     step_size: float | Callable[[int], float] = 1e-3   # constant or schedule
     predictive_site: str = "obs"              # for the NumPyro-model path
@@ -239,7 +242,9 @@ the above from the model), or a raw target. The raw target is
 `logdensity_fn` + `init_position` for the full-batch samplers, or
 `grad_estimator` + `init_position` + `step_size` for SG-MCMC (BlackJAX's
 `sgld`/`sghmc` are constructed from a `grad_estimator(position, minibatch)`,
-not from a full `logdensity_fn`). `predict_fn` is needed only to build a
+not from a full `logdensity_fn`). `num_integration_steps` is **required** for
+`hmc` and `sghmc` (their constructors — and `window_adaptation` for HMC —
+need it; NUTS/MCLMC/SGLD do not). `predict_fn` is needed only to build a
 predictive `Operator` from a raw task (see §7.5). The `numpyro_task` path
 reuses the model, the constrain map, and `Predictive` via the shared
 `_bayes` seam.
@@ -257,18 +262,29 @@ reuses the model, the constrain map, and `Predictive` via the shared
      takes a fresh minibatch and uses `grad_estimator(position, minibatch)`.
 3. **Warmup / tuning.**
    - Full-batch: `adapt = blackjax.window_adaptation(algorithm,
-     logdensity_fn)`; `(last_state, tuned_parameters), _ = adapt.run(key,
-     init_position, num_warmup)`; build the tuned `kernel` from
-     `tuned_parameters` (MCLMC uses `mclmc_find_L_and_step_size`).
+     logdensity_fn)` (HMC also needs `num_integration_steps`);
+     `(last_state, tuned_parameters), _ = adapt.run(key, init_position,
+     num_warmup)`; build the tuned `kernel` from `tuned_parameters` (MCLMC
+     uses `mclmc_find_L_and_step_size`).
    - SG-MCMC: no `window_adaptation`; the `kernel` is built from
-     `grad_estimator` and the `step_size` (schedule).
-4. **Per-step sampling loop** (the heart). For each step up to `max_steps`
-   (= number of posterior draws): `state, info = kernel.step(step_key,
-   state[, minibatch])`; record `θ` from `state.position`; log `info`
-   (acceptance, energy, `is_divergent`) to the `metric_writer`; fire
-   callbacks; checkpoint the sampler state (Orbax). `num_chains>1` is a
-   `vmap` over the step. (A `jax.lax.scan` fast path via
+     `grad_estimator` (and `num_integration_steps` for `sghmc`); the step
+     size is supplied **per transition** (see step 4).
+4. **Per-step loop** (the heart). The transition shape differs by family:
+   - **Full-batch** (`nuts`/`hmc`/`mclmc`): `state, info = kernel.step(
+     step_key, state)`; record `θ = state.position`; log `info` (acceptance,
+     energy, `is_divergent`) to the `metric_writer`.
+   - **SG-MCMC** (`sgld`/`sghmc`): BlackJAX's step returns the **new
+     position** (no `info`) and takes the minibatch + step size per call —
+     `position = kernel.step(step_key, position, minibatch, step_size(t))`;
+     log the step size / grad-norm (no acceptance for SGLD).
+   Fire callbacks and checkpoint the sampler state (Orbax) each step;
+   `num_chains>1` is a `vmap`. (A `jax.lax.scan` fast path via
    `run_inference_algorithm` is used when no per-step callback is active.)
+   **Burn-in:** the first `num_warmup` SG-MCMC transitions are discarded
+   (the chain starts at an arbitrary `init_position`, so early states are
+   transient, not posterior draws); only steps after burn-in are recorded
+   into `posterior_samples`. (Full-batch chains start from the warmup-tuned
+   `last_state`, so they record from step 0.)
 5. **Constrain + wrap the artifact.** Collect the unconstrained positions
    `{z^(s)}`. **NumPyro path:** map them through `postprocess_fn` to
    constrained samples `{θ^(s)}` (required — `Predictive` expects the
@@ -286,9 +302,9 @@ reuses the model, the constrain map, and `Predictive` via the shared
 | `task` (required) | `BlackjaxTask(..., sampler="nuts")` | `BlackjaxTask(..., sampler="sgld")` |
 | `loss` | N/A — target is the log-density | N/A |
 | `optimizer_config` | not used (step size from warmup) | not used (`step_size` is a task field) |
-| `max_steps` | number of posterior draws | number of minibatch draws |
+| `max_steps` | posterior draws (recorded from step 0) | total transitions; first `num_warmup` discarded as burn-in |
 | `batch_size` | ignored — full-batch log-density | **`_BatchSource` minibatch** |
-| per-step loop / callbacks | `kernel.step`; per-sample diagnostics | `kernel.step` on a minibatch |
+| per-step loop / callbacks | `kernel.step → (state, info)`; acceptance / energy / divergences | `kernel.step(key, pos, batch, step_size)` → new position; step-size / grad-norm only |
 | `checkpoint_dir` | sampler state + samples (Orbax) | same |
 | trained `model_op` | `_bayes` predictive op → `predictive_site` | same |
 | `backend_info` | sampler, num_warmup/draws, accept rate, divergences, ESS | + minibatch size |
