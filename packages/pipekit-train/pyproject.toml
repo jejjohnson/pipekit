@@ -24,6 +24,10 @@ equinox   = [
 lightning = ["lightning>=2.4", "torch>=2.0"]
 keras     = ["keras>=3.0"]
 
+# Bayesian-inference backends (numpyro-svi / numpyro-mcmc). One extra, two
+# adapters (per ADR D13). JAX arrives via numpyro.
+numpyro   = ["numpyro>=0.15", "optax>=0.2"]
+
 # Workspace-internal data sources / reproducibility integration.
 # `catalog` extra (geocatalog) lands once geocatalog publishes to PyPI;
 # see docs/design/api/datasets.md.

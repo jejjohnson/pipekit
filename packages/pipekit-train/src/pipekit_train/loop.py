@@ -204,6 +204,8 @@ _BACKEND_MODULES: dict[str, str] = {
     "equinox": "pipekit_train.adapters.equinox",
     "lightning": "pipekit_train.adapters.lightning",
     "keras": "pipekit_train.adapters.keras",
+    "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
+    "numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc",
 }
 
 
@@ -233,7 +235,8 @@ class TrainingLoop(StatefulOperator):
             see ADR D10.)
         steps_per_epoch: Optional. Controls when on_epoch_end fires.
         batch_size: Per-step minibatch size.
-        backend: One of ``"equinox"``, ``"lightning"``, ``"keras"``.
+        backend: One of ``"equinox"``, ``"lightning"``, ``"keras"``,
+            ``"numpyro-svi"``, ``"numpyro-mcmc"``.
         callbacks: Tuple of `Callback` instances.
         metric_writer: Optional `MetricWriter`.
         eval_every_n_steps: Validation cadence.
@@ -268,7 +271,9 @@ class TrainingLoop(StatefulOperator):
         max_steps: int = 10_000,
         steps_per_epoch: int | None = None,
         batch_size: int = 32,
-        backend: Literal["equinox", "lightning", "keras"] = "equinox",
+        backend: Literal[
+            "equinox", "lightning", "keras", "numpyro-svi", "numpyro-mcmc"
+        ] = "equinox",
         callbacks: tuple[Any, ...] = (),
         metric_writer: MetricWriter | None = None,
         eval_every_n_steps: int = 500,
