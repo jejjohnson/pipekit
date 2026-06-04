@@ -262,6 +262,34 @@ projects that already standardise on Keras layers.
 
 ---
 
+## NumPyro (planned) — Bayesian inference as a backend
+
+`pipekit_train.adapters.numpyro`. Extras: `pipekit-train[numpyro]`
+(`numpyro>=0.15`, `optax`, `grain`; JAX via NumPyro). See ADR D13 and the
+full design in [`../numpyro_adapter.md`](../numpyro_adapter.md).
+
+"Training" here is **Bayesian inference**, on the same adapter contract as
+every backend (`run(loop) -> (trained_model_op, backend_info)`). Two
+inference modes, one method-dispatched module:
+
+- **SVI** (primary, per-step) — `svi.update` returns `(state, loss)` per
+  step, so callbacks / `metric_writer` / eval / checkpoint reuse the loop
+  unchanged; `SVI(optim=...)` takes an optax transformation so
+  `optimizer_config` is reused.
+- **NUTS** (oracle, single call) — one `mcmc.run` over the **full** dataset
+  (not the minibatch iterator); `max_steps` -> `num_samples`.
+
+It is **task-first** (D9): `loop.task` is a `NumpyroTask` (model + guide +
+method); the carrier-agnostic `Loss` (D4) does not apply, so passing only
+`loss=` errors. The trained artifact is a `NumpyroPredictiveOp` (a
+posterior-predictive `Operator`) whose registry weight-blob is the
+variational params / posterior-samples PyTree (D7). It also fills the
+benchmark ladder's rung-2 (NUTS) and rung-4 (SVI). **Full design — user
+story, math, CS background, API, examples, build order, references:
+[`../numpyro_adapter.md`](../numpyro_adapter.md).**
+
+---
+
 ## Adapter selection
 
 `TrainingLoop.run()` selects the adapter by string:
@@ -270,6 +298,7 @@ projects that already standardise on Keras layers.
 loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
 loop = TrainingLoop(..., backend="lightning") # uses adapters.lightning
 loop = TrainingLoop(..., backend="keras")     # uses adapters.keras
+loop = TrainingLoop(..., backend="numpyro")   # uses adapters.numpyro (planned)
 ```
 
 The selection happens at `run()` time, not at construction, so a

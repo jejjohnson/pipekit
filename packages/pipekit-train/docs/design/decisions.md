@@ -330,6 +330,48 @@ Lightning adapter keeps its own native distributed support (D5).
 
 ---
 
+## D13: NumPyro adapter is task-first; SVI per-step + NUTS single-call
+
+**Status:** accepted (design; implementation planned)
+
+**Context:** A NumPyro backend would make Bayesian inference (variational
+and MCMC) a first-class `TrainingLoop` target, and it complements the
+`pipekit-evaluate` benchmark ladder (NUTS = rung-2 oracle, SVI = rung-4).
+But NumPyro's "training" is inference over a probabilistic model, which
+does not match the carrier-agnostic `Loss(pred, target)` surface (D4), and
+its two inference modes have very different shapes: SVI is a per-step
+gradient loop, NUTS is a single blocking sampler.
+
+**Decision:**
+
+- **Task-first.** The adapter requires `loop.task` (a `NumpyroTask`:
+  model + guide + method), not `loop.loss` — NumPyro's objective is the
+  ELBO / joint log-density defined by the model. This uses the
+  per-backend `TrainTask` seam D9 already provides; passing only `loss=`
+  errors. There is no loss→task synthesis (unlike the Equinox adapter).
+- **One module, method-dispatched** (D5: one module per backend), not two
+  backends. **SVI** is the primary per-step path — `svi.update` returns
+  `(state, loss)` per step, so callbacks / writer / eval / checkpoint reuse
+  the existing loop, and `SVI(optim=...)` takes an optax transformation so
+  `optimizer_config` is reused. **NUTS** is a single `mcmc.run` call
+  (begin/end callbacks only; `max_steps` → `num_samples`).
+- **Artifact is a posterior predictive, not point weights.** The trained
+  `model_op` is a `NumpyroPredictiveOp` wrapping
+  `Predictive(model, guide=…, params=…, num_samples=…)` (SVI) or
+  `Predictive(model, posterior_samples=…)` (NUTS), returning the mean of a
+  configured `predictive_site`; its registry weight-blob is the params /
+  samples PyTree, analogous to `pipekit-jax.JaxModelOp` (D7).
+
+**Consequences:** No mismatch is a blocker — the only structural change is
+"task-first instead of loss-first," already allowed by D9. The adapter adds
+no hard dependency (gated behind `[numpyro]`). Full design (user story,
+mathematical + CS background, current/target state, API, examples, build
+order, references) in [`numpyro_adapter.md`](numpyro_adapter.md); the
+concise per-backend entry is in `api/adapters.md`. Scope agreed as SVI +
+NUTS.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |

@@ -65,6 +65,15 @@ nav:
   - Notebooks:
       - Quickstart (MLP regression): notebooks/pipekit_train_quickstart.ipynb
       - Cycle handoff (emulator → forecast): notebooks/pipekit_train_cycle_handoff.ipynb
+  - Design:
+      - pipekit-train:
+          - Overview: design-train/README.md
+          - Vision: design-train/vision.md
+          - Architecture: design-train/architecture.md
+          - Decisions (ADRs): design-train/decisions.md
+          - Boundaries & future work: design-train/boundaries.md
+          - Backend adapters: design-train/api/adapters.md
+          - NumPyro adapter (SVI + NUTS): design-train/numpyro_adapter.md
   - Contributing: contributing.md
 
 markdown_extensions:
