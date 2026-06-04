@@ -262,6 +262,117 @@ projects that already standardise on Keras layers.
 
 ---
 
+## NumPyro (planned) — Bayesian inference as a backend
+
+`pipekit_train.adapters.numpyro`. Extras: `pipekit-train[numpyro]`
+(`numpyro>=0.15`, `optax`, `grain`; JAX comes via NumPyro). See ADR D13.
+
+### Why it fits
+
+"Training" in NumPyro is **Bayesian inference**, and it lands on the same
+adapter contract as every other backend — a module exposing
+`run(loop) -> (trained_model_op, backend_info)`, registered in
+`_BACKEND_MODULES` + the `backend` `Literal`, gated by an extra (D5). It
+also closes a loop with the benchmark ladder (`pipekit-evaluate`): NumPyro
+**NUTS** is the "model-based inference / rung-2 oracle" and **SVI** is the
+"emulator-based inference / rung-4" — so those estimators become trainable
+through the same `TrainingLoop`. (`plumax`, `xtremax`, `somax` all use
+NumPyro for their oracles.)
+
+### The one real difference: task-first, not loss-first
+
+The carrier-agnostic `Loss(pred, target)` (D4) does **not** map to NumPyro —
+its objective is the **ELBO** (SVI) or the joint log-density (NUTS) over a
+probabilistic `model(x, y=None)`, defined by the model itself. So the
+NumPyro adapter is **task-first**: it requires `loop.task` (a NumPyro model
++ guide), which D9 ("TrainTask Protocol per backend") already anticipates.
+Passing only `loss=` raises a clean error (there is no `_SynthesisedTask`
+analog).
+
+```python
+@dataclass
+class NumpyroTask:
+    """User-defined NumPyro inference target (loop.task for backend='numpyro')."""
+    model: Callable          # def model(x, y=None): numpyro.sample(...)
+    guide: Callable | None = None        # default: AutoNormal(model) for SVI
+    method: Literal["svi", "nuts"] = "svi"
+    loss: Any = None                     # default: numpyro.infer.Trace_ELBO()
+    num_warmup: int = 1000               # NUTS only
+    num_samples: int = 1000              # NUTS only
+    num_chains: int = 1                  # NUTS only
+```
+
+### Two inference modes, one adapter (method-dispatched)
+
+**SVI — the per-step path (primary).** `svi.update(state, *batch)` is *one
+gradient step returning `(state, loss)`*, so it drops straight into the
+existing per-step loop — callbacks, `metric_writer`, periodic eval
+(`svi.evaluate`), and checkpoint cadence all work unchanged. NumPyro's
+`SVI(optim=...)` accepts an **optax `GradientTransformation` directly**, so
+`optimizer_config` reuses the Equinox translation. Minibatching uses
+`numpyro.plate(subsample_size=batch_size)` fed by the existing Grain
+iterator (full-batch is the v1 default).
+
+**NUTS — the single-call path (oracle).** `mcmc.run(key)` is one blocking
+call (warmup + sampling), not a per-gradient loop. The adapter runs it as a
+single `fit`, firing `on_train_begin` / `on_train_end` only; `max_steps` is
+ignored in favour of the task's `num_warmup` / `num_samples`. Diagnostics
+(`num_divergences`, `r_hat` summary) go into `backend_info`.
+
+### What `run` does
+
+1. **Validate the task.** Require `loop.task` to be a `NumpyroTask`
+   (error if only `loop.loss` is set). Default `guide=AutoNormal(model)`
+   for SVI; `loss=Trace_ELBO()`.
+2. **Build the data iterator.** Reuse `_BatchSource` (Grain / streaming)
+   exactly as the Equinox adapter does; batches are `(x, y)` arrays.
+3. **Dispatch on `task.method`:**
+   - **svi:** `svi = SVI(model, guide, optax_optim, loss)`;
+     `state = svi.init(key, *first_batch)`; per-step `svi.update`; log the
+     ELBO; eval via `svi.evaluate` on `val_dataset`; checkpoint the
+     `SVIState` params (Orbax).
+   - **nuts:** `mcmc = MCMC(NUTS(model), num_warmup, num_samples,
+     num_chains)`; `mcmc.run(key, X, y)`; collect `mcmc.get_samples()`.
+4. **Wrap the trained artifact.** Return a `NumpyroPredictiveOp`
+   (`pipekit.Operator`, `forbid_in_yaml=True`) carrying
+   `Predictive(model, guide=guide, params=svi_params)` (SVI) or
+   `Predictive(model, posterior_samples=samples)` (NUTS). `_apply(x)`
+   returns the posterior-predictive mean by default (samples optionally).
+   The weight-blob round-trip through the model registry is the
+   params / posterior-samples PyTree — directly analogous to
+   `pipekit-jax.JaxModelOp`.
+
+### Mapping summary
+
+| `TrainingLoop` field | SVI | NUTS |
+|----------------------|-----|------|
+| `task` (required) | `NumpyroTask(model, guide, method="svi")` | `…method="nuts", num_warmup, num_samples` |
+| `loss` | N/A — objective is the model's ELBO | N/A — joint log-density |
+| `optimizer_config` | → optax → `SVI(optim=...)` | ignored |
+| `max_steps` | SVI steps | → `num_samples` |
+| `batch_size` | `plate(subsample_size=…)` minibatch | full-batch (subsample = HMCECS) |
+| per-step loop / callbacks | `svi.update` + `svi.evaluate` | one `mcmc.run`, begin/end only |
+| `checkpoint_dir` | `SVIState` params (Orbax) | posterior samples |
+| trained `model_op` | `NumpyroPredictiveOp(Predictive(model, guide, params))` | `…(Predictive(model, posterior_samples))` |
+| `backend_info` | numpyro/jax ver, method, final ELBO | num_warmup/samples, divergences, r̂ |
+
+### Build order (when implementation lands)
+
+```
+1. [numpyro] extra + registry/Literal entry + scaffold run() raising
+   NotImplementedError (matches lightning/keras scaffolds).
+2. NumpyroTask + NumpyroPredictiveOp + task-vs-loss validation.
+3. SVI per-step path (callbacks/writer/eval/checkpoint reuse the loop).
+   -> test: Bayesian linear regression, ELBO decreases, slope recovered.
+4. NUTS single-call path + diagnostics in backend_info.
+   -> test: NUTS posterior covers the true slope; predictive op round-trips.
+5. Minibatch SVI via numpyro.plate; docs + ADR finalised.
+```
+
+Tests gate on `importorskip("numpyro")`, like the Equinox suite.
+
+---
+
 ## Adapter selection
 
 `TrainingLoop.run()` selects the adapter by string:
@@ -270,6 +381,7 @@ projects that already standardise on Keras layers.
 loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
 loop = TrainingLoop(..., backend="lightning") # uses adapters.lightning
 loop = TrainingLoop(..., backend="keras")     # uses adapters.keras
+loop = TrainingLoop(..., backend="numpyro")   # uses adapters.numpyro (planned)
 ```
 
 The selection happens at `run()` time, not at construction, so a
