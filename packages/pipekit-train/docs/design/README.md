@@ -18,10 +18,12 @@ docs/design/
 ├── architecture.md        # The layered design + integration with
 │                          # pipekit, pipekit-cycle, pipekit-experiment.
 ├── boundaries.md          # Non-goals, open questions, future work.
-├── decisions.md           # ADRs D1–D13 (carrier-agnostic + Equinox +
-│                          # sharding + NumPyro).
+├── decisions.md           # ADRs D1–D14 (carrier-agnostic + Equinox +
+│                          # sharding + NumPyro + BlackJAX).
 ├── numpyro_adapter.md     # Full design — the NumPyro inference backend
 │                          # (SVI + NUTS). Companion to api/adapters.md.
+├── blackjax_adapter.md    # Full design — the BlackJAX sampler backend
+│                          # (NUTS / SG-MCMC). Sibling to numpyro_adapter.md.
 ├── api/
 │   ├── README.md          # Core abstractions (TrainingDataset,
 │   │                      # Loss, TrainingLoop, Callback, MetricWriter).

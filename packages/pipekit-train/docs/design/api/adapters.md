@@ -290,6 +290,31 @@ story, math, CS background, API, examples, build order, references:
 
 ---
 
+## BlackJAX (planned) — sampler-library backend
+
+`pipekit_train.adapters.blackjax`. Extras: `pipekit-train[blackjax]`
+(`blackjax>=1.2`, `optax`, `grain`; `numpyro` only for the NumPyro-model
+task path). See ADR D14 and the full design in
+[`../blackjax_adapter.md`](../blackjax_adapter.md).
+
+**Separate from NumPyro, by design.** BlackJAX is a *sampler library*, not a
+PPL: it operates on a `logdensity_fn`, and is PPL-agnostic. So it is its own
+backend (different tool / extra / contract) — but it **interoperates**: a
+`BlackjaxTask` accepts a raw `logdensity_fn` *or* a `NumpyroTask` (bridged
+via `numpyro.infer.util.initialize_model`), and both adapters share the
+model→logdensity + `Predictive` seam (`adapters._bayes`). Net UX: write a
+NumPyro model once, flip `backend="numpyro"` ↔ `"blackjax"`.
+
+Why a separate adapter pays off: BlackJAX's `kernel.step(rng, state) ->
+(state, info)` is **one sample per step**, so it reuses the per-step loop
+(per-sample diagnostics / checkpoint / early-stop) — a cleaner fit than
+NumPyro's blocking `mcmc.run`. It also unlocks an algorithm zoo NumPyro
+lacks: MCLMC, **stochastic-gradient MCMC** (`sgld`/`sghmc` — minibatch MCMC
+via `_BatchSource`), tempered SMC, and `pathfinder`/`svgd` VI. **Full design:
+[`../blackjax_adapter.md`](../blackjax_adapter.md).**
+
+---
+
 ## Adapter selection
 
 `TrainingLoop.run()` selects the adapter by string:
@@ -299,6 +324,7 @@ loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
 loop = TrainingLoop(..., backend="lightning") # uses adapters.lightning
 loop = TrainingLoop(..., backend="keras")     # uses adapters.keras
 loop = TrainingLoop(..., backend="numpyro")   # uses adapters.numpyro (planned)
+loop = TrainingLoop(..., backend="blackjax")  # uses adapters.blackjax (planned)
 ```
 
 The selection happens at `run()` time, not at construction, so a

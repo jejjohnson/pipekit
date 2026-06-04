@@ -372,6 +372,48 @@ NUTS.
 
 ---
 
+## D14: BlackJAX is a separate backend, sharing a Bayesian seam with NumPyro
+
+**Status:** accepted (design; implementation planned)
+
+**Context:** BlackJAX is also wanted as a backend. But BlackJAX is a
+*sampler library*, not a PPL: it operates on a `logdensity_fn` and is
+PPL-agnostic (it consumes log-densities from NumPyro, PyMC, or hand-written
+functions). The question was whether to bundle it into the NumPyro adapter
+or ship it separately.
+
+**Decision:** A **separate** `backend="blackjax"` module, gated behind a
+`[blackjax]` extra — **not** a NumPyro mode — for four reasons:
+
+1. **Different tool / extra / contract** (D5). The `[numpyro]` extra must
+   not pull BlackJAX, and BlackJAX must not require NumPyro (that would deny
+   its PPL-agnostic purpose). Its task is a `logdensity_fn`, not a model.
+2. **It fits the per-step loop *better* than NumPyro.** BlackJAX's
+   `kernel.step(rng, state) -> (state, info)` is one sample per step, so the
+   adapter reuses the per-step `TrainingLoop` (per-sample diagnostics,
+   checkpoint, early-stop) — unlike NumPyro's blocking `mcmc.run`, which the
+   NumPyro adapter runs as a single `fit` (D13).
+3. **A larger algorithm zoo** — MCLMC, stochastic-gradient MCMC
+   (`sgld`/`sghmc`, minibatch MCMC via `_BatchSource`), tempered SMC,
+   `pathfinder`/`svgd`.
+4. **Cross-checking.** A second, independent engine for the same model
+   strengthens the benchmark-ladder oracle story.
+
+**Shared seam, not bundling.** Both adapters emit the same
+posterior-predictive `Operator` (D7) and both can start from a NumPyro
+model. The model→logdensity bridge + `Predictive` wrapping is factored into
+`pipekit_train.adapters._bayes`; a `NumpyroTask` is one accepted task source
+for the BlackJAX adapter. Net UX: write a NumPyro model once, switch the
+engine by flipping `backend="numpyro"` ↔ `"blackjax"`.
+
+**Consequences:** Two thin Bayesian adapters over one shared seam rather
+than one overloaded module. Full design (user story, math, CS background,
+API, examples, build order, references) in
+[`blackjax_adapter.md`](blackjax_adapter.md). Scope agreed as NUTS + SG-MCMC
+first, MCLMC / SMC / VI as follow-ons.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |
