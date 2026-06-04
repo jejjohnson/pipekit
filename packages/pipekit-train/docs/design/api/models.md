@@ -94,8 +94,9 @@ class TrainingLoop(StatefulOperator):
             None means epoch boundaries are never reported.
         batch_size: Per-step minibatch size. The dataset's loader is
             wrapped with the appropriate Batch op.
-        backend: One of "equinox", "lightning", "keras". Maps to the
-            adapter module.
+        backend: One of "equinox", "lightning", "keras", and the planned
+            Bayesian backends "numpyro-svi", "numpyro-mcmc", "blackjax".
+            Maps to the adapter module.
         callbacks: Tuple of pipekit_train.Callback instances.
             Default: empty tuple. (Note: tuple, not list, to avoid
             mutable default + to preserve operator hashability.)
@@ -117,7 +118,10 @@ class TrainingLoop(StatefulOperator):
     max_steps: int = 10_000
     steps_per_epoch: int | None = None
     batch_size: int = 32
-    backend: Literal["equinox", "lightning", "keras"] = "equinox"
+    backend: Literal[
+        "equinox", "lightning", "keras",
+        "numpyro-svi", "numpyro-mcmc", "blackjax",   # planned (Bayesian)
+    ] = "equinox"
     callbacks: tuple[Callback, ...] = ()
     metric_writer: MetricWriter | None = None
     eval_every_n_steps: int = 500
@@ -144,9 +148,18 @@ class TrainingLoop(StatefulOperator):
 `TrainingLoop` does not itself call `train_step`. It delegates to:
 
 ```python
+_BACKEND_MODULES = {
+    "equinox": "pipekit_train.adapters.equinox",
+    "lightning": "pipekit_train.adapters.lightning",
+    "keras": "pipekit_train.adapters.keras",
+    # planned Bayesian backends (see design/numpyro_adapter.md, blackjax_adapter.md):
+    "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
+    "numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc",
+    "blackjax": "pipekit_train.adapters.blackjax",
+}
+
 def run(self):
-    from pipekit_train.adapters import equinox, lightning, keras
-    adapter = {"equinox": equinox, "lightning": lightning, "keras": keras}[self.backend]
+    adapter = import_module(_BACKEND_MODULES[self.backend])
     trained_model_op, backend_info = adapter.run(self)
     artifact = self._build_artifact(trained_model_op, backend_info)
     return trained_model_op, artifact

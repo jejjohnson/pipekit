@@ -262,31 +262,60 @@ projects that already standardise on Keras layers.
 
 ---
 
-## NumPyro (planned) — Bayesian inference as a backend
+## NumPyro (planned) — two Bayesian backends: `numpyro-svi` + `numpyro-mcmc`
 
-`pipekit_train.adapters.numpyro`. Extras: `pipekit-train[numpyro]`
-(`numpyro>=0.15`, `optax`, `grain`; JAX via NumPyro). See ADR D13 and the
-full design in [`../numpyro_adapter.md`](../numpyro_adapter.md).
+`pipekit_train.adapters.numpyro_svi` and `…numpyro_mcmc`. Extras:
+`pipekit-train[numpyro]` (`numpyro>=0.15`, `optax`, `grain`; JAX via
+NumPyro). See ADR D13 and the full design in
+[`../numpyro_adapter.md`](../numpyro_adapter.md).
 
-"Training" here is **Bayesian inference**, on the same adapter contract as
-every backend (`run(loop) -> (trained_model_op, backend_info)`). Two
-inference modes, one method-dispatched module:
+"Training" here is **Bayesian inference**. NumPyro is split into **two
+backends by paradigm** (the per-step vs blocking loop shapes are too
+different to method-dispatch):
 
-- **SVI** (primary, per-step) — `svi.update` returns `(state, loss)` per
-  step, so callbacks / `metric_writer` / eval / checkpoint reuse the loop
-  unchanged; `SVI(optim=...)` takes an optax transformation so
-  `optimizer_config` is reused.
-- **NUTS** (oracle, single call) — one `mcmc.run` over the **full** dataset
-  (not the minibatch iterator); `max_steps` -> `num_samples`.
+- **`numpyro-svi`** (variational, per-step) — `svi.update` returns
+  `(state, loss)` per step, so it *is* the per-step loop: callbacks /
+  `metric_writer` / eval / checkpoint / `max_steps` / `_BatchSource`
+  minibatching all apply, and `SVI(optim=...)` takes an optax transformation
+  so `optimizer_config` is reused.
+- **`numpyro-mcmc`** (sampling, single call) — one `mcmc.run` (NUTS) over the
+  **full** dataset (begin/end callbacks only; the per-step fields don't
+  apply).
 
-It is **task-first** (D9): `loop.task` is a `NumpyroTask` (model + guide +
-method); the carrier-agnostic `Loss` (D4) does not apply, so passing only
-`loss=` errors. The trained artifact is a `NumpyroPredictiveOp` (a
-posterior-predictive `Operator`) whose registry weight-blob is the
-variational params / posterior-samples PyTree (D7). It also fills the
-benchmark ladder's rung-2 (NUTS) and rung-4 (SVI). **Full design — user
-story, math, CS background, API, examples, build order, references:
+Both are **task-first** (D9): `loop.task` is one shared `NumpyroTask` (no
+`method` field — the backend selects the paradigm, so the *same task* works
+under either); the carrier-agnostic `Loss` (D4) does not apply. The artifact
+is a `NumpyroPredictiveOp` (posterior-predictive `Operator`) from the shared
+`adapters._bayes` seam (D7). They fill the benchmark ladder's rung-2
+(`numpyro-mcmc`) and rung-4 (`numpyro-svi`); `numpyro-mcmc` is a sibling of
+the BlackJAX sampler backend (below). **Full design — user story, math, CS
+background, API, examples, build order, references:
 [`../numpyro_adapter.md`](../numpyro_adapter.md).**
+
+---
+
+## BlackJAX (planned) — sampler-library backend
+
+`pipekit_train.adapters.blackjax`. Extras: `pipekit-train[blackjax]`
+(`blackjax>=1.2`, `optax`, `grain`; `numpyro` only for the NumPyro-model
+task path). See ADR D14 and the full design in
+[`../blackjax_adapter.md`](../blackjax_adapter.md).
+
+**Separate from NumPyro, by design.** BlackJAX is a *sampler library*, not a
+PPL: it operates on a `logdensity_fn`, and is PPL-agnostic. So it is its own
+backend (different tool / extra / contract) — but it **interoperates**: a
+`BlackjaxTask` accepts a raw `logdensity_fn` *or* a `NumpyroTask` (bridged
+via `numpyro.infer.util.initialize_model`), and both adapters share the
+model→logdensity + `Predictive` seam (`adapters._bayes`). Net UX: write a
+NumPyro model once, flip `backend="numpyro-mcmc"` ↔ `"blackjax"`.
+
+Why a separate adapter pays off: BlackJAX's `kernel.step(rng, state) ->
+(state, info)` is **one sample per step**, so it reuses the per-step loop
+(per-sample diagnostics / checkpoint / early-stop) — a cleaner fit than
+NumPyro's blocking `mcmc.run`. It also unlocks an algorithm zoo NumPyro
+lacks: MCLMC, **stochastic-gradient MCMC** (`sgld`/`sghmc` — minibatch MCMC
+via `_BatchSource`), tempered SMC, and `pathfinder`/`svgd` VI. **Full design:
+[`../blackjax_adapter.md`](../blackjax_adapter.md).**
 
 ---
 
@@ -297,8 +326,10 @@ story, math, CS background, API, examples, build order, references:
 ```python
 loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
 loop = TrainingLoop(..., backend="lightning") # uses adapters.lightning
-loop = TrainingLoop(..., backend="keras")     # uses adapters.keras
-loop = TrainingLoop(..., backend="numpyro")   # uses adapters.numpyro (planned)
+loop = TrainingLoop(..., backend="keras")        # uses adapters.keras
+loop = TrainingLoop(..., backend="numpyro-svi")  # adapters.numpyro_svi  (planned)
+loop = TrainingLoop(..., backend="numpyro-mcmc") # adapters.numpyro_mcmc (planned)
+loop = TrainingLoop(..., backend="blackjax")     # adapters.blackjax     (planned)
 ```
 
 The selection happens at `run()` time, not at construction, so a

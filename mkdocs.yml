@@ -73,7 +73,8 @@ nav:
           - Decisions (ADRs): design-train/decisions.md
           - Boundaries & future work: design-train/boundaries.md
           - Backend adapters: design-train/api/adapters.md
-          - NumPyro adapter (SVI + NUTS): design-train/numpyro_adapter.md
+          - NumPyro adapters (SVI + MCMC): design-train/numpyro_adapter.md
+          - BlackJAX adapter (NUTS / SG-MCMC): design-train/blackjax_adapter.md
   - Contributing: contributing.md
 
 markdown_extensions:

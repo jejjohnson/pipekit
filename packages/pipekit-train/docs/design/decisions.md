@@ -330,45 +330,90 @@ Lightning adapter keeps its own native distributed support (D5).
 
 ---
 
-## D13: NumPyro adapter is task-first; SVI per-step + NUTS single-call
+## D13: NumPyro = two task-first adapters — `numpyro-svi` + `numpyro-mcmc`
 
 **Status:** accepted (design; implementation planned)
 
-**Context:** A NumPyro backend would make Bayesian inference (variational
-and MCMC) a first-class `TrainingLoop` target, and it complements the
-`pipekit-evaluate` benchmark ladder (NUTS = rung-2 oracle, SVI = rung-4).
-But NumPyro's "training" is inference over a probabilistic model, which
-does not match the carrier-agnostic `Loss(pred, target)` surface (D4), and
-its two inference modes have very different shapes: SVI is a per-step
-gradient loop, NUTS is a single blocking sampler.
+**Context:** A NumPyro backend would make Bayesian inference a first-class
+`TrainingLoop` target, complementing the `pipekit-evaluate` benchmark ladder
+(MCMC = rung-2 oracle, SVI = rung-4). But NumPyro's "training" is inference
+over a probabilistic model — it does not match the carrier-agnostic
+`Loss(pred, target)` surface (D4) — and its two paradigms have **very
+different loop shapes**: SVI's `svi.update` is a per-step gradient step,
+while MCMC's `mcmc.run` is a single blocking sampler.
 
 **Decision:**
 
-- **Task-first.** The adapter requires `loop.task` (a `NumpyroTask`:
-  model + guide + method), not `loop.loss` — NumPyro's objective is the
-  ELBO / joint log-density defined by the model. This uses the
-  per-backend `TrainTask` seam D9 already provides; passing only `loss=`
-  errors. There is no loss→task synthesis (unlike the Equinox adapter).
-- **One module, method-dispatched** (D5: one module per backend), not two
-  backends. **SVI** is the primary per-step path — `svi.update` returns
-  `(state, loss)` per step, so callbacks / writer / eval / checkpoint reuse
-  the existing loop, and `SVI(optim=...)` takes an optax transformation so
-  `optimizer_config` is reused. **NUTS** is a single `mcmc.run` call
-  (begin/end callbacks only; `max_steps` → `num_samples`).
-- **Artifact is a posterior predictive, not point weights.** The trained
-  `model_op` is a `NumpyroPredictiveOp` wrapping
-  `Predictive(model, guide=…, params=…, num_samples=…)` (SVI) or
-  `Predictive(model, posterior_samples=…)` (NUTS), returning the mean of a
-  configured `predictive_site`; its registry weight-blob is the params /
-  samples PyTree, analogous to `pipekit-jax.JaxModelOp` (D7).
+- **Two adapters, split by paradigm**, not one method-dispatched module:
+  `backend="numpyro-svi"` and `backend="numpyro-mcmc"`. SVI genuinely *is*
+  the per-step `TrainingLoop` (`max_steps`, `optimizer_config`, per-step
+  eval/checkpoint, `_BatchSource` minibatching all apply; `SVI(optim=...)`
+  takes an optax transformation). MCMC is a single `mcmc.run` over the full
+  dataset (begin/end callbacks only; those loop fields do not apply).
+  Splitting removes the "ignored for nuts" caveats and lines NumPyro up with
+  BlackJAX (D14): `numpyro-mcmc` and `blackjax` are sibling *sampler*
+  backends, `numpyro-svi` is the *variational* one. The two NumPyro backends
+  share the **same `[numpyro]` extra** — a deliberate, minor exception to
+  D5's "one extra per backend" (the dependency is identical; only the
+  paradigm differs).
+- **Task-first, shared task.** Both require `loop.task` (one shared
+  `NumpyroTask`: model + predictive config + SVI fields + MCMC fields), not
+  `loop.loss` — the objective is the model's ELBO / joint log-density. No
+  `method` field: the backend string selects the paradigm, so the *same task
+  works under either backend*. Uses the D9 per-backend `TrainTask` seam;
+  passing only `loss=` errors (no loss→task synthesis).
+- **Shared seam.** `NumpyroPredictiveOp`, the model→logdensity bridge, and
+  the `Predictive` wrapping live in `pipekit_train.adapters._bayes`, reused
+  by both NumPyro adapters and the BlackJAX adapter (D14). The artifact is a
+  posterior-predictive `Operator` returning the mean of a configured
+  `predictive_site`; weight-blob = the params / posterior-samples PyTree (D7).
 
-**Consequences:** No mismatch is a blocker — the only structural change is
-"task-first instead of loss-first," already allowed by D9. The adapter adds
-no hard dependency (gated behind `[numpyro]`). Full design (user story,
-mathematical + CS background, current/target state, API, examples, build
-order, references) in [`numpyro_adapter.md`](numpyro_adapter.md); the
-concise per-backend entry is in `api/adapters.md`. Scope agreed as SVI +
-NUTS.
+**Consequences:** Two thin adapters over one shared seam, rather than one
+overloaded module. No hard dependency (gated behind `[numpyro]`). Full design
+in [`numpyro_adapter.md`](numpyro_adapter.md); concise entries in
+`api/adapters.md`. Scope: SVI + NUTS.
+
+---
+
+## D14: BlackJAX is a separate backend, sharing a Bayesian seam with NumPyro
+
+**Status:** accepted (design; implementation planned)
+
+**Context:** BlackJAX is also wanted as a backend. But BlackJAX is a
+*sampler library*, not a PPL: it operates on a `logdensity_fn` and is
+PPL-agnostic (it consumes log-densities from NumPyro, PyMC, or hand-written
+functions). The question was whether to bundle it into the NumPyro adapter
+or ship it separately.
+
+**Decision:** A **separate** `backend="blackjax"` module, gated behind a
+`[blackjax]` extra — **not** a NumPyro mode — for four reasons:
+
+1. **Different tool / extra / contract** (D5). The `[numpyro]` extra must
+   not pull BlackJAX, and BlackJAX must not require NumPyro (that would deny
+   its PPL-agnostic purpose). Its task is a `logdensity_fn`, not a model.
+2. **It fits the per-step loop *better* than NumPyro.** BlackJAX's
+   `kernel.step(rng, state) -> (state, info)` is one sample per step, so the
+   adapter reuses the per-step `TrainingLoop` (per-sample diagnostics,
+   checkpoint, early-stop) — unlike NumPyro's blocking `mcmc.run`, which the
+   NumPyro adapter runs as a single `fit` (D13).
+3. **A larger algorithm zoo** — MCLMC, stochastic-gradient MCMC
+   (`sgld`/`sghmc`, minibatch MCMC via `_BatchSource`), tempered SMC,
+   `pathfinder`/`svgd`.
+4. **Cross-checking.** A second, independent engine for the same model
+   strengthens the benchmark-ladder oracle story.
+
+**Shared seam, not bundling.** Both adapters emit the same
+posterior-predictive `Operator` (D7) and both can start from a NumPyro
+model. The model→logdensity bridge + `Predictive` wrapping is factored into
+`pipekit_train.adapters._bayes`; a `NumpyroTask` is one accepted task source
+for the BlackJAX adapter. Net UX: write a NumPyro model once, switch the
+MCMC engine by flipping `backend="numpyro-mcmc"` ↔ `"blackjax"`.
+
+**Consequences:** Two thin Bayesian adapters over one shared seam rather
+than one overloaded module. Full design (user story, math, CS background,
+API, examples, build order, references) in
+[`blackjax_adapter.md`](blackjax_adapter.md). Scope agreed as NUTS + SG-MCMC
+first, MCLMC / SMC / VI as follow-ons.
 
 ---
 
