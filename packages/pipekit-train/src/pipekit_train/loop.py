@@ -206,6 +206,7 @@ _BACKEND_MODULES: dict[str, str] = {
     "keras": "pipekit_train.adapters.keras",
     "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
     "numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc",
+    "blackjax": "pipekit_train.adapters.blackjax",
 }
 
 
@@ -236,7 +237,7 @@ class TrainingLoop(StatefulOperator):
         steps_per_epoch: Optional. Controls when on_epoch_end fires.
         batch_size: Per-step minibatch size.
         backend: One of ``"equinox"``, ``"lightning"``, ``"keras"``,
-            ``"numpyro-svi"``, ``"numpyro-mcmc"``.
+            ``"numpyro-svi"``, ``"numpyro-mcmc"``, ``"blackjax"``.
         callbacks: Tuple of `Callback` instances.
         metric_writer: Optional `MetricWriter`.
         eval_every_n_steps: Validation cadence.
@@ -272,7 +273,12 @@ class TrainingLoop(StatefulOperator):
         steps_per_epoch: int | None = None,
         batch_size: int = 32,
         backend: Literal[
-            "equinox", "lightning", "keras", "numpyro-svi", "numpyro-mcmc"
+            "equinox",
+            "lightning",
+            "keras",
+            "numpyro-svi",
+            "numpyro-mcmc",
+            "blackjax",
         ] = "equinox",
         callbacks: tuple[Any, ...] = (),
         metric_writer: MetricWriter | None = None,

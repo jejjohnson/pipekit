@@ -100,8 +100,8 @@ class NumpyroPredictiveOp(Operator):
         self.posterior = posterior
 
     def _apply(self, x: Any) -> Any:
-        import jax  # ty: ignore[unresolved-import]
-        import jax.numpy as jnp  # ty: ignore[unresolved-import]
+        import jax
+        import jax.numpy as jnp
 
         draws = self.predictive(jax.random.key(self.seed), jnp.asarray(x))
         if self.predictive_site not in draws:
@@ -157,7 +157,7 @@ def materialize(dataset: TrainingDataset) -> tuple[Any, Any]:
     ``numpyro.plate(subsample_size=…)`` is a follow-on), so a single pass
     over ``dataset`` materialises the whole likelihood.
     """
-    import jax.numpy as jnp  # ty: ignore[unresolved-import]
+    import jax.numpy as jnp
 
     # Single pass: a streaming/stateful dataset would be exhausted by a
     # second iteration, so collect both halves of each pair together.
@@ -169,6 +169,27 @@ def materialize(dataset: TrainingDataset) -> tuple[Any, Any]:
     if not xs:
         raise ValueError("dataset yielded no (x, y) pairs.")
     return jnp.asarray(np.stack(xs)), jnp.asarray(np.stack(ys))
+
+
+def numpyro_logdensity(model: Callable[..., Any], x: Any, y: Any, key: Any) -> Any:
+    """Bridge a NumPyro model to a BlackJAX-style target.
+
+    Returns ``(logdensity_fn, init_position, constrain_fn)`` via
+    ``numpyro.infer.util.initialize_model(dynamic_args=True)``:
+    ``logdensity_fn(position)`` is the (unconstrained) log-posterior,
+    ``init_position`` is the unconstrained starting point, and
+    ``constrain_fn(position)`` maps an unconstrained sample back to the
+    model's constrained sites (needed before ``Predictive``).
+    """
+    from numpyro.infer.util import initialize_model  # ty: ignore[unresolved-import]
+
+    info = initialize_model(key, model, model_args=(x, y), dynamic_args=True)
+    param_info, potential_fn_gen, postprocess_fn_gen, _ = info
+
+    def logdensity_fn(position: Any) -> Any:
+        return -potential_fn_gen(x, y)(position)
+
+    return logdensity_fn, param_info.z, postprocess_fn_gen(x, y)
 
 
 def build_optimizer(config: dict[str, Any]) -> Any:

@@ -379,6 +379,23 @@ wheels = [
 ]
 
 [[package]]
+name = "blackjax"
+version = "1.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "numpy" },
+    { name = "optax" },
+    { name = "scipy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/99/2e/49621e028c395730d005bff2272b7bb144b7e0eb40028f8ba569cf6e2712/blackjax-1.5.tar.gz", hash = "sha256:c4a9898d4f5340894301cd382c28d72790e38847edaf4cfc9584dbd47bd205e1", size = 4710254, upload-time = "2026-04-03T07:20:06.962Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/a7/83b321492fe7e5d0af07f484ec0100bb6ca561aa64cad1d34fc58a015d0f/blackjax-1.5-py3-none-any.whl", hash = "sha256:f3ba5cab7aeee79939326a49d71a08dd1ce35f647e96ff82d2e8556f19e4e487", size = 4697170, upload-time = "2026-04-03T07:20:05.139Z" },
+]
+
+[[package]]
 name = "bleach"
 version = "6.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4256,6 +4273,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+blackjax = [
+    { name = "blackjax" },
+    { name = "numpyro" },
+    { name = "optax" },
+]
 cache = [
     { name = "zarr" },
 ]
@@ -4302,6 +4324,7 @@ xreader = [
 
 [package.metadata]
 requires-dist = [
+    { name = "blackjax", marker = "extra == 'blackjax'", specifier = ">=1.2" },
     { name = "equinox", marker = "extra == 'equinox'", specifier = ">=0.11" },
     { name = "fsspec", marker = "extra == 'gcs'", specifier = ">=2024.0" },
     { name = "fsspec", marker = "extra == 's3'", specifier = ">=2024.0" },
@@ -4312,7 +4335,9 @@ requires-dist = [
     { name = "jaxtyping", marker = "extra == 'equinox'", specifier = ">=0.2" },
     { name = "keras", marker = "extra == 'keras'", specifier = ">=3.0" },
     { name = "lightning", marker = "extra == 'lightning'", specifier = ">=2.4" },
+    { name = "numpyro", marker = "extra == 'blackjax'", specifier = ">=0.15" },
     { name = "numpyro", marker = "extra == 'numpyro'", specifier = ">=0.15" },
+    { name = "optax", marker = "extra == 'blackjax'", specifier = ">=0.2" },
     { name = "optax", marker = "extra == 'equinox'", specifier = ">=0.2" },
     { name = "optax", marker = "extra == 'numpyro'", specifier = ">=0.2" },
     { name = "orbax-checkpoint", marker = "extra == 'equinox'", specifier = ">=0.6" },
@@ -4327,7 +4352,7 @@ requires-dist = [
     { name = "zarr", marker = "extra == 's3'", specifier = ">=2.18" },
     { name = "zarr", marker = "extra == 'xreader'", specifier = ">=2.18" },
 ]
-provides-extras = ["equinox", "lightning", "keras", "numpyro", "cycle", "experiment", "cache", "s3", "gcs", "xreader"]
+provides-extras = ["equinox", "lightning", "keras", "numpyro", "blackjax", "cycle", "experiment", "cache", "s3", "gcs", "xreader"]
 
 [[package]]
 name = "platformdirs"

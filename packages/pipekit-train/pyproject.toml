@@ -28,6 +28,10 @@ keras     = ["keras>=3.0"]
 # adapters (per ADR D13). JAX arrives via numpyro.
 numpyro   = ["numpyro>=0.15", "optax>=0.2"]
 
+# BlackJAX sampler backend (per ADR D14). numpyro provides the
+# model -> logdensity bridge for the NumpyroTask path.
+blackjax  = ["blackjax>=1.2", "numpyro>=0.15", "optax>=0.2"]
+
 # Workspace-internal data sources / reproducibility integration.
 # `catalog` extra (geocatalog) lands once geocatalog publishes to PyPI;
 # see docs/design/api/datasets.md.
