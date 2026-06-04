@@ -41,7 +41,7 @@ def _worker(process_id: int, num_processes: int, coordinator: str, q: Any) -> No
         from pipekit_train.adapters.equinox import (
             ShardingSpec,
             TrainState,
-            _place_batch,
+            _BatchSource,
             train_step,
         )
 
@@ -73,13 +73,29 @@ def _worker(process_id: int, num_processes: int, coordinator: str, q: Any) -> No
 
         task = _Task()
 
-        # Per-process local batch (2 rows); the global batch is
-        # 2 * num_processes, sharded along "data".
-        rng = np.random.default_rng(process_id)
-        local_x = rng.uniform(-1, 1, size=(2, 1)).astype("float32")
-        local_y = (2 * local_x + 1).astype("float32")
-        gx = _place_batch(jnp.asarray(local_x), spec.data_sharding)
-        gy = _place_batch(jnp.asarray(local_y), spec.data_sharding)
+        # Exercise the real sharded data path: each process reads a disjoint
+        # grain shard and batches the per-process local size, so the assembled
+        # global batch stays at the requested global batch_size (=4), not
+        # 4 * num_processes.
+        class _Indexable:
+            def __init__(self, n: int) -> None:
+                rng = np.random.default_rng(0)
+                xs = rng.uniform(-1, 1, size=(n, 1)).astype("float32")
+                ys = (2 * xs + 1).astype("float32")
+                self._pairs = list(zip(xs, ys, strict=True))
+
+            def __len__(self) -> int:
+                return len(self._pairs)
+
+            def __getitem__(self, i: int) -> Any:
+                return self._pairs[i]
+
+        global_batch = 4
+        src = _BatchSource(
+            _Indexable(16), batch_size=global_batch, seed=0, sharding=spec
+        )
+        gx, gy = src.next_batch()
+        global_ok = gx.shape[0] == global_batch  # not global_batch * num_processes
 
         key = jax.random.key(0)
         for _ in range(20):
@@ -87,8 +103,10 @@ def _worker(process_id: int, num_processes: int, coordinator: str, q: Any) -> No
 
         # Model stays replicated on every device across all processes.
         leaf = jax.tree.leaves(eqx.filter(state.model, eqx.is_array))[0]
-        ok = bool(leaf.sharding.is_fully_replicated) and bool(
-            jnp.isfinite(state.step).all()
+        ok = (
+            bool(leaf.sharding.is_fully_replicated)
+            and bool(jnp.isfinite(state.step).all())
+            and global_ok
         )
         q.put((process_id, ok, int(jax.process_count())))
     except Exception as exc:  # surface the failure to the parent
@@ -103,9 +121,14 @@ def main() -> int:
 
     coordinator = args.coordinator
     if coordinator.endswith(":0"):
-        import portpicker
+        # Pick a free port with the stdlib so the default invocation needs no
+        # dependency beyond the [equinox] extra.
+        import socket
 
-        coordinator = f"127.0.0.1:{portpicker.pick_unused_port()}"
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        coordinator = f"127.0.0.1:{port}"
 
     ctx = mp.get_context("spawn")
     q: Any = ctx.Queue()

@@ -150,10 +150,19 @@ class ShardingSpec:
         return jax.sharding.NamedSharding(self.mesh, jax.sharding.PartitionSpec())
 
 
-def _shard_pytree(tree: Any, sharding: Any) -> Any:
-    """Place the array leaves of ``tree`` on ``sharding`` (static leaves untouched)."""
+def _shard_pytree(tree: Any, sharding: Any, replicated: Any) -> Any:
+    """Place the array leaves of ``tree`` on ``sharding`` (static leaves untouched).
+
+    Rank-0 (scalar) leaves are always replicated: a non-trivial
+    ``PartitionSpec`` cannot shard a scalar, and optimiser state carries
+    scalar bookkeeping (e.g. Adam's update count) that would otherwise make
+    ``jax.device_put`` fail under a model-parallel ``model_pspec``.
+    """
     arrays, static = eqx.partition(tree, eqx.is_array)
-    placed = jax.device_put(arrays, sharding)
+    shardings = jax.tree.map(
+        lambda x: replicated if jnp.ndim(x) == 0 else sharding, arrays
+    )
+    placed = jax.device_put(arrays, shardings)
     return eqx.combine(placed, static)
 
 
@@ -216,8 +225,8 @@ def shard_train_state(state: TrainState, spec: ShardingSpec) -> TrainState:
     step is replicated across the mesh.
     """
     return TrainState(
-        model=_shard_pytree(state.model, spec.model_sharding),
-        opt_state=_shard_pytree(state.opt_state, spec.model_sharding),
+        model=_shard_pytree(state.model, spec.model_sharding, spec.replicated),
+        opt_state=_shard_pytree(state.opt_state, spec.model_sharding, spec.replicated),
         step=jax.device_put(state.step, spec.replicated),
     )
 
@@ -523,29 +532,48 @@ class _BatchSource:
         self._batch_size = batch_size
         self._seed = seed
         self._sharding = sharding
+        # Process-sharding only kicks in for an *explicit* spec; without one
+        # the documented single-device behaviour is preserved even if JAX was
+        # distributed-initialised (process_count > 1).
+        sharded = sharding is not None
         if _is_indexable(dataset):
-            self._inner = self._build_grain_iter(dataset, batch_size, seed)
+            self._inner = self._build_grain_iter(dataset, batch_size, seed, sharded)
             self._kind = "grain"
         else:
+            if sharded and jax.process_count() > 1:
+                raise NotImplementedError(
+                    "Multi-host sharding needs an indexable dataset (the Grain "
+                    "process-shard path); streaming IterableDatasets are "
+                    "single-process. Materialise the dataset or wrap it as an "
+                    "indexable TrainingDataset."
+                )
             self._inner = self._build_streaming_iter(dataset, batch_size)
             self._kind = "streaming"
 
     @staticmethod
-    def _build_grain_iter(dataset: Any, batch_size: int, seed: int) -> Any:
+    def _build_grain_iter(
+        dataset: Any, batch_size: int, seed: int, sharded: bool
+    ) -> Any:
         """Build the Grain iterator.
 
         Pipeline: ``MapDataset.source(dataset) → .shuffle(seed) →
-        .repeat(num_epochs=None) → .batch(batch_size, drop_remainder=True)
+        .repeat(num_epochs=None) → .batch(local_batch, drop_remainder=True)
         → .to_iter_dataset() → iter(...)``. ``drop_remainder=True``
         matches the v0.1 numpy fallback's behaviour of dropping
         trailing partial batches so `train_step` doesn't recompile
         per epoch boundary.
 
+        ``batch_size`` is the **global** per-step batch. With an explicit
+        sharding spec on multiple processes, each process reads a disjoint
+        shard (the MapDataset-API equivalent of
+        ``grain.python.ShardByJaxProcess``) and batches the *local* size
+        ``batch_size // process_count`` so the per-process batches assemble
+        back into a global batch of exactly ``batch_size``.
+
         Raises:
-            ValueError: when ``len(dataset) < batch_size``. With a
-                fixed batch_size we drop trailing partials; if the
-                dataset is smaller than one batch the iterator would
-                yield nothing and training would hang.
+            ValueError: when ``len(dataset) < batch_size``, or when a
+                multi-host ``batch_size`` is not divisible by
+                ``process_count``.
         """
         import grain  # ty: ignore[unresolved-import]
 
@@ -558,15 +586,21 @@ class _BatchSource:
                 "constraint)."
             )
         map_ds = grain.MapDataset.source(dataset)
-        # Multi-host: each process reads a disjoint shard of the data — the
-        # MapDataset-API equivalent of ``grain.python.ShardByJaxProcess``.
-        # No-op for the single-process case (process_count == 1).
-        if jax.process_count() > 1:
-            map_ds = map_ds[jax.process_index() :: jax.process_count()]
+        n_proc = jax.process_count()
+        local_batch = batch_size
+        if sharded and n_proc > 1:
+            if batch_size % n_proc != 0:
+                raise ValueError(
+                    f"Multi-host batch_size={batch_size} must be divisible by "
+                    f"process_count={n_proc} so the global batch stays "
+                    f"{batch_size}."
+                )
+            map_ds = map_ds[jax.process_index() :: n_proc]
+            local_batch = batch_size // n_proc
         map_ds = (
             map_ds.shuffle(seed=seed)
             .repeat(num_epochs=None)
-            .batch(batch_size=batch_size, drop_remainder=True)
+            .batch(batch_size=local_batch, drop_remainder=True)
         )
         return iter(map_ds.to_iter_dataset())
 

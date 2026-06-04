@@ -121,6 +121,26 @@ def test_shard_train_state_replicates_model() -> None:
     assert sharded.step.sharding == spec.replicated
 
 
+def test_model_parallel_replicates_optimizer_scalars() -> None:
+    # A non-trivial model_pspec must not be applied to Adam's rank-0 update
+    # count (jax.device_put with a named PartitionSpec can't shard a scalar).
+    spec = ShardingSpec(
+        mesh=_mesh(),
+        model_pspec=PartitionSpec("data"),  # shard each leaf's leading axis
+        data_pspec=PartitionSpec("data"),
+    )
+    model = eqx.nn.Linear(4, 4, key=jax.random.key(7))  # weight (4,4), bias (4,)
+    state = TrainState.create(model, optax.adam(1e-3), sharding=spec)  # must not raise
+
+    opt_leaves = jax.tree.leaves(eqx.filter(state.opt_state, eqx.is_array))
+    scalars = [leaf for leaf in opt_leaves if leaf.ndim == 0]
+    arrays = [leaf for leaf in opt_leaves if leaf.ndim > 0]
+    assert scalars and arrays
+    assert all(leaf.sharding.is_fully_replicated for leaf in scalars)
+    # the non-scalar optimiser leaves are actually sharded along "data"
+    assert any(not leaf.sharding.is_fully_replicated for leaf in arrays)
+
+
 def test_create_with_sharding_places_leaves() -> None:
     spec = _spec()
     model = _toy_mlp(jax.random.key(1))

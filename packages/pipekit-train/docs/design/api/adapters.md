@@ -164,11 +164,16 @@ How it threads through `run`:
   once its inputs are sharded (replicated model + a `data`-sharded batch
   give data-parallel SPMD, XLA inserting the collectives).
 - **Data iterator** — each batch is placed on `spec.data_sharding`. For
-  multi-host, each process first reads a disjoint shard of the `grain`
-  `MapDataset` (`map_ds[process_index::process_count]`, the modern
-  equivalent of `grain.ShardByJaxProcess`) and the per-process batches are
-  assembled into the global array via
-  `jax.make_array_from_process_local_data`.
+  multi-host (an explicit spec **and** `process_count > 1`), each process
+  reads a disjoint shard of the `grain` `MapDataset`
+  (`map_ds[process_index::process_count]`, the modern equivalent of
+  `grain.ShardByJaxProcess`) and batches the *local* size
+  `batch_size // process_count`, so the per-process batches assemble via
+  `jax.make_array_from_process_local_data` into a global batch of exactly
+  `batch_size`. Without a spec the single-device path is preserved even
+  under a distributed-initialised JAX. (`batch_size` must divide
+  `process_count`; multi-host needs an indexable dataset, not a streaming
+  one.)
 - **Checkpointing** — Orbax restore is sharding-aware automatically: the
   restore template is the already-sharded `TrainState`.
 - **`backend_info["sharding"]`** records the mesh shape and partition
