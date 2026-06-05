@@ -6,8 +6,9 @@ primitives from pipekit core, Report 2 Group M). Ships:
 - **Cycle wrappers** (`cycle`): `Cycle`, `EnsembleCycle`,
   `WindowedCycle`, `Recurrence`.
 - **Protocols** (`protocols`): `ForwardModel`, `ObservationOperator`,
-  `AnalysisStep` — runtime-checkable.
-- **DA cycles** (`da`): `DACycle`, `EnsembleDACycle`, `SmootherCycle`.
+  `AnalysisStep`, `ReducedBasis` — runtime-checkable.
+- **DA cycles** (`da`, `bfn`): `DACycle`, `EnsembleDACycle`,
+  `SmootherCycle`, `BFNCycle` (adjoint-free back-and-forth nudging).
 - **Observation operators** (`obs`): `IdentityObs`, `LinearObs`,
   `CallableObs`, `CompositeObs`.
 - **Forward-model adapters** (`forward`): `CallableForward`,
@@ -18,6 +19,7 @@ primitives from pipekit core, Report 2 Group M). Ships:
 See master plan Report 10.
 """
 
+from pipekit_cycle.bfn import BFNCycle
 from pipekit_cycle.cycle import (
     Cycle,
     EnsembleCycle,
@@ -40,12 +42,14 @@ from pipekit_cycle.protocols import (
     AnalysisStep,
     ForwardModel,
     ObservationOperator,
+    ReducedBasis,
 )
 from pipekit_cycle.state import DAState, IterationState, WindowState
 
 
 __all__ = [
     "AnalysisStep",
+    "BFNCycle",
     "CallableForward",
     "CallableObs",
     "CompositeForward",
@@ -62,6 +66,7 @@ __all__ = [
     "NeuralForward",
     "ObservationOperator",
     "Recurrence",
+    "ReducedBasis",
     "SmootherCycle",
     "WindowState",
     "WindowedCycle",

@@ -84,3 +84,32 @@ class AnalysisStep(Protocol):
         obs_op: ObservationOperator,
         obs_err_cov: Any,
     ) -> Any: ...
+
+
+@runtime_checkable
+class ReducedBasis(Protocol):
+    """Map a reduced control vector to a state increment (with a prior).
+
+    Variational inverse problems (4D-Var on SSH, …) parameterise the
+    control vector ``X`` not in full state space but in a reduced basis
+    ``Φ`` (Gaussian RBF, wavelet, MIOST), each coefficient carrying a
+    diagonal prior ``Q``. The basis maps coefficients to a state
+    increment, and its prior supplies the background term ``½ Xᵀ Q⁻¹ X``.
+
+    Concrete implementations live in algorithm libraries (or
+    `pipekit_cycle.basis`) and satisfy this protocol structurally.
+
+    Members:
+        operg(t, X, state): Apply the basis — coefficients ``X`` to a
+            state increment ``Φ(t) X`` at time ``t``.
+        prior_inv(X): Apply the diagonal prior inverse ``Q⁻¹ X`` (the
+            4D-Var background term operand).
+        nbasis: Length of the control vector ``X``.
+    """
+
+    def operg(self, t: float, X: Any, state: Any = None) -> Any: ...
+
+    def prior_inv(self, X: Any) -> Any: ...
+
+    @property
+    def nbasis(self) -> int: ...
