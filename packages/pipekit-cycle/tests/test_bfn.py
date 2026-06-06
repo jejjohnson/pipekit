@@ -133,8 +133,9 @@ def test_bfn_advances_carry_state() -> None:
     assert state.t == 6.0  # 3 window steps * dt=2.0
 
 
-def test_bfn_default_convergence_uses_numpy() -> None:
-    pytest.importorskip("numpy")
+def test_bfn_default_convergence_is_dependency_free() -> None:
+    # no convergence_fn -> the default relative-L2 metric, which must work for
+    # scalar carriers without importing numpy
     bfn = BFNCycle(
         _identity_model(),
         IdentityObs(),
@@ -143,9 +144,31 @@ def test_bfn_default_convergence_uses_numpy() -> None:
         max_iter=40,
         tol=1e-4,
         obs_source=_ConstObs(10.0),
-    )  # no convergence_fn -> default relative-L2 (numpy)
+    )
     result, _ = bfn(0.0, DAState())
     assert abs(result - 10.0) < 0.1
+
+
+def test_bfn_rejects_dt_ignoring_model_without_backward_model() -> None:
+    from pipekit_cycle import CompositeForward
+
+    comp = CompositeForward((_identity_model(),))  # CompositeForward ignores dt
+    with pytest.raises(TypeError, match="backward_model"):
+        BFNCycle(comp, IdentityObs(), _gain(), window=1)
+    # accepted once an explicit backward_model is supplied
+    bfn = BFNCycle(
+        comp,
+        IdentityObs(),
+        _gain(0.5),
+        window=1,
+        max_iter=20,
+        tol=1e-4,
+        obs_source=_ConstObs(5.0),
+        backward_model=_identity_model(),
+        convergence_fn=_abs_change,
+    )
+    result, _ = bfn(0.0, DAState())
+    assert abs(result - 5.0) < 0.1
 
 
 def test_bfn_validation() -> None:

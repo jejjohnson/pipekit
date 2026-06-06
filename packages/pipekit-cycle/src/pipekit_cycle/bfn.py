@@ -23,6 +23,7 @@ from typing import Any, ClassVar
 from pipekit import Operator, StatefulOperator
 
 from pipekit_cycle.da import _advance_da_state
+from pipekit_cycle.forward import CompositeForward, NeuralForward
 from pipekit_cycle.protocols import ForwardModel, ObservationOperator
 
 
@@ -36,9 +37,10 @@ class BFNCycle(StatefulOperator):
 
     The forward model must support backward stepping — ``step(state, -dt)``
     — which holds for time-reversible cores and works through
-    `CallableForward` (it forwards ``dt`` to your callable). A
-    `NeuralForward` ignores ``dt``, so emulator cores must supply an
-    explicit ``backward_model``.
+    `CallableForward` (it forwards ``dt`` to your callable). Models that
+    ignore ``dt`` cannot reverse via negative ``dt``; the dt-ignoring
+    built-ins (`CompositeForward`, `NeuralForward`) are rejected at
+    construction unless an explicit ``backward_model`` is supplied.
 
     Args:
         forward_model: Object satisfying `ForwardModel` (forward pass).
@@ -53,15 +55,17 @@ class BFNCycle(StatefulOperator):
         spectral_sigma: If set, Gaussian-filter the innovation before
             applying the gain (spectral nudging); needs ``scipy``.
         obs_source: Optional `Operator` invoked ``obs_source(step_index)``
-            for the observation at each step. ``None`` skips nudging (the
-            cycle is then a pure forth/back integration).
+            for the observation at each step, where ``step_index`` is the
+            *call-local* index ``0..window-1`` (the same per-call convention
+            as `DACycle` / `SmootherCycle`). For a global clock across
+            repeated calls, supply a stateful or clock-aware ``obs_source``.
+            ``None`` skips nudging (a pure forth/back integration).
         backward_model: Optional `ForwardModel` for the backward pass when
             the forward model is not time-reversible.
         convergence_fn: Optional ``(new_x0, old_x0) -> float`` measuring the
             change between successive back-pass initial states. Defaults to a
-            relative L2 norm (the only place the cycle reaches for ``numpy``);
-            inject your own to keep the cycle dependency-free or to use a
-            domain metric.
+            dependency-free relative L2 norm (works for scalars and
+            numpy / JAX arrays); inject your own for a domain metric.
 
     Raises:
         TypeError: if the model / obs operator / obs source have the wrong
@@ -96,6 +100,18 @@ class BFNCycle(StatefulOperator):
             raise TypeError("BFNCycle.obs_source must be an Operator or None.")
         if backward_model is not None and not isinstance(backward_model, ForwardModel):
             raise TypeError("BFNCycle.backward_model must satisfy ForwardModel.")
+        if backward_model is None and isinstance(
+            forward_model, (CompositeForward, NeuralForward)
+        ):
+            # These ignore the dt sign (CompositeForward always steps each
+            # component by its own +dt; NeuralForward ignores dt), so the
+            # backward pass cannot reverse them via negative dt — reject early
+            # rather than silently integrate forward on the back sweep.
+            raise TypeError(
+                f"{type(forward_model).__name__} ignores the dt sign, so BFN's "
+                "backward pass cannot reverse it via negative dt; pass an "
+                "explicit backward_model."
+            )
         if window < 1:
             raise ValueError(f"BFNCycle.window must be >= 1, got {window}.")
         if max_iter < 1:
@@ -191,10 +207,16 @@ class BFNCycle(StatefulOperator):
 
 
 def _relative_change(new: Any, old: Any) -> float:
-    """Relative L2 change ``‖new - old‖ / (‖old‖ + ε)`` (carrier-agnostic)."""
-    import numpy as np
+    """Relative L2 change ``norm(new - old) / (norm(old) + eps)``.
 
-    a = np.asarray(new, dtype=float)
-    b = np.asarray(old, dtype=float)
-    denom = float(np.linalg.norm(b)) + 1e-12
-    return float(np.linalg.norm(a - b)) / denom
+    Dependency-free: uses only the carrier's own arithmetic, so scalars and
+    numpy / JAX arrays all work without importing numpy.
+    """
+    return _l2(new - old) / (_l2(old) + 1e-12)
+
+
+def _l2(x: Any) -> float:
+    """L2 norm of a scalar or array-like carrier (no numpy required)."""
+    sq = x * x
+    total = sq.sum() if hasattr(sq, "sum") else sq
+    return float(total) ** 0.5
