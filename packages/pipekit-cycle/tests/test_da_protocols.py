@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit_cycle import ErrorSubspace, ReducedBasis, TangentLinearModel
+from pipekit_cycle import (
+    ErrorSubspace,
+    ReducedBasis,
+    ReducedOrderModel,
+    TangentLinearModel,
+)
 
 
 class _DummyBasis:
@@ -96,3 +101,40 @@ def test_dummy_subspace_satisfies_error_subspace() -> None:
 
 def test_incomplete_subspace_is_not_error_subspace() -> None:
     assert not isinstance(_MissingRank(), ErrorSubspace)
+
+
+class _DummyROM:
+    """Minimal object satisfying `ReducedOrderModel` structurally."""
+
+    def encode(self, state: Any) -> Any:
+        return state
+
+    def decode(self, coords: Any) -> Any:
+        return coords
+
+    def step(self, coords: Any, dt: float) -> Any:
+        return coords
+
+    @property
+    def latent_dim(self) -> int:
+        return 4
+
+
+class _MissingDecode:
+    def encode(self, state: Any) -> Any:
+        return state
+
+    def step(self, coords: Any, dt: float) -> Any:
+        return coords
+
+    @property
+    def latent_dim(self) -> int:
+        return 4
+
+
+def test_dummy_rom_satisfies_reduced_order_model() -> None:
+    assert isinstance(_DummyROM(), ReducedOrderModel)
+
+
+def test_incomplete_rom_is_not_reduced_order_model() -> None:
+    assert not isinstance(_MissingDecode(), ReducedOrderModel)

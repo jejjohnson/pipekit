@@ -3,8 +3,10 @@
 The core triple — `ForwardModel`, `ObservationOperator`, `AnalysisStep`
 (predict, compare, update) — plus the reduced-order seams for
 variational and reduced-rank methods: `ReducedBasis` (a reduced control
-basis with a prior), `TangentLinearModel` (M' / M* of the dynamics), and
-`ErrorSubspace` (a propagating low-rank covariance factor). Each algorithm
+basis with a prior), `TangentLinearModel` (M' / M* of the dynamics),
+`ErrorSubspace` (a propagating low-rank covariance factor), and
+`ReducedOrderModel` (a Galerkin ROM — encode/decode + latent dynamics).
+Each algorithm
 library (filterx, vardax, plumax, …) ships adapter classes that satisfy
 these protocols **without importing pipekit-cycle**. The protocols are
 runtime-checkable so ``isinstance(obj, ForwardModel)`` succeeds on any
@@ -168,3 +170,42 @@ class ErrorSubspace(Protocol):
 
     @property
     def rank(self) -> int: ...
+
+
+@runtime_checkable
+class ReducedOrderModel(Protocol):
+    """A Galerkin / POD reduced-order model: encode/decode + latent dynamics.
+
+    A Galerkin ROM projects the full state onto a low-dimensional trial
+    subspace and advances the *reduced* coordinates with the
+    subspace-projected dynamics. Bundling the projection maps with the
+    reduced step lets one object serve both uses:
+
+    - **As a fast `ForwardModel`** on full states — wrap
+      ``x -> decode(step(encode(x), dt))``.
+    - **For data assimilation in reduced space** — ``encode`` the state (and
+      observations), assimilate the small latent vector, then ``decode``.
+
+    Concrete ROMs (POD/EOF, balanced truncation, autoencoder latents) live
+    in algorithm libraries and satisfy this structurally; the latent
+    dynamics may itself be a `ForwardModel` or a learned emulator.
+
+    Members:
+        encode(state): Full state -> reduced coordinates ``z`` (e.g.
+            ``z = Psi^T (x - x_ref)`` for a (Petrov-)Galerkin trial/test
+            basis).
+        decode(coords): Reduced coordinates -> full state
+            (``x = x_ref + Phi z``).
+        step(coords, dt): Advance the reduced coordinates by ``dt`` with the
+            projected reduced dynamics.
+        latent_dim: Dimension of the reduced coordinate vector.
+    """
+
+    def encode(self, state: Any) -> Any: ...
+
+    def decode(self, coords: Any) -> Any: ...
+
+    def step(self, coords: Any, dt: float) -> Any: ...
+
+    @property
+    def latent_dim(self) -> int: ...

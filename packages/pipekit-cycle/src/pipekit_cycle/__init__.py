@@ -6,8 +6,8 @@ primitives from pipekit core, Report 2 Group M). Ships:
 - **Cycle wrappers** (`cycle`): `Cycle`, `EnsembleCycle`,
   `WindowedCycle`, `Recurrence`.
 - **Protocols** (`protocols`): `ForwardModel`, `ObservationOperator`,
-  `AnalysisStep`, `ReducedBasis`, `TangentLinearModel`, `ErrorSubspace`
-  — runtime-checkable.
+  `AnalysisStep`, `ReducedBasis`, `TangentLinearModel`, `ErrorSubspace`,
+  `ReducedOrderModel` — runtime-checkable.
 - **DA cycles** (`da`, `bfn`): `DACycle`, `EnsembleDACycle`,
   `SmootherCycle`, `BFNCycle` (adjoint-free back-and-forth nudging).
 - **Observation operators** (`obs`): `IdentityObs`, `LinearObs`,
@@ -45,6 +45,7 @@ from pipekit_cycle.protocols import (
     ForwardModel,
     ObservationOperator,
     ReducedBasis,
+    ReducedOrderModel,
     TangentLinearModel,
 )
 from pipekit_cycle.state import DAState, IterationState, WindowState
@@ -71,6 +72,7 @@ __all__ = [
     "ObservationOperator",
     "Recurrence",
     "ReducedBasis",
+    "ReducedOrderModel",
     "SmootherCycle",
     "TangentLinearModel",
     "WindowState",
