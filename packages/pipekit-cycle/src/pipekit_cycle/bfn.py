@@ -22,6 +22,7 @@ from typing import Any, ClassVar
 
 from pipekit import Operator, StatefulOperator
 
+from pipekit_cycle.da import _advance_da_state
 from pipekit_cycle.protocols import ForwardModel, ObservationOperator
 
 
@@ -123,7 +124,14 @@ class BFNCycle(StatefulOperator):
         return x + self.nudging_gain(innov)
 
     def _integrate(self, x: Any, way: int, obs_seq: list[Any]) -> Any:
-        """Integrate one sweep in time direction ``way`` (+1 / -1), nudging."""
+        """Integrate one sweep in time direction ``way`` (+1 / -1), nudging.
+
+        The forward sweep **steps then relaxes** (obs applied at the new time
+        level); the backward sweep **relaxes then steps**, so a reversed
+        ``obs_seq`` lands each backward nudge on the *same* time level as its
+        forward counterpart — correct for time-varying observations, where a
+        uniform step-then-relax would shift every backward nudge by one step.
+        """
         if way > 0:
             model = self.forward_model
             dt = model.dt
@@ -131,8 +139,10 @@ class BFNCycle(StatefulOperator):
             model = self.backward_model or self.forward_model
             dt = -model.dt if self.backward_model is None else model.dt
         for obs in obs_seq:
-            x = model.step(x, dt)
-            x = self._relax(x, obs)
+            if way > 0:
+                x = self._relax(model.step(x, dt), obs)
+            else:
+                x = model.step(self._relax(x, obs), dt)
         return x
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
@@ -155,6 +165,10 @@ class BFNCycle(StatefulOperator):
                 break
         # propagate the converged initial state forward as the analysis
         end = self._integrate(x0, +1, window_obs)
+        # advance the threaded clock / cycle count over the window, matching
+        # DACycle / SmootherCycle so downstream operators see fresh metadata.
+        for _ in range(self.window):
+            state = _advance_da_state(state, self.forward_model.dt)
         return end, state
 
     def get_config(self) -> dict[str, Any]:

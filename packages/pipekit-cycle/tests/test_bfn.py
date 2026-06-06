@@ -117,6 +117,22 @@ def test_bfn_uses_backward_model_when_supplied() -> None:
     assert abs(result - 5.0) < 0.1
 
 
+def test_bfn_advances_carry_state() -> None:
+    # the threaded clock / cycle count advance over the window, like DACycle
+    bfn = BFNCycle(
+        _identity_model(dt=2.0),
+        IdentityObs(),
+        _gain(0.5),
+        window=3,
+        max_iter=5,
+        obs_source=_ConstObs(10.0),
+        convergence_fn=_abs_change,
+    )
+    _, state = bfn(0.0, DAState(t=0.0))
+    assert state.cycle_count == 3
+    assert state.t == 6.0  # 3 window steps * dt=2.0
+
+
 def test_bfn_default_convergence_uses_numpy() -> None:
     pytest.importorskip("numpy")
     bfn = BFNCycle(
