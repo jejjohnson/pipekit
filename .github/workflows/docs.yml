@@ -1,4 +1,4 @@
-name: Type Check
+name: Docs Build
 
 on:
   push:
@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  typecheck:
+  build:
+    name: mkdocs build --strict
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -18,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - name: Install typecheck dependencies
-        run: uv sync --group typecheck
-      - name: Run ty check
-        run: make typecheck
+      - name: Install docs dependencies
+        run: uv sync --group docs
+      - name: Build docs (strict)
+        run: uv run --group docs mkdocs build --strict

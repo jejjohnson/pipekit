@@ -16,7 +16,7 @@ The packages, in dependency order:
 | `pipekit-array`      | partial       | Array-API operators (Phase A: namespace dispatch + MeanScalar + Stack/Concat). Phases B-D pending. |
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
-| `pipekit-evaluate`   | scaffolded    | Evaluation metrics, lenses, units. Planned, not implemented.                  |
+| `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule). Scorer taxonomy planned.  |
 | `pipekit-train`      | implemented   | Training pipelines + Equinox adapter. Design at `packages/pipekit-train/docs/design/`. |
 | `pipekit-jax`        | implemented   | `JaxModelOp` — eqx.Module wrapper with weight-blob round-trip through `ModelRegistry`. |
 
@@ -76,14 +76,17 @@ packages/
 │   │   ├── signature.py      # Signature (shape inference)
 │   │   ├── parallel.py       # ThreadMap, ProcessMap, AsyncMap, BatchedMap
 │   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
-│   │   └── state.py          # StatefulOperator, CarryState
+│   │   ├── state.py          # StatefulOperator, CarryState
+│   │   ├── protocols.py      # Predictor, FittableTransformer (structural seams)
+│   │   └── hashing.py        # stable_json, stable_repr, sha256_hex (shared)
 │   └── tests/
 ├── pipekit-array/            # Array-API operators (Phase A landed; B-D pending)
 ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
 │   ├── src/pipekit_cycle/
 │   │   ├── cycle.py          # Cycle, EnsembleCycle, WindowedCycle, Recurrence
 │   │   ├── da.py             # DACycle, EnsembleDACycle, SmootherCycle
-│   │   ├── protocols.py      # ForwardModel, ObservationOperator, AnalysisStep
+│   │   ├── protocols.py      # ForwardModel, ObservationOperator, AnalysisStep,
+│   │   │                     # + ensemble/inversion seams (ObservationNoise, …)
 │   │   ├── obs.py            # IdentityObs, LinearObs, CallableObs, CompositeObs
 │   │   ├── forward.py        # CallableForward, CompositeForward, NeuralForward
 │   │   └── state.py          # DAState, IterationState, WindowState

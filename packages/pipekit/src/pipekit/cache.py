@@ -18,11 +18,10 @@ See master plan Report 2, Group G.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
 
 from pipekit._base.operator import Operator
+from pipekit.hashing import sha256_hex, stable_json, stable_repr
 
 
 class Cache(Operator):
@@ -89,26 +88,4 @@ Memoize = Cache
 
 def _make_key(value: Any, config: dict[str, Any]) -> str:
     """Build a stable hash key from ``(value, config)``."""
-    h = hashlib.sha256()
-    h.update(_stable_repr(value).encode("utf-8"))
-    h.update(b"\x00")
-    h.update(_canonical_json(config).encode("utf-8"))
-    return h.hexdigest()
-
-
-def _stable_repr(value: Any) -> str:
-    """Return a stable string representation for hashing.
-
-    Tries ``repr`` first; falls back to ``str(type)`` for objects whose
-    repr embeds an ``id``. The result need not be reversible — only
-    deterministic per-process for equal inputs.
-    """
-    try:
-        return repr(value)
-    except Exception:
-        return f"<unrepr {type(value).__name__}>"
-
-
-def _canonical_json(obj: Any) -> str:
-    """JSON-encode ``obj`` with sorted keys; non-JSON values use ``repr``."""
-    return json.dumps(obj, sort_keys=True, default=repr)
+    return sha256_hex(stable_repr(value), b"\x00", stable_json(config))

@@ -19,29 +19,23 @@ See ``docs/design/api/datasets.md``.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
 from pipekit import Operator
+from pipekit.hashing import sha256_hex, stable_json
 
 
 Split = Literal["train", "val", "test"]
 
 
-def _stable_json(obj: Any) -> str:
-    """sha256-stable JSON serialisation with ``default=repr`` fallback."""
-    return json.dumps(obj, sort_keys=True, default=repr)
-
-
 def _hash_config(*parts: Any) -> str:
-    h = hashlib.sha256()
+    """sha256 over ``parts``, each stable-JSON-encoded and NUL-terminated."""
+    chunks: list[bytes | str] = []
     for p in parts:
-        h.update(_stable_json(p).encode("utf-8"))
-        h.update(b"\x00")
-    return h.hexdigest()
+        chunks += [stable_json(p), b"\x00"]
+    return sha256_hex(*chunks)
 
 
 class TrainingDataset(Operator):

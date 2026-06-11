@@ -41,6 +41,7 @@ final_state, _ = forecast(x0, None)
 | If you want to…                             | Read this                                              |
 |---------------------------------------------|--------------------------------------------------------|
 | Understand the mental model in 10 minutes   | [docs/concepts.md](docs/concepts.md)                   |
+| Plug your library in without depending on pipekit | [docs/protocols.md](docs/protocols.md)            |
 | Get from `git clone` to a running pipeline  | [docs/getting-started.md](docs/getting-started.md)     |
 | Install only the parts you need             | [docs/installation.md](docs/installation.md)           |
 | Train an emulator end-to-end                | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
@@ -66,7 +67,7 @@ graph TB
         PT[pipekit-train<br/>Training pipelines]
         PC[pipekit-cycle<br/>Time-stepping + DA]
         PE[pipekit-experiment<br/>Registry + tracker]
-        PV[pipekit-evaluate<br/>Metrics planned]
+        PV[pipekit-evaluate<br/>Benchmark ladder]
         PK[pipekit<br/>core: Operator/Sequential/Graph]
     end
 
@@ -96,7 +97,7 @@ graph TB
 | `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A: namespace + MeanScalar + Stack/Concat).    |
 | `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.                 |
 | `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.      |
-| `pipekit-evaluate`   | 📋 scaffolded | Evaluation metrics, lenses, units (planned).                             |
+| `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder (cube, protocols, reference rule). Scorer taxonomy planned. |
 | `pipekit-train`      | ✅ implemented | Training pipelines — datasets, losses, loop, Equinox adapter.            |
 | `pipekit-jax`        | ✅ implemented | `JaxModelOp` — `eqx.Module` wrapper with registry weight round-trip.     |
 
@@ -127,7 +128,7 @@ For per-package installs (once published to PyPI) see
 
 ---
 
-## 🧠 The five things to know
+## 🧠 The six things to know
 
 1. **An `Operator` is a class with one method** — `_apply(self,
    carrier) -> carrier`. The carrier is whatever you want (array,
@@ -145,6 +146,11 @@ For per-package installs (once published to PyPI) see
    hash of the config. Same operator + same config = same hash.
    That's how `pipekit-experiment.ModelRegistry` indexes trained
    models.
+6. **Libraries plug in via Protocols** — algorithm libraries
+   (filterax, vardax, …) never import pipekit; they satisfy
+   runtime-checkable Protocols (`ForwardModel`, `AnalysisStep`,
+   `ObservationNoise`, …) structurally. See
+   [docs/protocols.md](docs/protocols.md) for the full inventory.
 
 For the long-form version see [docs/concepts.md](docs/concepts.md).
 
@@ -159,7 +165,7 @@ pipekit/
 │   ├── pipekit-array/            # Array-API operators (Phase A landed)
 │   ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
 │   ├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
-│   ├── pipekit-evaluate/         # Scaffold — evaluation metrics (planned)
+│   ├── pipekit-evaluate/         # Benchmark ladder (scorer taxonomy planned)
 │   ├── pipekit-train/            # Training pipelines + Equinox adapter
 │   └── pipekit-jax/              # JaxModelOp — eqx.Module ↔ ModelRegistry
 ├── docs/                         # MkDocs documentation source
