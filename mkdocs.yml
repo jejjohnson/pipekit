@@ -51,6 +51,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Concepts: concepts.md
+  - Protocols: protocols.md
   - Installation: installation.md
   - Tutorials:
       - Train an emulator: tutorials/train-emulator.md
@@ -60,6 +61,7 @@ nav:
       - pipekit-array: api/pipekit-array.md
       - pipekit-cycle: api/pipekit-cycle.md
       - pipekit-experiment: api/pipekit-experiment.md
+      - pipekit-evaluate: api/pipekit-evaluate.md
       - pipekit-train: api/pipekit-train.md
       - pipekit-jax: api/pipekit-jax.md
   - Notebooks:

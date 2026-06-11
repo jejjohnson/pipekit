@@ -28,26 +28,18 @@ See master plan Report 12, section 2.4 and section 5.
 from __future__ import annotations
 
 import builtins
-import hashlib
 import json
 import os
 from pathlib import Path
 from typing import Any
 
 from pipekit import Operator
-
-
-def _stable_json(obj: Any) -> str:
-    return json.dumps(obj, sort_keys=True, default=repr)
+from pipekit.hashing import sha256_hex, stable_json
 
 
 def _hash_payload(config: dict[str, Any], weights: bytes | None) -> str:
-    h = hashlib.sha256()
-    h.update(_stable_json(config).encode("utf-8"))
-    h.update(b"\x00")
-    if weights is not None:
-        h.update(weights)
-    return h.hexdigest()
+    """Content hash of ``(operator state, optional weight bytes)``."""
+    return sha256_hex(stable_json(config), b"\x00", weights or b"")
 
 
 class LocalModelRegistry:
@@ -86,11 +78,11 @@ class LocalModelRegistry:
         h = _hash_payload(state, weights)
         dest = self.root / h
         dest.mkdir(exist_ok=True)
-        (dest / "operator.json").write_text(_stable_json(state))
+        (dest / "operator.json").write_text(stable_json(state))
         if weights is not None:
             (dest / "weights.bin").write_bytes(weights)
         metadata = {"tags": dict(tags) if tags else {}}
-        (dest / "metadata.json").write_text(_stable_json(metadata))
+        (dest / "metadata.json").write_text(stable_json(metadata))
         if name is not None:
             self.tag(h, name, force=True)
         return h
@@ -208,13 +200,13 @@ class S3ModelRegistry:
         h = _hash_payload(state, weights)
         fs = self._fs()
         with fs.open(self._path(h, "operator.json"), "w") as f:
-            f.write(_stable_json(state))
+            f.write(stable_json(state))
         if weights is not None:
             with fs.open(self._path(h, "weights.bin"), "wb") as f:
                 f.write(weights)
         metadata = {"tags": dict(tags) if tags else {}}
         with fs.open(self._path(h, "metadata.json"), "w") as f:
-            f.write(_stable_json(metadata))
+            f.write(stable_json(metadata))
         if name is not None:
             self.tag(h, name, force=True)
         return h

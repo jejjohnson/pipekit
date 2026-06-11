@@ -23,6 +23,12 @@ The v0.1 public surface, grouped by module:
   `loads_sandboxed`, `register`.
 - **Group M — state primitives** (`state`): `StatefulOperator`,
   `CarryState`.
+- **Group N — structural protocols** (`protocols`): `Predictor`,
+  `FittableTransformer`.
+
+Shared internals: `pipekit.hashing` holds the stable-hash primitives
+(`stable_json`, `stable_repr`, `sha256_hex`) reused by `Cache`, the
+pipekit-train datasets, and the pipekit-experiment registries.
 
 See the master plan (Report 2) for the full v0.1 inventory.
 """
@@ -43,6 +49,7 @@ from pipekit.parallel import (
     ThreadMap,
     check_pickleable,
 )
+from pipekit.protocols import FittableTransformer, Predictor
 from pipekit.qc import (
     AssertCallable,
     AssertDType,
@@ -71,6 +78,7 @@ __all__ = [
     "ConfigMixin",
     "Const",
     "Fanout",
+    "FittableTransformer",
     "Graph",
     "Histogram",
     "Identity",
@@ -79,6 +87,7 @@ __all__ = [
     "Memoize",
     "Node",
     "Operator",
+    "Predictor",
     "ProcessMap",
     "Profile",
     "QCError",

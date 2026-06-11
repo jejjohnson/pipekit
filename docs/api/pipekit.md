@@ -54,3 +54,11 @@ third-party dependencies. Master plan reference: Report 2.
 ## State primitives
 
 ::: pipekit.state
+
+## Structural protocols
+
+::: pipekit.protocols
+
+## Hashing primitives
+
+::: pipekit.hashing

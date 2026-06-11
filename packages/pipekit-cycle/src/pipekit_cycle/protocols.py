@@ -6,8 +6,20 @@ variational and reduced-rank methods: `ReducedBasis` (a reduced control
 basis with a prior), `TangentLinearModel` (M' / M* of the dynamics),
 `ErrorSubspace` (a propagating low-rank covariance factor), and
 `ReducedOrderModel` (a Galerkin ROM — encode/decode + latent dynamics).
+
+Ensemble-method seams: `ObservationNoise` (a noise model that can both
+report its covariance and draw samples), `CovarianceLocalizer`
+(distance-based covariance tapering), `EnsembleInflator` (post-analysis
+ensemble inflation), and `LatentMap` (an encode/decode pair for
+latent-space assimilation — the stateless subset of
+`ReducedOrderModel`).
+
+Iterative-inversion seams: `IterativeProcess` (ensemble Kalman
+inversion / sampling — EKI, EKS, UKI) and `StepScheduler` (its
+step-size policy).
+
 Each algorithm
-library (filterx, vardax, plumax, …) ships adapter classes that satisfy
+library (filterax, vardax, plumax, …) ships adapter classes that satisfy
 these protocols **without importing pipekit-cycle**. The protocols are
 runtime-checkable so ``isinstance(obj, ForwardModel)`` succeeds on any
 structurally compatible class.
@@ -209,3 +221,132 @@ class ReducedOrderModel(Protocol):
 
     @property
     def latent_dim(self) -> int: ...
+
+
+@runtime_checkable
+class LatentMap(Protocol):
+    """An encode/decode pair between full state space and a latent space.
+
+    The stateless subset of `ReducedOrderModel` — no latent dynamics,
+    just the projection maps. This is the seam latent-space assimilation
+    methods need (encode the ensemble, assimilate in latent space,
+    decode the analysis) and what autoencoder priors naturally expose.
+    Implementations: POD/EOF projections, autoencoders, or an identity
+    map for testing.
+
+    Members:
+        encode(state): Full state -> latent coordinates ``z``.
+        decode(coords): Latent coordinates -> full state.
+    """
+
+    def encode(self, state: Any) -> Any: ...
+
+    def decode(self, coords: Any) -> Any: ...
+
+
+@runtime_checkable
+class ObservationNoise(Protocol):
+    """An observation-error model that exposes covariance *and* sampling.
+
+    Richer than the opaque ``obs_err_cov`` operand of `AnalysisStep`:
+    deterministic analyses (ETKF, 3D-Var) need only the covariance,
+    while stochastic ones (perturbed-observation EnKF) and synthetic-data
+    generation also need draws from the error distribution. Bundling
+    both keeps the two views consistent by construction.
+
+    Members:
+        covariance(): The error covariance — a matrix, a linear
+            operator, or any object the consuming `AnalysisStep`
+            understands.
+        sample(key, shape): Draw error samples of the given batch
+            shape. ``key`` is the RNG seed/key (e.g. a JAX PRNG key);
+            implementations on a global RNG may ignore it.
+    """
+
+    def covariance(self) -> Any: ...
+
+    def sample(self, key: Any, shape: tuple[int, ...]) -> Any: ...
+
+
+@runtime_checkable
+class CovarianceLocalizer(Protocol):
+    """Taper spurious long-range covariances in ensemble methods.
+
+    Localisation suppresses sampling noise in low-rank ensemble
+    covariances by damping entries between distant locations
+    (Gaspari-Cohn, Gaussian taper, hard cutoff, …). Cycles thread the
+    localizer through to the `AnalysisStep`; supplying one is optional.
+
+    Members:
+        __call__(covariance, coords): Return the localized covariance
+            given per-element coordinates used to compute distances.
+    """
+
+    def __call__(self, covariance: Any, coords: Any) -> Any: ...
+
+
+@runtime_checkable
+class EnsembleInflator(Protocol):
+    """Inflate an analysis ensemble to counter variance underestimation.
+
+    Ensemble filters systematically underestimate spread; inflation
+    (multiplicative, additive, relaxation-to-prior) corrects for it
+    after each analysis. Relaxation methods blend in the forecast
+    ensemble, hence the optional second argument.
+
+    Members:
+        __call__(particles, forecast_particles=None, **kwargs): Return
+            the inflated ensemble. ``forecast_particles`` is the prior
+            ensemble for relaxation-to-prior schemes (RTPS / RTPP);
+            pure multiplicative or additive schemes ignore it.
+    """
+
+    def __call__(
+        self,
+        particles: Any,
+        forecast_particles: Any = None,
+        **kwargs: Any,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class StepScheduler(Protocol):
+    """Step-size policy for an `IterativeProcess`.
+
+    Iterative ensemble methods (EKI, EKS, UKI) advance in pseudo-time;
+    the scheduler chooses each increment — fixed, data-misfit
+    controlled, or stability-bounded — from the current iteration
+    state.
+
+    Members:
+        get_dt(state): Return the scalar pseudo-time step for the next
+            iteration given the process state (particles, forward
+            evaluations, misfit, …).
+    """
+
+    def get_dt(self, state: Any) -> Any: ...
+
+
+@runtime_checkable
+class IterativeProcess(Protocol):
+    """An iterative ensemble inversion / sampling process (EKI, EKS, UKI).
+
+    The parameter-estimation counterpart of the sequential-DA triple:
+    instead of cycling through time, the ensemble iterates in
+    pseudo-time toward the posterior over parameters. pipekit owns the
+    loop (initialise, evaluate the forward model on each particle,
+    update, repeat per the `StepScheduler`); algorithm libraries supply
+    the process.
+
+    Members:
+        init(particles, obs, noise_cov): Build the initial iteration
+            state from the prior ensemble, the observations, and the
+            observation-noise covariance.
+        update(state, forward_evals, **kwargs): Apply one iteration
+            given the forward-model evaluations of the current
+            particles; return the updated state.
+    """
+
+    def init(self, particles: Any, obs: Any, noise_cov: Any) -> Any: ...
+
+    def update(self, state: Any, forward_evals: Any, **kwargs: Any) -> Any: ...

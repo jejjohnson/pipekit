@@ -128,3 +128,23 @@ def test_s3_registry_import_error_without_fsspec(monkeypatch):
 
     with pytest.raises(ImportError, match="fsspec"):
         S3ModelRegistry("s3://x/")
+
+
+def test_hash_payload_digest_unchanged():
+    """The shared hashing helpers reproduce the pre-refactor framing."""
+    import hashlib
+
+    from pipekit.hashing import stable_json
+    from pipekit_experiment.registry import _hash_payload
+
+    config = {"class": "Identity", "config": {}}
+    h = hashlib.sha256()
+    h.update(stable_json(config).encode("utf-8"))
+    h.update(b"\x00")
+    h.update(b"weights")
+    assert _hash_payload(config, b"weights") == h.hexdigest()
+
+    h2 = hashlib.sha256()
+    h2.update(stable_json(config).encode("utf-8"))
+    h2.update(b"\x00")
+    assert _hash_payload(config, None) == h2.hexdigest()

@@ -7,7 +7,9 @@ primitives from pipekit core, Report 2 Group M). Ships:
   `WindowedCycle`, `Recurrence`.
 - **Protocols** (`protocols`): `ForwardModel`, `ObservationOperator`,
   `AnalysisStep`, `ReducedBasis`, `TangentLinearModel`, `ErrorSubspace`,
-  `ReducedOrderModel` — runtime-checkable.
+  `ReducedOrderModel`, `LatentMap`, `ObservationNoise`,
+  `CovarianceLocalizer`, `EnsembleInflator`, `StepScheduler`,
+  `IterativeProcess` — runtime-checkable.
 - **DA cycles** (`da`, `bfn`): `DACycle`, `EnsembleDACycle`,
   `SmootherCycle`, `BFNCycle` (adjoint-free back-and-forth nudging).
 - **Observation operators** (`obs`): `IdentityObs`, `LinearObs`,
@@ -41,11 +43,17 @@ from pipekit_cycle.obs import (
 )
 from pipekit_cycle.protocols import (
     AnalysisStep,
+    CovarianceLocalizer,
+    EnsembleInflator,
     ErrorSubspace,
     ForwardModel,
+    IterativeProcess,
+    LatentMap,
+    ObservationNoise,
     ObservationOperator,
     ReducedBasis,
     ReducedOrderModel,
+    StepScheduler,
     TangentLinearModel,
 )
 from pipekit_cycle.state import DAState, IterationState, WindowState
@@ -58,22 +66,28 @@ __all__ = [
     "CallableObs",
     "CompositeForward",
     "CompositeObs",
+    "CovarianceLocalizer",
     "Cycle",
     "DACycle",
     "DAState",
     "EnsembleCycle",
     "EnsembleDACycle",
+    "EnsembleInflator",
     "ErrorSubspace",
     "ForwardModel",
     "IdentityObs",
     "IterationState",
+    "IterativeProcess",
+    "LatentMap",
     "LinearObs",
     "NeuralForward",
+    "ObservationNoise",
     "ObservationOperator",
     "Recurrence",
     "ReducedBasis",
     "ReducedOrderModel",
     "SmootherCycle",
+    "StepScheduler",
     "TangentLinearModel",
     "WindowState",
     "WindowedCycle",
