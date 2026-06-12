@@ -22,6 +22,14 @@ primitives from pipekit core, Report 2 Group M). Ships:
 See master plan Report 10.
 """
 
+from pipekit_cycle.adjoints import (
+    AdjointSpec,
+    BacksolveAdjoint,
+    DirectAdjoint,
+    ImplicitAdjoint,
+    RecursiveCheckpointAdjoint,
+    TruncatedAdjoint,
+)
 from pipekit_cycle.bfn import BFNCycle
 from pipekit_cycle.cycle import (
     Cycle,
@@ -54,14 +62,17 @@ from pipekit_cycle.protocols import (
     ReducedBasis,
     ReducedOrderModel,
     StepScheduler,
+    SupportsAdjoint,
     TangentLinearModel,
 )
 from pipekit_cycle.state import DAState, IterationState, WindowState
 
 
 __all__ = [
+    "AdjointSpec",
     "AnalysisStep",
     "BFNCycle",
+    "BacksolveAdjoint",
     "CallableForward",
     "CallableObs",
     "CompositeForward",
@@ -70,12 +81,14 @@ __all__ = [
     "Cycle",
     "DACycle",
     "DAState",
+    "DirectAdjoint",
     "EnsembleCycle",
     "EnsembleDACycle",
     "EnsembleInflator",
     "ErrorSubspace",
     "ForwardModel",
     "IdentityObs",
+    "ImplicitAdjoint",
     "IterationState",
     "IterativeProcess",
     "LatentMap",
@@ -84,11 +97,14 @@ __all__ = [
     "ObservationNoise",
     "ObservationOperator",
     "Recurrence",
+    "RecursiveCheckpointAdjoint",
     "ReducedBasis",
     "ReducedOrderModel",
     "SmootherCycle",
     "StepScheduler",
+    "SupportsAdjoint",
     "TangentLinearModel",
+    "TruncatedAdjoint",
     "WindowState",
     "WindowedCycle",
 ]

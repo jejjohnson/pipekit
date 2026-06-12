@@ -350,3 +350,28 @@ class IterativeProcess(Protocol):
     def init(self, particles: Any, obs: Any, noise_cov: Any) -> Any: ...
 
     def update(self, state: Any, forward_evals: Any, **kwargs: Any) -> Any: ...
+
+
+@runtime_checkable
+class SupportsAdjoint(Protocol):
+    """A differentiable component that exposes its adjoint strategy.
+
+    Components whose forward pass is a rollout (a `ForwardModel`
+    backed by an ODE/SDE solve, a differentiable analysis loop, …)
+    advertise *how gradients flow* through them via a declarative spec
+    from `pipekit_cycle.adjoints`. Cycles never interpret the spec —
+    they pass components through untouched — so strategy selection is
+    pure configuration.
+
+    Members:
+        adjoint: The current adjoint spec (an
+            `pipekit_cycle.adjoints.AdjointSpec` member, or any object
+            the component's execution layer understands).
+        with_adjoint(spec): Return a copy of the component configured
+            with ``spec``; the original is unchanged.
+    """
+
+    @property
+    def adjoint(self) -> Any: ...
+
+    def with_adjoint(self, spec: Any) -> SupportsAdjoint: ...

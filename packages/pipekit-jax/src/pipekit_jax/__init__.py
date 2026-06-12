@@ -13,9 +13,27 @@ See master plan Report 11 (companion of pipekit-train) and
 caveat this package closes.
 """
 
+from typing import Any
+
+from pipekit_jax.adjoints import to_diffrax_adjoint, truncated_scan
 from pipekit_jax.model_op import JaxModelOp
 
 
-__all__ = ["JaxModelOp"]
+def __getattr__(name: str) -> Any:
+    # DiffraxForwardModel needs the [diffrax] extra; import lazily so the
+    # base package keeps working without it.
+    if name == "DiffraxForwardModel":
+        from pipekit_jax.diffrax_model import DiffraxForwardModel
+
+        return DiffraxForwardModel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "DiffraxForwardModel",
+    "JaxModelOp",
+    "to_diffrax_adjoint",
+    "truncated_scan",
+]
 
 __version__ = "0.0.1"  # x-release-please-version

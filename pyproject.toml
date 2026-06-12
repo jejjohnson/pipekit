@@ -36,6 +36,9 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "pre-commit>=4.5.1",
+    # diffrax backs the pipekit-jax [diffrax] extra; dev-installed so the
+    # adapter tests run in the workspace.
+    "diffrax>=0.7",
     # Workspace members are dev-installed so tests can import them.
     "pipekit",
     "pipekit-array",
