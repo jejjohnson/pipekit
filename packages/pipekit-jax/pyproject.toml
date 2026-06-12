@@ -11,10 +11,14 @@ requires-python = ">=3.12"
 classifiers = ["Development Status :: 3 - Alpha"]
 dependencies = [
     "pipekit",
+    "pipekit-cycle",
     "equinox>=0.11",
     "jax>=0.4.30",
     "jaxtyping>=0.2",
 ]
+
+[project.optional-dependencies]
+diffrax = ["diffrax>=0.7"]
 
 [build-system]
 requires = ["hatchling"]
