@@ -60,6 +60,11 @@ class DiffraxForwardModel(eqx.Module):
             increment into state space — e.g.
             ``lineax.DiagonalLinearOperator(sigma)`` for diagonal
             noise, or a ``(N_x, N_w)`` matrix.
+        brownian_shape: Shape of the Brownian increment (SDE only).
+            ``None`` derives it from the state — correct for diagonal
+            noise. For non-square noise (a diffusion returning an
+            ``(N_x, N_w)`` linear map with ``N_w != N_x``) pass
+            ``(N_w,)`` explicitly.
         sde_key: PRNG key for the Brownian path (SDE only). The key is
             fixed at construction; refresh it per cycle through your
             DA state (e.g. ``DAState.extras["rng_key"]``) by rebuilding
@@ -76,6 +81,7 @@ class DiffraxForwardModel(eqx.Module):
     stepsize_controller: diffrax.AbstractStepSizeController = diffrax.ConstantStepSize()
     diffusion: Callable[[Any, Any, Any], Any] | None = None
     sde_key: jax.Array | None = None
+    brownian_shape: tuple[int, ...] | None = eqx.field(static=True, default=None)
     max_steps: int = eqx.field(static=True, default=4096)
 
     def __check_init__(self) -> None:
@@ -89,11 +95,14 @@ class DiffraxForwardModel(eqx.Module):
         drift = diffrax.ODETerm(self.vector_field)
         if self.diffusion is None:
             return drift
+        bm_shape = (
+            self.brownian_shape if self.brownian_shape is not None else jnp.shape(state)
+        )
         brownian = diffrax.VirtualBrownianTree(
             t0,
             t1,
             tol=self.dt0 / 2,
-            shape=jax.ShapeDtypeStruct(jnp.shape(state), jnp.result_type(state)),
+            shape=jax.ShapeDtypeStruct(bm_shape, jnp.result_type(state)),
             key=self.sde_key,
         )
         return diffrax.MultiTerm(drift, diffrax.ControlTerm(self.diffusion, brownian))

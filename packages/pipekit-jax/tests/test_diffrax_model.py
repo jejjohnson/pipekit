@@ -108,6 +108,22 @@ class TestSDE:
         assert out.shape == (3,)
         assert jnp.all(jnp.isfinite(out))
 
+    def test_sde_nonsquare_noise(self):
+        # Two Brownian channels driving a three-dimensional state: the
+        # diffusion is a (3, 2) matrix and brownian_shape must be (2,).
+        B = jnp.array([[0.1, 0.0], [0.0, 0.1], [0.05, 0.05]])
+        m = DiffraxForwardModel(
+            vector_field=_decay,
+            diffusion=lambda t, y, args: B,
+            brownian_shape=(2,),
+            sde_key=jax.random.key(1),
+            solver=diffrax.Heun(),
+            dt0=0.01,
+        )
+        out = m.step(jnp.ones(3), 1.0)
+        assert out.shape == (3,)
+        assert jnp.all(jnp.isfinite(out))
+
     def test_sde_requires_key(self):
         with pytest.raises(ValueError, match="sde_key"):
             DiffraxForwardModel(
