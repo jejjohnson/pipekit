@@ -43,7 +43,7 @@ mode, for four reasons (ADR D14):
 **Shared seam (not duplicated):** both adapters produce the same artifact (a
 posterior-predictive `Operator`) and both can start from a NumPyro model.
 The **model→logdensity bridge + `Predictive` wrapping** is factored into a
-shared helper (proposed `pipekit_train.adapters._bayes`); a `NumpyroTask`
+shared helper (proposed `pipekit_train.adapters.bayes`); a `NumpyroTask`
 is *one accepted task source* for this adapter. Net UX: **write a NumPyro
 model once, switch the MCMC engine by flipping `backend="numpyro-mcmc"` ↔
 `backend="blackjax"`** — without bundling.
@@ -89,7 +89,7 @@ Two personas:
   cross-checking).
 - **Reuse, not reinvention** — adapter pattern (D5), per-backend task seam
   (D9), artifact/registry (D6/D7), the `_BatchSource` iterator, and the
-  shared `_bayes` predictive seam.
+  shared `bayes` predictive seam.
 
 ---
 
@@ -151,7 +151,7 @@ modelling DSL. The pieces the adapter touches:
 - **PPL bridge** — `numpyro.infer.util.initialize_model(key, model,
   model_args=(x, y))` returns the initial (**unconstrained**) params, the
   `potential_fn`, and a **`postprocess_fn`** (the constrain / transform map).
-  The shared `_bayes` seam builds `logdensity_fn = lambda z: -potential_fn(z)`
+  The shared `bayes` seam builds `logdensity_fn = lambda z: -potential_fn(z)`
   *and keeps `postprocess_fn`* — sampled positions are in unconstrained
   space, so they must be mapped back to the model's constrained sites before
   `Predictive` (essential for transformed latents such as a `HalfNormal`
@@ -187,7 +187,7 @@ as in the Equinox and NumPyro adapters.
   config.
 - `run()` returns `(predictive_op, backend_info)` — the **same**
   posterior-predictive `Operator` the NumPyro adapters return (shared
-  `_bayes` seam) plus per-run diagnostics (acceptance, divergences, ESS).
+  `bayes` seam) plus per-run diagnostics (acceptance, divergences, ESS).
 - **Per-step sampling** drives the existing loop: each `kernel.step` is a
   loop step, so diagnostics stream to the `metric_writer`, the sampler state
   checkpoints, and early-stopping works.
@@ -247,7 +247,7 @@ not from a full `logdensity_fn`). `num_integration_steps` is **required** for
 need it; NUTS/MCLMC/SGLD do not). `predict_fn` is needed only to build a
 predictive `Operator` from a raw task (see §7.5). The `numpyro_task` path
 reuses the model, the constrain map, and `Predictive` via the shared
-`_bayes` seam.
+`bayes` seam.
 
 ### 7.3 `run(loop)` flow
 
@@ -306,7 +306,7 @@ reuses the model, the constrain map, and `Predictive` via the shared
 | `batch_size` | ignored — full-batch log-density | **`_BatchSource` minibatch** |
 | per-step loop / callbacks | `kernel.step → (state, info)`; acceptance / energy / divergences | `kernel.step(key, pos, batch, step_size)` → new position; step-size / grad-norm only |
 | `checkpoint_dir` | sampler state + samples (Orbax) | same |
-| trained `model_op` | `_bayes` predictive op → `predictive_site` | same |
+| trained `model_op` | `bayes` predictive op → `predictive_site` | same |
 | `backend_info` | sampler, num_warmup/draws, accept rate, divergences, ESS | + minibatch size |
 
 ### 7.5 Open design decisions (where to push back)
@@ -318,7 +318,7 @@ reuses the model, the constrain map, and `Predictive` via the shared
    optional `BlackjaxTask` field; with it the op returns posterior-predictive
    means, without it the raw path returns posterior samples only. (The
    `numpyro_task` path always has a predictive via the model.)
-3. **Shared seam location.** `pipekit_train.adapters._bayes` (model→logdensity
+3. **Shared seam location.** `pipekit_train.adapters.bayes` (model→logdensity
    + `Predictive` wrapping), imported by both `numpyro` and `blackjax`
    adapters. Confirm the factoring.
 4. **Multiple chains** as `vmap` (single device) vs sharded across devices
@@ -334,7 +334,7 @@ BlackJAX — once from a NumPyro model, once from a raw log-density.
 ```python
 import jax, jax.numpy as jnp, numpyro, numpyro.distributions as dist
 from pipekit_train import TrainingLoop, IterableDataset
-from pipekit_train.adapters._bayes import NumpyroTask
+from pipekit_train.adapters.bayes import NumpyroTask
 from pipekit_train.adapters.blackjax import BlackjaxTask
 
 def model(x, y=None):
@@ -388,7 +388,7 @@ pipelines and round-trip through the model registry like any trained model
 ```
 1. [blackjax] extra + registry/Literal entry + scaffold run() raising
    NotImplementedError (matches the lightning/keras scaffolds).
-2. Factor the shared _bayes seam (model->logdensity bridge + Predictive
+2. Factor the shared bayes seam (model->logdensity bridge + Predictive
    wrapping) shared with the NumPyro adapters; BlackjaxTask + predictive op.
 3. Full-batch per-step path: window_adaptation warmup + kernel.step loop
    (NUTS), per-sample diagnostics to the writer, Orbax checkpoint of

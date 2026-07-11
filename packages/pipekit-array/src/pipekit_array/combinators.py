@@ -25,6 +25,10 @@ class StackAlong(Operator):
     Args:
         axis: Position of the new axis in the output. Default 0.
 
+    Raises:
+        ValueError: From ``_apply`` when the input sequence is empty
+            (also via `array_namespace` when the inputs mix backends).
+
     Example::
 
         out = StackAlong(axis=0)([arr_a, arr_b, arr_c])  # shape (3, H, W)
@@ -53,6 +57,10 @@ class ConcatenateAlong(Operator):
 
     Args:
         axis: Existing axis to concatenate along. Default 0.
+
+    Raises:
+        ValueError: From ``_apply`` when the input sequence is empty
+            (also via `array_namespace` when the inputs mix backends).
 
     Example::
 

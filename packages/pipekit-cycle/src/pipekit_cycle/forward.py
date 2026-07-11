@@ -86,6 +86,7 @@ class CompositeForward(Operator):
 
     Raises:
         ValueError: if ``components`` is empty.
+        TypeError: if any component doesn't satisfy `ForwardModel`.
     """
 
     __config_mixin_auto__ = False

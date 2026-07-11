@@ -123,6 +123,11 @@ class BlackjaxPredictiveOp(Operator):
 
 
 def _validate_task(loop: Any) -> BlackjaxTask:
+    """Return ``loop.task`` if it is a `BlackjaxTask`; raise otherwise.
+
+    Mirrors `bayes.validate_task` — the blackjax backend is task-first,
+    so a carrier-agnostic ``Loss`` cannot stand in for the target.
+    """
     task = getattr(loop, "task", None)
     if task is None:
         raise ValueError(
@@ -138,7 +143,17 @@ def _validate_task(loop: Any) -> BlackjaxTask:
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
-    """Sample ``loop.task`` with BlackJAX (NUTS); return ``(op, info)``."""
+    """Sample ``loop.task`` with BlackJAX (NUTS).
+
+    Returns:
+        A pair ``(model_op, backend_info)``. ``model_op`` is a
+        `bayes.NumpyroPredictiveOp` (numpyro-bridged path) or a
+        `BlackjaxPredictiveOp` (raw-logdensity path); ``backend_info``
+        carries the keys ``backend``, ``sampler``, ``jax_version``,
+        ``blackjax_version``, ``devices``, ``total_seconds``,
+        ``final_step``, ``num_warmup``, ``num_samples``,
+        ``num_divergences``, and ``final_metrics``.
+    """
     try:
         import blackjax  # ty: ignore[unresolved-import]
     except ImportError as exc:

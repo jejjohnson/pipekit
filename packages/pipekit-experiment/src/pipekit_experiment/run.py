@@ -76,6 +76,7 @@ class RunMetrics:
         return {n: pairs[-1][1] for n, pairs in self.values.items() if pairs}
 
     def clear(self) -> None:
+        """Drop all recorded entries."""
         self.values.clear()
 
 
@@ -95,7 +96,9 @@ class RunArtifacts:
         self.items[name] = uri
 
     def get(self, name: str) -> str | None:
+        """Return the artifact stored under ``name``, or ``None``."""
         return self.items.get(name)
 
     def clear(self) -> None:
+        """Drop all recorded entries."""
         self.items.clear()

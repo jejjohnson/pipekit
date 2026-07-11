@@ -19,8 +19,10 @@ The v0.1 public surface, grouped by module:
 - **Group I — shape inference** (`signature`): `Signature`.
 - **Group J — parallelism** (`parallel`): `ThreadMap`, `ProcessMap`,
   `AsyncMap`, `BatchedMap`, `check_pickleable`.
+- *(Group K is reserved in the master plan for a disk-cache backend;
+  nothing ships under it yet.)*
 - **Group L — serialisation** (`serial`): `dumps`, `loads`,
-  `loads_sandboxed`, `register`.
+  `loads_sandboxed`, `register`, `unregister`, `allowed`.
 - **Group M — state primitives** (`state`): `StatefulOperator`,
   `CarryState`.
 - **Group N — structural protocols** (`protocols`): `Predictor`,

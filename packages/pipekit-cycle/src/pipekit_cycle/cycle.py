@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from pipekit import Operator, StatefulOperator
+from pipekit._base.operator import nested_config
 
 from pipekit_cycle.protocols import ForwardModel
 
@@ -85,6 +86,11 @@ class Cycle(StatefulOperator):
 
     Returns from ``_apply(carrier, state)``: ``(final_carrier, final_state)``.
 
+    Raises:
+        TypeError: If ``step_op`` is neither a `StatefulOperator` nor a
+            `ForwardModel`.
+        ValueError: If ``n_steps < 0`` or ``history_stride < 1``.
+
     Example::
 
         cycle = Cycle(step_op=Advect(dt=3600.0), n_steps=24, save_history=True)
@@ -123,10 +129,7 @@ class Cycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "step_op": {
-                "class": type(self.step_op).__name__,
-                "config": self.step_op.get_config(),
-            },
+            "step_op": nested_config(self.step_op),
             "n_steps": self.n_steps,
             "save_history": self.save_history,
             "history_stride": self.history_stride,
@@ -153,6 +156,13 @@ class EnsembleCycle(StatefulOperator):
             length-checked at call time.
 
     Returns from ``_apply(members, state)``: ``(list_of_final_members, state)``.
+
+    Raises:
+        TypeError: If ``step_op`` is neither a `StatefulOperator` nor a
+            `ForwardModel`.
+        ValueError: If ``n_steps < 0`` or ``n_members < 1`` (from the
+            constructor), or if the input ensemble's length differs
+            from ``n_members`` (at call time).
     """
 
     __config_mixin_auto__ = False
@@ -183,10 +193,7 @@ class EnsembleCycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "step_op": {
-                "class": type(self.step_op).__name__,
-                "config": self.step_op.get_config(),
-            },
+            "step_op": nested_config(self.step_op),
             "n_steps": self.n_steps,
             "n_members": self.n_members,
         }
@@ -249,10 +256,7 @@ class WindowedCycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "step_op": {
-                "class": type(self.step_op).__name__,
-                "config": self.step_op.get_config(),
-            },
+            "step_op": nested_config(self.step_op),
             "window": self.window,
             "stride": self.stride,
         }
@@ -274,6 +278,11 @@ class Recurrence(StatefulOperator):
 
     Returns from ``_apply(carrier, state)``: ``(carrier, state)``
     after either convergence or hitting ``max_iters``.
+
+    Raises:
+        TypeError: If ``step_op`` is neither a `StatefulOperator` nor a
+            `ForwardModel`, or if ``condition_op`` is not an `Operator`.
+        ValueError: If ``max_iters < 1``.
     """
 
     __config_mixin_auto__ = False
@@ -310,13 +319,7 @@ class Recurrence(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "step_op": {
-                "class": type(self.step_op).__name__,
-                "config": self.step_op.get_config(),
-            },
-            "condition_op": {
-                "class": type(self.condition_op).__name__,
-                "config": self.condition_op.get_config(),
-            },
+            "step_op": nested_config(self.step_op),
+            "condition_op": nested_config(self.condition_op),
             "max_iters": self.max_iters,
         }

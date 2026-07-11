@@ -496,6 +496,7 @@ def _build_optimizer(config: dict[str, Any]) -> optax.GradientTransformation:
 
 
 def _is_indexable(dataset: Any) -> bool:
+    """True when ``dataset`` supports random access (``len`` + ``getitem``)."""
     return hasattr(dataset, "__len__") and hasattr(dataset, "__getitem__")
 
 

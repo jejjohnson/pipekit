@@ -23,7 +23,16 @@ if TYPE_CHECKING:
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
-    """Fit ``loop.task`` with NumPyro NUTS; return ``(predictive_op, info)``."""
+    """Fit ``loop.task`` with NumPyro NUTS.
+
+    Returns:
+        A pair ``(predictive_op, backend_info)``. ``predictive_op`` is a
+        `bayes.NumpyroPredictiveOp` over the posterior samples;
+        ``backend_info`` carries the keys ``backend``, ``jax_version``,
+        ``numpyro_version``, ``devices``, ``total_seconds``,
+        ``final_step``, ``num_warmup``, ``num_samples``, ``num_chains``,
+        ``num_divergences``, ``final_metrics``, and ``sites``.
+    """
     import jax
     import numpy as np
 

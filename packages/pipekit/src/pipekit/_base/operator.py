@@ -315,6 +315,7 @@ def require_operator(value: Any, owner: str, field: str) -> None:
 
 
 def _operator_subclasses(cls: type[Operator]) -> tuple[type[Operator], ...]:
+    """All transitive subclasses of ``cls``, in definition order."""
     subclasses: list[type[Operator]] = []
     for subclass in cls.__subclasses__():
         subclasses.append(subclass)

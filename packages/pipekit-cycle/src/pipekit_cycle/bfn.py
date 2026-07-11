@@ -5,7 +5,7 @@ BFN (Auroux & Blum, 2008) repeatedly integrates the model **forward** then
 observations on each pass, until the successive back-pass initial states
 converge. It needs no adjoint — only the forward model run in both time
 directions plus a nudging gain ``K`` — which makes it a cheap baseline
-beside `SmootherCycle` / `Incremental4DVar`.
+beside `SmootherCycle`.
 
 Sign convention: the nudging is **corrective on both passes** (``x <-
 x + K(y - H x)``); ``way`` flips only the *model* integration direction

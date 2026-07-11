@@ -1,12 +1,15 @@
 # pipekit-jax
 
-JAX / Equinox carrier integration for `pipekit`. Ships one operator:
+JAX / Equinox carrier integration for `pipekit`:
 
 - **`JaxModelOp`** — wraps an `eqx.Module` as a `pipekit.Operator`,
-  with `serialize_weights` / `with_weights` methods so trained
-  weights round-trip byte-identically through any
-  `pipekit_experiment.ModelRegistry` via the registry's `weights`
-  blob.
+  with `serialize_weights` / `with_weights` / `from_registry` methods
+  so trained weights round-trip byte-identically through any
+  `pipekit_experiment.ModelRegistry` via the registry's `weights` blob.
+- **`DiffraxForwardModel`** — a `pipekit_cycle.ForwardModel` backed by
+  a diffrax ODE/SDE solve (behind the `[diffrax]` extra).
+- **`to_diffrax_adjoint` / `truncated_scan`** — JAX-side interpreters
+  for the carrier-agnostic adjoint specs in `pipekit_cycle.adjoints`.
 
 `JaxModelOp` is the public successor to the in-package
 `pipekit_train.adapters.equinox.EquinoxModelOp` stand-in that the

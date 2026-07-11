@@ -99,15 +99,24 @@ packages/
 │   │   ├── artifacts.py      # TrainingArtifact, InferenceArtifact
 │   │   └── adapters/         # dvc, hydra, metaflow (one module per tool)
 │   └── tests/
-├── pipekit-evaluate/         # SCAFFOLD ONLY (no implementation yet)
-└── pipekit-train/            # SCAFFOLD — Lightning/Keras adapter stubs +
-                              # Protocols + JSONLWriter. Full design at
+├── pipekit-evaluate/         # Benchmark ladder (cube/protocols/reference/run);
+│                             # scorer taxonomy still planned
+├── pipekit-jax/              # JaxModelOp, DiffraxForwardModel, adjoint
+│                             # interpreters (truncated_scan, to_diffrax_adjoint)
+└── pipekit-train/            # Training loop + adapters. Full design at
                               # packages/pipekit-train/docs/design/.
     └── src/pipekit_train/
+        ├── loop.py           # TrainingLoop + backend dispatch
+        ├── dataset.py        # TrainingDataset, SimulationDataset, CachedDataset
+        ├── xarray_window.py  # XarrayWindowDataset (windowed Zarr)
+        ├── sweep.py          # HyperSweep + ParameterGrid
         ├── loss.py           # Loss Protocol (carrier-agnostic)
-        ├── callbacks.py      # Callback Protocol
+        ├── callbacks.py      # Callback Protocol + concrete callbacks
         ├── writer.py         # MetricWriter Protocol + JSONLWriter
         └── adapters/
+            ├── equinox.py    # reference backend (Equinox+Optax+Orbax+Grain)
+            ├── bayes.py      # shared NumPyro/BlackJAX seam (NumpyroTask, …)
+            ├── numpyro_svi.py / numpyro_mcmc.py / blackjax.py
             ├── lightning.py  # v0.2 — raises NotImplementedError
             └── keras.py      # v0.3 — raises NotImplementedError
 ```

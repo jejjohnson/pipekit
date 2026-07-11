@@ -363,7 +363,7 @@ while MCMC's `mcmc.run` is a single blocking sampler.
   works under either backend*. Uses the D9 per-backend `TrainTask` seam;
   passing only `loss=` errors (no loss→task synthesis).
 - **Shared seam.** `NumpyroPredictiveOp`, the model→logdensity bridge, and
-  the `Predictive` wrapping live in `pipekit_train.adapters._bayes`, reused
+  the `Predictive` wrapping live in `pipekit_train.adapters.bayes`, reused
   by both NumPyro adapters and the BlackJAX adapter (D14). The artifact is a
   posterior-predictive `Operator` returning the mean of a configured
   `predictive_site`; weight-blob = the params / posterior-samples PyTree (D7).
@@ -405,7 +405,7 @@ or ship it separately.
 **Shared seam, not bundling.** Both adapters emit the same
 posterior-predictive `Operator` (D7) and both can start from a NumPyro
 model. The model→logdensity bridge + `Predictive` wrapping is factored into
-`pipekit_train.adapters._bayes`; a `NumpyroTask` is one accepted task source
+`pipekit_train.adapters.bayes`; a `NumpyroTask` is one accepted task source
 for the BlackJAX adapter. Net UX: write a NumPyro model once, switch the
 MCMC engine by flipping `backend="numpyro-mcmc"` ↔ `"blackjax"`.
 

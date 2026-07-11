@@ -71,6 +71,12 @@ class DACycle(StatefulOperator):
 
     Returns from ``_apply(carrier, state)``:
         ``(analysis_carrier, updated_state)``.
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol
+            (`ForwardModel` / `ObservationOperator` / `AnalysisStep`),
+            or ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``n_steps < 0``.
     """
 
     __config_mixin_auto__ = False
@@ -162,7 +168,15 @@ class EnsembleDACycle(StatefulOperator):
             Receives ``(forecast_members, obs, obs_op=..., obs_err_cov=...)``.
         obs_source: Optional observation source.
         n_steps: Number of cycles per call.
-        n_members: Expected ensemble size (length-checked at call time).
+        n_members: Expected ensemble size (keyword-only;
+            length-checked at call time).
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol, or
+            ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``n_members < 1`` or ``n_steps < 0`` (from the
+            constructor), or if the input ensemble's length differs
+            from ``n_members`` (at call time).
     """
 
     __config_mixin_auto__ = False
@@ -258,6 +272,11 @@ class SmootherCycle(StatefulOperator):
         stride: Number of windows to take per call (default 1).
         obs_source: Optional observation source; invoked per step
             inside the window. ``None`` skips the analysis step.
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol, or
+            ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``window < 1`` or ``stride < 1``.
     """
 
     __config_mixin_auto__ = False

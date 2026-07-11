@@ -286,7 +286,7 @@ Both are **task-first** (D9): `loop.task` is one shared `NumpyroTask` (no
 `method` field — the backend selects the paradigm, so the *same task* works
 under either); the carrier-agnostic `Loss` (D4) does not apply. The artifact
 is a `NumpyroPredictiveOp` (posterior-predictive `Operator`) from the shared
-`adapters._bayes` seam (D7). They fill the benchmark ladder's rung-2
+`adapters.bayes` seam (D7). They fill the benchmark ladder's rung-2
 (`numpyro-mcmc`) and rung-4 (`numpyro-svi`); `numpyro-mcmc` is a sibling of
 the BlackJAX sampler backend (below). **Full design — user story, math, CS
 background, API, examples, build order, references:
@@ -306,7 +306,7 @@ PPL: it operates on a `logdensity_fn`, and is PPL-agnostic. So it is its own
 backend (different tool / extra / contract) — but it **interoperates**: a
 `BlackjaxTask` accepts a raw `logdensity_fn` *or* a `NumpyroTask` (bridged
 via `numpyro.infer.util.initialize_model`), and both adapters share the
-model→logdensity + `Predictive` seam (`adapters._bayes`). Net UX: write a
+model→logdensity + `Predictive` seam (`adapters.bayes`). Net UX: write a
 NumPyro model once, flip `backend="numpyro-mcmc"` ↔ `"blackjax"`.
 
 Why a separate adapter pays off: BlackJAX's `kernel.step(rng, state) ->

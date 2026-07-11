@@ -92,6 +92,19 @@ class Sequential(Operator):
         return any(getattr(op, "_is_stateful", False) for op in self.operators)
 
     def _apply(self, carrier: Carrier = _MISSING, state: Any = _MISSING) -> Any:
+        """Run the pipeline, dispatching between stateless and stateful modes.
+
+        Stateless (the common case): thread ``carrier`` through each
+        operator left to right. Stateful — chosen when a ``state`` kwarg
+        is supplied or any step is a `StatefulOperator` — delegates to
+        `_apply_stateful`, which threads ``(carrier, state)`` pairs. The
+        `_MISSING` sentinel distinguishes "argument omitted" from an
+        explicit ``None`` so ``pipe(None)`` still means "carrier is None".
+
+        Raises:
+            TypeError: Calling an empty pipeline with no input, or
+                supplying ``state`` without a carrier.
+        """
         if carrier is _MISSING and not self.operators:
             raise TypeError(
                 "Sequential([]) cannot be called without an input: "
