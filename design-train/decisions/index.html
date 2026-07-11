@@ -1,0 +1,2532 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A carrier-agnostic operator-graph framework for composable scientific pipelines.">
+      
+      
+        <meta name="author" content="J. Emmanuel Johnson">
+      
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../boundaries/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Decisions (ADRs) - pipekit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-decisions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="pipekit" class="md-header__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pipekit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Decisions (ADRs)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../protocols/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Protocols
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/train-emulator/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/pipekit/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../notebooks/pipekit_train_quickstart/" class="md-tabs__link">
+          
+  
+  
+  Notebooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="pipekit" class="md-nav__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pipekit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/train-emulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train an emulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/da-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a DA cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-array
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-evaluate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-jax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart (MLP regression)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_cycle_handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cycle handoff (emulator → forecast)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_svi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro SVI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — BlackJAX NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#d1-thin-orchestration-over-existing-training-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D1: Thin orchestration over existing training tools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d2-trainingdataset-is-a-pipekitoperator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D2: TrainingDataset is a pipekit.Operator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d3-trainingloop-is-a-statefuloperator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D3: TrainingLoop is a StatefulOperator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d4-loss-is-a-protocol-common-losses-are-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D4: Loss is a Protocol; common Losses are Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d5-adapter-pattern-extras-gated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D5: Adapter pattern, extras-gated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d6-training-artifacts-integrate-with-pipekit-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D6: Training artifacts integrate with pipekit-experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d7-trained-models-are-pipekit-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D7: Trained models are pipekit Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d8-equinox-adapter-uses-grain-orbax-optax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D8: Equinox adapter uses Grain + Orbax + Optax
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d9-traintask-protocol-per-backend-callback-hooks-are-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D9: TrainTask Protocol per backend; Callback hooks are optional
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d10-per-step-is-the-unit-of-training-not-per-epoch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D10: Per-step is the unit of training, not per-epoch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d11-trainerconfig-is-the-operators-config-dict-not-a-separate-dataclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D11: TrainerConfig is the operator's config dict, not a separate dataclass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d12-sharding-is-an-optional-shardingspec-not-a-new-code-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D12: Sharding is an optional ShardingSpec, not a new code path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d13-numpyro-two-task-first-adapters-numpyro-svi-numpyro-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D13: NumPyro = two task-first adapters — numpyro-svi + numpyro-mcmc
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d14-blackjax-is-a-separate-backend-sharing-a-bayesian-seam-with-numpyro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D14: BlackJAX is a separate backend, sharing a Bayesian seam with NumPyro
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolved-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-see-boundariesmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions (see boundaries.md)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundaries & future work
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend adapters
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../numpyro_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blackjax_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlackJAX adapter (NUTS / SG-MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#d1-thin-orchestration-over-existing-training-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D1: Thin orchestration over existing training tools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d2-trainingdataset-is-a-pipekitoperator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D2: TrainingDataset is a pipekit.Operator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d3-trainingloop-is-a-statefuloperator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D3: TrainingLoop is a StatefulOperator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d4-loss-is-a-protocol-common-losses-are-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D4: Loss is a Protocol; common Losses are Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d5-adapter-pattern-extras-gated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D5: Adapter pattern, extras-gated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d6-training-artifacts-integrate-with-pipekit-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D6: Training artifacts integrate with pipekit-experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d7-trained-models-are-pipekit-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D7: Trained models are pipekit Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d8-equinox-adapter-uses-grain-orbax-optax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D8: Equinox adapter uses Grain + Orbax + Optax
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d9-traintask-protocol-per-backend-callback-hooks-are-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D9: TrainTask Protocol per backend; Callback hooks are optional
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d10-per-step-is-the-unit-of-training-not-per-epoch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D10: Per-step is the unit of training, not per-epoch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d11-trainerconfig-is-the-operators-config-dict-not-a-separate-dataclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D11: TrainerConfig is the operator's config dict, not a separate dataclass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d12-sharding-is-an-optional-shardingspec-not-a-new-code-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D12: Sharding is an optional ShardingSpec, not a new code path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d13-numpyro-two-task-first-adapters-numpyro-svi-numpyro-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D13: NumPyro = two task-first adapters — numpyro-svi + numpyro-mcmc
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d14-blackjax-is-a-separate-backend-sharing-a-bayesian-seam-with-numpyro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D14: BlackJAX is a separate backend, sharing a Bayesian seam with NumPyro
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolved-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-see-boundariesmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions (see boundaries.md)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h1>
+<p>Eleven ADRs total. Decisions D1–D7 are about the carrier-agnostic
+surface. Decisions D8–D11 are about the Equinox adapter
+specifically (they port and extend the eqx_trainer D1–D6).</p>
+<p>When the design lands, each accepted ADR should also be reflected in
+a one-paragraph entry in the package CHANGELOG and (where it
+materially constrains future work) in <code>AGENTS.md</code>.</p>
+<hr />
+<h2 id="d1-thin-orchestration-over-existing-training-tools">D1: Thin orchestration over existing training tools<a class="headerlink" href="#d1-thin-orchestration-over-existing-training-tools" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> PyTorch Lightning, Equinox+Optax, and Keras 3 each ship
+complete, battle-tested training loops with distributed support,
+mixed precision, profiling, and checkpointing. A fourth
+implementation cannot improve on any of them.</p>
+<p><strong>Decision:</strong> pipekit-train wraps these tools through an
+adapter pattern. It does not reimplement gradient descent,
+optimiser updates, distributed primitives, or checkpoint
+serialisation. Each adapter is ~150 LOC of glue.</p>
+<p><strong>Consequences:</strong> Users debugging a training failure may need to read
+both pipekit-train and the underlying backend. Mitigation: error
+messages name the responsible layer; per-backend debugging guides
+in the docs.</p>
+<hr />
+<h2 id="d2-trainingdataset-is-a-pipekitoperator">D2: TrainingDataset is a <code>pipekit.Operator</code><a class="headerlink" href="#d2-trainingdataset-is-a-pipekitoperator" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> Could be a generator function, an iterator class, or an
+operator. Generator and iterator forms lose YAML round-trip, content
+hashing, and composability with the rest of pipekit. Master plan
+proposes the Operator form.</p>
+<p><strong>Decision:</strong> <code>TrainingDataset</code> extends <code>pipekit.Operator</code>. It
+defines <code>__iter__</code> returning <code>(x, y)</code> pairs and a <code>content_hash()</code>
+returning a stable identifier. Subclasses (<code>CatalogDataset</code>,
+<code>SimulationDataset</code>, <code>CachedDataset</code>) inherit operator semantics:
+they serialise via <code>get_config</code> / <code>dumps</code>, compose with
+<code>Sequential</code>, and integrate with the registry.</p>
+<p><strong>Consequences:</strong> Iteration semantics need to be defined precisely
+for the operator surface — see <code>api/datasets.md</code> for the
+"<code>__iter__</code> is the side-effect entrypoint; <code>_apply</code> is undefined"
+rule. Worth it for the composability gain.</p>
+<hr />
+<h2 id="d3-trainingloop-is-a-statefuloperator">D3: <code>TrainingLoop</code> is a <code>StatefulOperator</code><a class="headerlink" href="#d3-trainingloop-is-a-statefuloperator" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> Master plan and <code>eqx_trainer</code> both treat the training
+loop as the headline composable. The pipekit-core <code>StatefulOperator</code>
+abstraction (Group M) already exists for cycles and iterative
+processes. The training loop's natural shape is exactly
+"(carrier_in, state_in) → (carrier_out, state_out)" with state
+being <code>(model, optimizer_state, step, epoch, metrics, rng)</code>.</p>
+<p><strong>Decision:</strong> <code>TrainingLoop</code> extends <code>pipekit.StatefulOperator</code>. Its
+carry-state is a <code>TrainerCarryState</code> (subclass of
+<code>pipekit.CarryState</code>) carrying the six fields above.
+<code>TrainingLoop._apply(carrier, state)</code> delegates to the configured
+adapter and returns <code>(trained_model_op, new_state)</code>.</p>
+<p><strong>Consequences:</strong> Checkpointing reduces to "serialise the
+carry-state". Resume-from-checkpoint is a single
+<code>from_dict</code>. Multi-stage training (pretrain → fine-tune) is a
+<code>Sequential</code> of two <code>TrainingLoop</code>s threading carry-state through.</p>
+<hr />
+<h2 id="d4-loss-is-a-protocol-common-losses-are-operators">D4: Loss is a Protocol; common Losses are Operators<a class="headerlink" href="#d4-loss-is-a-protocol-common-losses-are-operators" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> <code>eqx_trainer</code> (D4) makes <code>TrainTask</code> a Protocol and
+deliberately avoids shipping common losses. The master plan ships
+<code>MSE</code>, <code>NLL</code>, <code>KL</code>, <code>Composite</code> as Operators. Both can coexist.</p>
+<p><strong>Decision:</strong> Ship two surfaces. (1) A runtime-checkable <code>Loss</code>
+Protocol (signature: <code>(predicted, target) -&gt; float</code>) for users who
+want to plug in their own loss. (2) Common <code>Loss</code> Operators (<code>MSE</code>,
+<code>NLL</code>, <code>KL</code>, <code>Composite</code>) that satisfy the Protocol and additionally
+provide YAML round-trip + composition. Per-backend, the adapter
+either calls the <code>Loss</code> directly or wraps it in the backend's
+expected idiom (Equinox: bundles it into a synthesised <code>TrainTask</code>;
+Lightning: uses it inside the generated <code>LightningModule.training_step</code>).</p>
+<p><strong>Consequences:</strong> Two ways to write a loss is an honest cost. The
+Protocol is the escape hatch; the common Losses are the default.</p>
+<hr />
+<h2 id="d5-adapter-pattern-extras-gated">D5: Adapter pattern, extras-gated<a class="headerlink" href="#d5-adapter-pattern-extras-gated" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> Each backend has a different idiom (Lightning's
+LightningModule, Equinox's filter_jit, Keras's compile/fit). Heavy
+backend dependencies (torch, jax, tensorflow) cannot all be hard
+requirements.</p>
+<p><strong>Decision:</strong> Each backend lives in one module under
+<code>pipekit_train.adapters.&lt;backend&gt;</code>. Each is gated behind a
+<code>[&lt;backend&gt;]</code> extra in <code>pyproject.toml</code>. Importing the adapter
+module without its extra raises a clean <code>ImportError</code> on first use,
+not at import time — so a CLI can branch on what's installed.
+Equinox is the v0.1 reference. Lightning and Keras adapters are
+scaffolds that raise <code>NotImplementedError</code> in v0.1; targeted v0.2 /
+v0.3.</p>
+<p><strong>Consequences:</strong> Pipekit-train ships with no backend by default.
+Users must <code>pip install pipekit-train[equinox]</code> (or another
+backend). This matches the <code>pipekit-array</code> and <code>pipekit-experiment</code>
+extras model.</p>
+<hr />
+<h2 id="d6-training-artifacts-integrate-with-pipekit-experiment">D6: Training artifacts integrate with <code>pipekit-experiment</code><a class="headerlink" href="#d6-training-artifacts-integrate-with-pipekit-experiment" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> Reproducibility for training runs requires capturing the
+training pipeline, dataset content hash, trained model hash, tracker
+run id, and registry URI. <code>pipekit-experiment</code> already ships
+<code>TrainingArtifact</code> for exactly this purpose.</p>
+<p><strong>Decision:</strong> <code>TrainingLoop.run()</code> returns
+<code>(trained_model_op, TrainingArtifact)</code>. The artifact is filled in by
+the callback layer: <code>LogToExperiment</code> fills <code>tracker_run_id</code>;
+<code>Checkpoint</code> (when configured against a <code>ModelRegistry</code>) fills
+<code>model_registry_uri</code> and <code>trained_model_hash</code>; the loop itself fills
+<code>training_pipeline_yaml</code>, <code>dataset_hash</code>, <code>backend_info</code>, and
+<code>deps_lock</code>. The <code>pipekit-experiment</code> dependency is gated behind the
+<code>[experiment]</code> extra.</p>
+<p><strong>Consequences:</strong> No new reproducibility primitive is invented in
+this package. Users without <code>pipekit-experiment</code> get a "naked"
+<code>(trained_model_op, dict)</code> return value — the dict is the same
+shape as <code>TrainingArtifact.__dict__</code> but not typed.</p>
+<hr />
+<h2 id="d7-trained-models-are-pipekit-operators">D7: Trained models are pipekit Operators<a class="headerlink" href="#d7-trained-models-are-pipekit-operators" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> A trained model needs to compose with inference
+pipelines without rewrite. <code>pipekit-array.ModelOp</code> and (planned)
+<code>pipekit-jax.JaxModelOp</code> already exist as the operator wrappers.</p>
+<p><strong>Decision:</strong> The Layer 4 adapter's <code>run()</code> returns a
+<code>pipekit.Operator</code>. For Equinox, this is a <code>JaxModelOp</code> (or a
+domain-specific subclass). For Lightning / Keras, it's a <code>ModelOp</code>.
+The wrapper round-trips its weights through a backend-defined
+weight blob (<code>bytes</code>) that <code>ModelRegistry.store(..., weights=...)</code>
+persists alongside the operator config.</p>
+<p><strong>Consequences:</strong> A trained emulator drops into
+<code>pipekit_cycle.NeuralForward(model_op, dt=...)</code> without any
+conversion. A trained classifier drops into any <code>Sequential</code>
+preprocessing pipeline. This is the core "train→serve loop is one
+operator swap" claim.</p>
+<hr />
+<h2 id="d8-equinox-adapter-uses-grain-orbax-optax">D8: Equinox adapter uses Grain + Orbax + Optax<a class="headerlink" href="#d8-equinox-adapter-uses-grain-orbax-optax" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (ports eqx_trainer D2, D3)</p>
+<p><strong>Context:</strong> The eqx_trainer design picks Grain for data, Orbax for
+checkpointing, and Optax for optimisation. These are the modern
+JAX-ecosystem choices: deterministic iterators, async multi-device
+checkpoints, structured gradient transformations.</p>
+<p><strong>Decision:</strong> The Equinox adapter uses these libraries directly.
+<code>grain.DataLoader</code> for the iterator (with
+<code>PyGrainCheckpointHandler</code> so preemption recovery restores both
+weights <em>and</em> iterator position); <code>orbax-checkpoint.CheckpointManager</code>
+with <code>eqx.partition</code> bridge for serialisation; <code>optax</code> for the
+optimiser.</p>
+<p><strong>Consequences:</strong> The <code>[equinox]</code> extra pins six libraries
+(equinox, optax, jax, grain, orbax-checkpoint, jaxtyping). All are
+single-binary-friendly on CPU+GPU. No TensorFlow dependency leaks
+through.</p>
+<hr />
+<h2 id="d9-traintask-protocol-per-backend-callback-hooks-are-optional">D9: TrainTask Protocol per backend; Callback hooks are optional<a class="headerlink" href="#d9-traintask-protocol-per-backend-callback-hooks-are-optional" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (ports eqx_trainer D4)</p>
+<p><strong>Context:</strong> Two related issues. (1) <code>eqx_trainer</code> (D4) makes the
+user-supplied training target a <code>TrainTask</code> Protocol (<code>loss_fn</code> +
+optional <code>eval_fn</code>). This is the cleanest interface for JAX where
+the loss function returns auxiliary metrics from inside the same
+<code>eqx.filter_grad</code>. Other backends have their own idioms
+(Lightning's <code>LightningModule.training_step</code>). (2) The <code>Callback</code>
+surface defines five hooks but most callbacks only care about one
+or two; the adapter must tolerate partial implementations.</p>
+<p><strong>Decision:</strong></p>
+<ol>
+<li>Each adapter defines its own <code>TrainTask</code> Protocol or equivalent.
+   For the Equinox adapter, this is the eqx_trainer <code>TrainTask</code>
+   Protocol verbatim. For the Lightning adapter (v0.2), the
+   equivalent is a <code>LightningModule</code> factory function. For Keras
+   (v0.3), it's a <code>(loss, metrics)</code> tuple. The carrier-agnostic
+   <code>Loss</code> from D4 is the <em>default</em> — if the user doesn't supply a
+   backend <code>TrainTask</code>, the adapter synthesises one from the <code>Loss</code>
+   Operator.</li>
+<li>The <code>Callback</code> Protocol is <strong>not</strong> <code>@runtime_checkable</code>.
+   <code>runtime_checkable</code> would require every callback to implement
+   all five hooks (otherwise <code>isinstance(cb, Callback)</code> returns
+   False), which contradicts the partial-implementation model.
+   The Protocol stays as the static-typing contract for the <em>full</em>
+   hook surface; runtime dispatch in adapters uses <code>getattr(cb,
+   hook, None)</code>. <code>Loss</code> and <code>MetricWriter</code> <em>are</em> runtime-checkable
+   because every implementation has the same single-method surface.</li>
+</ol>
+<p><strong>Consequences:</strong> Power users see backend idioms; default users
+only see <code>Loss</code>. The synthesised path is what the worked examples
+in <code>examples/</code> use. Partial <code>Callback</code> implementations (e.g. a
+metric logger that only cares about <code>on_step_end</code>) are valid by
+design, and the test suite encodes this contract structurally
+rather than via <code>isinstance</code>.</p>
+<hr />
+<h2 id="d10-per-step-is-the-unit-of-training-not-per-epoch">D10: Per-step is the unit of training, not per-epoch<a class="headerlink" href="#d10-per-step-is-the-unit-of-training-not-per-epoch" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted</p>
+<p><strong>Context:</strong> Master plan uses <code>n_epochs</code>. eqx_trainer uses
+<code>num_steps</code>. Grain iterators are typically infinite (<code>num_epochs=None</code>).
+Per-epoch semantics break down when the dataset is a streaming
+simulator or when steps_per_epoch isn't well-defined.</p>
+<p><strong>Decision:</strong> The training loop's unit is the step. <code>TrainingLoop</code>
+takes <code>max_steps</code> (required); <code>steps_per_epoch</code> is optional and
+purely cosmetic (controls when <code>on_epoch_end</code> callbacks fire).
+Eval and checkpoint cadences are <code>every_n_steps</code>. Datasets are
+expected to be infinite iterators; finite datasets are wrapped to
+repeat.</p>
+<p><strong>Consequences:</strong> Existing-user mental model of "10 epochs" needs
+translation to "10 × steps_per_epoch steps". Documented prominently
+in the examples.</p>
+<hr />
+<h2 id="d11-trainerconfig-is-the-operators-config-dict-not-a-separate-dataclass">D11: TrainerConfig is the operator's config dict, not a separate dataclass<a class="headerlink" href="#d11-trainerconfig-is-the-operators-config-dict-not-a-separate-dataclass" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (refines eqx_trainer D5)</p>
+<p><strong>Context:</strong> <code>eqx_trainer</code> (D5) ships a <code>TrainerConfig</code> dataclass and
+explicitly avoids YAML / ml_collections. The pipekit world already
+has a YAML round-trip via <code>pipekit.serial.dumps</code>. A separate config
+dataclass would duplicate machinery.</p>
+<p><strong>Decision:</strong> <code>TrainingLoop</code> is constructed with the same flat-config
+shape that the eqx_trainer <code>TrainerConfig</code> proposes (<code>max_steps</code>,
+<code>seed</code>, <code>checkpoint_every_n_steps</code>, <code>max_checkpoints_to_keep</code>,
+<code>eval_every_n_steps</code>, <code>log_every_n_steps</code>, …), but those fields live
+directly on the operator and are surfaced through its
+<code>get_config()</code>. The YAML round-trip is free. Users who prefer the
+dataclass-only style can ignore the YAML side and treat
+<code>TrainingLoop</code> exactly like the eqx_trainer's <code>Trainer</code> +
+<code>TrainerConfig</code> pair.</p>
+<p><strong>Consequences:</strong> Slight tension with eqx_trainer D5's "config files
+are the caller's responsibility". Resolved by saying: pipekit-train
+<em>provides</em> the YAML facility (via the operator surface) but does not
+<em>require</em> it. Callers using a dataclass-style API see no YAML.</p>
+<hr />
+<h2 id="d12-sharding-is-an-optional-shardingspec-not-a-new-code-path">D12: Sharding is an optional <code>ShardingSpec</code>, not a new code path<a class="headerlink" href="#d12-sharding-is-an-optional-shardingspec-not-a-new-code-path" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (resolves boundaries.md Q1, issue #15)</p>
+<p><strong>Context:</strong> The v0.1 Equinox adapter was single-host, single-device.
+Multi-GPU (model parallelism, larger batches) and multi-host (training
+across nodes) are the most-requested extension. The risk was forking the
+adapter into a parallel "distributed" code path.</p>
+<p><strong>Decision:</strong> Add one optional, frozen <code>ShardingSpec(mesh, model_pspec,
+data_pspec)</code> and thread it through the <em>existing</em> path rather than
+branching:</p>
+<ul>
+<li><code>TrainState.create(..., sharding=spec)</code> places model + optimiser array
+  leaves on <code>spec.model_sharding</code>; the step counter is replicated.</li>
+<li><code>train_step</code> is unchanged — <code>eqx.filter_jit</code> compiles sharding-aware
+  automatically once its inputs are sharded (replicated model + a batch
+  sharded along <code>data_pspec</code> gives data-parallel SPMD with XLA inserting
+  the collectives). No explicit <code>pjit</code> wrapper is needed for the
+  data-parallel case.</li>
+<li>The data iterator places each batch on <code>spec.data_sharding</code>; for
+  multi-host it first reads a disjoint <strong>process-shard</strong> of the <code>grain</code>
+  <code>MapDataset</code> (<code>map_ds[process_index::process_count]</code>, the modern
+  equivalent of <code>grain.ShardByJaxProcess</code>) and assembles the global array
+  with <code>jax.make_array_from_process_local_data</code>.</li>
+<li>Orbax restore is sharding-aware <em>for free</em>: the restore template is the
+  already-sharded <code>TrainState</code>, so <code>to_shape_dtype_struct</code> carries each
+  leaf's sharding into <code>StandardRestore</code>.</li>
+<li><code>TrainingLoop.sharding</code> is typed <code>Any | None</code> so the carrier-agnostic
+  core never imports JAX (the spec lives in <code>adapters.equinox</code>).</li>
+</ul>
+<p><strong>Consequences:</strong> <code>sharding=None</code> is byte-for-byte the old single-device
+path. The default (data-parallel) spec is <code>model_pspec=PartitionSpec()</code>
+(replicated) + <code>data_pspec=PartitionSpec("data")</code>; uniform model-parallel
+specs work when leaf ranks are compatible. Verified on a CPU-simulated
+2-device mesh and a scripted 2-process <code>jax.distributed</code> smoke. The
+Lightning adapter keeps its own native distributed support (D5).</p>
+<hr />
+<h2 id="d13-numpyro-two-task-first-adapters-numpyro-svi-numpyro-mcmc">D13: NumPyro = two task-first adapters — <code>numpyro-svi</code> + <code>numpyro-mcmc</code><a class="headerlink" href="#d13-numpyro-two-task-first-adapters-numpyro-svi-numpyro-mcmc" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (design; implementation planned)</p>
+<p><strong>Context:</strong> A NumPyro backend would make Bayesian inference a first-class
+<code>TrainingLoop</code> target, complementing the <code>pipekit-evaluate</code> benchmark ladder
+(MCMC = rung-2 oracle, SVI = rung-4). But NumPyro's "training" is inference
+over a probabilistic model — it does not match the carrier-agnostic
+<code>Loss(pred, target)</code> surface (D4) — and its two paradigms have <strong>very
+different loop shapes</strong>: SVI's <code>svi.update</code> is a per-step gradient step,
+while MCMC's <code>mcmc.run</code> is a single blocking sampler.</p>
+<p><strong>Decision:</strong></p>
+<ul>
+<li><strong>Two adapters, split by paradigm</strong>, not one method-dispatched module:
+  <code>backend="numpyro-svi"</code> and <code>backend="numpyro-mcmc"</code>. SVI genuinely <em>is</em>
+  the per-step <code>TrainingLoop</code> (<code>max_steps</code>, <code>optimizer_config</code>, per-step
+  eval/checkpoint, <code>_BatchSource</code> minibatching all apply; <code>SVI(optim=...)</code>
+  takes an optax transformation). MCMC is a single <code>mcmc.run</code> over the full
+  dataset (begin/end callbacks only; those loop fields do not apply).
+  Splitting removes the "ignored for nuts" caveats and lines NumPyro up with
+  BlackJAX (D14): <code>numpyro-mcmc</code> and <code>blackjax</code> are sibling <em>sampler</em>
+  backends, <code>numpyro-svi</code> is the <em>variational</em> one. The two NumPyro backends
+  share the <strong>same <code>[numpyro]</code> extra</strong> — a deliberate, minor exception to
+  D5's "one extra per backend" (the dependency is identical; only the
+  paradigm differs).</li>
+<li><strong>Task-first, shared task.</strong> Both require <code>loop.task</code> (one shared
+  <code>NumpyroTask</code>: model + predictive config + SVI fields + MCMC fields), not
+  <code>loop.loss</code> — the objective is the model's ELBO / joint log-density. No
+  <code>method</code> field: the backend string selects the paradigm, so the <em>same task
+  works under either backend</em>. Uses the D9 per-backend <code>TrainTask</code> seam;
+  passing only <code>loss=</code> errors (no loss→task synthesis).</li>
+<li><strong>Shared seam.</strong> <code>NumpyroPredictiveOp</code>, the model→logdensity bridge, and
+  the <code>Predictive</code> wrapping live in <code>pipekit_train.adapters.bayes</code>, reused
+  by both NumPyro adapters and the BlackJAX adapter (D14). The artifact is a
+  posterior-predictive <code>Operator</code> returning the mean of a configured
+  <code>predictive_site</code>; weight-blob = the params / posterior-samples PyTree (D7).</li>
+</ul>
+<p><strong>Consequences:</strong> Two thin adapters over one shared seam, rather than one
+overloaded module. No hard dependency (gated behind <code>[numpyro]</code>). Full design
+in <a href="../numpyro_adapter/"><code>numpyro_adapter.md</code></a>; concise entries in
+<code>api/adapters.md</code>. Scope: SVI + NUTS.</p>
+<hr />
+<h2 id="d14-blackjax-is-a-separate-backend-sharing-a-bayesian-seam-with-numpyro">D14: BlackJAX is a separate backend, sharing a Bayesian seam with NumPyro<a class="headerlink" href="#d14-blackjax-is-a-separate-backend-sharing-a-bayesian-seam-with-numpyro" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> accepted (design; implementation planned)</p>
+<p><strong>Context:</strong> BlackJAX is also wanted as a backend. But BlackJAX is a
+<em>sampler library</em>, not a PPL: it operates on a <code>logdensity_fn</code> and is
+PPL-agnostic (it consumes log-densities from NumPyro, PyMC, or hand-written
+functions). The question was whether to bundle it into the NumPyro adapter
+or ship it separately.</p>
+<p><strong>Decision:</strong> A <strong>separate</strong> <code>backend="blackjax"</code> module, gated behind a
+<code>[blackjax]</code> extra — <strong>not</strong> a NumPyro mode — for four reasons:</p>
+<ol>
+<li><strong>Different tool / extra / contract</strong> (D5). The <code>[numpyro]</code> extra must
+   not pull BlackJAX, and BlackJAX must not require NumPyro (that would deny
+   its PPL-agnostic purpose). Its task is a <code>logdensity_fn</code>, not a model.</li>
+<li><strong>It fits the per-step loop <em>better</em> than NumPyro.</strong> BlackJAX's
+   <code>kernel.step(rng, state) -&gt; (state, info)</code> is one sample per step, so the
+   adapter reuses the per-step <code>TrainingLoop</code> (per-sample diagnostics,
+   checkpoint, early-stop) — unlike NumPyro's blocking <code>mcmc.run</code>, which the
+   NumPyro adapter runs as a single <code>fit</code> (D13).</li>
+<li><strong>A larger algorithm zoo</strong> — MCLMC, stochastic-gradient MCMC
+   (<code>sgld</code>/<code>sghmc</code>, minibatch MCMC via <code>_BatchSource</code>), tempered SMC,
+   <code>pathfinder</code>/<code>svgd</code>.</li>
+<li><strong>Cross-checking.</strong> A second, independent engine for the same model
+   strengthens the benchmark-ladder oracle story.</li>
+</ol>
+<p><strong>Shared seam, not bundling.</strong> Both adapters emit the same
+posterior-predictive <code>Operator</code> (D7) and both can start from a NumPyro
+model. The model→logdensity bridge + <code>Predictive</code> wrapping is factored into
+<code>pipekit_train.adapters.bayes</code>; a <code>NumpyroTask</code> is one accepted task source
+for the BlackJAX adapter. Net UX: write a NumPyro model once, switch the
+MCMC engine by flipping <code>backend="numpyro-mcmc"</code> ↔ <code>"blackjax"</code>.</p>
+<p><strong>Consequences:</strong> Two thin Bayesian adapters over one shared seam rather
+than one overloaded module. Full design (user story, math, CS background,
+API, examples, build order, references) in
+<a href="../blackjax_adapter/"><code>blackjax_adapter.md</code></a>. Scope agreed as NUTS + SG-MCMC
+first, MCLMC / SMC / VI as follow-ons.</p>
+<hr />
+<h2 id="resolved-questions">Resolved Questions<a class="headerlink" href="#resolved-questions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend strategy</td>
+<td>Adapter pattern, extras-gated (D5)</td>
+</tr>
+<tr>
+<td>Carrier-agnostic surface</td>
+<td>Datasets + Losses as Operators (D2, D4)</td>
+</tr>
+<tr>
+<td>Loop primitive</td>
+<td>StatefulOperator (D3)</td>
+</tr>
+<tr>
+<td>Reproducibility</td>
+<td>pipekit-experiment.TrainingArtifact (D6)</td>
+</tr>
+<tr>
+<td>Train→serve composition</td>
+<td>Trained models are Operators (D7)</td>
+</tr>
+<tr>
+<td>JAX stack</td>
+<td>Grain + Orbax + Optax (D8)</td>
+</tr>
+<tr>
+<td>User loss interface</td>
+<td>Per-backend TrainTask Protocol (D9)</td>
+</tr>
+<tr>
+<td>Training unit</td>
+<td>Per-step (D10)</td>
+</tr>
+<tr>
+<td>Config representation</td>
+<td>Operator.get_config() — YAML for free (D11)</td>
+</tr>
+<tr>
+<td>Distributed training</td>
+<td>Delegated to backend (Lightning native; JAX</td>
+</tr>
+<tr>
+<td></td>
+<td>sharding for Equinox) — see boundaries.md</td>
+</tr>
+<tr>
+<td>Hyperparameter search</td>
+<td>Deferred to v0.2 sweep.py — see boundaries.md</td>
+</tr>
+</tbody>
+</table>
+<h2 id="open-questions-see-boundariesmd">Open Questions (see boundaries.md)<a class="headerlink" href="#open-questions-see-boundariesmd" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Q1: Multi-device sharding for the Equinox adapter.</li>
+<li>Q2: Gradient accumulation (Optax MultiSteps vs trainer-level).</li>
+<li>Q3: Mixed precision (per-backend, no carrier-agnostic API).</li>
+<li>Q4: Stateful layers (<code>eqx.nn.State</code> for BatchNorm-like layers).</li>
+<li>Q5: Streaming / online updates as a v0.3 follow-up.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2596 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A carrier-agnostic operator-graph framework for composable scientific pipelines.">
+      
+      
+        <meta name="author" content="J. Emmanuel Johnson">
+      
+      
+      
+        <link rel="prev" href="../api/adapters/">
+      
+      
+        <link rel="next" href="../blackjax_adapter/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>NumPyro adapters (SVI + MCMC) - pipekit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-numpyro-inference-adapters-numpyro-svi-numpyro-mcmc" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="pipekit" class="md-header__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pipekit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              NumPyro adapters (SVI + MCMC)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../protocols/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Protocols
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/train-emulator/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/pipekit/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../notebooks/pipekit_train_quickstart/" class="md-tabs__link">
+          
+  
+  
+  Notebooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="pipekit" class="md-nav__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pipekit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/train-emulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train an emulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/da-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a DA cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-array
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-evaluate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-jax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart (MLP regression)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_cycle_handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cycle handoff (emulator → forecast)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_svi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro SVI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — BlackJAX NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundaries & future work
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend adapters
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-user-story" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. User story
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-motivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Motivation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-mathematical-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Mathematical background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cs-coding-background-numpyro-surface-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. CS / coding background (NumPyro surface used)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Current state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-target-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Target state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-proposal-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Proposal &amp; API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Proposal &amp; API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-registration-two-modules-one-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Registration — two modules, one extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-shared-numpyrotask-the-per-backend-task-d9-not-a-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Shared NumpyroTask (the per-backend task — D9, not a Loss)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-shared-seam-numpyropredictiveop-the-artifact-d7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Shared seam — NumpyroPredictiveOp (the artifact, D7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-numpyro-svi-what-runloop-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 numpyro-svi — what run(loop) does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-numpyro-mcmc-what-runloop-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 numpyro-mcmc — what run(loop) does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-trainingloop-field-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 TrainingLoop-field mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-open-design-decisions-where-to-push-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 Open design decisions (where to push back)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-example-api-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Example API usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-steps-to-completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Steps to completion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blackjax_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlackJAX adapter (NUTS / SG-MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-user-story" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. User story
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-motivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Motivation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-mathematical-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Mathematical background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cs-coding-background-numpyro-surface-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. CS / coding background (NumPyro surface used)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Current state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-target-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Target state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-proposal-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Proposal &amp; API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Proposal &amp; API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-registration-two-modules-one-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Registration — two modules, one extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-shared-numpyrotask-the-per-backend-task-d9-not-a-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Shared NumpyroTask (the per-backend task — D9, not a Loss)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-shared-seam-numpyropredictiveop-the-artifact-d7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Shared seam — NumpyroPredictiveOp (the artifact, D7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-numpyro-svi-what-runloop-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 numpyro-svi — what run(loop) does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-numpyro-mcmc-what-runloop-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 numpyro-mcmc — what run(loop) does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-trainingloop-field-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 TrainingLoop-field mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-open-design-decisions-where-to-push-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 Open design decisions (where to push back)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-example-api-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Example API usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-steps-to-completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Steps to completion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-numpyro-inference-adapters-numpyro-svi-numpyro-mcmc">Design — NumPyro inference adapters (<code>numpyro-svi</code> + <code>numpyro-mcmc</code>)<a class="headerlink" href="#design-numpyro-inference-adapters-numpyro-svi-numpyro-mcmc" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Two</strong> <code>pipekit-train</code> backends that make <strong>Bayesian inference</strong> a
+first-class <code>TrainingLoop</code> target, split by paradigm:
+<strong><code>numpyro-svi</code></strong> (variational — a per-step optimizer) and
+<strong><code>numpyro-mcmc</code></strong> (sampling — a single blocking run). Companion to
+<code>api/adapters.md</code> and ADR <strong>D13</strong> in <code>decisions.md</code>. <strong>Status: implemented
+(v1)</strong> — both backends + the shared <code>adapters.bayes</code> seam ship; SVI
+minibatching (a <code>numpyro.plate</code> subsample hook) remains the documented
+follow-on. Tests are gated behind the <code>[numpyro]</code> extra and the
+<code>slow</code>/<code>integration</code> markers (CI runs the fast subset).</p>
+<p><strong>Why two adapters, not one?</strong> SVI and MCMC only <em>look</em> alike. SVI's
+<code>svi.update</code> returns <code>(state, loss)</code> per step, so it genuinely <em>is</em> the
+per-step <code>TrainingLoop</code> — <code>max_steps</code>, <code>optimizer_config</code>, per-step
+eval/checkpoint all apply (and the <code>_BatchSource</code> minibatch iterator once a
+subsample plate is added; v1 is full-batch). MCMC's <code>mcmc.run</code> is one
+blocking call — none of those fields apply. A single
+method-dispatched module forced awkward "ignored for nuts" caveats;
+splitting removes them and lines NumPyro up cleanly with BlackJAX:
+<strong><code>numpyro-mcmc</code> and <code>blackjax</code> are sibling <em>sampler</em> backends</strong>, while
+<strong><code>numpyro-svi</code> is the <em>variational</em> one</strong>. All three share the
+model→predictive seam (<code>adapters.bayes</code>); see
+<a href="../blackjax_adapter/"><code>blackjax_adapter.md</code></a>.</p>
+</blockquote>
+<hr />
+<h2 id="1-user-story">1. User story<a class="headerlink" href="#1-user-story" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>As a scientist with a probabilistic model — a NumPyro
+<code>model(x, y=None)</code> that places priors on parameters <code>θ</code> and a likelihood
+on observations — I want to </em><em>fit it through the same <code>TrainingLoop</code> I
+already use for neural nets</em><em>: pick variational (SVI) or MCMC (NUTS)
+inference, get the usual callbacks / metric logging / checkpoints /
+<code>TrainingArtifact</code>, and receive back a <code>pipekit.Operator</code> I can drop into
+an inference pipeline and store in the model registry — without
+hand-rolling an inference script that re-implements all of that.</em></p>
+</blockquote>
+<p>Two concrete personas, both already in the ecosystem:</p>
+<ul>
+<li><strong>The oracle builder.</strong> A plume / ocean / land-extremes modeller whose
+  "ground truth" estimator is a NumPyro <strong>NUTS</strong> posterior (the benchmark
+  ladder's <em>rung-2 oracle</em>; <code>plumax</code>, <code>xtremax</code>, <code>somax</code> all use NumPyro
+  here). They want that oracle to be a reproducible <code>TrainingLoop</code> run, not
+  a notebook.</li>
+<li><strong>The fast-posterior user.</strong> Someone who wants an amortizable /
+  variational posterior (<strong>SVI</strong>, the ladder's <em>rung-4</em>) with the same
+  optimizer-config, minibatching, early-stopping and checkpoint machinery
+  the Equinox adapter already provides.</li>
+</ul>
+<hr />
+<h2 id="2-motivation">2. Motivation<a class="headerlink" href="#2-motivation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Inference is "training" too.</strong> <code>TrainingLoop</code> is a carrier-agnostic
+  orchestration layer (ADR D3); fitting a posterior is exactly the
+  <code>(model, data) → fitted thing + artifact</code> shape it already owns. A
+  probabilistic backend is a natural fourth adapter, not a new primitive.</li>
+<li><strong>Ecosystem coherence with the benchmark ladder.</strong> <code>pipekit-evaluate</code>'s
+  <code>benchmark_ladder.md</code> names <strong>NUTS = rung-2 (model-based oracle)</strong> and
+  <strong>SVI = rung-4 (emulator-based inference)</strong>. The two NumPyro backends make
+  both rungs <em>trainable through the same loop</em> — a benchmark <code>Task</code> fits its
+  oracle with <code>backend="numpyro-mcmc"</code> and its fast posterior with
+  <code>backend="numpyro-svi"</code>, registering each result.</li>
+<li><strong>Reuse, not reinvention.</strong> It rides the existing adapter pattern (D5),
+  the per-backend task seam (D9), the artifact/registry handshake (D6/D7),
+  and the Equinox data iterator (<code>_BatchSource</code>). It adds no hard
+  dependency — gated behind a <code>[numpyro]</code> extra.</li>
+</ul>
+<hr />
+<h2 id="3-mathematical-background">3. Mathematical background<a class="headerlink" href="#3-mathematical-background" title="Permanent link">&para;</a></h2>
+<p>A NumPyro model is a generative story for parameters <code>θ</code> and observations
+<code>y</code> given inputs <code>x</code>:</p>
+<div class="arithmatex">\[
+\theta \sim p(\theta), \qquad y \mid x, \theta \sim p\bigl(y \mid f(x,\theta)\bigr),
+\qquad p(\theta, y \mid x) = p(\theta)\, p(y \mid x, \theta).
+\]</div>
+<p>The target is the <strong>posterior</strong> <span class="arithmatex">\(p(\theta \mid x, y) \propto
+p(y \mid x, \theta)\, p(\theta)\)</span>, which is intractable in general. The two
+inference modes are the two standard ways to get at it:</p>
+<p><strong>Variational inference (SVI).</strong> Pick a parametric family <span class="arithmatex">\(q_\phi(\theta)\)</span>
+(the <em>guide</em>) and maximise the evidence lower bound</p>
+<div class="arithmatex">\[
+\mathrm{ELBO}(\phi) \;=\; \mathbb{E}_{q_\phi(\theta)}\!\bigl[\log p(\theta, y \mid x) - \log q_\phi(\theta)\bigr] \;\le\; \log p(y \mid x).
+\]</div>
+<p>Maximising the ELBO minimises <span class="arithmatex">\(\mathrm{KL}\!\left(q_\phi \,\|\, p(\theta \mid x,y)\right)\)</span>.
+This is a <strong>gradient-ascent loop</strong> in <span class="arithmatex">\(\phi\)</span> — one stochastic gradient step
+per minibatch — which is exactly why it maps onto the per-step
+<code>TrainingLoop</code>. NumPyro minimises <span class="arithmatex">\(-\mathrm{ELBO}\)</span>.</p>
+<p><strong>MCMC (NUTS).</strong> The No-U-Turn Sampler (Hoffman &amp; Gelman, 2014) is adaptive
+Hamiltonian Monte Carlo: it draws correlated samples
+<span class="arithmatex">\(\{\theta^{(s)}\}_{s=1}^{S} \sim p(\theta \mid x, y)\)</span> using gradients of the
+log-joint, with a warmup phase that adapts the step size and mass matrix.
+It is <strong>not</strong> a per-gradient-step optimiser — it is a single run of
+<code>warmup + sampling</code> that consumes the <strong>full</strong> likelihood each step. It is
+asymptotically exact (the oracle), at higher cost.</p>
+<p><strong>Posterior predictive (the served artifact).</strong> Whichever mode produced the
+posterior, prediction at a new input <span class="arithmatex">\(x^\ast\)</span> marginalises over it:</p>
+<div class="arithmatex">\[
+p(y^\ast \mid x^\ast, \text{data}) = \int p(y^\ast \mid x^\ast, \theta)\, p(\theta \mid \text{data})\, \mathrm{d}\theta
+\;\approx\; \frac{1}{S}\sum_{s=1}^{S} p\!\bigl(y^\ast \mid x^\ast, \theta^{(s)}\bigr).
+\]</div>
+<p>The trained <code>Operator</code> wraps this map; <code>_apply(x)</code> returns its mean (full
+samples optionally).</p>
+<hr />
+<h2 id="4-cs-coding-background-numpyro-surface-used">4. CS / coding background (NumPyro surface used)<a class="headerlink" href="#4-cs-coding-background-numpyro-surface-used" title="Permanent link">&para;</a></h2>
+<p>NumPyro is JAX-native, so PRNG, JIT, and <code>vmap</code> all behave like the Equinox
+adapter. The pieces the adapter touches:</p>
+<ul>
+<li><strong>Model</strong> — a Python callable using primitives: <code>numpyro.sample("obs",
+  dist, obs=y)</code> (the likelihood site, conditioned on data when <code>y</code> is
+  given), <code>numpyro.plate(name, size, subsample_size=…)</code> (conditional
+  independence + minibatch scaling), <code>numpyro.deterministic</code>.</li>
+<li><strong>SVI</strong> — <code>SVI(model, guide, optim, loss)</code>. Key methods:
+  <code>init(key, *args) → SVIState</code>; <strong><code>update(state, *args) → (state, loss)</code></strong>
+  performs <em>one</em> gradient step; <code>get_params(state)</code>; <code>evaluate(state,
+  *args)</code> returns the ELBO (for eval). <code>optim</code> accepts an <strong>optax
+  <code>GradientTransformation</code> directly</strong>, so <code>optimizer_config</code> reuses the
+  Equinox translation.</li>
+<li><strong>Guides</strong> — <code>numpyro.infer.autoguide.AutoNormal</code> (mean-field; the
+  default), <code>AutoDelta</code> (MAP), <code>AutoMultivariateNormal</code>, <code>AutoDAIS</code>, …</li>
+<li><strong>MCMC</strong> — <code>MCMC(sampler, num_warmup=…, num_samples=…, num_chains=…)</code>
+  (the count args are <strong>keyword-only</strong> in <code>numpyro&gt;=0.15</code>), with the
+  <code>NUTS(model)</code> / <code>HMC(model)</code> kernels. <code>run(key, *args)</code> is one blocking
+  call; <code>get_samples()</code> returns a dict; <code>print_summary()</code> /
+  <code>last_state</code> expose <span class="arithmatex">\(\hat r\)</span>, effective sample size, divergences.</li>
+<li><strong>Predictive</strong> — <code>Predictive(model, posterior_samples=samples)</code> (MCMC) or
+  <code>Predictive(model, guide=guide, params=params, num_samples=N)</code> (SVI; the
+  <code>num_samples</code> is <strong>required</strong> — a guide + params alone is not enough).
+  Called <code>predictive(key, *args)</code> → a dict keyed by <strong>site name</strong>, so the
+  adapter must be told <em>which</em> site is the prediction.</li>
+<li><strong>PRNG</strong> — <code>jax.random.key(loop.seed)</code>, split per step (as the Equinox
+  adapter already does).</li>
+</ul>
+<hr />
+<h2 id="5-current-state">5. Current state<a class="headerlink" href="#5-current-state" title="Permanent link">&para;</a></h2>
+<p><code>pipekit-train</code> today:</p>
+<ul>
+<li><code>TrainingLoop</code> (a <code>StatefulOperator</code>, D3) dispatches to
+  <code>pipekit_train.adapters.&lt;backend&gt;.run(loop)</code> via <code>_BACKEND_MODULES</code> and a
+  <code>backend: Literal["equinox", "lightning", "keras"]</code>.</li>
+<li><strong>Equinox</strong> is the implemented reference (loss-first <em>or</em> task-first); it
+  synthesises a <code>TrainTask</code> from the carrier-agnostic <code>Loss(pred, target)</code>
+  (D4), runs an <code>eqx.filter_jit</code> per-step loop, threads callbacks /
+  <code>metric_writer</code> / Orbax checkpoints, and returns
+  <code>(EquinoxModelOp, backend_info)</code>.</li>
+<li><strong>Lightning / Keras</strong> are <code>NotImplementedError</code> scaffolds.</li>
+<li><strong>There is no probabilistic / Bayesian backend.</strong> A user who wants a
+  NumPyro posterior must hand-roll an inference script <em>outside</em> pipekit and
+  forfeit the artifact, registry, checkpoint, callback and metric-writer
+  machinery — and there is no <code>TrainingLoop</code>-shaped way to fit the benchmark
+  ladder's NUTS oracle.</li>
+</ul>
+<hr />
+<h2 id="6-target-state">6. Target state<a class="headerlink" href="#6-target-state" title="Permanent link">&para;</a></h2>
+<p>After this lands:</p>
+<ul>
+<li><code>backend="numpyro-svi"</code> and <code>backend="numpyro-mcmc"</code> are both selectable,
+  gated behind the shared <code>[numpyro]</code> extra (clean <code>ImportError</code> without it).</li>
+<li>One shared <strong><code>NumpyroTask</code></strong> (the model + predictive config, plus
+  SVI-specific and MCMC-specific fields) is consumed by <em>either</em> backend —
+  so a benchmark can swap engines without rewriting the task.</li>
+<li><code>numpyro-svi</code> is a <strong>per-step</strong> optimizer reusing the full loop
+  (callbacks / <code>metric_writer</code> / eval / checkpoint, <code>optimizer_config</code>,
+  minibatching). <code>numpyro-mcmc</code> is a <strong>single <code>mcmc.run</code></strong> (begin/end
+  callbacks only).</li>
+<li>Both <code>run()</code>s return <code>(NumpyroPredictiveOp, backend_info)</code> — a
+  posterior-predictive <code>pipekit.Operator</code> plus diagnostics (final ELBO for
+  SVI; <span class="arithmatex">\(\hat r\)</span> / divergences / sample counts for MCMC).</li>
+<li>The trained <code>Operator</code> drops into inference pipelines and the model
+  registry like any other (D7), its weight-blob being the variational
+  params / posterior-samples PyTree.</li>
+<li>Benchmark-ladder rung-2 (<code>numpyro-mcmc</code>) and rung-4 (<code>numpyro-svi</code>) are now
+  <code>TrainingLoop</code> targets, fit and registered reproducibly.</li>
+</ul>
+<hr />
+<h2 id="7-proposal-api">7. Proposal &amp; API<a class="headerlink" href="#7-proposal-api" title="Permanent link">&para;</a></h2>
+<h3 id="71-registration-two-modules-one-extra">7.1 Registration — two modules, one extra<a class="headerlink" href="#71-registration-two-modules-one-extra" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>[numpyro]</code> extra: <code>numpyro&gt;=0.15</code>, <code>optax</code>, <code>grain</code> (JAX arrives via
+  NumPyro). Two backend strings → two modules behind the <em>same</em> extra:
+  <code>"numpyro-svi": "pipekit_train.adapters.numpyro_svi"</code> and
+  <code>"numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc"</code> in
+  <code>_BACKEND_MODULES</code> + the <code>backend</code> <code>Literal</code>. (Two backends sharing one
+  extra is a deliberate, minor exception to D5's "one extra per backend" —
+  the dependency is identical; the <em>paradigm</em> differs.)</li>
+<li>Each ships a scaffold <code>run()</code> raising <code>NotImplementedError</code> first.</li>
+</ul>
+<h3 id="72-shared-numpyrotask-the-per-backend-task-d9-not-a-loss">7.2 Shared <code>NumpyroTask</code> (the per-backend task — D9, <strong>not</strong> a <code>Loss</code>)<a class="headerlink" href="#72-shared-numpyrotask-the-per-backend-task-d9-not-a-loss" title="Permanent link">&para;</a></h3>
+<p>Both adapters are <strong>task-first</strong>: NumPyro's objective is the ELBO /
+joint log-density <em>defined by the model</em>, which does not match <code>Loss(pred,
+target)</code> (D4). So <code>loop.task</code> is required; passing only <code>loop.loss</code> errors.
+One shared task carries the common config plus each paradigm's fields, so
+the <em>same task object works under either backend</em> (swap the engine, keep the
+task):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">NumpyroTask</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;A NumPyro inference target (loop.task for backend=&#39;numpyro-svi&#39;|&#39;numpyro-mcmc&#39;).&quot;&quot;&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">model</span><span class="p">:</span> <span class="n">Callable</span>           <span class="c1"># def model(x, y=None): numpyro.sample(&quot;obs&quot;, ..., obs=y)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">predictive_site</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;obs&quot;</span>       <span class="c1"># which model site the trained op returns</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">predictive_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span>      <span class="c1"># Predictive draw count (num_samples)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="c1"># numpyro-svi fields</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">guide</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>      <span class="c1"># default: AutoNormal(model)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">loss</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>                   <span class="c1"># SVI objective; default Trace_ELBO()</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="c1"># numpyro-mcmc fields</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">num_warmup</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+</code></pre></div>
+<p>There is no <code>method</code> field — the <strong>backend string</strong> selects the paradigm;
+each adapter reads only its own fields. <code>predictive_site</code> resolves the
+"which site?" ambiguity; <code>predictive_samples</code> is required because NumPyro's
+SVI <code>Predictive</code> needs a sample count.</p>
+<h3 id="73-shared-seam-numpyropredictiveop-the-artifact-d7">7.3 Shared seam — <code>NumpyroPredictiveOp</code> (the artifact, D7)<a class="headerlink" href="#73-shared-seam-numpyropredictiveop-the-artifact-d7" title="Permanent link">&para;</a></h3>
+<p><code>NumpyroPredictiveOp</code>, the model→logdensity bridge, and the <code>Predictive</code>
+wrapping live in <strong><code>pipekit_train.adapters.bayes</code></strong>, imported by both
+NumPyro adapters (and the BlackJAX adapter):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NumpyroPredictiveOp</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">forbid_in_yaml</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>   <span class="c1"># carries the model closure</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="c1"># _apply(x): draw S predictive samples, return the mean of predictive_site.</span>
+</code></pre></div>
+<p>Registry weight-blob = the SVI params dict or the posterior-samples PyTree —
+analogous to <code>pipekit-jax.JaxModelOp</code>.</p>
+<h3 id="74-numpyro-svi-what-runloop-does">7.4 <code>numpyro-svi</code> — what <code>run(loop)</code> does<a class="headerlink" href="#74-numpyro-svi-what-runloop-does" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Validate.</strong> Require a <code>NumpyroTask</code>; default <code>guide=AutoNormal(model)</code>,
+   <code>loss=Trace_ELBO()</code>.</li>
+<li><strong>Data.</strong> Reuse <code>_BatchSource</code> (Grain / streaming) — <code>(x, y)</code> minibatches
+   per step, exactly as Equinox.</li>
+<li><strong>Fit (per-step).</strong> <code>svi = SVI(model, guide, optax_optim, loss)</code>;
+   <code>state = svi.init(key, *first_batch)</code>; per-step <code>svi.update</code> returning
+   <code>(state, -ELBO)</code>; log the ELBO; eval via <code>svi.evaluate</code> on <code>val_dataset</code>;
+   checkpoint the <code>SVIState</code> params (Orbax). The existing per-step loop,
+   <code>optimizer_config</code>, <code>max_steps</code>, callbacks and writer all apply unchanged.</li>
+<li><strong>Artifact.</strong> <code>NumpyroPredictiveOp</code> around <code>Predictive(model, guide=guide,
+   params=svi_params, num_samples=task.predictive_samples)</code>; <code>_apply(x)</code>
+   returns the mean of <code>task.predictive_site</code>. <code>backend_info</code>: final ELBO,
+   versions.</li>
+</ol>
+<h3 id="75-numpyro-mcmc-what-runloop-does">7.5 <code>numpyro-mcmc</code> — what <code>run(loop)</code> does<a class="headerlink" href="#75-numpyro-mcmc-what-runloop-does" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Validate.</strong> Require a <code>NumpyroTask</code> (the SVI fields are ignored).</li>
+<li><strong>Data.</strong> <em>No</em> minibatch iterator: <strong>materialise the full dataset</strong> into
+   single <code>(X, y)</code> arrays (one pass over <code>loop.dataset</code>); <code>mcmc.run</code> consumes
+   the whole likelihood in one call. (<code>max_steps</code>, <code>optimizer_config</code>,
+   <code>batch_size</code>, per-step eval do not apply.)</li>
+<li><strong>Fit (single call).</strong> <code>mcmc = MCMC(NUTS(model),
+   num_warmup=task.num_warmup, num_samples=task.num_samples,
+   num_chains=task.num_chains)</code> (the count args are keyword-only in
+   <code>numpyro&gt;=0.15</code>); <code>mcmc.run(key, X, y)</code>; <code>samples = mcmc.get_samples()</code>.
+   Fire <code>on_train_begin</code> / <code>on_train_end</code> only.</li>
+<li><strong>Artifact.</strong> <code>NumpyroPredictiveOp</code> around <code>Predictive(model,
+   posterior_samples=samples)</code>; <code>_apply(x)</code> returns the mean of
+   <code>task.predictive_site</code>. <code>backend_info</code>: <code>num_warmup</code>/<code>num_samples</code>,
+   <code>num_divergences</code>, <span class="arithmatex">\(\hat r\)</span> summary.</li>
+</ol>
+<h3 id="76-trainingloop-field-mapping">7.6 <code>TrainingLoop</code>-field mapping<a class="headerlink" href="#76-trainingloop-field-mapping" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th><code>TrainingLoop</code> field</th>
+<th><code>numpyro-svi</code></th>
+<th><code>numpyro-mcmc</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task</code> (required)</td>
+<td><code>NumpyroTask(model, guide=…)</code></td>
+<td><code>NumpyroTask(model, num_warmup=…, num_samples=…)</code></td>
+</tr>
+<tr>
+<td><code>loss</code></td>
+<td>N/A — objective is the model's ELBO</td>
+<td>N/A — joint log-density</td>
+</tr>
+<tr>
+<td><code>optimizer_config</code></td>
+<td>→ optax → <code>SVI(optim=...)</code></td>
+<td>not used</td>
+</tr>
+<tr>
+<td><code>max_steps</code></td>
+<td>SVI steps</td>
+<td>not used (→ <code>num_samples</code>)</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>full-batch in v1; minibatch needs a <code>plate(subsample_size=…)</code> (follow-on)</td>
+<td>not used — full dataset materialised</td>
+</tr>
+<tr>
+<td>per-step loop / callbacks</td>
+<td><code>svi.update</code> + <code>svi.evaluate</code>, full per-step loop</td>
+<td>one <code>mcmc.run</code>, begin/end only</td>
+</tr>
+<tr>
+<td><code>checkpoint_dir</code></td>
+<td><code>SVIState</code> params (Orbax)</td>
+<td>posterior samples</td>
+</tr>
+<tr>
+<td>trained <code>model_op</code></td>
+<td><code>NumpyroPredictiveOp</code> → <code>predictive_site</code> mean</td>
+<td><code>NumpyroPredictiveOp</code> → <code>predictive_site</code> mean</td>
+</tr>
+<tr>
+<td><code>backend_info</code></td>
+<td>versions, final ELBO</td>
+<td>num_warmup/samples, divergences, <span class="arithmatex">\(\hat r\)</span></td>
+</tr>
+</tbody>
+</table>
+<h3 id="77-open-design-decisions-where-to-push-back">7.7 Open design decisions (where to push back)<a class="headerlink" href="#77-open-design-decisions-where-to-push-back" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Two adapters, one extra.</strong> Decided: split by paradigm (<code>numpyro-svi</code> /
+   <code>numpyro-mcmc</code>) — the per-step vs blocking shapes are too different to
+   method-dispatch, and it aligns with BlackJAX (§0 of
+   <a href="../blackjax_adapter/"><code>blackjax_adapter.md</code></a>). The shared <code>[numpyro]</code>
+   extra is the accepted cost.</li>
+<li><strong>Shared task vs two tasks.</strong> Proposed: one <code>NumpyroTask</code> (above), so the
+   same task swaps between backends. Alternative: <code>SviTask</code> / <code>McmcTask</code>.</li>
+<li><strong>SVI minibatching.</strong> Full-batch for v1, add
+   <code>numpyro.plate(subsample_size=…)</code> later — or wire it from the start?</li>
+<li><strong>Predictive return.</strong> Mean of <code>predictive_site</code> by default; flag for
+   full samples / multiple sites?</li>
+</ol>
+<hr />
+<h2 id="8-example-api-usage">8. Example API usage<a class="headerlink" href="#8-example-api-usage" title="Permanent link">&para;</a></h2>
+<p>A Bayesian linear regression. <strong>One task object</strong>, fit by either backend —
+flip the <code>backend</code> string to switch engines.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span><span class="o">,</span><span class="w"> </span><span class="nn">numpyro</span><span class="o">,</span><span class="w"> </span><span class="nn">numpyro.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">numpyro.infer.autoguide</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoNormal</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit_train</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingLoop</span><span class="p">,</span> <span class="n">IterableDataset</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit_train.adapters.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NumpyroTask</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">w</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">b</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">sigma</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;sigma&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">HalfNormal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">))</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">mu</span> <span class="o">=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">b</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;obs&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span><span class="p">),</span> <span class="n">obs</span><span class="o">=</span><span class="n">y</span><span class="p">)</span>   <span class="c1"># likelihood site</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">dataset</span> <span class="o">=</span> <span class="n">IterableDataset</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">pairs</span><span class="p">,</span> <span class="n">content_hash</span><span class="o">=</span><span class="s2">&quot;linreg-64&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">task</span> <span class="o">=</span> <span class="n">NumpyroTask</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">guide</span><span class="o">=</span><span class="n">AutoNormal</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="n">predictive_site</span><span class="o">=</span><span class="s2">&quot;obs&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                   <span class="n">num_warmup</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>   <span class="c1"># used by either backend</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># --- numpyro-svi: fast variational posterior (per-step; reuses the loop) --</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="c1"># v1 is FULL-BATCH: the model above has no `numpyro.plate(..., subsample_size=)`,</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># so each step uses the whole dataset (correctly scaled ELBO). Minibatch SVI</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="c1"># (batch_size &lt; N) requires wrapping the likelihood in a subsample plate so the</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="c1"># ELBO is rescaled — a documented follow-on (build order step 5).</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">svi_op</span><span class="p">,</span> <span class="n">svi_artifact</span> <span class="o">=</span> <span class="n">TrainingLoop</span><span class="p">(</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="n">model_op</span><span class="o">=...</span><span class="p">,</span>                       <span class="c1"># ignored; the task carries the model</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;numpyro-svi&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>    <span class="n">task</span><span class="o">=</span><span class="n">task</span><span class="p">,</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    <span class="n">optimizer_config</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;adam&quot;</span><span class="p">,</span> <span class="s2">&quot;lr&quot;</span><span class="p">:</span> <span class="mf">1e-2</span><span class="p">},</span>   <span class="c1"># → optax → SVI(optim=...)</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    <span class="n">max_steps</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="n">y_hat</span> <span class="o">=</span> <span class="n">svi_op</span><span class="p">(</span><span class="n">x_new</span><span class="p">)</span>                    <span class="c1"># posterior-predictive mean of &quot;obs&quot;</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="c1"># --- numpyro-mcmc: the exact oracle (single mcmc.run; full dataset) -------</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="n">oracle_op</span><span class="p">,</span> <span class="n">oracle_artifact</span> <span class="o">=</span> <span class="n">TrainingLoop</span><span class="p">(</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>    <span class="n">model_op</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;numpyro-mcmc&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>    <span class="n">task</span><span class="o">=</span><span class="n">task</span><span class="p">,</span>                           <span class="c1"># same task; SVI fields are ignored here</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="n">oracle_artifact</span><span class="o">.</span><span class="n">backend_info</span><span class="p">[</span><span class="s2">&quot;num_divergences&quot;</span><span class="p">]</span>   <span class="c1"># MCMC diagnostics</span>
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a><span class="n">y_hat_oracle</span> <span class="o">=</span> <span class="n">oracle_op</span><span class="p">(</span><span class="n">x_new</span><span class="p">)</span>
+</code></pre></div>
+<p>Both <code>svi_op</code> and <code>oracle_op</code> are ordinary <code>pipekit.Operator</code>s: they compose
+into inference pipelines and round-trip through the model registry exactly
+like a trained neural net (D7).</p>
+<hr />
+<h2 id="9-steps-to-completion">9. Steps to completion<a class="headerlink" href="#9-steps-to-completion" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>1. [numpyro] extra + two registry/Literal entries (numpyro-svi, numpyro-mcmc)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>   + scaffold run()s raising NotImplementedError.
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>2. Shared adapters.bayes: NumpyroTask + NumpyroPredictiveOp + the
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>   model/Predictive helpers + task-vs-loss validation.
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>3. numpyro-svi adapter — svi.init/update/evaluate; ELBO logging; Orbax
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>   checkpoint of SVIState params; callbacks/writer/eval reuse the loop.
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>   -&gt; test: Bayesian linear regression; ELBO decreases; slope recovered.
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>4. numpyro-mcmc adapter — full-dataset materialisation; MCMC(keyword args);
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>   get_samples(); divergences/r-hat into backend_info.
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>   -&gt; test: posterior covers the true slope; predictive op round-trips;
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>      agrees with the numpyro-svi posterior within MC error.
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>5. SVI minibatching via numpyro.plate(subsample_size); finalise docs + ADR.
+</code></pre></div>
+<p>Tests gate on <code>importorskip("numpyro")</code>, like the Equinox suite (CI does not
+install the inference extras, so they run locally / in an extra-enabled job).</p>
+<hr />
+<h2 id="10-references">10. References<a class="headerlink" href="#10-references" title="Permanent link">&para;</a></h2>
+<p><strong>NumPyro / inference engine.</strong></p>
+<ul>
+<li>NumPyro SVI: <a href="https://num.pyro.ai/en/stable/svi.html">https://num.pyro.ai/en/stable/svi.html</a>
+  (<code>SVI</code>, <code>Trace_ELBO</code>, <code>optax_to_numpyro</code>).</li>
+<li>NumPyro MCMC: <a href="https://num.pyro.ai/en/stable/mcmc.html">https://num.pyro.ai/en/stable/mcmc.html</a>
+  (<code>MCMC</code>, <code>NUTS</code>, <code>HMC</code>).</li>
+<li>NumPyro autoguides: <a href="https://num.pyro.ai/en/stable/autoguide.html">https://num.pyro.ai/en/stable/autoguide.html</a>
+  (<code>AutoNormal</code>, <code>AutoDelta</code>, <code>AutoMultivariateNormal</code>).</li>
+<li>NumPyro <code>Predictive</code>: <a href="https://num.pyro.ai/en/stable/utilities.html">https://num.pyro.ai/en/stable/utilities.html</a>.</li>
+</ul>
+<p><strong>Methods literature.</strong></p>
+<ul>
+<li>Hoffman &amp; Gelman (2014), <em>The No-U-Turn Sampler</em>, JMLR — NUTS.</li>
+<li>Hoffman et al. (2013), <em>Stochastic Variational Inference</em>, JMLR.</li>
+<li>Ranganath, Gerrish &amp; Blei (2014), <em>Black Box Variational Inference</em>.</li>
+<li>Kucukelbir et al. (2017), <em>Automatic Differentiation Variational
+  Inference</em> (ADVI) — the basis of the autoguides.</li>
+<li>Blei, Kucukelbir &amp; McAuliffe (2017), <em>Variational Inference: A Review for
+  Statisticians</em>.</li>
+<li>Phan, Pradhan &amp; Jankowiak (2019), <em>Composable Effects for Flexible and
+  Accelerated Probabilistic Programming in NumPyro</em>.</li>
+</ul>
+<p><strong>pipekit context.</strong></p>
+<ul>
+<li><code>api/adapters.md</code> — the per-backend reference (concise NumPyro entries).</li>
+<li><a href="../blackjax_adapter/"><code>blackjax_adapter.md</code></a> — the sibling BlackJAX
+  sampler backend; <code>numpyro-mcmc</code> and <code>blackjax</code> share the seam.</li>
+<li><code>decisions.md</code> — ADRs D4 (Loss protocol), D5 (adapter pattern), D6/D7
+  (artifact / Operator), D9 (per-backend <code>TrainTask</code>), <strong>D13</strong> (these two
+  adapters).</li>
+<li><code>pipekit-evaluate</code> <code>benchmark_ladder.md</code> — <code>numpyro-mcmc</code> = rung-2 oracle,
+  <code>numpyro-svi</code> = rung-4.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
