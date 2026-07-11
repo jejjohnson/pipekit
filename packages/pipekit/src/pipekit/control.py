@@ -228,15 +228,24 @@ class Coalesce(Operator):
     input; the first whose output passes ``is_ok`` is returned. If all
     sources fail the check, `Coalesce` raises ``RuntimeError``.
 
+    By default a source that *raises* propagates its exception
+    immediately — only returned values are screened. Pass ``on`` (as
+    with `Retry`) to also treat listed exception types as "not ok, try
+    the next source".
+
     Args:
         sources: Operators to try in order.
         is_ok: Predicate ``result → bool``. The acceptance criterion.
+        on: Tuple of exception types a source may raise to mean "no
+            result here, fall through". Exceptions not listed propagate
+            immediately. Default: ``()`` — sources must not raise.
 
     Example::
 
         pick_best = Coalesce(
             sources=[ReadCloudFree(t), ReadPartialCloud(t), ReadAny(t)],
             is_ok=lambda gt: gt.cloud_fraction < 0.1,
+            on=(IOError,),
         )
     """
 
@@ -247,6 +256,7 @@ class Coalesce(Operator):
         self,
         sources: list[Operator],
         is_ok: Callable[[Any], bool],
+        on: tuple[type[Exception], ...] = (),
     ) -> None:
         if not sources:
             raise ValueError("Coalesce requires at least one source.")
@@ -256,17 +266,28 @@ class Coalesce(Operator):
                     f"Coalesce.sources[{i}] must be an Operator, "
                     f"got {type(op).__name__}."
                 )
+        for exc in on:
+            if not (isinstance(exc, type) and issubclass(exc, Exception)):
+                raise TypeError(
+                    f"Coalesce.on entries must be Exception types, got {exc!r}."
+                )
         self.sources = list(sources)
         self.is_ok = is_ok
+        self.on = tuple(on)
 
     def _apply(self, x: Any) -> Any:
+        failures = 0
         for op in self.sources:
-            result = op(x)
+            try:
+                result = op(x)
+            except self.on:
+                failures += 1
+                continue
             if self.is_ok(result):
                 return result
         raise RuntimeError(
             f"Coalesce: none of {len(self.sources)} sources produced an output "
-            "passing `is_ok`."
+            f"passing `is_ok` ({failures} raised a tolerated exception)."
         )
 
     def get_config(self) -> dict[str, Any]:
@@ -276,6 +297,7 @@ class Coalesce(Operator):
                 for op in self.sources
             ],
             "is_ok": getattr(self.is_ok, "__name__", repr(self.is_ok)),
+            "on": [exc.__name__ for exc in self.on],
         }
 
 

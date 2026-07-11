@@ -328,3 +328,36 @@ def test_control_flow_composes_into_sequential(Scale_cls, AddConst_cls):
     )
     assert pipe(3.0) == 7.0  # (3 * 2) + 1
     assert pipe(-3.0) == 98.0  # (-3 + 100) + 1
+
+
+def test_coalesce_raising_source_propagates_by_default():
+    """Without `on`, a raising source is an error, not a fall-through."""
+    boom = Lambda(lambda x: (_ for _ in ()).throw(OSError("io")), name="boom")
+    op = Coalesce(sources=[boom, Const(1)], is_ok=lambda r: True)
+    with pytest.raises(OSError):
+        op(0)
+
+
+def test_coalesce_on_tolerates_listed_exceptions():
+    boom = Lambda(lambda x: (_ for _ in ()).throw(OSError("io")), name="boom")
+    op = Coalesce(sources=[boom, Const(7)], is_ok=lambda r: True, on=(OSError,))
+    assert op(0) == 7
+
+
+def test_coalesce_on_does_not_swallow_unlisted_exceptions():
+    boom = Lambda(lambda x: (_ for _ in ()).throw(KeyError("k")), name="boom")
+    op = Coalesce(sources=[boom, Const(1)], is_ok=lambda r: True, on=(OSError,))
+    with pytest.raises(KeyError):
+        op(0)
+
+
+def test_coalesce_all_sources_raising_reports_runtime_error():
+    boom = Lambda(lambda x: (_ for _ in ()).throw(OSError("io")), name="boom")
+    op = Coalesce(sources=[boom], is_ok=lambda r: True, on=(OSError,))
+    with pytest.raises(RuntimeError, match="1 raised"):
+        op(0)
+
+
+def test_coalesce_rejects_non_exception_on_entries():
+    with pytest.raises(TypeError):
+        Coalesce(sources=[Const(1)], is_ok=lambda r: True, on=("oops",))

@@ -44,7 +44,13 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         num_chains=task.num_chains,
         progress_bar=False,
     )
-    mcmc.run(rng, x_train, y_train, extra_fields=("diverging",))
+    # try/finally: close the writer even if sampling raises, for symmetry
+    # with the per-step backends.
+    try:
+        mcmc.run(rng, x_train, y_train, extra_fields=("diverging",))
+    finally:
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
     samples = mcmc.get_samples()
     extra = mcmc.get_extra_fields()
     num_divergences = int(np.sum(np.asarray(extra["diverging"]))) if extra else 0
@@ -60,8 +66,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     final_step = task.num_samples * task.num_chains
     final = _bayes.carry_state(loop, model_op, final_step, {})
     _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
 
     backend_info = {
         "backend": "numpyro-mcmc",

@@ -45,8 +45,13 @@ class LinearObs(Operator):
         H: Any object supporting the ``@`` operator with the carrier.
             Typically a numpy / JAX array; pipekit-cycle stays
             backend-agnostic by relying on ``__matmul__``.
+
+    Carries ``forbid_in_yaml = True`` because the matrix ``H`` is a
+    runtime array that doesn't round-trip through JSON / YAML;
+    ``get_config()`` reports only its shape as a debug payload.
     """
 
+    forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
     def __init__(self, H: Any) -> None:

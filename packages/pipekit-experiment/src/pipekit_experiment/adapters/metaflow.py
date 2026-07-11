@@ -47,7 +47,8 @@ class MetaflowStepAdapter:
       output to ``self.<name>``. Apply ``@step`` to it inside a
       ``FlowSpec``.
     - `run(op, namespace, name, inputs)` to invoke the same logic
-      synchronously, passing a dict / SimpleNamespace as ``namespace``.
+      synchronously, passing any attribute-style object (e.g. a
+      ``SimpleNamespace``; *not* a plain dict) as ``namespace``.
       Useful for testing flows outside Metaflow.
 
     The adapter never inspects Metaflow internals; it only relies on

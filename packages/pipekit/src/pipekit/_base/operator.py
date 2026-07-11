@@ -212,7 +212,8 @@ class Operator(ConfigMixin):
         Raises:
             ValueError: if the state record is malformed.
             TypeError: if the class isn't a loaded `Operator` subclass.
-            RuntimeError: if the config contains non-primitive values.
+            RuntimeError: if the class is marked ``forbid_in_yaml`` or the
+                config contains non-primitive values.
         """
         module_name = state.get("module")
         class_name = state.get("class")
@@ -226,6 +227,16 @@ class Operator(ConfigMixin):
 
         for op_type in (cls, *_operator_subclasses(cls)):
             if op_type.__module__ == module_name and op_type.__name__ == class_name:
+                if op_type.forbid_in_yaml:
+                    # A flagged operator's get_config() is a debug payload —
+                    # its keys need not match the constructor, so calling
+                    # op_type(**config) would raise a confusing TypeError.
+                    raise RuntimeError(
+                        f"from_state cannot reconstruct {op_type.__name__}: "
+                        "it is marked forbid_in_yaml (its config is a debug "
+                        "payload, not a faithful round-trip). Rebuild it in "
+                        "code instead."
+                    )
                 non_primitive = [
                     k for k, v in config.items() if not _is_json_primitive(v)
                 ]

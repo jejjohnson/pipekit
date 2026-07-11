@@ -17,6 +17,7 @@ See master plan Report 10, section 2.4.
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from pipekit import Operator, StatefulOperator
@@ -311,16 +312,23 @@ class SmootherCycle(StatefulOperator):
 
 
 def _advance_da_state(state: Any, dt: float) -> Any:
-    """Increment ``t`` and ``cycle_count`` if the state exposes them.
+    """Return a copy of ``state`` with ``t`` / ``cycle_count`` advanced.
 
-    Carrier-agnostic: any state object with mutable ``t`` /
-    ``cycle_count`` attributes participates; objects without them are
-    returned unchanged.
+    Carrier-agnostic: any state object with ``t`` / ``cycle_count``
+    attributes participates; objects without them are returned
+    unchanged. The input is never mutated — `CarryState` subclasses
+    hash/compare by value, so callers may legitimately hold snapshots
+    of earlier states (e.g. for history diffing or checkpointing).
     """
     if state is None:
         return state
-    if hasattr(state, "t"):
-        state.t = state.t + dt
-    if hasattr(state, "cycle_count"):
-        state.cycle_count = state.cycle_count + 1
-    return state
+    has_t = hasattr(state, "t")
+    has_count = hasattr(state, "cycle_count")
+    if not (has_t or has_count):
+        return state
+    advanced = copy.copy(state)
+    if has_t:
+        advanced.t = state.t + dt
+    if has_count:
+        advanced.cycle_count = state.cycle_count + 1
+    return advanced

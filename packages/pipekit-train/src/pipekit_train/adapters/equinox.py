@@ -678,8 +678,14 @@ def _evaluate(
     val_dataset: Any,
     batch_size: int,
     task: TrainTask,
+    key: jax.Array,
 ) -> dict[str, float]:
-    """Run model on val_dataset, return averaged metric dict."""
+    """Run model on val_dataset, return averaged metric dict.
+
+    ``key`` seeds stochastic tasks (dropout, reparameterised sampling)
+    and is split per batch so every batch — and every eval round —
+    sees distinct randomness. Deterministic tasks ignore it.
+    """
     sums: dict[str, float] = {}
     n = 0
     # We always do a single-pass (one epoch) over the val dataset.
@@ -687,7 +693,8 @@ def _evaluate(
     # mini-batches as if they were training batches.
     iterator = _eval_pass(val_dataset, batch_size)
     for batch in iterator:
-        _, aux = task.loss_fn(model, batch, jax.random.key(0))
+        key, batch_key = jax.random.split(key)
+        _, aux = task.loss_fn(model, batch, batch_key)
         for k, v in aux.items():
             sums[k] = sums.get(k, 0.0) + float(np.asarray(v))
         n += 1
@@ -845,62 +852,75 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     _dispatch(loop.callbacks, "on_train_begin", loop, initial_state)
 
     # --- Main loop -----------------------------------------------------
+    # try/finally: a raising callback / loss / NaN guard must not leak
+    # the metric writer's file handle (dropping buffered lines) or leave
+    # an async checkpoint half-written.
     last_metrics: dict[str, float] = {}
-    # Inside the loop body, `train_iter` is guaranteed non-None because
-    # the loop condition matches the guard that built it.
-    while int(state.step) < loop.max_steps:
-        assert train_iter is not None  # see iterator-build guard above
-        rng, step_key = jax.random.split(rng)
-        batch = train_iter.next_batch()
-        state, metrics = train_step(state, batch, step_key, task, optimizer)
-        last_metrics = {k: float(np.asarray(v)) for k, v in metrics.items()}
+    try:
+        # Inside the loop body, `train_iter` is guaranteed non-None because
+        # the loop condition matches the guard that built it.
+        while int(state.step) < loop.max_steps:
+            assert train_iter is not None  # see iterator-build guard above
+            rng, step_key = jax.random.split(rng)
+            batch = train_iter.next_batch()
+            state, metrics = train_step(state, batch, step_key, task, optimizer)
+            last_metrics = {k: float(np.asarray(v)) for k, v in metrics.items()}
 
-        step = int(state.step)
+            step = int(state.step)
 
-        # Per-step log to the writer (if any).
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, last_metrics)
+            # Per-step log to the writer (if any).
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, last_metrics)
 
-        # Callbacks on_step_end.
-        carry = _carry_state(state, loop, last_metrics)
-        _dispatch(loop.callbacks, "on_step_end", loop, carry, last_metrics)
+            # Callbacks on_step_end.
+            carry = _carry_state(state, loop, last_metrics)
+            _dispatch(loop.callbacks, "on_step_end", loop, carry, last_metrics)
 
-        # Periodic epoch boundary (cosmetic; controls on_epoch_end firing).
-        if loop.steps_per_epoch and step > 0 and step % loop.steps_per_epoch == 0:
-            _dispatch(loop.callbacks, "on_epoch_end", loop, carry, last_metrics)
+            # Periodic epoch boundary (cosmetic; controls on_epoch_end firing).
+            if loop.steps_per_epoch and step > 0 and step % loop.steps_per_epoch == 0:
+                _dispatch(loop.callbacks, "on_epoch_end", loop, carry, last_metrics)
 
-        # Periodic evaluation.
+            # Periodic evaluation.
+            if (
+                loop.val_dataset is not None
+                and step > 0
+                and step % loop.eval_every_n_steps == 0
+            ):
+                rng, eval_key = jax.random.split(rng)
+                eval_metrics = _evaluate(
+                    state.model, loop.val_dataset, loop.batch_size, task, eval_key
+                )
+                _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
+
+            # Checkpoint — gated on the manager's configured cadence
+            # (CheckpointManager.save_interval_steps, derived from the
+            # Checkpoint callback's every_n_steps). Calling save() every
+            # step would defeat the configured cadence and add I/O on
+            # the fast path.
+            if mngr is not None and step > 0 and mngr.should_save(step):
+                save_state(mngr, state, step, data_iter_state=train_iter.get_state())
+
+            # Early-stopping check — break before next step.
+            if _any_should_stop(loop.callbacks):
+                break
+
+        # --- Final eval (if val_dataset and we didn't just eval) ------
         if (
             loop.val_dataset is not None
-            and step > 0
-            and step % loop.eval_every_n_steps == 0
+            and int(state.step) % loop.eval_every_n_steps != 0
         ):
-            eval_metrics = _evaluate(
-                state.model, loop.val_dataset, loop.batch_size, task
+            rng, eval_key = jax.random.split(rng)
+            final_eval = _evaluate(
+                state.model, loop.val_dataset, loop.batch_size, task, eval_key
             )
-            _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
-
-        # Checkpoint — gated on the manager's configured cadence
-        # (CheckpointManager.save_interval_steps, derived from the
-        # Checkpoint callback's every_n_steps). Calling save() every
-        # step would defeat the configured cadence and add I/O on
-        # the fast path.
-        if mngr is not None and step > 0 and mngr.should_save(step):
-            save_state(mngr, state, step, data_iter_state=train_iter.get_state())
-
-        # Early-stopping check — break before next step.
-        if _any_should_stop(loop.callbacks):
-            break
-
-    # --- Final eval (if val_dataset and we didn't just eval) ----------
-    if loop.val_dataset is not None and int(state.step) % loop.eval_every_n_steps != 0:
-        final_eval = _evaluate(state.model, loop.val_dataset, loop.batch_size, task)
-        carry = _carry_state(state, loop, last_metrics)
-        _dispatch(loop.callbacks, "on_eval_end", loop, carry, final_eval)
-
-    # --- Wait for any async checkpoint -------------------------------
-    if mngr is not None:
-        mngr.wait_until_finished()
+            carry = _carry_state(state, loop, last_metrics)
+            _dispatch(loop.callbacks, "on_eval_end", loop, carry, final_eval)
+    finally:
+        # --- Wait for any async checkpoint + close the writer ---------
+        if mngr is not None:
+            mngr.wait_until_finished()
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     # --- Wrap the trained module + dispatch on_train_end -------------
     trained_model_op = EquinoxModelOp(state.model)
@@ -908,10 +928,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         state, loop, last_metrics, model_override=trained_model_op
     )
     _dispatch(loop.callbacks, "on_train_end", loop, final_carry)
-
-    # --- Close any open writer ---------------------------------------
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
 
     backend_info = {
         "backend": "equinox",

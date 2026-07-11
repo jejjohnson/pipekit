@@ -300,6 +300,12 @@ class XarrayWindowDataset(TrainingDataset):
     # --- split handling -----------------------------------------------------
 
     def with_split(self, split: Split) -> XarrayWindowDataset:
+        """Return a clone of this dataset restricted to ``split``.
+
+        The clone builds its own reader sources (and, lazily, its own
+        loader thread pools); the parent keeps its own. Call `close`
+        on datasets you no longer iterate to release their pools.
+        """
         clone = XarrayWindowDataset.__new__(XarrayWindowDataset)
         clone.__dict__.update(self.__dict__)
         clone.split = split
@@ -308,6 +314,16 @@ class XarrayWindowDataset(TrainingDataset):
         )
         clone._grain_source = clone._build_grain_source()
         return clone
+
+    def close(self) -> None:
+        """Release the loader thread pools held by this dataset's sources.
+
+        Each reader source lazily creates a large `ThreadPoolExecutor` on
+        first read; without an explicit close those threads are only
+        reclaimed by the garbage collector. Safe to call repeatedly; the
+        pools are rebuilt on the next read if the dataset is used again.
+        """
+        self._grain_source.close()
 
     # --- reproducibility ----------------------------------------------------
 

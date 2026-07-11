@@ -160,7 +160,6 @@ def test_s3_registry_functional_round_trip_via_memory_fs():
     """Exercise the fsspec backend end-to-end on the in-memory filesystem."""
     pytest.importorskip("fsspec")
     from fsspec.implementations.memory import MemoryFileSystem
-
     from pipekit_experiment import S3ModelRegistry
 
     MemoryFileSystem.store.clear()
@@ -183,7 +182,6 @@ def test_s3_registry_functional_round_trip_via_memory_fs():
 def test_s3_registry_weights_round_trip_via_memory_fs():
     pytest.importorskip("fsspec")
     from fsspec.implementations.memory import MemoryFileSystem
-
     from pipekit_experiment import S3ModelRegistry
 
     MemoryFileSystem.store.clear()

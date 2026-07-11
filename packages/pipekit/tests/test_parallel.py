@@ -167,3 +167,24 @@ def test_check_pickleable_walks_branch():
 def test_check_pickleable_clean_pipeline_returns_empty():
     pipe = Sequential([Identity(), Double()])
     assert check_pickleable(pipe) == []
+
+
+def test_check_pickleable_walks_graph():
+    """A flagged operator buried in a Graph node must be surfaced."""
+    from pipekit import Graph, Input
+
+    x = Input("x")
+    y = Lambda(lambda v: v + 1, name="bump")(x)
+    z = Double()(y)
+    g = Graph(inputs={"x": x}, outputs={"out": z})
+    flagged = check_pickleable(g)
+    assert any(type(o).__name__ == "Lambda" for o in flagged)
+
+
+def test_check_pickleable_clean_graph_returns_empty():
+    from pipekit import Graph, Input
+
+    x = Input("x")
+    y = Double()(x)
+    g = Graph(inputs={"x": x}, outputs={"out": y})
+    assert check_pickleable(g) == []

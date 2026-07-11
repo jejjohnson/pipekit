@@ -49,7 +49,7 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import functools
-from collections.abc import Callable, Hashable
+from collections.abc import Hashable
 from typing import Any
 
 import numpy as np
@@ -135,22 +135,25 @@ def _example_nbytes(
 # ---------------------------------------------------------------------
 
 
-def _thread_pool_loader(
-    max_workers: int = 100,
-) -> Callable[[xarray.Dataset], xarray.Dataset]:
+class _PoolLoader:
     """Dataset loader using a large thread pool for concurrency.
 
     A separate thread reads each data variable, which suffices for maximum
     concurrency against a Zarr store (the store uses internal per-chunk
-    concurrency underneath).
+    concurrency underneath). The pool is owned by this object; call
+    `close()` to release its threads deterministically instead of waiting
+    for the garbage collector.
     """
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers)
 
-    def load(dataset: xarray.Dataset) -> xarray.Dataset:
-        arrays = executor.map(lambda var: var.values, dataset.values())
+    def __init__(self, max_workers: int = 100) -> None:
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers)
+
+    def __call__(self, dataset: xarray.Dataset) -> xarray.Dataset:
+        arrays = self._executor.map(lambda var: var.values, dataset.values())
         return dataset.copy(data=dict(zip(dataset, arrays, strict=True)))
 
-    return load
+    def close(self) -> None:
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
 
 # ---------------------------------------------------------------------
@@ -167,8 +170,8 @@ class _XarraySliceSource:
     sample_dim: str
 
     @functools.cached_property
-    def loader(self) -> Callable[[xarray.Dataset], xarray.Dataset]:
-        return _thread_pool_loader()
+    def loader(self) -> _PoolLoader:
+        return _PoolLoader()
 
     def __getitem__(self, index: int) -> xarray.Dataset:
         selection = self.source.isel({self.sample_dim: self.slices[index]})
@@ -176,6 +179,12 @@ class _XarraySliceSource:
 
     def __len__(self) -> int:
         return len(self.slices)
+
+    def close(self) -> None:
+        """Shut down the lazily created loader thread pool, if any."""
+        loader = self.__dict__.pop("loader", None)
+        if loader is not None:
+            loader.close()
 
     def __getstate__(self) -> dict[str, Any]:
         # Cannot pickle the loader because it includes a thread pool; it is a
@@ -202,8 +211,8 @@ class _XarrayBlockSource:
     sample_dim: str
 
     @functools.cached_property
-    def loader(self) -> Callable[[xarray.Dataset], xarray.Dataset]:
-        return _thread_pool_loader()
+    def loader(self) -> _PoolLoader:
+        return _PoolLoader()
 
     def __getitem__(self, index: int) -> _BlockResult:
         block_slice, sub_slices = self.groups[index]
@@ -212,6 +221,12 @@ class _XarrayBlockSource:
 
     def __len__(self) -> int:
         return len(self.groups)
+
+    def close(self) -> None:
+        """Shut down the lazily created loader thread pool, if any."""
+        loader = self.__dict__.pop("loader", None)
+        if loader is not None:
+            loader.close()
 
     def __getstate__(self) -> dict[str, Any]:
         return {
@@ -242,6 +257,13 @@ class _PytreeSource:
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         return {name: source[index] for name, source in self.sources.items()}
+
+    def close(self) -> None:
+        """Close every leaf source that supports it (releases thread pools)."""
+        for source in self.sources.values():
+            close = getattr(source, "close", None)
+            if close is not None:
+                close()
 
 
 # ---------------------------------------------------------------------

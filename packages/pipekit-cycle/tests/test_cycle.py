@@ -115,3 +115,10 @@ def test_recurrence_hits_max_iters(AddOneStateful_cls, SimpleState_cls):
     rec(0, SimpleState_cls())
     assert rec.converged is False
     assert rec.iters == 3
+
+
+def test_windowed_cycle_short_stream_raises(AddOneStateful_cls):
+    """A stream shorter than one window is a misconfiguration, not a no-op."""
+    cyc = WindowedCycle(step_op=AddOneStateful_cls(), window=5)
+    with pytest.raises(ValueError, match="shorter than one window"):
+        cyc([1.0, 2.0], None)

@@ -66,12 +66,7 @@ def _check_component(value: str, kind: str) -> str:
         ValueError: If ``value`` is empty, contains a path separator,
             is a traversal component (``.``/``..``), or is ``_tags``.
     """
-    if (
-        not value
-        or "/" in value
-        or "\\" in value
-        or value in (".", "..", "_tags")
-    ):
+    if not value or "/" in value or "\\" in value or value in (".", "..", "_tags"):
         raise ValueError(
             f"Invalid {kind} {value!r}: must be a non-empty name without "
             "path separators (and not '_tags')."
@@ -105,7 +100,9 @@ class _ModelRegistryBase:
     def _write_bytes(self, data: bytes, *parts: str) -> None:
         raise NotImplementedError
 
-    def _children(self) -> list[str]:
+    def _children(self) -> builtins.list[str]:
+        # `builtins.list`: the public `list` method below shadows the builtin
+        # inside this class body.
         raise NotImplementedError
 
     def _where(self) -> str:

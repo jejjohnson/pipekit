@@ -55,8 +55,9 @@ def test_loads_rejects_non_object_json():
 def test_loads_with_closure_config_raises():
     """Lambda emits a debug-only config — loads can't reconstruct it."""
     s = dumps(Lambda(lambda x: x, name="noop"))
-    # Class loads, but constructor needs `fn` — absent from debug config.
-    with pytest.raises(TypeError):
+    # forbid_in_yaml classes are rejected with an explanatory error rather
+    # than a confusing TypeError from calling the constructor with debug keys.
+    with pytest.raises(RuntimeError, match="forbid_in_yaml"):
         loads(s)
 
 

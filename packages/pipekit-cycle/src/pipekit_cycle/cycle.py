@@ -209,6 +209,12 @@ class WindowedCycle(StatefulOperator):
 
     Returns from ``_apply(stream, state)``:
         ``(list_of_window_final_carriers, state)``.
+
+    Raises:
+        ValueError: From the constructor for invalid ``window`` /
+            ``stride``, and from ``_apply`` when the stream is shorter
+            than one window (which would otherwise silently produce
+            zero windows).
     """
 
     __config_mixin_auto__ = False
@@ -229,6 +235,11 @@ class WindowedCycle(StatefulOperator):
     ) -> tuple[list[Any], Any]:
         outputs: list[Any] = []
         n = len(stream)
+        if n < self.window:
+            raise ValueError(
+                f"WindowedCycle: stream of length {n} is shorter than one "
+                f"window ({self.window}); no windows would be produced."
+            )
         for start in range(0, n - self.window + 1, self.stride):
             carrier = stream[start]
             for _ in range(self.window):

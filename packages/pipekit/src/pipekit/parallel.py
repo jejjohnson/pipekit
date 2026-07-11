@@ -22,12 +22,12 @@ See master plan Report 2, Group J.
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, ClassVar
 
 from pipekit._base.operator import Operator
-from pipekit._base.sequential import Sequential
 
 
 class ThreadMap(Operator):
@@ -117,8 +117,6 @@ class ProcessMap(Operator):
                 except Exception as exc:
                     if self.on_error == "raise":
                         raise
-                    import sys
-
                     print(
                         f"ProcessMap: item {i} failed with {type(exc).__name__}: {exc}",
                         file=sys.stderr,
@@ -259,35 +257,43 @@ def check_pickleable(op: Operator) -> list[Operator]:
     ``forbid_in_yaml = True`` (closures, callables, user RNGs) is a
     pickleability hazard.
 
-    Walks `Sequential` children and the ``op``/``inner`` slots of the
-    parallel / cache wrappers. Returns the flagged operators in
+    Walks the operator tree generically: every instance attribute of
+    every operator is scanned for nested operators — held directly,
+    inside list / tuple / set / dict containers, or inside `Graph`
+    nodes — so new operator shapes are covered without registering
+    their attribute names here. Returns the flagged operators in
     encounter order (deduplicated by ``id``).
     """
+    from pipekit._base.graph import Node
+
     found: list[Operator] = []
     seen: set[int] = set()
 
-    def visit(node: Any) -> None:
-        if not isinstance(node, Operator) or id(node) in seen:
+    def scan(value: Any) -> None:
+        if isinstance(value, Operator):
+            visit(value)
+        elif isinstance(value, Node):
+            if id(value) in seen:
+                return
+            seen.add(id(value))
+            scan(value.operator)
+            for parent in value.parents:
+                scan(parent)
+        elif isinstance(value, dict):
+            for child in value.values():
+                scan(child)
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            for child in value:
+                scan(child)
+
+    def visit(node: Operator) -> None:
+        if id(node) in seen:
             return
         seen.add(id(node))
         if getattr(type(node), "forbid_in_yaml", False):
             found.append(node)
-        if isinstance(node, Sequential):
-            for child in node.operators:
-                visit(child)
-        for attr in ("op", "inner", "primary", "fallback", "if_true", "if_false"):
-            child = getattr(node, attr, None)
-            if isinstance(child, Operator):
-                visit(child)
-        for attr in ("branches", "cases"):
-            mapping = getattr(node, attr, None)
-            if isinstance(mapping, dict):
-                for child in mapping.values():
-                    visit(child)
-        sources = getattr(node, "sources", None)
-        if isinstance(sources, list):
-            for child in sources:
-                visit(child)
+        for value in vars(node).values():
+            scan(value)
 
     visit(op)
     return found

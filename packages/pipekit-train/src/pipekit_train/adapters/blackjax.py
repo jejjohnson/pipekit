@@ -211,26 +211,32 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     # --- per-step sampling loop ------------------------------------------
+    # try/finally: a raising callback must not leak the writer's file
+    # handle (dropping its buffered lines).
     positions: list[Any] = []
     num_divergent = 0
     step = 0
-    for step in range(1, loop.max_steps + 1):
-        rng, step_key = jax.random.split(rng)
-        state, info = step_fn(step_key, state)
-        positions.append(state.position)
-        num_divergent += int(bool(info.is_divergent))
-        metrics = {
-            "acceptance_rate": float(info.acceptance_rate),
-            "is_divergent": float(info.is_divergent),
-        }
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, metrics)
-        carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
-        _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
-        if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
-            _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
-        if _any_should_stop(loop.callbacks):
-            break
+    try:
+        for step in range(1, loop.max_steps + 1):
+            rng, step_key = jax.random.split(rng)
+            state, info = step_fn(step_key, state)
+            positions.append(state.position)
+            num_divergent += int(bool(info.is_divergent))
+            metrics = {
+                "acceptance_rate": float(info.acceptance_rate),
+                "is_divergent": float(info.is_divergent),
+            }
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, metrics)
+            carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
+            _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
+            if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
+                _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
+            if _any_should_stop(loop.callbacks):
+                break
+    finally:
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     # stack the per-step positions into a pytree with a leading sample axis
     samples = jax.tree.map(lambda *leaves: jnp.stack(leaves), *positions)
@@ -258,8 +264,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     final = _bayes.carry_state(loop, model_op, int(step), {})
     _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
 
     backend_info = {
         "backend": "blackjax",

@@ -54,29 +54,36 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     last_loss = float("nan")
-    for step in range(1, loop.max_steps + 1):
-        state, loss = svi.update(state, x_train, y_train)
-        last_loss = float(loss)
-        metrics = {"elbo": -last_loss, "loss": last_loss}
+    step = 0
+    # try/finally: a raising callback must not leak the writer's file
+    # handle (dropping its buffered lines).
+    try:
+        for step in range(1, loop.max_steps + 1):
+            state, loss = svi.update(state, x_train, y_train)
+            last_loss = float(loss)
+            metrics = {"elbo": -last_loss, "loss": last_loss}
 
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, metrics)
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, metrics)
 
-        carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
-        _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
+            carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
+            _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
 
-        if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
-            _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
+            if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
+                _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
 
-        if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
-            x_val, y_val = _bayes.materialize(loop.val_dataset)
-            val_elbo = -float(svi.evaluate(state, x_val, y_val))
-            _bayes.dispatch(
-                loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
-            )
+            if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
+                x_val, y_val = _bayes.materialize(loop.val_dataset)
+                val_elbo = -float(svi.evaluate(state, x_val, y_val))
+                _bayes.dispatch(
+                    loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
+                )
 
-        if _any_should_stop(loop.callbacks):
-            break
+            if _any_should_stop(loop.callbacks):
+                break
+    finally:
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     params = svi.get_params(state)
     predictive = Predictive(
@@ -93,8 +100,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         loop, model_op, int(min(loop.max_steps, step)), {"elbo": -last_loss}
     )
     _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
 
     backend_info = {
         "backend": "numpyro-svi",

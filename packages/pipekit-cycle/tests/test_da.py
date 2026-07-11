@@ -187,3 +187,19 @@ def test_dacycle_uses_state_obs_err_cov(ToyForward_cls):
     )
     da(1.0, DAState(obs_err_cov="MY_R"))
     assert captured["err"] == "MY_R"
+
+
+def test_dacycle_does_not_mutate_input_state(ToyForward_cls, ToyAnalysis_cls):
+    """CarryState is a value object — snapshots held by callers must survive."""
+    da = DACycle(
+        forward_model=ToyForward_cls(),
+        obs_op=IdentityObs(),
+        analysis_step=ToyAnalysis_cls(),
+        obs_source=FixedObsSource([0.0, 0.0, 0.0]),
+        n_steps=3,
+    )
+    before = DAState(t=0.0, cycle_count=0)
+    _, after = da(1.0, before)
+    assert (before.t, before.cycle_count) == (0.0, 0)
+    assert after.cycle_count == 3
+    assert after is not before

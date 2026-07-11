@@ -95,6 +95,11 @@ class Benchmark:
         """Fit every estimator, resolve each cell's reference, and score it."""
         self._check_unique_cells()
         data = dict(self.task.datasets())
+        if self.obs_key not in data:
+            raise KeyError(
+                f"Benchmark: obs_key {self.obs_key!r} not in task.datasets() "
+                f"(available keys: {sorted(data)})."
+            )
         obs = data[self.obs_key]
 
         # Pass 1 — fit and predict every estimator, keyed by (rung, complexity).
