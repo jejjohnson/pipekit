@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-jax"
-version = "0.0.1"
+version = "0.0.2"
 description = "JAX / Equinox carrier integration for pipekit — JaxModelOp with weight-blob round-trip through ModelRegistry."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},

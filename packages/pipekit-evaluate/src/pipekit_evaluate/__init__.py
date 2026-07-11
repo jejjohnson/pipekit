@@ -26,7 +26,7 @@ from pipekit_evaluate.benchmark import (
 )
 
 
-__version__ = "0.0.1"  # x-release-please-version
+__version__ = "0.0.2"  # x-release-please-version
 
 __all__ = [
     "Axis",
