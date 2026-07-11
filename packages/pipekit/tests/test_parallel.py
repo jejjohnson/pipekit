@@ -188,3 +188,10 @@ def test_check_pickleable_clean_graph_returns_empty():
     y = Double()(x)
     g = Graph(inputs={"x": x}, outputs={"out": y})
     assert check_pickleable(g) == []
+
+
+def test_maps_are_not_forbid_in_yaml():
+    """The maps hold only a nested operator — the walker finds flagged
+    children structurally, so the wrappers themselves stay unflagged."""
+    for cls in (ThreadMap, ProcessMap, AsyncMap, BatchedMap):
+        assert cls.forbid_in_yaml is False, cls.__name__

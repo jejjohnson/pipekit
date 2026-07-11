@@ -110,9 +110,10 @@ class JaxModelOp(Operator):
 
         Raises:
             ValueError: if ``blob`` doesn't deserialise into a tree
-                with the same structure as ``self.module``. The
-                underlying ``eqx.tree_deserialise_leaves`` raises
-                this when the on-disk header doesn't match.
+                with the same structure as ``self.module``.
+            RuntimeError: from newer equinox versions when a
+                deserialised leaf's shape/dtype doesn't match the
+                skeleton (``eqx.tree_deserialise_leaves``).
         """
         if not isinstance(blob, (bytes, bytearray)):
             raise TypeError(
