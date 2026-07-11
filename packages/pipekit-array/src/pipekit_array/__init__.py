@@ -12,7 +12,7 @@ from pipekit_array.combinators import ConcatenateAlong, StackAlong
 from pipekit_array.reduce import MeanScalar
 
 
-__version__ = "0.0.1"  # x-release-please-version
+__version__ = "0.0.2"  # x-release-please-version
 
 __all__ = [
     "ConcatenateAlong",

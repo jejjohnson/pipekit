@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-train"
-version = "0.0.1"
+version = "0.0.2"
 description = "Training pipelines for emulators and amortized inference — thin orchestration over Lightning, Equinox+Optax, and Keras 3."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
