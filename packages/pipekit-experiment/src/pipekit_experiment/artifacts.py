@@ -19,13 +19,34 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Self, cast
 
 from pipekit import Operator
 
 
+class _JsonArtifact:
+    """Shared JSON persistence for the artifact dataclasses.
+
+    ``save`` writes the dataclass as sorted, indented JSON; ``load`` is
+    its inverse. Byte-identical bodies previously lived on both
+    `TrainingArtifact` and `InferenceArtifact`. Only meaningful on
+    ``@dataclass`` subclasses (``asdict`` requires one).
+    """
+
+    def save(self, path: str | Path) -> None:
+        """Write the artifact to ``path`` as JSON."""
+        payload = asdict(cast("Any", self))
+        Path(path).write_text(json.dumps(payload, sort_keys=True, indent=2))
+
+    @classmethod
+    def load(cls, path: str | Path) -> Self:
+        """Read an artifact previously written by `save`."""
+        data = json.loads(Path(path).read_text())
+        return cls(**data)
+
+
 @dataclass
-class TrainingArtifact:
+class TrainingArtifact(_JsonArtifact):
     """Reproducibility snapshot for a training run.
 
     Attributes:
@@ -54,16 +75,6 @@ class TrainingArtifact:
     deps_lock: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def save(self, path: str | Path) -> None:
-        """Write the artifact to ``path`` as JSON."""
-        Path(path).write_text(json.dumps(asdict(self), sort_keys=True, indent=2))
-
-    @classmethod
-    def load(cls, path: str | Path) -> TrainingArtifact:
-        """Read an artifact previously written by `save`."""
-        data = json.loads(Path(path).read_text())
-        return cls(**data)
-
     def reload_model(self, registry: Any) -> Operator:
         """Resolve the stored model via ``registry.load``.
 
@@ -75,7 +86,7 @@ class TrainingArtifact:
 
 
 @dataclass
-class InferenceArtifact:
+class InferenceArtifact(_JsonArtifact):
     """Reproducibility snapshot for an inference pipeline.
 
     Pins the trained-model hashes referenced by the pipeline so a
@@ -95,14 +106,6 @@ class InferenceArtifact:
     backend_info: dict[str, Any] = field(default_factory=dict)
     deps_lock: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
-
-    def save(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps(asdict(self), sort_keys=True, indent=2))
-
-    @classmethod
-    def load(cls, path: str | Path) -> InferenceArtifact:
-        data = json.loads(Path(path).read_text())
-        return cls(**data)
 
     def reload_models(self, registry: Any) -> dict[str, Operator]:
         """Resolve every pinned model via ``registry.load``.

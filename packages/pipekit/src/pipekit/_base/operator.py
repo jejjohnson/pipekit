@@ -14,11 +14,15 @@ behaviours every operator inherits:
 3. **JSON-safe `state` / `from_state`** — a serialisable record that
    round-trips through any subclass of `Operator` that's been imported.
 
-Operators carrying user closures (`Tap`, `Lambda`, `Branch`, …) set
+Operators that themselves hold non-serialisable runtime state — user
+closures (`Tap`, `Lambda`, `Branch`, …) or runtime arrays — set
 `forbid_in_yaml = True` to signal that `get_config()` is a debug repr,
-not a faithful YAML round-trip. The flag also doubles as a
-pickleability warning for the future `parallel.check_pickleable`
-utility.
+not a faithful round-trip; `from_state` refuses flagged classes and
+`parallel.check_pickleable` surfaces flagged instances as pickling
+hazards. Operators that merely *nest* other operators (`Cache`, `Try`,
+the parallel maps, …) do not set the flag: nesting is discovered
+structurally by `check_pickleable`, and their nested-dict configs are
+already rejected cleanly by `from_state`'s primitive check.
 
 See master plan Report 2, Group A.
 """
@@ -37,6 +41,11 @@ if TYPE_CHECKING:
 # pipekit is carrier-agnostic — sister libraries narrow this at their
 # own signatures (geotoolz → GeoTensor, xr_toolz → xr.Dataset, etc.).
 Carrier = Any
+
+# Shared "argument was omitted" sentinel — distinguishes an omitted
+# parameter from an explicit None (used by `Sequential._apply` and
+# `qc.AssertAttr`).
+_MISSING = object()
 
 
 class ConfigMixin:
@@ -96,11 +105,13 @@ class Operator(ConfigMixin):
     argument is a graph node.
 
     Attributes:
-        forbid_in_yaml: ``True`` on subclasses that hold non-serialisable
-            user state (callables, closures, runtime references). YAML
-            loaders refuse to instantiate flagged operators; the
-            `parallel.check_pickleable` utility surfaces them as
-            pickleability warnings. Default ``False``.
+        forbid_in_yaml: ``True`` on subclasses that *directly* hold
+            non-serialisable user state (callables, closures, runtime
+            arrays, RNGs). YAML loaders and `from_state` refuse to
+            instantiate flagged operators; `parallel.check_pickleable`
+            surfaces them as pickleability warnings. Operators that only
+            nest other operators leave this ``False`` — the walker finds
+            flagged children structurally. Default ``False``.
         _terminal: ``True`` on subclasses that legitimately return
             ``None`` (or otherwise break the carrier-in / carrier-out
             contract). `Sequential` rejects terminal operators except
@@ -266,6 +277,41 @@ class Operator(ConfigMixin):
         if isinstance(other, Sequential):
             return Sequential([self, *other.operators])
         return Sequential([self, other])
+
+
+def nested_config(op: Operator) -> dict[str, Any]:
+    """Debug-config payload for an operator nested inside another's config.
+
+    The canonical ``{"class": ..., "config": ...}`` shape every container
+    operator (`Sequential`, `Cache`, `Branch`, the parallel maps, …) emits
+    for its children. One helper instead of one inline dict per module, so
+    the payload shape can never drift between operators.
+    """
+    return {"class": type(op).__name__, "config": op.get_config()}
+
+
+def callable_name(fn: Any) -> str:
+    """Best-effort display name for a user-supplied callable.
+
+    ``__name__`` when present (functions, classes), else ``repr`` (lambdas
+    assigned through functools.partial, callable instances, …).
+    """
+    return getattr(fn, "__name__", repr(fn))
+
+
+def require_operator(value: Any, owner: str, field: str) -> None:
+    """Raise a standardized ``TypeError`` unless ``value`` is an `Operator`.
+
+    Args:
+        value: The candidate object.
+        owner: The validating class's name (for the message).
+        field: The parameter/attribute name (may include an index, e.g.
+            ``"sources[2]"``).
+    """
+    if not isinstance(value, Operator):
+        raise TypeError(
+            f"{owner}.{field} must be an Operator, got {type(value).__name__}."
+        )
 
 
 def _operator_subclasses(cls: type[Operator]) -> tuple[type[Operator], ...]:

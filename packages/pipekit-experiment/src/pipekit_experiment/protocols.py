@@ -61,6 +61,9 @@ class ModelRegistry(Protocol):
     def load(self, ref: str) -> Operator:
         """Resolve ``ref`` (hash or name) and return the rebuilt operator."""
 
+    def load_weights(self, ref: str) -> bytes | None:
+        """Return the raw weight bytes stored for ``ref``, or ``None``."""
+
     def list(self, *, tags: dict[str, Any] | None = None) -> builtins.list[str]:
         """Return content hashes, optionally filtered by tag values."""
 

@@ -29,7 +29,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import Operator, nested_config, require_operator
 from pipekit.hashing import sha256_hex, stable_json, stable_repr
 
 
@@ -56,10 +56,7 @@ class Cache(Operator):
     __config_exclude__ = ("hits", "misses")
 
     def __init__(self, inner: Operator) -> None:
-        if not isinstance(inner, Operator):
-            raise TypeError(
-                f"Cache.inner must be an Operator, got {type(inner).__name__}."
-            )
+        require_operator(inner, "Cache", "inner")
         self.inner = inner
         self._store: dict[str, Any] = {}
         self._lock = threading.Lock()
@@ -87,12 +84,7 @@ class Cache(Operator):
             self._store.clear()
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "inner": {
-                "class": type(self.inner).__name__,
-                "config": self.inner.get_config(),
-            }
-        }
+        return {"inner": nested_config(self.inner)}
 
     def __repr__(self) -> str:
         return f"Cache({self.inner!r})"

@@ -146,8 +146,8 @@ def test_from_registry_with_loader_method():
     )
 
 
-def test_from_registry_local_filesystem_fallback(tmp_path):
-    """Fallback path: LocalModelRegistry-style `_resolve` + `root`."""
+def test_from_registry_with_local_model_registry(tmp_path):
+    """End-to-end round-trip through a real LocalModelRegistry."""
     from pipekit_experiment import LocalModelRegistry
 
     trained = JaxModelOp(_toy_mlp(key=0))

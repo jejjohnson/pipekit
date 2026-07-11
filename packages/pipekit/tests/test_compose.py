@@ -92,5 +92,5 @@ def test_complement_with_args():
 
 def test_pipe_rejects_non_operator():
     """pipe wraps in Sequential which enforces Operator instances."""
-    with pytest.raises(TypeError, match="expected Operator"):
+    with pytest.raises(TypeError, match="must be an Operator"):
         pipe(1, lambda x: x)  # type: ignore[arg-type]

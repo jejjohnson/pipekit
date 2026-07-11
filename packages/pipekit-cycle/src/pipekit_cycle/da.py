@@ -21,8 +21,24 @@ import copy
 from typing import Any
 
 from pipekit import Operator, StatefulOperator
+from pipekit._base.operator import nested_config
 
 from pipekit_cycle.protocols import AnalysisStep, ForwardModel, ObservationOperator
+
+
+def _component_config(obj: Any) -> Any:
+    """Debug-config payload for a DA component.
+
+    Components are protocol objects (`ForwardModel`, `AnalysisStep`, …)
+    that need not be pipekit Operators; when one is, emit core's
+    canonical ``{"class", "config"}`` payload, otherwise fall back to
+    the bare class name.
+    """
+    if obj is None:
+        return None
+    if isinstance(obj, Operator):
+        return nested_config(obj)
+    return type(obj).__name__
 
 
 class DACycle(StatefulOperator):
@@ -119,12 +135,10 @@ class DACycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "save_history": self.save_history,
         }
@@ -158,8 +172,9 @@ class EnsembleDACycle(StatefulOperator):
         forward_model: ForwardModel,
         obs_op: ObservationOperator,
         analysis_step: AnalysisStep,
-        obs_source: Operator | None,
-        n_steps: int,
+        obs_source: Operator | None = None,
+        n_steps: int = 1,
+        *,
         n_members: int,
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
@@ -214,12 +229,10 @@ class EnsembleDACycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "n_members": self.n_members,
         }
@@ -300,12 +313,10 @@ class SmootherCycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "window": self.window,
             "stride": self.stride,
         }

@@ -25,9 +25,9 @@ import asyncio
 import sys
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from typing import Any, ClassVar
+from typing import Any
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import Operator, nested_config, require_operator
 
 
 class ThreadMap(Operator):
@@ -46,10 +46,7 @@ class ThreadMap(Operator):
     __config_mixin_auto__ = False
 
     def __init__(self, op: Operator, n_workers: int = 8) -> None:
-        if not isinstance(op, Operator):
-            raise TypeError(
-                f"ThreadMap.op must be an Operator, got {type(op).__name__}."
-            )
+        require_operator(op, "ThreadMap", "op")
         if n_workers < 1:
             raise ValueError(f"ThreadMap.n_workers must be >= 1, got {n_workers}.")
         self.op = op
@@ -62,7 +59,7 @@ class ThreadMap(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "op": {"class": type(self.op).__name__, "config": self.op.get_config()},
+            "op": nested_config(self.op),
             "n_workers": self.n_workers,
         }
 
@@ -91,10 +88,7 @@ class ProcessMap(Operator):
         n_workers: int = 8,
         on_error: str = "raise",
     ) -> None:
-        if not isinstance(op, Operator):
-            raise TypeError(
-                f"ProcessMap.op must be an Operator, got {type(op).__name__}."
-            )
+        require_operator(op, "ProcessMap", "op")
         if n_workers < 1:
             raise ValueError(f"ProcessMap.n_workers must be >= 1, got {n_workers}.")
         if on_error not in ("raise", "log_and_continue"):
@@ -126,7 +120,7 @@ class ProcessMap(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "op": {"class": type(self.op).__name__, "config": self.op.get_config()},
+            "op": nested_config(self.op),
             "n_workers": self.n_workers,
             "on_error": self.on_error,
         }
@@ -151,14 +145,10 @@ class AsyncMap(Operator):
     Returns from ``__call__(iterable)``: a list of results in input order.
     """
 
-    forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
     def __init__(self, op: Operator, semaphore: int = 8) -> None:
-        if not isinstance(op, Operator):
-            raise TypeError(
-                f"AsyncMap.op must be an Operator, got {type(op).__name__}."
-            )
+        require_operator(op, "AsyncMap", "op")
         if semaphore < 1:
             raise ValueError(f"AsyncMap.semaphore must be >= 1, got {semaphore}.")
         self.op = op
@@ -183,7 +173,7 @@ class AsyncMap(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "op": {"class": type(self.op).__name__, "config": self.op.get_config()},
+            "op": nested_config(self.op),
             "semaphore": self.semaphore,
         }
 
@@ -220,10 +210,7 @@ class BatchedMap(Operator):
         batch_size: int = 8,
         flatten: bool = True,
     ) -> None:
-        if not isinstance(op, Operator):
-            raise TypeError(
-                f"BatchedMap.op must be an Operator, got {type(op).__name__}."
-            )
+        require_operator(op, "BatchedMap", "op")
         if batch_size < 1:
             raise ValueError(f"BatchedMap.batch_size must be >= 1, got {batch_size}.")
         self.op = op
@@ -244,7 +231,7 @@ class BatchedMap(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "op": {"class": type(self.op).__name__, "config": self.op.get_config()},
+            "op": nested_config(self.op),
             "batch_size": self.batch_size,
             "flatten": self.flatten,
         }

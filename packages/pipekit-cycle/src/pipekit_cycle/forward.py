@@ -20,6 +20,8 @@ from typing import Any, ClassVar
 
 from pipekit import Operator
 
+from pipekit_cycle.protocols import ForwardModel
+
 
 class CallableForward(Operator):
     """Wrap a plain callable as a forward model.
@@ -92,10 +94,10 @@ class CompositeForward(Operator):
         if not components:
             raise ValueError("CompositeForward requires at least one component.")
         for i, c in enumerate(components):
-            if not all(hasattr(c, n) for n in ("step", "dt")):
+            if not isinstance(c, ForwardModel):
                 raise TypeError(
                     f"CompositeForward.components[{i}] does not satisfy "
-                    "ForwardModel (missing `step` or `dt`)."
+                    "ForwardModel (needs `step`, `dt`, and `state_signature`)."
                 )
         self.components = tuple(components)
 

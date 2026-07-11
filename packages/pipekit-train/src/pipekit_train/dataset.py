@@ -30,8 +30,13 @@ from pipekit.hashing import sha256_hex, stable_json
 Split = Literal["train", "val", "test"]
 
 
-def _hash_config(*parts: Any) -> str:
-    """sha256 over ``parts``, each stable-JSON-encoded and NUL-terminated."""
+def hash_config(*parts: Any) -> str:
+    """sha256 over ``parts``, each stable-JSON-encoded and NUL-terminated.
+
+    The shared content-hash framing for `TrainingDataset.content_hash`
+    implementations (used by `SimulationDataset`, `CachedDataset`, and
+    `pipekit_train.xarray_window.XarrayWindowDataset`).
+    """
     chunks: list[bytes | str] = []
     for p in parts:
         chunks += [stable_json(p), b"\x00"]
@@ -91,7 +96,7 @@ class TrainingDataset(Operator):
         with external state (catalog URIs, forward-model signatures)
         override to fold those in as well.
         """
-        return _hash_config(type(self).__qualname__, self.get_config())
+        return hash_config(type(self).__qualname__, self.get_config())
 
     def with_split(self, split: Split) -> TrainingDataset:
         """Return a shallow clone of this dataset with a different split.
@@ -164,7 +169,7 @@ class IterableDataset(TrainingDataset):
         yield from source
 
     def content_hash(self) -> str:
-        return _hash_config(
+        return hash_config(
             "IterableDataset",
             {"hash": self._content_hash, "seed": self.seed, "split": self.split},
         )
@@ -297,7 +302,7 @@ class SimulationDataset(TrainingDataset):
     def content_hash(self) -> str:
         fm_sig = getattr(self.forward_model, "state_signature", None)
         fm_dt = getattr(self.forward_model, "dt", None)
-        return _hash_config(
+        return hash_config(
             "SimulationDataset",
             {
                 "forward_model": {

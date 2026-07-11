@@ -44,7 +44,7 @@ def test_bfn_converges_toward_obs() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=40,
+        max_iters=40,
         tol=1e-4,
         obs_source=_ConstObs(10.0),
         convergence_fn=_abs_change,
@@ -60,7 +60,7 @@ def test_bfn_early_stop_when_already_converged() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=10,
+        max_iters=10,
         tol=1e-6,
         obs_source=_ConstObs(10.0),
         convergence_fn=_abs_change,
@@ -77,7 +77,7 @@ def test_bfn_hits_max_iter_when_not_converged() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=3,
+        max_iters=3,
         tol=1e-12,
         obs_source=_ConstObs(10.0),
         convergence_fn=_abs_change,
@@ -107,7 +107,7 @@ def test_bfn_uses_backward_model_when_supplied() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=20,
+        max_iters=20,
         tol=1e-4,
         obs_source=_ConstObs(5.0),
         backward_model=_identity_model(),
@@ -124,7 +124,7 @@ def test_bfn_advances_carry_state() -> None:
         IdentityObs(),
         _gain(0.5),
         window=3,
-        max_iter=5,
+        max_iters=5,
         obs_source=_ConstObs(10.0),
         convergence_fn=_abs_change,
     )
@@ -141,7 +141,7 @@ def test_bfn_default_convergence_is_dependency_free() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=40,
+        max_iters=40,
         tol=1e-4,
         obs_source=_ConstObs(10.0),
     )
@@ -161,7 +161,7 @@ def test_bfn_rejects_dt_ignoring_model_without_backward_model() -> None:
         IdentityObs(),
         _gain(0.5),
         window=1,
-        max_iter=20,
+        max_iters=20,
         tol=1e-4,
         obs_source=_ConstObs(5.0),
         backward_model=_identity_model(),
@@ -175,7 +175,7 @@ def test_bfn_validation() -> None:
     with pytest.raises(ValueError, match="window"):
         BFNCycle(_identity_model(), IdentityObs(), _gain(), window=0)
     with pytest.raises(ValueError, match="max_iter"):
-        BFNCycle(_identity_model(), IdentityObs(), _gain(), window=1, max_iter=0)
+        BFNCycle(_identity_model(), IdentityObs(), _gain(), window=1, max_iters=0)
     with pytest.raises(TypeError, match="ForwardModel"):
         BFNCycle(object(), IdentityObs(), _gain(), window=1)
     with pytest.raises(TypeError, match="ObservationOperator"):

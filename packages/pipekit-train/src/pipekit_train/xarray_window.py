@@ -21,14 +21,14 @@ from terrax in `pipekit_train._xreader`. See ``docs/design/api/datasets.md``.
 
 from __future__ import annotations
 
-import hashlib
 from typing import Any, ClassVar
 
 import numpy as np
 import xarray  # ty: ignore[unresolved-import]
+from pipekit.hashing import sha256_hex
 
 from pipekit_train import _xreader
-from pipekit_train.dataset import Split, TrainingDataset, _hash_config
+from pipekit_train.dataset import Split, TrainingDataset, hash_config
 
 
 try:
@@ -56,16 +56,14 @@ _SPLIT_TENTHS: dict[Split, tuple[int, int]] = {
 def _sha(array: np.typing.ArrayLike) -> str:
     """Stable sha256 of an array's values + dtype (no data read involved)."""
     arr = np.ascontiguousarray(array)
-    h = hashlib.sha256()
-    h.update(str(arr.dtype).encode("utf-8"))
     if arr.dtype == object:
         # Object dtype (e.g. cftime calendars, caller-supplied object origins):
         # tobytes() would hash PyObject* pointers, which vary across processes
         # and break the stable-identity promise. Hash a value-stable repr.
-        h.update(repr(arr.tolist()).encode("utf-8"))
+        payload: bytes | str = repr(arr.tolist())
     else:
-        h.update(arr.tobytes())
-    return h.hexdigest()
+        payload = arr.tobytes()
+    return sha256_hex(str(arr.dtype), payload)
 
 
 def _intersect_valid_origins(
@@ -330,7 +328,7 @@ class XarrayWindowDataset(TrainingDataset):
     def content_hash(self) -> str:
         # NB: block_reader / buffer / shard params are deliberately NOT hashed —
         # they change iteration order / sharding, not the logical (x, y) set.
-        return _hash_config(
+        return hash_config(
             "XarrayWindowDataset",
             {
                 "store_version": self.store_version,

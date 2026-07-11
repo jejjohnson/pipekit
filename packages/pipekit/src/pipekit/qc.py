@@ -24,10 +24,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit._base.operator import Operator
-
-
-_MISSING = object()
+from pipekit._base.operator import _MISSING, Operator, callable_name
 
 
 class QCError(AssertionError):
@@ -78,10 +75,10 @@ class Quarantine(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "check": getattr(self.check, "__name__", repr(self.check)),
+            "check": callable_name(self.check),
             "sentinel": _safe_repr(self.sentinel),
             "on_quarantine": (
-                getattr(self.on_quarantine, "__name__", repr(self.on_quarantine))
+                callable_name(self.on_quarantine)
                 if self.on_quarantine is not None
                 else None
             ),
@@ -213,13 +210,13 @@ class AssertCallable(Operator):
 
     def _apply(self, x: Any) -> Any:
         if not self.predicate(x):
-            name = getattr(self.predicate, "__name__", repr(self.predicate))
+            name = callable_name(self.predicate)
             raise QCError(f"AssertCallable({name}): {self.message}")
         return x
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "predicate": getattr(self.predicate, "__name__", repr(self.predicate)),
+            "predicate": callable_name(self.predicate),
             "message": self.message,
         }
 

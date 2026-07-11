@@ -135,11 +135,8 @@ class JaxModelOp(Operator):
 
         Args:
             registry: Anything satisfying
-                ``pipekit_experiment.ModelRegistry`` with a
-                ``load_weights(ref) -> bytes`` method. ``ModelRegistry``
-                itself ships a duck-typed ``load_weights`` path in
-                v0.2; for older versions, read the bytes manually
-                from ``registry.root / ref / "weights.bin"``.
+                ``pipekit_experiment.ModelRegistry`` (which includes
+                ``load_weights(ref) -> bytes | None``).
             ref: Hash or tag identifying the stored model.
 
         Returns:
@@ -152,15 +149,14 @@ class JaxModelOp(Operator):
             ValueError: if the stored weights don't match
                 ``self.module``'s structure.
         """
-        # Prefer the protocol-shaped `.load_weights(ref) -> bytes | None`
-        # if the registry exposes it (returns None when no weight blob
-        # was stored for that ref). Fall back to the local-filesystem
-        # layout used by `LocalModelRegistry` (`<root>/<hash>/weights.bin`).
         loader = getattr(registry, "load_weights", None)
-        if loader is not None:
-            blob = loader(ref)
-        else:
-            blob = _read_weights_blob_local(registry, ref)
+        if loader is None:
+            raise TypeError(
+                "JaxModelOp.from_registry: registry must satisfy the "
+                "ModelRegistry protocol (missing `load_weights`). Got "
+                f"{type(registry).__name__}."
+            )
+        blob = loader(ref)
         if blob is None:
             raise ValueError(
                 f"JaxModelOp.from_registry: no weights blob stored "
@@ -169,30 +165,3 @@ class JaxModelOp(Operator):
                 "to registry.store() when persisting a JaxModelOp."
             )
         return self.with_weights(blob)
-
-
-def _read_weights_blob_local(registry: Any, ref: str) -> bytes:
-    """Fallback: read ``<registry.root>/<resolved_ref>/weights.bin``.
-
-    Uses the existing public-ish bits of `LocalModelRegistry` —
-    ``_resolve(ref)`` to follow tag → hash, and ``root`` for the
-    on-disk layout.
-    """
-    resolve = getattr(registry, "_resolve", None)
-    root = getattr(registry, "root", None)
-    if resolve is None or root is None:
-        raise TypeError(
-            "JaxModelOp.from_registry: registry doesn't expose a "
-            "`load_weights(ref)` method nor the LocalModelRegistry "
-            "fallback layout (`_resolve` + `root`). Got "
-            f"{type(registry).__name__}."
-        )
-    h = resolve(ref)
-    path = root / h / "weights.bin"
-    if not path.exists():
-        raise ValueError(
-            f"JaxModelOp.from_registry: no weights blob found at "
-            f"{path}. The model was stored without weights bytes; "
-            "pass weights=op.serialize_weights() to registry.store."
-        )
-    return path.read_bytes()

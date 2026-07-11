@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from pipekit_train.adapters import _bayes
+from pipekit_train.adapters import bayes
 
 
 if TYPE_CHECKING:
@@ -26,16 +26,23 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """Fit ``loop.task`` with NumPyro NUTS; return ``(predictive_op, info)``."""
     import jax
     import numpy as np
-    import numpyro  # ty: ignore[unresolved-import]
+
+    try:
+        import numpyro  # ty: ignore[unresolved-import]
+    except ImportError as exc:
+        raise ImportError(
+            "backend='numpyro-mcmc' needs the [numpyro] extra. Install with "
+            "`pip install pipekit-train[numpyro]`."
+        ) from exc
     from numpyro.infer import MCMC, NUTS, Predictive  # ty: ignore[unresolved-import]
 
     t0 = time.time()
-    task = _bayes.validate_task(loop)
-    x_train, y_train = _bayes.materialize(loop.dataset)
+    task = bayes.validate_task(loop)
+    x_train, y_train = bayes.materialize(loop.dataset)
     rng = jax.random.key(loop.seed)
 
-    initial = _bayes.carry_state(loop, loop.model_op, 0, {})
-    _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
+    initial = bayes.carry_state(loop, loop.model_op, 0, {})
+    bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     mcmc = MCMC(
         NUTS(task.model),
@@ -56,7 +63,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     num_divergences = int(np.sum(np.asarray(extra["diverging"]))) if extra else 0
 
     predictive = Predictive(task.model, posterior_samples=samples)
-    model_op = _bayes.NumpyroPredictiveOp(
+    model_op = bayes.NumpyroPredictiveOp(
         predictive,
         predictive_site=task.predictive_site,
         seed=loop.seed,
@@ -64,8 +71,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     )
 
     final_step = task.num_samples * task.num_chains
-    final = _bayes.carry_state(loop, model_op, final_step, {})
-    _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
+    final = bayes.carry_state(loop, model_op, final_step, {})
+    bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
 
     backend_info = {
         "backend": "numpyro-mcmc",

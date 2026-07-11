@@ -1,7 +1,7 @@
 """Tests for the BlackJAX backend — ``backend="blackjax"``.
 
 Gated by ``importorskip`` (needs the ``[blackjax]`` extra). The headline
-path — BlackJAX NUTS on a NumPyro model via the shared ``_bayes`` bridge —
+path — BlackJAX NUTS on a NumPyro model via the shared ``bayes`` bridge —
 is exercised on a Bayesian linear regression and cross-checked against the
 ``numpyro-mcmc`` engine on the *same* task.
 """
@@ -22,7 +22,7 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit import Operator
 from pipekit_train import IterableDataset, TrainingLoop
-from pipekit_train.adapters._bayes import NumpyroTask
+from pipekit_train.adapters.bayes import NumpyroTask
 from pipekit_train.adapters.blackjax import BlackjaxPredictiveOp, BlackjaxTask
 
 

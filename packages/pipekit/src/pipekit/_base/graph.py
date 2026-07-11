@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit._base.operator import Carrier, Operator
+from pipekit._base.operator import Carrier, Operator, nested_config
 
 
 class Node:
@@ -226,14 +226,11 @@ class Graph(Operator):
         return {
             "inputs": list(self.inputs),
             "outputs": {
-                name: {
-                    "class": type(node.operator).__name__
+                name: (
+                    nested_config(node.operator)
                     if node.operator is not None
-                    else "Input",
-                    "config": node.operator.get_config()
-                    if node.operator is not None
-                    else {},
-                }
+                    else {"class": "Input", "config": {}}
+                )
                 for name, node in self.outputs.items()
             },
         }

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import AssertCallable
 from pipekit_cycle import (
     Cycle,
     EnsembleCycle,
@@ -93,18 +92,15 @@ def test_windowed_cycle_stride_skip(AddOneStateful_cls, SimpleState_cls):
 
 
 def test_recurrence_stops_on_condition(AddOneStateful_cls, SimpleState_cls):
-    # Stop once state.count >= 5
-    cond = AssertCallable(lambda s: s.count >= 5, message="not yet")
-    # AssertCallable raises on False; we want truthy=stop, so wrap:
     from pipekit import Lambda
 
+    # Stop once state.count >= 5.
     stop_cond = Lambda(lambda s: s.count >= 5)
     rec = Recurrence(AddOneStateful_cls(), condition_op=stop_cond, max_iters=100)
     _, state_out = rec(0, SimpleState_cls())
     assert state_out.count == 5
     assert rec.converged is True
     assert rec.iters == 5
-    del cond
 
 
 def test_recurrence_hits_max_iters(AddOneStateful_cls, SimpleState_cls):

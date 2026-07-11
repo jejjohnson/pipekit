@@ -148,8 +148,9 @@ def test_try_rejects_non_operator_fallback():
         Try(primary=Identity(), fallback=lambda x: x, on=(ValueError,))  # type: ignore[arg-type]
 
 
-def test_try_is_forbid_in_yaml():
-    assert Try.forbid_in_yaml is True
+def test_try_is_not_forbid_in_yaml():
+    """Try holds only operators + exception types — both picklable."""
+    assert Try.forbid_in_yaml is False
 
 
 def test_try_config_serialises_exception_names():
@@ -305,8 +306,9 @@ def test_retry_rejects_invalid_args():
         Retry(op=Identity(), attempts=3, base_delay=0.0, on=())
 
 
-def test_retry_is_forbid_in_yaml():
-    assert Retry.forbid_in_yaml is True
+def test_retry_is_not_forbid_in_yaml():
+    """Retry holds only an operator + exception types — both picklable."""
+    assert Retry.forbid_in_yaml is False
 
 
 # -----------------------------------------------------------------------------

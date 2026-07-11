@@ -30,7 +30,7 @@ from pipekit_cycle.protocols import ForwardModel, ObservationOperator
 class BFNCycle(StatefulOperator):
     """Back-and-Forth Nudging over an assimilation window.
 
-    Each call runs up to ``max_iter`` forth/back sweeps over a ``window``
+    Each call runs up to ``max_iters`` forth/back sweeps over a ``window``
     of forward steps, relaxing toward observations each step, and stops
     once successive back-pass initial states agree within ``tol``. The
     number of sweeps actually run is recorded on ``self.iterations``.
@@ -49,7 +49,7 @@ class BFNCycle(StatefulOperator):
             gain ``K`` (e.g. a Gaspari-Cohn-tapered relaxation). The
             innovation is ``y - H(x)``.
         window: Number of forward steps per sweep.
-        max_iter: Maximum forth/back sweeps.
+        max_iters: Maximum forth/back sweeps.
         tol: Convergence threshold on the relative change of the back-pass
             initial state between sweeps.
         spectral_sigma: If set, Gaussian-filter the innovation before
@@ -70,7 +70,7 @@ class BFNCycle(StatefulOperator):
     Raises:
         TypeError: if the model / obs operator / obs source have the wrong
             type, or ``nudging_gain`` is not callable.
-        ValueError: if ``window < 1`` or ``max_iter < 1``.
+        ValueError: if ``window < 1`` or ``max_iters < 1``.
     """
 
     __config_mixin_auto__ = False
@@ -83,7 +83,7 @@ class BFNCycle(StatefulOperator):
         nudging_gain: Callable[[Any], Any],
         *,
         window: int,
-        max_iter: int = 10,
+        max_iters: int = 10,
         tol: float = 1e-3,
         spectral_sigma: float | None = None,
         obs_source: Operator | None = None,
@@ -114,13 +114,13 @@ class BFNCycle(StatefulOperator):
             )
         if window < 1:
             raise ValueError(f"BFNCycle.window must be >= 1, got {window}.")
-        if max_iter < 1:
-            raise ValueError(f"BFNCycle.max_iter must be >= 1, got {max_iter}.")
+        if max_iters < 1:
+            raise ValueError(f"BFNCycle.max_iters must be >= 1, got {max_iters}.")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.nudging_gain = nudging_gain
         self.window = window
-        self.max_iter = max_iter
+        self.max_iters = max_iters
         self.tol = tol
         self.spectral_sigma = spectral_sigma
         self.obs_source = obs_source
@@ -171,7 +171,7 @@ class BFNCycle(StatefulOperator):
         self.iterations = 0
         x0 = carrier
         end = carrier
-        for _ in range(self.max_iter):
+        for _ in range(self.max_iters):
             self.iterations += 1
             end = self._integrate(x0, +1, window_obs)
             new_x0 = self._integrate(end, -1, list(reversed(window_obs)))
@@ -192,7 +192,7 @@ class BFNCycle(StatefulOperator):
             "forward_model": type(self.forward_model).__name__,
             "obs_op": type(self.obs_op).__name__,
             "window": self.window,
-            "max_iter": self.max_iter,
+            "max_iters": self.max_iters,
             "tol": self.tol,
             "spectral_sigma": self.spectral_sigma,
             "obs_source": (
