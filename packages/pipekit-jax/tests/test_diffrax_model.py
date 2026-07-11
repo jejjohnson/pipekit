@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-import equinox as eqx
-import jax
-import jax.numpy as jnp
-import lineax as lx
 import pytest
 
 
+# Skip guards must precede the real imports: without the [diffrax] extra,
+# a bare `import equinox` / `import lineax` at module scope would turn
+# collection into a hard ModuleNotFoundError instead of a clean skip.
 diffrax = pytest.importorskip("diffrax")
+eqx = pytest.importorskip("equinox")
+lx = pytest.importorskip("lineax")
 
+import jax
+import jax.numpy as jnp
 from pipekit_cycle import (
     BacksolveAdjoint,
     DACycle,

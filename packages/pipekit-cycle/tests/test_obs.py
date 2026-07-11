@@ -96,3 +96,22 @@ def test_composite_obs_linearize_chains():
 def test_composite_obs_satisfies_operator_interface():
     comp = CompositeObs((IdentityObs(),))
     assert isinstance(comp, Operator)
+
+
+def test_linear_obs_is_forbid_in_yaml():
+    """H is a runtime array; the config is a debug payload only."""
+    assert LinearObs.forbid_in_yaml is True
+
+
+def test_linear_obs_from_state_raises_cleanly():
+    """from_state must refuse the debug payload, not crash on H_shape."""
+
+    class _Mat:
+        shape = (2, 3)
+
+        def __matmul__(self, other):
+            return other
+
+    op = LinearObs(_Mat())
+    with pytest.raises(RuntimeError, match="forbid_in_yaml"):
+        Operator.from_state(op.state)

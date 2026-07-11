@@ -19,8 +19,14 @@ Layout under ``root/`` (or ``s3://bucket/prefix/``):
 
 The ``weights.bin`` blob is opaque to the registry — domain
 operators round-trip their own weights via a separate channel
-(`pipekit-array.ModelOp.with_weights` etc.). The registry just
+(`pipekit_jax.JaxModelOp.with_weights` etc.). The registry just
 persists / retrieves the bytes alongside the operator config.
+
+Both backends share their control flow via `_ModelRegistryBase`; the
+subclasses only supply the storage primitives (local ``Path`` I/O vs
+fsspec). References (hashes) and tag names are restricted to single
+path segments so a caller-supplied string can never escape the
+registry root.
 
 See master plan Report 12, section 2.4 and section 5.
 """
@@ -42,8 +48,205 @@ def _hash_payload(config: dict[str, Any], weights: bytes | None) -> str:
     return sha256_hex(stable_json(config), b"\x00", weights or b"")
 
 
-class LocalModelRegistry:
+def _check_component(value: str, kind: str) -> str:
+    """Validate that ``value`` is a safe single path segment.
+
+    Hashes, tag names, and refs are all used to build storage paths, so
+    they must not contain separators or traversal sequences and must not
+    collide with the reserved ``_tags`` directory.
+
+    Args:
+        value: The caller-supplied hash / tag name / ref.
+        kind: Human-readable noun for the error message.
+
+    Returns:
+        ``value`` unchanged, if valid.
+
+    Raises:
+        ValueError: If ``value`` is empty, contains a path separator,
+            is a traversal component (``.``/``..``), or is ``_tags``.
+    """
+    if not value or "/" in value or "\\" in value or value in (".", "..", "_tags"):
+        raise ValueError(
+            f"Invalid {kind} {value!r}: must be a non-empty name without "
+            "path separators (and not '_tags')."
+        )
+    return value
+
+
+class _ModelRegistryBase:
+    """Shared store/load/tag control flow for model registries.
+
+    Subclasses provide the storage primitives (``_exists``,
+    ``_read_text`` / ``_write_text``, ``_read_bytes`` / ``_write_bytes``,
+    ``_children``, ``_where``); everything user-facing lives here so the
+    local and fsspec backends cannot drift apart.
+    """
+
+    # -- storage primitives (implemented by subclasses) -------------------
+
+    def _exists(self, *parts: str) -> bool:
+        raise NotImplementedError
+
+    def _read_text(self, *parts: str) -> str:
+        raise NotImplementedError
+
+    def _write_text(self, text: str, *parts: str) -> None:
+        raise NotImplementedError
+
+    def _read_bytes(self, *parts: str) -> bytes:
+        raise NotImplementedError
+
+    def _write_bytes(self, data: bytes, *parts: str) -> None:
+        raise NotImplementedError
+
+    def _children(self) -> builtins.list[str]:
+        # `builtins.list`: the public `list` method below shadows the builtin
+        # inside this class body.
+        raise NotImplementedError
+
+    def _where(self) -> str:
+        raise NotImplementedError
+
+    # -- public API --------------------------------------------------------
+
+    def store(
+        self,
+        model_op: Operator,
+        *,
+        name: str | None = None,
+        tags: dict[str, Any] | None = None,
+        weights: bytes | None = None,
+    ) -> str:
+        """Store ``model_op`` (and optional weights) under its content hash.
+
+        Re-storing identical content is idempotent and *merges* ``tags``
+        into any previously stored ones (existing tags are never wiped by
+        a later ``store`` call that omits them).
+
+        Args:
+            model_op: The operator whose state is persisted.
+            name: Optional tag name bound to the new hash (``force=True``
+                semantics — an existing binding is moved).
+            tags: Key/value metadata used by :meth:`list` filtering.
+            weights: Optional opaque weight bytes. Empty bytes are
+                normalized to "absent" so ``b""`` and ``None`` cannot
+                produce divergent layouts for the same content hash.
+
+        Returns:
+            The content hash the model was stored under.
+
+        Raises:
+            TypeError: If ``model_op`` is not an `Operator`.
+        """
+        if not isinstance(model_op, Operator):
+            raise TypeError(
+                f"store: model_op must be an Operator, got {type(model_op).__name__}."
+            )
+        if not weights:
+            # b"" and None hash identically; storing them differently would
+            # make load_weights() depend on write order.
+            weights = None
+        state = model_op.state
+        h = _hash_payload(state, weights)
+        self._write_text(stable_json(state), h, "operator.json")
+        if weights is not None:
+            self._write_bytes(weights, h, "weights.bin")
+        merged: dict[str, Any] = {}
+        if self._exists(h, "metadata.json"):
+            merged = json.loads(self._read_text(h, "metadata.json")).get("tags", {})
+        if tags:
+            merged.update(tags)
+        self._write_text(stable_json({"tags": merged}), h, "metadata.json")
+        if name is not None:
+            self.tag(h, name, force=True)
+        return h
+
+    def load(self, ref: str) -> Operator:
+        """Reconstruct the operator stored under ``ref`` (hash or tag)."""
+        h = self._resolve(ref)
+        if not self._exists(h, "operator.json"):
+            raise KeyError(f"No model with hash {h!r} in {self._where()}.")
+        state = json.loads(self._read_text(h, "operator.json"))
+        return Operator.from_state(state)
+
+    def load_weights(self, ref: str) -> bytes | None:
+        """Return the raw weight bytes for ``ref``, or ``None`` if absent."""
+        h = self._resolve(ref)
+        if not self._exists(h, "weights.bin"):
+            return None
+        return self._read_bytes(h, "weights.bin")
+
+    def list(
+        self,
+        *,
+        tags: dict[str, Any] | None = None,
+    ) -> builtins.list[str]:
+        """Return stored model hashes, optionally filtered by tag values."""
+        hashes: list[str] = []
+        for name in self._children():
+            if name == "_tags":
+                continue
+            if tags:
+                if not self._exists(name, "metadata.json"):
+                    continue
+                meta = json.loads(self._read_text(name, "metadata.json"))
+                stored = meta.get("tags", {})
+                if not all(stored.get(k) == v for k, v in tags.items()):
+                    continue
+            hashes.append(name)
+        return sorted(hashes)
+
+    def tag(self, hash: str, name: str, *, force: bool = False) -> None:
+        """Bind tag ``name`` to ``hash``.
+
+        Args:
+            hash: An existing content hash.
+            name: The tag name (a single path segment).
+            force: Overwrite an existing binding instead of raising.
+
+        Raises:
+            ValueError: If ``hash`` or ``name`` is not a safe path segment.
+            KeyError: If ``hash`` is not stored in this registry.
+            FileExistsError: If ``name`` exists and ``force`` is false.
+        """
+        _check_component(hash, "hash")
+        _check_component(name, "tag name")
+        if not self._exists(hash, "operator.json"):
+            raise KeyError(f"Cannot tag unknown hash {hash!r}.")
+        if self._exists("_tags", name) and not force:
+            raise FileExistsError(
+                f"Tag {name!r} already exists. Pass force=True to overwrite."
+            )
+        self._write_text(hash, "_tags", name)
+
+    def resolve_tag(self, name: str) -> str:
+        """Return the hash bound to ``name``.
+
+        Raises:
+            ValueError: If ``name`` is not a safe path segment.
+            KeyError: If the tag does not exist.
+        """
+        _check_component(name, "tag name")
+        if not self._exists("_tags", name):
+            raise KeyError(f"Unknown tag {name!r}.")
+        return self._read_text("_tags", name).strip()
+
+    def _resolve(self, ref: str) -> str:
+        """Treat ``ref`` as a hash if its ``operator.json`` exists,
+        otherwise as a tag.
+        """
+        _check_component(ref, "ref")
+        if self._exists(ref, "operator.json"):
+            return ref
+        return self.resolve_tag(ref)
+
+
+class LocalModelRegistry(_ModelRegistryBase):
     """Local-filesystem model registry.
+
+    Writes are atomic (temp file + ``os.replace``), so a crash mid-write
+    can never leave a truncated ``operator.json`` or tag file behind.
 
     Args:
         root: Directory under which models are stored. Created on
@@ -62,102 +265,53 @@ class LocalModelRegistry:
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "_tags").mkdir(exist_ok=True)
 
-    def store(
-        self,
-        model_op: Operator,
-        *,
-        name: str | None = None,
-        tags: dict[str, Any] | None = None,
-        weights: bytes | None = None,
-    ) -> str:
-        if not isinstance(model_op, Operator):
-            raise TypeError(
-                f"store: model_op must be an Operator, got {type(model_op).__name__}."
-            )
-        state = model_op.state
-        h = _hash_payload(state, weights)
-        dest = self.root / h
-        dest.mkdir(exist_ok=True)
-        (dest / "operator.json").write_text(stable_json(state))
-        if weights is not None:
-            (dest / "weights.bin").write_bytes(weights)
-        metadata = {"tags": dict(tags) if tags else {}}
-        (dest / "metadata.json").write_text(stable_json(metadata))
-        if name is not None:
-            self.tag(h, name, force=True)
-        return h
+    def _exists(self, *parts: str) -> bool:
+        return self.root.joinpath(*parts).exists()
 
-    def load(self, ref: str) -> Operator:
-        h = self._resolve(ref)
-        path = self.root / h / "operator.json"
-        if not path.exists():
-            raise KeyError(f"No model with hash {h!r} in {self.root}.")
-        state = json.loads(path.read_text())
-        return Operator.from_state(state)
+    def _read_text(self, *parts: str) -> str:
+        return self.root.joinpath(*parts).read_text()
 
-    def load_weights(self, ref: str) -> bytes | None:
-        """Return the raw weight bytes for ``ref``, or ``None`` if absent."""
-        h = self._resolve(ref)
-        path = self.root / h / "weights.bin"
-        return path.read_bytes() if path.exists() else None
+    def _write_text(self, text: str, *parts: str) -> None:
+        self._atomic_write(text.encode("utf-8"), *parts)
 
-    def list(
-        self,
-        *,
-        tags: dict[str, Any] | None = None,
-    ) -> builtins.list[str]:
-        """Return stored model hashes, optionally filtered by tag values."""
-        hashes: list[str] = []
-        for child in sorted(self.root.iterdir()):
-            if not child.is_dir() or child.name == "_tags":
-                continue
-            if tags:
-                meta_path = child / "metadata.json"
-                if not meta_path.exists():
-                    continue
-                meta = json.loads(meta_path.read_text())
-                stored = meta.get("tags", {})
-                if not all(stored.get(k) == v for k, v in tags.items()):
-                    continue
-            hashes.append(child.name)
-        return hashes
+    def _read_bytes(self, *parts: str) -> bytes:
+        return self.root.joinpath(*parts).read_bytes()
 
-    def tag(self, hash: str, name: str, *, force: bool = False) -> None:
-        if not (self.root / hash).exists():
-            raise KeyError(f"Cannot tag unknown hash {hash!r}.")
-        path = self.root / "_tags" / name
-        if path.exists() and not force:
-            raise FileExistsError(
-                f"Tag {name!r} already exists. Pass force=True to overwrite."
-            )
-        path.write_text(hash)
+    def _write_bytes(self, data: bytes, *parts: str) -> None:
+        self._atomic_write(data, *parts)
 
-    def resolve_tag(self, name: str) -> str:
-        """Return the hash bound to ``name``."""
-        path = self.root / "_tags" / name
-        if not path.exists():
-            raise KeyError(f"Unknown tag {name!r}.")
-        return path.read_text().strip()
+    def _atomic_write(self, data: bytes, *parts: str) -> None:
+        path = self.root.joinpath(*parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
 
-    def _resolve(self, ref: str) -> str:
-        """Treat ``ref`` as a hash if a matching directory exists,
-        otherwise as a tag.
-        """
-        if (self.root / ref).is_dir() and ref != "_tags":
-            return ref
-        return self.resolve_tag(ref)
+    def _children(self) -> list[str]:
+        return sorted(p.name for p in self.root.iterdir() if p.is_dir())
+
+    def _where(self) -> str:
+        return str(self.root)
 
 
-class S3ModelRegistry:
+class S3ModelRegistry(_ModelRegistryBase):
     """fsspec-backed model registry.
 
     Works with any fsspec-supported scheme (``s3://``, ``gs://``,
-    ``az://``, plain ``file://`` paths). Behind the ``[s3]`` extra.
+    ``az://``, ``memory://``, plain ``file://`` paths). Behind the
+    ``[s3]`` extra.
+
+    Unlike `LocalModelRegistry`, writes are only as atomic as the
+    backing store makes them (object stores typically are; plain
+    ``file://`` through fsspec is not).
 
     Args:
         uri: Root URI (e.g. ``"s3://bucket/models/"``).
         storage_options: Passed straight to ``fsspec.open``. Use this
             for credentials / endpoints.
+
+    Raises:
+        ImportError: If ``fsspec`` is not installed.
     """
 
     def __init__(
@@ -184,100 +338,30 @@ class S3ModelRegistry:
     def _path(self, *parts: str) -> str:
         return self.uri + "/".join(parts)
 
-    def store(
-        self,
-        model_op: Operator,
-        *,
-        name: str | None = None,
-        tags: dict[str, Any] | None = None,
-        weights: bytes | None = None,
-    ) -> str:
-        if not isinstance(model_op, Operator):
-            raise TypeError(
-                f"store: model_op must be an Operator, got {type(model_op).__name__}."
-            )
-        state = model_op.state
-        h = _hash_payload(state, weights)
-        fs = self._fs()
-        with fs.open(self._path(h, "operator.json"), "w") as f:
-            f.write(stable_json(state))
-        if weights is not None:
-            with fs.open(self._path(h, "weights.bin"), "wb") as f:
-                f.write(weights)
-        metadata = {"tags": dict(tags) if tags else {}}
-        with fs.open(self._path(h, "metadata.json"), "w") as f:
-            f.write(stable_json(metadata))
-        if name is not None:
-            self.tag(h, name, force=True)
-        return h
+    def _exists(self, *parts: str) -> bool:
+        return self._fs().exists(self._path(*parts))
 
-    def load(self, ref: str) -> Operator:
-        h = self._resolve(ref)
-        fs = self._fs()
-        path = self._path(h, "operator.json")
-        if not fs.exists(path):
-            raise KeyError(f"No model with hash {h!r} at {self.uri}.")
-        with fs.open(path, "r") as f:
-            state = json.loads(f.read())
-        return Operator.from_state(state)
-
-    def load_weights(self, ref: str) -> bytes | None:
-        h = self._resolve(ref)
-        fs = self._fs()
-        path = self._path(h, "weights.bin")
-        if not fs.exists(path):
-            return None
-        with fs.open(path, "rb") as f:
+    def _read_text(self, *parts: str) -> str:
+        with self._fs().open(self._path(*parts), "r") as f:
             return f.read()
 
-    def list(
-        self,
-        *,
-        tags: dict[str, Any] | None = None,
-    ) -> builtins.list[str]:
-        fs = self._fs()
-        entries = fs.ls(self.uri.rstrip("/"))
-        hashes: list[str] = []
-        for entry in entries:
-            name = entry.rstrip("/").split("/")[-1]
-            if name in ("_tags",):
-                continue
-            if tags:
-                meta_path = self._path(name, "metadata.json")
-                if not fs.exists(meta_path):
-                    continue
-                with fs.open(meta_path, "r") as f:
-                    meta = json.loads(f.read())
-                stored = meta.get("tags", {})
-                if not all(stored.get(k) == v for k, v in tags.items()):
-                    continue
-            hashes.append(name)
-        return sorted(hashes)
+    def _write_text(self, text: str, *parts: str) -> None:
+        with self._fs().open(self._path(*parts), "w") as f:
+            f.write(text)
 
-    def tag(self, hash: str, name: str, *, force: bool = False) -> None:
-        fs = self._fs()
-        target = self._path(hash, "operator.json")
-        if not fs.exists(target):
-            raise KeyError(f"Cannot tag unknown hash {hash!r}.")
-        tag_path = self._path("_tags", name)
-        if fs.exists(tag_path) and not force:
-            raise FileExistsError(
-                f"Tag {name!r} already exists. Pass force=True to overwrite."
-            )
-        with fs.open(tag_path, "w") as f:
-            f.write(hash)
+    def _read_bytes(self, *parts: str) -> bytes:
+        with self._fs().open(self._path(*parts), "rb") as f:
+            return f.read()
 
-    def resolve_tag(self, name: str) -> str:
-        fs = self._fs()
-        path = self._path("_tags", name)
-        if not fs.exists(path):
-            raise KeyError(f"Unknown tag {name!r}.")
-        with fs.open(path, "r") as f:
-            return f.read().strip()
+    def _write_bytes(self, data: bytes, *parts: str) -> None:
+        with self._fs().open(self._path(*parts), "wb") as f:
+            f.write(data)
 
-    def _resolve(self, ref: str) -> str:
-        fs = self._fs()
-        # Try as hash first
-        if fs.exists(self._path(ref, "operator.json")):
-            return ref
-        return self.resolve_tag(ref)
+    def _children(self) -> list[str]:
+        # detail=False explicitly: several backends (memory, local) default
+        # to detail=True and return dicts instead of path strings.
+        entries = self._fs().ls(self.uri.rstrip("/"), detail=False)
+        return sorted(entry.rstrip("/").split("/")[-1] for entry in entries)
+
+    def _where(self) -> str:
+        return self.uri

@@ -127,6 +127,11 @@ class Estimator(Protocol):
 class Oracle(Protocol):
     """The designated reference :class:`Estimator` for a task (usually rung 2).
 
+    Not yet consumed by `Benchmark` — reference selection currently
+    lives inline in ``Benchmark._oracle_prediction``; this seam exists
+    for the planned scorer taxonomy, where reference policy becomes
+    pluggable.
+
     Members:
         reference_for(task): Return the estimator whose output is the
             reference posterior for the fast rungs of ``task``.

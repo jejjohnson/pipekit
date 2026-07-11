@@ -159,3 +159,10 @@ def test_histogram_rejects_zero_bins():
 
     with pytest.raises(ValueError):
         Histogram(bins=0)
+
+
+def test_observer_reprs_are_readable():
+    """Every observer renders a compact repr, not a raw config dict."""
+    assert repr(Snapshot().at("k")).startswith("Snapshot.at(")
+    assert repr(ShapeTrace()).startswith("ShapeTrace(")
+    assert repr(Histogram(bins=4)).startswith("Histogram(")

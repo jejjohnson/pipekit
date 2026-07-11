@@ -29,10 +29,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit._base.operator import Carrier, Operator
-
-
-_MISSING = object()
+from pipekit._base.operator import (
+    _MISSING,
+    Carrier,
+    Operator,
+    nested_config,
+    require_operator,
+)
 
 
 class Sequential(Operator):
@@ -68,10 +71,7 @@ class Sequential(Operator):
 
     def __init__(self, operators: list[Operator]) -> None:
         for i, op in enumerate(operators):
-            if not isinstance(op, Operator):
-                raise TypeError(
-                    f"Sequential[{i}] is {type(op).__name__}, expected Operator."
-                )
+            require_operator(op, "Sequential", f"operators[{i}]")
         for i, op in enumerate(operators[:-1]):
             if op._terminal:
                 raise TypeError(
@@ -92,6 +92,19 @@ class Sequential(Operator):
         return any(getattr(op, "_is_stateful", False) for op in self.operators)
 
     def _apply(self, carrier: Carrier = _MISSING, state: Any = _MISSING) -> Any:
+        """Run the pipeline, dispatching between stateless and stateful modes.
+
+        Stateless (the common case): thread ``carrier`` through each
+        operator left to right. Stateful — chosen when a ``state`` kwarg
+        is supplied or any step is a `StatefulOperator` — delegates to
+        `_apply_stateful`, which threads ``(carrier, state)`` pairs. The
+        `_MISSING` sentinel distinguishes "argument omitted" from an
+        explicit ``None`` so ``pipe(None)`` still means "carrier is None".
+
+        Raises:
+            TypeError: Calling an empty pipeline with no input, or
+                supplying ``state`` without a carrier.
+        """
         if carrier is _MISSING and not self.operators:
             raise TypeError(
                 "Sequential([]) cannot be called without an input: "
@@ -145,12 +158,7 @@ class Sequential(Operator):
         return sig
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "operators": [
-                {"class": type(op).__name__, "config": op.get_config()}
-                for op in self.operators
-            ]
-        }
+        return {"operators": [nested_config(op) for op in self.operators]}
 
     def __or__(self, other: Operator) -> Sequential:
         """Append on the right; flatten nested `Sequential`s."""

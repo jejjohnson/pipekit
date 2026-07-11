@@ -1,7 +1,7 @@
-"""Shared Bayesian-backend seam for the NumPyro (and BlackJAX) adapters.
+"""Shared Bayesian-backend seam for the NumPyro and BlackJAX adapters.
 
-Per ADR D13/D14, the NumPyro `svi` / `mcmc` adapters (and the planned
-BlackJAX adapter) are *task-first*: their objective is a probabilistic
+Per ADR D13/D14, the NumPyro `svi` / `mcmc` adapters and the BlackJAX
+adapter are *task-first*: their objective is a probabilistic
 ``model(x, y=None)`` rather than a carrier-agnostic ``Loss(pred, target)``.
 This module holds what they share:
 
@@ -28,14 +28,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import numpy as np
 from pipekit import Operator
 
+from pipekit_train.adapters import _common
+from pipekit_train.adapters._common import any_should_stop, dispatch  # noqa: F401
+
 
 if TYPE_CHECKING:
     from pipekit_train.dataset import TrainingDataset
-
-# optax optimiser names supported by ``optimizer_config`` (mirrors the
-# Equinox adapter's surface, kept here so the [numpyro] extra needn't pull in
-# the equinox adapter module).
-_OPTIMIZER_NAMES: tuple[str, ...] = ("adam", "adamw", "sgd", "rmsprop")
 
 
 @dataclass
@@ -73,7 +71,7 @@ class NumpyroPredictiveOp(Operator):
     over draws of ``predictive_site``. Marked ``forbid_in_yaml`` because it
     carries the model closure + a sample/param PyTree; the round-trip path is
     the model registry weight-blob (the posterior samples / variational
-    params), analogous to ``pipekit-jax.JaxModelOp``.
+    params), analogous to `pipekit_jax.JaxModelOp`.
 
     Args:
         predictive: A configured ``numpyro.infer.Predictive``.
@@ -139,7 +137,7 @@ def validate_task(loop: Any) -> NumpyroTask:
     if task is None:
         raise ValueError(
             "The numpyro backends are task-first: pass a "
-            "pipekit_train.adapters._bayes.NumpyroTask as loop.task "
+            "pipekit_train.adapters.bayes.NumpyroTask as loop.task "
             "(a Loss does not define a probabilistic model)."
         )
     if not isinstance(task, NumpyroTask):
@@ -195,28 +193,10 @@ def numpyro_logdensity(model: Callable[..., Any], x: Any, y: Any, key: Any) -> A
 def build_optimizer(config: dict[str, Any]) -> Any:
     """Translate ``optimizer_config`` into an optax ``GradientTransformation``.
 
-    Mirrors the Equinox adapter: supports ``adam``/``adamw``/``sgd``/
-    ``rmsprop``; ``lr`` is normalised to ``learning_rate``.
+    Thin wrapper over `adapters._common.build_optimizer` with the
+    Bayesian backends' default optimiser (``adam``).
     """
-    import optax  # ty: ignore[unresolved-import]
-
-    config = dict(config) if config else {"name": "adam", "lr": 1e-3}
-    name = config.pop("name", "adam")
-    if "lr" in config and "learning_rate" not in config:
-        config["learning_rate"] = config.pop("lr")
-    if name not in _OPTIMIZER_NAMES:
-        raise ValueError(
-            f"Unknown optimizer {name!r}. Supported: {sorted(_OPTIMIZER_NAMES)}."
-        )
-    return getattr(optax, name)(**config)
-
-
-def dispatch(callbacks: tuple[Any, ...], hook: str, *args: Any) -> None:
-    """Call ``hook`` on each callback that implements it (mirrors equinox)."""
-    for cb in callbacks:
-        fn = getattr(cb, hook, None)
-        if fn is not None:
-            fn(*args)
+    return _common.build_optimizer(config, default_name="adam")
 
 
 def carry_state(loop: Any, model_op: Operator, step: int, metrics: dict[str, float]):

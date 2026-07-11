@@ -19,8 +19,10 @@ The v0.1 public surface, grouped by module:
 - **Group I — shape inference** (`signature`): `Signature`.
 - **Group J — parallelism** (`parallel`): `ThreadMap`, `ProcessMap`,
   `AsyncMap`, `BatchedMap`, `check_pickleable`.
+- *(Group K is reserved in the master plan for a disk-cache backend;
+  nothing ships under it yet.)*
 - **Group L — serialisation** (`serial`): `dumps`, `loads`,
-  `loads_sandboxed`, `register`.
+  `loads_sandboxed`, `register`, `unregister`, `allowed`.
 - **Group M — state primitives** (`state`): `StatefulOperator`,
   `CarryState`.
 - **Group N — structural protocols** (`protocols`): `Predictor`,
@@ -58,8 +60,8 @@ from pipekit.qc import (
     QCError,
     Quarantine,
 )
-from pipekit.serial import dumps, loads, loads_sandboxed, register
-from pipekit.signature import Signature
+from pipekit.serial import allowed, dumps, loads, loads_sandboxed, register, unregister
+from pipekit.signature import Signature, compute_output_signature
 from pipekit.state import CarryState, StatefulOperator
 
 
@@ -103,16 +105,19 @@ __all__ = [
     "Tap",
     "ThreadMap",
     "Try",
+    "allowed",
     "check_pickleable",
     "complement",
     "compose",
     "compose_left",
+    "compute_output_signature",
     "dumps",
     "juxt",
     "loads",
     "loads_sandboxed",
     "pipe",
     "register",
+    "unregister",
 ]
 
 __version__ = "0.0.1"  # x-release-please-version

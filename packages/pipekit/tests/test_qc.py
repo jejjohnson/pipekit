@@ -134,3 +134,16 @@ def test_assert_callable_fail():
 
 def test_qc_error_is_assertion_error():
     assert issubclass(QCError, AssertionError)
+
+
+def test_quarantine_is_forbid_in_yaml():
+    """Quarantine holds user callables — flag pins the policy."""
+    from pipekit import Quarantine
+
+    assert Quarantine.forbid_in_yaml is True
+
+
+def test_assert_callable_is_forbid_in_yaml():
+    from pipekit import AssertCallable
+
+    assert AssertCallable.forbid_in_yaml is True

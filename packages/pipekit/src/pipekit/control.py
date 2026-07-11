@@ -13,8 +13,12 @@ other step.
 - `Coalesce(sources, is_ok)` — first source whose output passes ``is_ok`` wins.
 - `Retry(op, attempts, base_delay, on)` — exponential-backoff retry loop.
 
-All five carry ``forbid_in_yaml = True`` — they hold callables /
-exception types that don't JSON / YAML round-trip.
+`Branch`, `Switch`, and `Coalesce` carry ``forbid_in_yaml = True`` —
+they hold user callables (predicates / key functions) that don't JSON /
+YAML round-trip and are a pickling hazard. `Try` and `Retry` hold only
+nested operators and exception *types* (both picklable), so they are
+not flagged; their nested-operator configs are debug payloads either
+way and `from_state` rejects them cleanly.
 
 See master plan Report 2, Group D.
 """
@@ -25,7 +29,12 @@ import time
 from collections.abc import Callable, Hashable
 from typing import Any, ClassVar
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import (
+    Operator,
+    callable_name,
+    nested_config,
+    require_operator,
+)
 from pipekit.blocks import Identity
 
 
@@ -56,14 +65,9 @@ class Branch(Operator):
         if_true: Operator,
         if_false: Operator | None = None,
     ) -> None:
-        if not isinstance(if_true, Operator):
-            raise TypeError(
-                f"Branch.if_true must be an Operator, got {type(if_true).__name__}."
-            )
-        if if_false is not None and not isinstance(if_false, Operator):
-            raise TypeError(
-                f"Branch.if_false must be an Operator, got {type(if_false).__name__}."
-            )
+        require_operator(if_true, "Branch", "if_true")
+        if if_false is not None:
+            require_operator(if_false, "Branch", "if_false")
         self.predicate = predicate
         self.if_true = if_true
         self.if_false = if_false if if_false is not None else Identity()
@@ -73,16 +77,16 @@ class Branch(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "predicate": getattr(self.predicate, "__name__", repr(self.predicate)),
-            "if_true": {
-                "class": type(self.if_true).__name__,
-                "config": self.if_true.get_config(),
-            },
-            "if_false": {
-                "class": type(self.if_false).__name__,
-                "config": self.if_false.get_config(),
-            },
+            "predicate": callable_name(self.predicate),
+            "if_true": nested_config(self.if_true),
+            "if_false": nested_config(self.if_false),
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"Branch(predicate={callable_name(self.predicate)}, "
+            f"if_true={self.if_true!r}, if_false={self.if_false!r})"
+        )
 
 
 class Switch(Operator):
@@ -116,14 +120,9 @@ class Switch(Operator):
         default: Operator | None = None,
     ) -> None:
         for k, op in cases.items():
-            if not isinstance(op, Operator):
-                raise TypeError(
-                    f"Switch.cases[{k!r}] must be an Operator, got {type(op).__name__}."
-                )
-        if default is not None and not isinstance(default, Operator):
-            raise TypeError(
-                f"Switch.default must be an Operator, got {type(default).__name__}."
-            )
+            require_operator(op, "Switch", f"cases[{k!r}]")
+        if default is not None:
+            require_operator(default, "Switch", "default")
         self.key = key
         self.cases = dict(cases)
         self.default = default if default is not None else Identity()
@@ -135,16 +134,17 @@ class Switch(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "key": getattr(self.key, "__name__", repr(self.key)),
-            "cases": {
-                str(k): {"class": type(op).__name__, "config": op.get_config()}
-                for k, op in self.cases.items()
-            },
-            "default": {
-                "class": type(self.default).__name__,
-                "config": self.default.get_config(),
-            },
+            "key": callable_name(self.key),
+            "cases": {str(k): nested_config(op) for k, op in self.cases.items()},
+            "default": nested_config(self.default),
         }
+
+    def __repr__(self) -> str:
+        cases = ", ".join(f"{k!r}: {op!r}" for k, op in self.cases.items())
+        return (
+            f"Switch(key={callable_name(self.key)}, cases={{{cases}}}, "
+            f"default={self.default!r})"
+        )
 
 
 class Try(Operator):
@@ -170,7 +170,6 @@ class Try(Operator):
         )
     """
 
-    forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
     def __init__(
@@ -179,14 +178,8 @@ class Try(Operator):
         fallback: Operator,
         on: tuple[type[BaseException], ...],
     ) -> None:
-        if not isinstance(primary, Operator):
-            raise TypeError(
-                f"Try.primary must be an Operator, got {type(primary).__name__}."
-            )
-        if not isinstance(fallback, Operator):
-            raise TypeError(
-                f"Try.fallback must be an Operator, got {type(fallback).__name__}."
-            )
+        require_operator(primary, "Try", "primary")
+        require_operator(fallback, "Try", "fallback")
         if not on:
             raise ValueError(
                 "Try.on must list at least one exception type — "
@@ -209,16 +202,14 @@ class Try(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "primary": {
-                "class": type(self.primary).__name__,
-                "config": self.primary.get_config(),
-            },
-            "fallback": {
-                "class": type(self.fallback).__name__,
-                "config": self.fallback.get_config(),
-            },
+            "primary": nested_config(self.primary),
+            "fallback": nested_config(self.fallback),
             "on": [exc.__name__ for exc in self.on],
         }
+
+    def __repr__(self) -> str:
+        on = ", ".join(exc.__name__ for exc in self.on)
+        return f"Try({self.primary!r}, fallback={self.fallback!r}, on=({on},))"
 
 
 class Coalesce(Operator):
@@ -228,15 +219,24 @@ class Coalesce(Operator):
     input; the first whose output passes ``is_ok`` is returned. If all
     sources fail the check, `Coalesce` raises ``RuntimeError``.
 
+    By default a source that *raises* propagates its exception
+    immediately — only returned values are screened. Pass ``on`` (as
+    with `Retry`) to also treat listed exception types as "not ok, try
+    the next source".
+
     Args:
         sources: Operators to try in order.
         is_ok: Predicate ``result → bool``. The acceptance criterion.
+        on: Tuple of exception types a source may raise to mean "no
+            result here, fall through". Exceptions not listed propagate
+            immediately. Default: ``()`` — sources must not raise.
 
     Example::
 
         pick_best = Coalesce(
             sources=[ReadCloudFree(t), ReadPartialCloud(t), ReadAny(t)],
             is_ok=lambda gt: gt.cloud_fraction < 0.1,
+            on=(IOError,),
         )
     """
 
@@ -247,36 +247,45 @@ class Coalesce(Operator):
         self,
         sources: list[Operator],
         is_ok: Callable[[Any], bool],
+        on: tuple[type[Exception], ...] = (),
     ) -> None:
         if not sources:
             raise ValueError("Coalesce requires at least one source.")
         for i, op in enumerate(sources):
-            if not isinstance(op, Operator):
+            require_operator(op, "Coalesce", f"sources[{i}]")
+        for exc in on:
+            if not (isinstance(exc, type) and issubclass(exc, Exception)):
                 raise TypeError(
-                    f"Coalesce.sources[{i}] must be an Operator, "
-                    f"got {type(op).__name__}."
+                    f"Coalesce.on entries must be Exception types, got {exc!r}."
                 )
         self.sources = list(sources)
         self.is_ok = is_ok
+        self.on = tuple(on)
 
     def _apply(self, x: Any) -> Any:
+        failures = 0
         for op in self.sources:
-            result = op(x)
+            try:
+                result = op(x)
+            except self.on:
+                failures += 1
+                continue
             if self.is_ok(result):
                 return result
         raise RuntimeError(
             f"Coalesce: none of {len(self.sources)} sources produced an output "
-            "passing `is_ok`."
+            f"passing `is_ok` ({failures} raised a tolerated exception)."
         )
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "sources": [
-                {"class": type(op).__name__, "config": op.get_config()}
-                for op in self.sources
-            ],
-            "is_ok": getattr(self.is_ok, "__name__", repr(self.is_ok)),
+            "sources": [nested_config(op) for op in self.sources],
+            "is_ok": callable_name(self.is_ok),
+            "on": [exc.__name__ for exc in self.on],
         }
+
+    def __repr__(self) -> str:
+        return f"Coalesce({self.sources!r}, is_ok={callable_name(self.is_ok)})"
 
 
 class Retry(Operator):
@@ -302,7 +311,6 @@ class Retry(Operator):
         )
     """
 
-    forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
     def __init__(
@@ -312,8 +320,7 @@ class Retry(Operator):
         base_delay: float,
         on: tuple[type[BaseException], ...],
     ) -> None:
-        if not isinstance(op, Operator):
-            raise TypeError(f"Retry.op must be an Operator, got {type(op).__name__}.")
+        require_operator(op, "Retry", "op")
         if attempts < 1:
             raise ValueError(f"Retry.attempts must be >= 1, got {attempts}.")
         if base_delay < 0:
@@ -352,11 +359,15 @@ class Retry(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "op": {
-                "class": type(self.op).__name__,
-                "config": self.op.get_config(),
-            },
+            "op": nested_config(self.op),
             "attempts": self.attempts,
             "base_delay": self.base_delay,
             "on": [exc.__name__ for exc in self.on],
         }
+
+    def __repr__(self) -> str:
+        on = ", ".join(exc.__name__ for exc in self.on)
+        return (
+            f"Retry({self.op!r}, attempts={self.attempts}, "
+            f"base_delay={self.base_delay}, on=({on},))"
+        )

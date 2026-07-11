@@ -30,13 +30,21 @@ class ExperimentTracker(Protocol):
     the adapter translates to the tool's API.
     """
 
-    def start_run(self, name: str, config: dict[str, Any]) -> Run: ...
+    def start_run(self, name: str, config: dict[str, Any]) -> Run:
+        """Open a run named ``name`` with hyperparameters ``config``."""
+        ...
 
-    def log_metrics(self, run: Run, metrics: dict[str, float], step: int) -> None: ...
+    def log_metrics(self, run: Run, metrics: dict[str, float], step: int) -> None:
+        """Record scalar ``metrics`` for ``run`` at global ``step``."""
+        ...
 
-    def log_artifact(self, run: Run, path: str, name: str) -> None: ...
+    def log_artifact(self, run: Run, path: str, name: str) -> None:
+        """Attach the file at ``path`` to ``run`` under ``name``."""
+        ...
 
-    def end_run(self, run: Run, status: str) -> None: ...
+    def end_run(self, run: Run, status: str) -> None:
+        """Close ``run`` with a final ``status`` (e.g. ``"ok"``/``"failed"``)."""
+        ...
 
 
 @runtime_checkable
@@ -60,6 +68,9 @@ class ModelRegistry(Protocol):
 
     def load(self, ref: str) -> Operator:
         """Resolve ``ref`` (hash or name) and return the rebuilt operator."""
+
+    def load_weights(self, ref: str) -> bytes | None:
+        """Return the raw weight bytes stored for ``ref``, or ``None``."""
 
     def list(self, *, tags: dict[str, Any] | None = None) -> builtins.list[str]:
         """Return content hashes, optionally filtered by tag values."""

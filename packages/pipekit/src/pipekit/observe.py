@@ -34,7 +34,7 @@ import time
 from collections.abc import Callable, Iterable
 from typing import Any, ClassVar
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import Operator, nested_config, require_operator
 
 
 class Tap(Operator):
@@ -201,12 +201,7 @@ class _ProfileWrap(Operator):
         return out
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "inner": {
-                "class": type(self.inner).__name__,
-                "config": self.inner.get_config(),
-            }
-        }
+        return {"inner": nested_config(self.inner)}
 
     def __repr__(self) -> str:
         return f"Profile.wrap({self.inner!r})"
@@ -236,10 +231,7 @@ class Profile:
         self.timings: dict[str, list[float]] = {}
 
     def wrap(self, op: Operator) -> Operator:
-        if not isinstance(op, Operator):
-            raise TypeError(
-                f"Profile.wrap requires an Operator, got {type(op).__name__}."
-            )
+        require_operator(op, "Profile.wrap", "op")
         return _ProfileWrap(self, op)
 
     def report(self) -> dict[str, dict[str, float]]:

@@ -26,6 +26,11 @@ class MeanScalar(Operator):
             all axes.
         keepdims: If True, retains the reduced axes with size 1.
 
+    Raises:
+        ValueError: From `compute_output_signature` when ``axis`` is out
+            of range for the input signature's rank (``xp.mean`` would
+            raise the backend-native equivalent at apply time).
+
     Example::
 
         out = MeanScalar()(image)               # scalar

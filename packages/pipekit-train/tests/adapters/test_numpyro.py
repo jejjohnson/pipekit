@@ -22,7 +22,7 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit import Operator
 from pipekit_train import MSE, IterableDataset, TrainingLoop
-from pipekit_train.adapters._bayes import NumpyroPredictiveOp, NumpyroTask
+from pipekit_train.adapters.bayes import NumpyroPredictiveOp, NumpyroTask
 
 
 # --- fixtures -------------------------------------------------------------

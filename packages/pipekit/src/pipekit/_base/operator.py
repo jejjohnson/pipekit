@@ -14,11 +14,15 @@ behaviours every operator inherits:
 3. **JSON-safe `state` / `from_state`** — a serialisable record that
    round-trips through any subclass of `Operator` that's been imported.
 
-Operators carrying user closures (`Tap`, `Lambda`, `Branch`, …) set
+Operators that themselves hold non-serialisable runtime state — user
+closures (`Tap`, `Lambda`, `Branch`, …) or runtime arrays — set
 `forbid_in_yaml = True` to signal that `get_config()` is a debug repr,
-not a faithful YAML round-trip. The flag also doubles as a
-pickleability warning for the future `parallel.check_pickleable`
-utility.
+not a faithful round-trip; `from_state` refuses flagged classes and
+`parallel.check_pickleable` surfaces flagged instances as pickling
+hazards. Operators that merely *nest* other operators (`Cache`, `Try`,
+the parallel maps, …) do not set the flag: nesting is discovered
+structurally by `check_pickleable`, and their nested-dict configs are
+already rejected cleanly by `from_state`'s primitive check.
 
 See master plan Report 2, Group A.
 """
@@ -37,6 +41,11 @@ if TYPE_CHECKING:
 # pipekit is carrier-agnostic — sister libraries narrow this at their
 # own signatures (geotoolz → GeoTensor, xr_toolz → xr.Dataset, etc.).
 Carrier = Any
+
+# Shared "argument was omitted" sentinel — distinguishes an omitted
+# parameter from an explicit None (used by `Sequential._apply` and
+# `qc.AssertAttr`).
+_MISSING = object()
 
 
 class ConfigMixin:
@@ -96,11 +105,13 @@ class Operator(ConfigMixin):
     argument is a graph node.
 
     Attributes:
-        forbid_in_yaml: ``True`` on subclasses that hold non-serialisable
-            user state (callables, closures, runtime references). YAML
-            loaders refuse to instantiate flagged operators; the
-            `parallel.check_pickleable` utility surfaces them as
-            pickleability warnings. Default ``False``.
+        forbid_in_yaml: ``True`` on subclasses that *directly* hold
+            non-serialisable user state (callables, closures, runtime
+            arrays, RNGs). YAML loaders and `from_state` refuse to
+            instantiate flagged operators; `parallel.check_pickleable`
+            surfaces them as pickleability warnings. Operators that only
+            nest other operators leave this ``False`` — the walker finds
+            flagged children structurally. Default ``False``.
         _terminal: ``True`` on subclasses that legitimately return
             ``None`` (or otherwise break the carrier-in / carrier-out
             contract). `Sequential` rejects terminal operators except
@@ -212,7 +223,8 @@ class Operator(ConfigMixin):
         Raises:
             ValueError: if the state record is malformed.
             TypeError: if the class isn't a loaded `Operator` subclass.
-            RuntimeError: if the config contains non-primitive values.
+            RuntimeError: if the class is marked ``forbid_in_yaml`` or the
+                config contains non-primitive values.
         """
         module_name = state.get("module")
         class_name = state.get("class")
@@ -226,6 +238,16 @@ class Operator(ConfigMixin):
 
         for op_type in (cls, *_operator_subclasses(cls)):
             if op_type.__module__ == module_name and op_type.__name__ == class_name:
+                if op_type.forbid_in_yaml:
+                    # A flagged operator's get_config() is a debug payload —
+                    # its keys need not match the constructor, so calling
+                    # op_type(**config) would raise a confusing TypeError.
+                    raise RuntimeError(
+                        f"from_state cannot reconstruct {op_type.__name__}: "
+                        "it is marked forbid_in_yaml (its config is a debug "
+                        "payload, not a faithful round-trip). Rebuild it in "
+                        "code instead."
+                    )
                 non_primitive = [
                     k for k, v in config.items() if not _is_json_primitive(v)
                 ]
@@ -257,7 +279,43 @@ class Operator(ConfigMixin):
         return Sequential([self, other])
 
 
+def nested_config(op: Operator) -> dict[str, Any]:
+    """Debug-config payload for an operator nested inside another's config.
+
+    The canonical ``{"class": ..., "config": ...}`` shape every container
+    operator (`Sequential`, `Cache`, `Branch`, the parallel maps, …) emits
+    for its children. One helper instead of one inline dict per module, so
+    the payload shape can never drift between operators.
+    """
+    return {"class": type(op).__name__, "config": op.get_config()}
+
+
+def callable_name(fn: Any) -> str:
+    """Best-effort display name for a user-supplied callable.
+
+    ``__name__`` when present (functions, classes), else ``repr`` (lambdas
+    assigned through functools.partial, callable instances, …).
+    """
+    return getattr(fn, "__name__", repr(fn))
+
+
+def require_operator(value: Any, owner: str, field: str) -> None:
+    """Raise a standardized ``TypeError`` unless ``value`` is an `Operator`.
+
+    Args:
+        value: The candidate object.
+        owner: The validating class's name (for the message).
+        field: The parameter/attribute name (may include an index, e.g.
+            ``"sources[2]"``).
+    """
+    if not isinstance(value, Operator):
+        raise TypeError(
+            f"{owner}.{field} must be an Operator, got {type(value).__name__}."
+        )
+
+
 def _operator_subclasses(cls: type[Operator]) -> tuple[type[Operator], ...]:
+    """All transitive subclasses of ``cls``, in definition order."""
     subclasses: list[type[Operator]] = []
     for subclass in cls.__subclasses__():
         subclasses.append(subclass)

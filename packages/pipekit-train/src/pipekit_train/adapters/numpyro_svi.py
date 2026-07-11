@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from pipekit_train.adapters import _bayes
+from pipekit_train.adapters import bayes
 
 
 if TYPE_CHECKING:
@@ -26,10 +26,26 @@ if TYPE_CHECKING:
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
-    """Fit ``loop.task`` with NumPyro SVI; return ``(predictive_op, info)``."""
+    """Fit ``loop.task`` with NumPyro SVI.
+
+    Returns:
+        A pair ``(predictive_op, backend_info)``. ``predictive_op`` is a
+        `bayes.NumpyroPredictiveOp` over the fitted guide;
+        ``backend_info`` carries the keys ``backend``, ``jax_version``,
+        ``numpyro_version``, ``devices``, ``total_seconds``,
+        ``final_step``, ``final_elbo``, ``final_metrics``, ``guide``,
+        and ``param_shapes``.
+    """
     import jax
     import numpy as np
-    import numpyro  # ty: ignore[unresolved-import]
+
+    try:
+        import numpyro  # ty: ignore[unresolved-import]
+    except ImportError as exc:
+        raise ImportError(
+            "backend='numpyro-svi' needs the [numpyro] extra. Install with "
+            "`pip install pipekit-train[numpyro]`."
+        ) from exc
     from numpyro.infer import (  # ty: ignore[unresolved-import]
         SVI,
         Predictive,
@@ -38,63 +54,68 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     from numpyro.infer.autoguide import AutoNormal  # ty: ignore[unresolved-import]
 
     t0 = time.time()
-    task = _bayes.validate_task(loop)
+    task = bayes.validate_task(loop)
     guide = task.guide if task.guide is not None else AutoNormal(task.model)
     elbo = task.loss if task.loss is not None else Trace_ELBO()
-    optimizer = _bayes.build_optimizer(loop.optimizer_config)
+    optimizer = bayes.build_optimizer(loop.optimizer_config)
 
-    x_train, y_train = _bayes.materialize(loop.dataset)
+    x_train, y_train = bayes.materialize(loop.dataset)
     rng = jax.random.key(loop.seed)
     rng, init_key = jax.random.split(rng)
 
     svi = SVI(task.model, guide, optimizer, loss=elbo)
     state = svi.init(init_key, x_train, y_train)
 
-    initial = _bayes.carry_state(loop, loop.model_op, 0, {})
-    _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
+    initial = bayes.carry_state(loop, loop.model_op, 0, {})
+    bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     last_loss = float("nan")
-    for step in range(1, loop.max_steps + 1):
-        state, loss = svi.update(state, x_train, y_train)
-        last_loss = float(loss)
-        metrics = {"elbo": -last_loss, "loss": last_loss}
+    step = 0
+    # try/finally: a raising callback must not leak the writer's file
+    # handle (dropping its buffered lines).
+    try:
+        for step in range(1, loop.max_steps + 1):
+            state, loss = svi.update(state, x_train, y_train)
+            last_loss = float(loss)
+            metrics = {"elbo": -last_loss, "loss": last_loss}
 
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, metrics)
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, metrics)
 
-        carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
-        _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
+            carry = bayes.carry_state(loop, loop.model_op, step, metrics)
+            bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
 
-        if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
-            _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
+            if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
+                bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
 
-        if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
-            x_val, y_val = _bayes.materialize(loop.val_dataset)
-            val_elbo = -float(svi.evaluate(state, x_val, y_val))
-            _bayes.dispatch(
-                loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
-            )
+            if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
+                x_val, y_val = bayes.materialize(loop.val_dataset)
+                val_elbo = -float(svi.evaluate(state, x_val, y_val))
+                bayes.dispatch(
+                    loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
+                )
 
-        if _any_should_stop(loop.callbacks):
-            break
+            if bayes.any_should_stop(loop.callbacks):
+                break
+    finally:
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     params = svi.get_params(state)
     predictive = Predictive(
         task.model, guide=guide, params=params, num_samples=task.predictive_samples
     )
-    model_op = _bayes.NumpyroPredictiveOp(
+    model_op = bayes.NumpyroPredictiveOp(
         predictive,
         predictive_site=task.predictive_site,
         seed=loop.seed,
         posterior=dict(params),
     )
 
-    final = _bayes.carry_state(
+    final = bayes.carry_state(
         loop, model_op, int(min(loop.max_steps, step)), {"elbo": -last_loss}
     )
-    _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
+    bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
 
     backend_info = {
         "backend": "numpyro-svi",
@@ -109,7 +130,3 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "param_shapes": {k: list(np.shape(v)) for k, v in params.items()},
     }
     return model_op, backend_info
-
-
-def _any_should_stop(callbacks: tuple[Any, ...]) -> bool:
-    return any(getattr(cb, "should_stop", False) for cb in callbacks)

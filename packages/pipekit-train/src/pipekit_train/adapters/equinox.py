@@ -18,8 +18,11 @@ Module surface:
 - `train_step` — pure function, ``@eqx.filter_jit`` wrapped.
 - `save_state` / `restore_state` — Orbax bridge via ``eqx.partition``.
 - `EquinoxModelOp(Operator)` — wraps a trained ``eqx.Module`` as a
-  `pipekit.Operator`. v0.1 in-package replacement for the future
-  `pipekit-jax.JaxModelOp`.
+  `pipekit.Operator`. Deliberate in-package twin of
+  `pipekit_jax.JaxModelOp` (kept separate so pipekit-train depends only
+  on pipekit core); unlike `JaxModelOp` it has no weight-blob
+  round-trip — wrap the trained module in a `JaxModelOp` when you need
+  `serialize_weights` / `from_registry`.
 - `run(loop)` — full end-to-end training entry point.
 
 See ADRs D8, D9, D10 in ``docs/design/decisions.md``.
@@ -38,6 +41,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from pipekit import Operator
+
+from pipekit_train.adapters import _common
 
 
 # `optax` and `orbax.checkpoint` are lazy-imported inside the
@@ -61,11 +66,12 @@ if TYPE_CHECKING:
 class EquinoxModelOp(Operator):
     """Wrap an `eqx.Module` as a `pipekit.Operator`.
 
-    Public surface used in notebooks and downstream packages. Drop-in
-    replacement for the future ``pipekit-jax.JaxModelOp`` — same
-    constructor signature; same ``_apply`` shape (calls the module on
-    the input). When ``pipekit-jax`` ships, users swap the import and
-    everything still works.
+    Public surface used in notebooks and downstream packages. Same
+    constructor signature and ``_apply`` shape as
+    ``pipekit_jax.JaxModelOp`` — swap the import when you need the
+    registry weight round-trip (``serialize_weights`` /
+    ``with_weights`` / ``from_registry``), which this in-package twin
+    deliberately omits so pipekit-train depends only on pipekit core.
 
     The wrapper is marked ``forbid_in_yaml = True`` because an
     ``eqx.Module`` is a JAX PyTree of arrays — the round-trip path is
@@ -93,12 +99,9 @@ class EquinoxModelOp(Operator):
         return cast(Any, self.module)(x)
 
     def get_config(self) -> dict[str, Any]:
-        return {"module_class": type(self.module).__name__}
-
-
-# Backwards-compatible alias — the underscore form was used in earlier
-# PRs / external code that may still import from this path.
-_EquinoxModelOp = EquinoxModelOp
+        # __qualname__ matches pipekit_jax.JaxModelOp so the two twins emit
+        # identical configs for the same module.
+        return {"module_class": type(self.module).__qualname__}
 
 
 # ---------------------------------------------------------------------
@@ -477,34 +480,14 @@ def _unjsonify_grain_state(state: Any) -> Any:
 # ---------------------------------------------------------------------
 
 
-# Optimizer constructors are resolved lazily inside `_build_optimizer`
-# so this module imports without optax installed (optax stays a
-# `pipekit-train[equinox]` extra; the surrounding module's
-# `EquinoxModelOp` only needs equinox itself).
-_OPTIMIZER_NAMES: tuple[str, ...] = ("adam", "adamw", "sgd", "rmsprop")
-
-
 def _build_optimizer(config: dict[str, Any]) -> optax.GradientTransformation:
-    """Translate ``optimizer_config`` into an `optax.GradientTransformation`.
+    """Build the optax optimiser via the shared `adapters._common` helper.
 
-    Supported names: ``adam``, ``adamw``, ``sgd``, ``rmsprop``. The
-    rest of the config is forwarded as kwargs to the constructor.
-    Conveniences:
-
-    - ``lr`` is normalised to ``learning_rate`` (the design uses the
-      shorter form; optax uses the longer one).
+    Equinox's default optimiser is ``adamw``; supported names and the
+    ``lr`` → ``learning_rate`` normalisation live in `_common` so the
+    surface can't drift between backends.
     """
-    import optax  # ty: ignore[unresolved-import]
-
-    config = dict(config)
-    name = config.pop("name", "adamw")
-    if "lr" in config and "learning_rate" not in config:
-        config["learning_rate"] = config.pop("lr")
-    if name not in _OPTIMIZER_NAMES:
-        raise ValueError(
-            f"Unknown optimizer {name!r}. v0.1 supports {sorted(_OPTIMIZER_NAMES)}."
-        )
-    return getattr(optax, name)(**config)
+    return _common.build_optimizer(config, default_name="adamw")
 
 
 # ---------------------------------------------------------------------
@@ -513,6 +496,7 @@ def _build_optimizer(config: dict[str, Any]) -> optax.GradientTransformation:
 
 
 def _is_indexable(dataset: Any) -> bool:
+    """True when ``dataset`` supports random access (``len`` + ``getitem``)."""
     return hasattr(dataset, "__len__") and hasattr(dataset, "__getitem__")
 
 
@@ -595,7 +579,14 @@ class _BatchSource:
                 multi-host ``batch_size`` is not divisible by
                 ``process_count``.
         """
-        import grain  # ty: ignore[unresolved-import]
+        try:
+            import grain  # ty: ignore[unresolved-import]
+        except ImportError as exc:
+            raise ImportError(
+                "The Equinox adapter's data path needs grain (part of the "
+                "[equinox] extra). Install with "
+                "`pip install pipekit-train[equinox]`."
+            ) from exc
 
         n = len(dataset)
         if n < batch_size:
@@ -678,8 +669,14 @@ def _evaluate(
     val_dataset: Any,
     batch_size: int,
     task: TrainTask,
+    key: jax.Array,
 ) -> dict[str, float]:
-    """Run model on val_dataset, return averaged metric dict."""
+    """Run model on val_dataset, return averaged metric dict.
+
+    ``key`` seeds stochastic tasks (dropout, reparameterised sampling)
+    and is split per batch so every batch — and every eval round —
+    sees distinct randomness. Deterministic tasks ignore it.
+    """
     sums: dict[str, float] = {}
     n = 0
     # We always do a single-pass (one epoch) over the val dataset.
@@ -687,7 +684,8 @@ def _evaluate(
     # mini-batches as if they were training batches.
     iterator = _eval_pass(val_dataset, batch_size)
     for batch in iterator:
-        _, aux = task.loss_fn(model, batch, jax.random.key(0))
+        key, batch_key = jax.random.split(key)
+        _, aux = task.loss_fn(model, batch, batch_key)
         for k, v in aux.items():
             sums[k] = sums.get(k, 0.0) + float(np.asarray(v))
         n += 1
@@ -716,17 +714,10 @@ def _eval_pass(
 # ---------------------------------------------------------------------
 
 
-def _dispatch(callbacks: tuple[Any, ...], hook: str, *args: Any) -> None:
-    """Call ``hook`` on each callback that implements it."""
-    for cb in callbacks:
-        fn = getattr(cb, hook, None)
-        if fn is not None:
-            fn(*args)
-
-
-def _any_should_stop(callbacks: tuple[Any, ...]) -> bool:
-    """True if any callback signals ``should_stop`` (e.g. EarlyStopping)."""
-    return any(getattr(cb, "should_stop", False) for cb in callbacks)
+# Callback dispatch + the early-stop check live in `adapters._common`,
+# shared with the Bayesian backends.
+_dispatch = _common.dispatch
+_any_should_stop = _common.any_should_stop
 
 
 # ---------------------------------------------------------------------
@@ -747,8 +738,15 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """
     # Lazy imports — keep this module loadable without the full
     # [equinox] extra installed (see module docstring).
-    import optax  # ty: ignore[unresolved-import]
-    import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+    try:
+        import optax  # ty: ignore[unresolved-import]
+        import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
+    except ImportError as exc:
+        raise ImportError(
+            "backend='equinox' needs the full [equinox] extra (optax + "
+            "orbax-checkpoint + grain). Install with "
+            "`pip install pipekit-train[equinox]`."
+        ) from exc
 
     t0 = time.time()
     # --- Unwrap the model ----------------------------------------------
@@ -758,7 +756,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     elif isinstance(model_op, eqx.Module):
         eqx_module = model_op
     elif hasattr(model_op, "module") and isinstance(model_op.module, eqx.Module):
-        # Future pipekit-jax.JaxModelOp would land here.
+        # pipekit_jax.JaxModelOp (or anything module-shaped) lands here.
         eqx_module = model_op.module
     else:
         raise TypeError(
@@ -845,62 +843,75 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     _dispatch(loop.callbacks, "on_train_begin", loop, initial_state)
 
     # --- Main loop -----------------------------------------------------
+    # try/finally: a raising callback / loss / NaN guard must not leak
+    # the metric writer's file handle (dropping buffered lines) or leave
+    # an async checkpoint half-written.
     last_metrics: dict[str, float] = {}
-    # Inside the loop body, `train_iter` is guaranteed non-None because
-    # the loop condition matches the guard that built it.
-    while int(state.step) < loop.max_steps:
-        assert train_iter is not None  # see iterator-build guard above
-        rng, step_key = jax.random.split(rng)
-        batch = train_iter.next_batch()
-        state, metrics = train_step(state, batch, step_key, task, optimizer)
-        last_metrics = {k: float(np.asarray(v)) for k, v in metrics.items()}
+    try:
+        # Inside the loop body, `train_iter` is guaranteed non-None because
+        # the loop condition matches the guard that built it.
+        while int(state.step) < loop.max_steps:
+            assert train_iter is not None  # see iterator-build guard above
+            rng, step_key = jax.random.split(rng)
+            batch = train_iter.next_batch()
+            state, metrics = train_step(state, batch, step_key, task, optimizer)
+            last_metrics = {k: float(np.asarray(v)) for k, v in metrics.items()}
 
-        step = int(state.step)
+            step = int(state.step)
 
-        # Per-step log to the writer (if any).
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, last_metrics)
+            # Per-step log to the writer (if any).
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, last_metrics)
 
-        # Callbacks on_step_end.
-        carry = _carry_state(state, loop, last_metrics)
-        _dispatch(loop.callbacks, "on_step_end", loop, carry, last_metrics)
+            # Callbacks on_step_end.
+            carry = _carry_state(state, loop, last_metrics)
+            _dispatch(loop.callbacks, "on_step_end", loop, carry, last_metrics)
 
-        # Periodic epoch boundary (cosmetic; controls on_epoch_end firing).
-        if loop.steps_per_epoch and step > 0 and step % loop.steps_per_epoch == 0:
-            _dispatch(loop.callbacks, "on_epoch_end", loop, carry, last_metrics)
+            # Periodic epoch boundary (cosmetic; controls on_epoch_end firing).
+            if loop.steps_per_epoch and step > 0 and step % loop.steps_per_epoch == 0:
+                _dispatch(loop.callbacks, "on_epoch_end", loop, carry, last_metrics)
 
-        # Periodic evaluation.
+            # Periodic evaluation.
+            if (
+                loop.val_dataset is not None
+                and step > 0
+                and step % loop.eval_every_n_steps == 0
+            ):
+                rng, eval_key = jax.random.split(rng)
+                eval_metrics = _evaluate(
+                    state.model, loop.val_dataset, loop.batch_size, task, eval_key
+                )
+                _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
+
+            # Checkpoint — gated on the manager's configured cadence
+            # (CheckpointManager.save_interval_steps, derived from the
+            # Checkpoint callback's every_n_steps). Calling save() every
+            # step would defeat the configured cadence and add I/O on
+            # the fast path.
+            if mngr is not None and step > 0 and mngr.should_save(step):
+                save_state(mngr, state, step, data_iter_state=train_iter.get_state())
+
+            # Early-stopping check — break before next step.
+            if _any_should_stop(loop.callbacks):
+                break
+
+        # --- Final eval (if val_dataset and we didn't just eval) ------
         if (
             loop.val_dataset is not None
-            and step > 0
-            and step % loop.eval_every_n_steps == 0
+            and int(state.step) % loop.eval_every_n_steps != 0
         ):
-            eval_metrics = _evaluate(
-                state.model, loop.val_dataset, loop.batch_size, task
+            rng, eval_key = jax.random.split(rng)
+            final_eval = _evaluate(
+                state.model, loop.val_dataset, loop.batch_size, task, eval_key
             )
-            _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
-
-        # Checkpoint — gated on the manager's configured cadence
-        # (CheckpointManager.save_interval_steps, derived from the
-        # Checkpoint callback's every_n_steps). Calling save() every
-        # step would defeat the configured cadence and add I/O on
-        # the fast path.
-        if mngr is not None and step > 0 and mngr.should_save(step):
-            save_state(mngr, state, step, data_iter_state=train_iter.get_state())
-
-        # Early-stopping check — break before next step.
-        if _any_should_stop(loop.callbacks):
-            break
-
-    # --- Final eval (if val_dataset and we didn't just eval) ----------
-    if loop.val_dataset is not None and int(state.step) % loop.eval_every_n_steps != 0:
-        final_eval = _evaluate(state.model, loop.val_dataset, loop.batch_size, task)
-        carry = _carry_state(state, loop, last_metrics)
-        _dispatch(loop.callbacks, "on_eval_end", loop, carry, final_eval)
-
-    # --- Wait for any async checkpoint -------------------------------
-    if mngr is not None:
-        mngr.wait_until_finished()
+            carry = _carry_state(state, loop, last_metrics)
+            _dispatch(loop.callbacks, "on_eval_end", loop, carry, final_eval)
+    finally:
+        # --- Wait for any async checkpoint + close the writer ---------
+        if mngr is not None:
+            mngr.wait_until_finished()
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     # --- Wrap the trained module + dispatch on_train_end -------------
     trained_model_op = EquinoxModelOp(state.model)
@@ -908,10 +919,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         state, loop, last_metrics, model_override=trained_model_op
     )
     _dispatch(loop.callbacks, "on_train_end", loop, final_carry)
-
-    # --- Close any open writer ---------------------------------------
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
 
     backend_info = {
         "backend": "equinox",

@@ -146,8 +146,8 @@ def test_from_registry_with_loader_method():
     )
 
 
-def test_from_registry_local_filesystem_fallback(tmp_path):
-    """Fallback path: LocalModelRegistry-style `_resolve` + `root`."""
+def test_from_registry_with_local_model_registry(tmp_path):
+    """End-to-end round-trip through a real LocalModelRegistry."""
     from pipekit_experiment import LocalModelRegistry
 
     trained = JaxModelOp(_toy_mlp(key=0))
@@ -215,3 +215,14 @@ def test_trained_model_reloads_byte_identical_predictions(tmp_path):
 
     actual = reloaded(x)
     np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+
+
+def test_with_weights_structure_mismatch_raises():
+    """Loading a blob into a differently-shaped skeleton must not succeed."""
+    trained = JaxModelOp(_toy_mlp(key=0))
+    blob = trained.serialize_weights()
+    wrong_shape = JaxModelOp(
+        eqx.nn.MLP(in_size=3, out_size=1, width_size=4, depth=1, key=jax.random.key(2))
+    )
+    with pytest.raises((ValueError, RuntimeError), match=r"shape|structure"):
+        wrong_shape.with_weights(blob)

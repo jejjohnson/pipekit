@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import Operator, nested_config, require_operator
 
 
 class Fanout(Operator):
@@ -48,11 +48,7 @@ class Fanout(Operator):
         if not branches:
             raise ValueError("Fanout requires at least one branch.")
         for name, op in branches.items():
-            if not isinstance(op, Operator):
-                raise TypeError(
-                    f"Fanout.branches[{name!r}] must be an Operator, "
-                    f"got {type(op).__name__}."
-                )
+            require_operator(op, "Fanout", f"branches[{name!r}]")
         self.branches = dict(branches)
 
     def _apply(self, x: Any) -> dict[str, Any]:
@@ -60,10 +56,7 @@ class Fanout(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "branches": {
-                name: {"class": type(op).__name__, "config": op.get_config()}
-                for name, op in self.branches.items()
-            }
+            "branches": {name: nested_config(op) for name, op in self.branches.items()}
         }
 
     def __repr__(self) -> str:

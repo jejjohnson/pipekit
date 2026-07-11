@@ -10,7 +10,7 @@ version: 0.1.0
 > **`numpyro-svi`** (variational — a per-step optimizer) and
 > **`numpyro-mcmc`** (sampling — a single blocking run). Companion to
 > `api/adapters.md` and ADR **D13** in `decisions.md`. **Status: implemented
-> (v1)** — both backends + the shared `adapters._bayes` seam ship; SVI
+> (v1)** — both backends + the shared `adapters.bayes` seam ship; SVI
 > minibatching (a `numpyro.plate` subsample hook) remains the documented
 > follow-on. Tests are gated behind the `[numpyro]` extra and the
 > `slow`/`integration` markers (CI runs the fast subset).
@@ -25,7 +25,7 @@ version: 0.1.0
 > splitting removes them and lines NumPyro up cleanly with BlackJAX:
 > **`numpyro-mcmc` and `blackjax` are sibling *sampler* backends**, while
 > **`numpyro-svi` is the *variational* one**. All three share the
-> model→predictive seam (`adapters._bayes`); see
+> model→predictive seam (`adapters.bayes`); see
 > [`blackjax_adapter.md`](blackjax_adapter.md).
 
 ---
@@ -244,7 +244,7 @@ SVI `Predictive` needs a sample count.
 ### 7.3 Shared seam — `NumpyroPredictiveOp` (the artifact, D7)
 
 `NumpyroPredictiveOp`, the model→logdensity bridge, and the `Predictive`
-wrapping live in **`pipekit_train.adapters._bayes`**, imported by both
+wrapping live in **`pipekit_train.adapters.bayes`**, imported by both
 NumPyro adapters (and the BlackJAX adapter):
 
 ```python
@@ -328,7 +328,7 @@ flip the `backend` string to switch engines.
 import jax, numpyro, numpyro.distributions as dist
 from numpyro.infer.autoguide import AutoNormal
 from pipekit_train import TrainingLoop, IterableDataset
-from pipekit_train.adapters._bayes import NumpyroTask
+from pipekit_train.adapters.bayes import NumpyroTask
 
 def model(x, y=None):
     w = numpyro.sample("w", dist.Normal(0.0, 1.0))
@@ -380,7 +380,7 @@ like a trained neural net (D7).
 ```
 1. [numpyro] extra + two registry/Literal entries (numpyro-svi, numpyro-mcmc)
    + scaffold run()s raising NotImplementedError.
-2. Shared adapters._bayes: NumpyroTask + NumpyroPredictiveOp + the
+2. Shared adapters.bayes: NumpyroTask + NumpyroPredictiveOp + the
    model/Predictive helpers + task-vs-loss validation.
 3. numpyro-svi adapter — svi.init/update/evaluate; ELBO logging; Orbax
    checkpoint of SVIState params; callbacks/writer/eval reuse the loop.

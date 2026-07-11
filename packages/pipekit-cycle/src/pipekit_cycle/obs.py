@@ -20,6 +20,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from pipekit import Operator
+from pipekit._base.operator import nested_config
 
 
 class IdentityObs(Operator):
@@ -34,7 +35,7 @@ class IdentityObs(Operator):
         return state
 
     def linearize(self, state: Any) -> Operator:
-        """Identity is its own tangent linear."""
+        """Identity is its own tangent linear (``state`` is intentionally unused)."""
         return self
 
 
@@ -45,8 +46,13 @@ class LinearObs(Operator):
         H: Any object supporting the ``@`` operator with the carrier.
             Typically a numpy / JAX array; pipekit-cycle stays
             backend-agnostic by relying on ``__matmul__``.
+
+    Carries ``forbid_in_yaml = True`` because the matrix ``H`` is a
+    runtime array that doesn't round-trip through JSON / YAML;
+    ``get_config()`` reports only its shape as a debug payload.
     """
 
+    forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
     def __init__(self, H: Any) -> None:
@@ -56,7 +62,7 @@ class LinearObs(Operator):
         return self.H @ state
 
     def linearize(self, state: Any) -> LinearObs:
-        """The map is already linear — returns ``self``."""
+        """The map is already linear — returns ``self`` (``state`` unused)."""
         return self
 
     def get_config(self) -> dict[str, Any]:
@@ -159,12 +165,7 @@ class CompositeObs(Operator):
         return CompositeObs(tuple(lins))
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "components": [
-                {"class": type(op).__name__, "config": op.get_config()}
-                for op in self.components
-            ]
-        }
+        return {"components": [nested_config(op) for op in self.components]}
 
 
 def _shape_or_repr(obj: Any) -> Any:

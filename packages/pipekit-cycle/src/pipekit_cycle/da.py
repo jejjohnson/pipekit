@@ -17,11 +17,28 @@ See master plan Report 10, section 2.4.
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from pipekit import Operator, StatefulOperator
+from pipekit._base.operator import nested_config
 
 from pipekit_cycle.protocols import AnalysisStep, ForwardModel, ObservationOperator
+
+
+def _component_config(obj: Any) -> Any:
+    """Debug-config payload for a DA component.
+
+    Components are protocol objects (`ForwardModel`, `AnalysisStep`, …)
+    that need not be pipekit Operators; when one is, emit core's
+    canonical ``{"class", "config"}`` payload, otherwise fall back to
+    the bare class name.
+    """
+    if obj is None:
+        return None
+    if isinstance(obj, Operator):
+        return nested_config(obj)
+    return type(obj).__name__
 
 
 class DACycle(StatefulOperator):
@@ -54,6 +71,12 @@ class DACycle(StatefulOperator):
 
     Returns from ``_apply(carrier, state)``:
         ``(analysis_carrier, updated_state)``.
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol
+            (`ForwardModel` / `ObservationOperator` / `AnalysisStep`),
+            or ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``n_steps < 0``.
     """
 
     __config_mixin_auto__ = False
@@ -118,12 +141,10 @@ class DACycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "save_history": self.save_history,
         }
@@ -147,7 +168,15 @@ class EnsembleDACycle(StatefulOperator):
             Receives ``(forecast_members, obs, obs_op=..., obs_err_cov=...)``.
         obs_source: Optional observation source.
         n_steps: Number of cycles per call.
-        n_members: Expected ensemble size (length-checked at call time).
+        n_members: Expected ensemble size (keyword-only;
+            length-checked at call time).
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol, or
+            ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``n_members < 1`` or ``n_steps < 0`` (from the
+            constructor), or if the input ensemble's length differs
+            from ``n_members`` (at call time).
     """
 
     __config_mixin_auto__ = False
@@ -157,8 +186,9 @@ class EnsembleDACycle(StatefulOperator):
         forward_model: ForwardModel,
         obs_op: ObservationOperator,
         analysis_step: AnalysisStep,
-        obs_source: Operator | None,
-        n_steps: int,
+        obs_source: Operator | None = None,
+        n_steps: int = 1,
+        *,
         n_members: int,
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
@@ -213,12 +243,10 @@ class EnsembleDACycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "n_members": self.n_members,
         }
@@ -244,6 +272,11 @@ class SmootherCycle(StatefulOperator):
         stride: Number of windows to take per call (default 1).
         obs_source: Optional observation source; invoked per step
             inside the window. ``None`` skips the analysis step.
+
+    Raises:
+        TypeError: If a component doesn't satisfy its protocol, or
+            ``obs_source`` is neither an `Operator` nor ``None``.
+        ValueError: If ``window < 1`` or ``stride < 1``.
     """
 
     __config_mixin_auto__ = False
@@ -299,28 +332,33 @@ class SmootherCycle(StatefulOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "forward_model": type(self.forward_model).__name__,
-            "obs_op": type(self.obs_op).__name__,
-            "analysis_step": type(self.analysis_step).__name__,
-            "obs_source": (
-                type(self.obs_source).__name__ if self.obs_source is not None else None
-            ),
+            "forward_model": _component_config(self.forward_model),
+            "obs_op": _component_config(self.obs_op),
+            "analysis_step": _component_config(self.analysis_step),
+            "obs_source": _component_config(self.obs_source),
             "window": self.window,
             "stride": self.stride,
         }
 
 
 def _advance_da_state(state: Any, dt: float) -> Any:
-    """Increment ``t`` and ``cycle_count`` if the state exposes them.
+    """Return a copy of ``state`` with ``t`` / ``cycle_count`` advanced.
 
-    Carrier-agnostic: any state object with mutable ``t`` /
-    ``cycle_count`` attributes participates; objects without them are
-    returned unchanged.
+    Carrier-agnostic: any state object with ``t`` / ``cycle_count``
+    attributes participates; objects without them are returned
+    unchanged. The input is never mutated — `CarryState` subclasses
+    hash/compare by value, so callers may legitimately hold snapshots
+    of earlier states (e.g. for history diffing or checkpointing).
     """
     if state is None:
         return state
-    if hasattr(state, "t"):
-        state.t = state.t + dt
-    if hasattr(state, "cycle_count"):
-        state.cycle_count = state.cycle_count + 1
-    return state
+    has_t = hasattr(state, "t")
+    has_count = hasattr(state, "cycle_count")
+    if not (has_t or has_count):
+        return state
+    advanced = copy.copy(state)
+    if has_t:
+        advanced.t = state.t + dt
+    if has_count:
+        advanced.cycle_count = state.cycle_count + 1
+    return advanced

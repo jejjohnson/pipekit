@@ -4,7 +4,7 @@ BlackJAX is a sampler library on a ``logdensity_fn`` (PPL-agnostic), not a
 PPL — so it is its own backend, but it interoperates with NumPyro: a
 `BlackjaxTask` accepts a raw ``logdensity_fn`` *or* a `NumpyroTask` (bridged
 via ``numpyro.infer.util.initialize_model``), reusing the shared
-``adapters._bayes`` seam (`NumpyroPredictiveOp`, the constrain map). Its
+``adapters.bayes`` seam (`NumpyroPredictiveOp`, the constrain map). Its
 per-step ``kernel.step`` maps onto the per-step `TrainingLoop` (per-sample
 diagnostics). See ADR D14 and ``docs/design/blackjax_adapter.md``.
 
@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 import numpy as np
 from pipekit import Operator
 
-from pipekit_train.adapters import _bayes
+from pipekit_train.adapters import bayes
 
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class BlackjaxTask:
     logdensity_fn: Callable[..., Any] | None = None
     init_position: Any = None
     predict_fn: Callable[..., Any] | None = None
-    numpyro_task: _bayes.NumpyroTask | None = None
+    numpyro_task: bayes.NumpyroTask | None = None
     sampler: Literal["nuts", "mclmc", "hmc", "sgld", "sghmc"] = "nuts"
     num_warmup: int = 1000
     num_chains: int = 1
@@ -123,6 +123,11 @@ class BlackjaxPredictiveOp(Operator):
 
 
 def _validate_task(loop: Any) -> BlackjaxTask:
+    """Return ``loop.task`` if it is a `BlackjaxTask`; raise otherwise.
+
+    Mirrors `bayes.validate_task` — the blackjax backend is task-first,
+    so a carrier-agnostic ``Loss`` cannot stand in for the target.
+    """
     task = getattr(loop, "task", None)
     if task is None:
         raise ValueError(
@@ -138,8 +143,24 @@ def _validate_task(loop: Any) -> BlackjaxTask:
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
-    """Sample ``loop.task`` with BlackJAX (NUTS); return ``(op, info)``."""
-    import blackjax  # ty: ignore[unresolved-import]
+    """Sample ``loop.task`` with BlackJAX (NUTS).
+
+    Returns:
+        A pair ``(model_op, backend_info)``. ``model_op`` is a
+        `bayes.NumpyroPredictiveOp` (numpyro-bridged path) or a
+        `BlackjaxPredictiveOp` (raw-logdensity path); ``backend_info``
+        carries the keys ``backend``, ``sampler``, ``jax_version``,
+        ``blackjax_version``, ``devices``, ``total_seconds``,
+        ``final_step``, ``num_warmup``, ``num_samples``,
+        ``num_divergences``, and ``final_metrics``.
+    """
+    try:
+        import blackjax  # ty: ignore[unresolved-import]
+    except ImportError as exc:
+        raise ImportError(
+            "backend='blackjax' needs the [blackjax] extra. Install with "
+            "`pip install pipekit-train[blackjax]`."
+        ) from exc
     import jax
     import jax.numpy as jnp
 
@@ -186,8 +207,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         # Materialise the dataset only on the numpyro path — the raw target
         # carries its own logdensity, so it needn't touch loop.dataset (and
         # should work with an empty placeholder dataset).
-        x_train, y_train = _bayes.materialize(loop.dataset)
-        logdensity_fn, init_position, constrain_fn = _bayes.numpyro_logdensity(
+        x_train, y_train = bayes.materialize(loop.dataset)
+        logdensity_fn, init_position, constrain_fn = bayes.numpyro_logdensity(
             model, x_train, y_train, init_key
         )
     elif task.logdensity_fn is not None and task.init_position is not None:
@@ -207,30 +228,36 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # loop would re-trace/compile every iteration (pathologically slow).
     step_fn = jax.jit(kernel.step)
 
-    initial = _bayes.carry_state(loop, loop.model_op, 0, {})
-    _bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
+    initial = bayes.carry_state(loop, loop.model_op, 0, {})
+    bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     # --- per-step sampling loop ------------------------------------------
+    # try/finally: a raising callback must not leak the writer's file
+    # handle (dropping its buffered lines).
     positions: list[Any] = []
     num_divergent = 0
     step = 0
-    for step in range(1, loop.max_steps + 1):
-        rng, step_key = jax.random.split(rng)
-        state, info = step_fn(step_key, state)
-        positions.append(state.position)
-        num_divergent += int(bool(info.is_divergent))
-        metrics = {
-            "acceptance_rate": float(info.acceptance_rate),
-            "is_divergent": float(info.is_divergent),
-        }
-        if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
-            loop.metric_writer.write(step, metrics)
-        carry = _bayes.carry_state(loop, loop.model_op, step, metrics)
-        _bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
-        if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
-            _bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
-        if _any_should_stop(loop.callbacks):
-            break
+    try:
+        for step in range(1, loop.max_steps + 1):
+            rng, step_key = jax.random.split(rng)
+            state, info = step_fn(step_key, state)
+            positions.append(state.position)
+            num_divergent += int(bool(info.is_divergent))
+            metrics = {
+                "acceptance_rate": float(info.acceptance_rate),
+                "is_divergent": float(info.is_divergent),
+            }
+            if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
+                loop.metric_writer.write(step, metrics)
+            carry = bayes.carry_state(loop, loop.model_op, step, metrics)
+            bayes.dispatch(loop.callbacks, "on_step_end", loop, carry, metrics)
+            if loop.steps_per_epoch and step % loop.steps_per_epoch == 0:
+                bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
+            if bayes.any_should_stop(loop.callbacks):
+                break
+    finally:
+        if loop.metric_writer is not None:
+            loop.metric_writer.close()
 
     # stack the per-step positions into a pytree with a leading sample axis
     samples = jax.tree.map(lambda *leaves: jnp.stack(leaves), *positions)
@@ -242,7 +269,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         assert constrain_fn is not None  # set whenever model is (numpyro path)
         constrained = jax.vmap(constrain_fn)(samples)
         predictive = Predictive(model, posterior_samples=constrained)
-        model_op: Operator = _bayes.NumpyroPredictiveOp(
+        model_op: Operator = bayes.NumpyroPredictiveOp(
             predictive,
             predictive_site=predictive_site,
             seed=loop.seed,
@@ -256,10 +283,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             task.predict_fn, samples, predictive_site=predictive_site
         )
 
-    final = _bayes.carry_state(loop, model_op, int(step), {})
-    _bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
-    if loop.metric_writer is not None:
-        loop.metric_writer.close()
+    final = bayes.carry_state(loop, model_op, int(step), {})
+    bayes.dispatch(loop.callbacks, "on_train_end", loop, final)
 
     backend_info = {
         "backend": "blackjax",
@@ -275,7 +300,3 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "final_metrics": {},
     }
     return model_op, backend_info
-
-
-def _any_should_stop(callbacks: tuple[Any, ...]) -> bool:
-    return any(getattr(cb, "should_stop", False) for cb in callbacks)

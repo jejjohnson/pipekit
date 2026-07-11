@@ -23,7 +23,9 @@ def test_empty_sequential_is_identity_when_input_given():
 
 
 def test_construction_rejects_non_operator():
-    with pytest.raises(TypeError, match=r"Sequential\[1\] is int"):
+    with pytest.raises(
+        TypeError, match=r"Sequential.operators\[1\] must be an Operator"
+    ):
         Sequential([_Identity(), 5])  # type: ignore[list-item]
 
 

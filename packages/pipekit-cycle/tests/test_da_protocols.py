@@ -138,3 +138,24 @@ def test_dummy_rom_satisfies_reduced_order_model() -> None:
 
 def test_incomplete_rom_is_not_reduced_order_model() -> None:
     assert not isinstance(_MissingDecode(), ReducedOrderModel)
+
+
+class _FullAnalysis:
+    def __call__(self, forecast, obs, *, obs_op, obs_err_cov):
+        return forecast
+
+
+class _NotCallableAnalysis:
+    """No __call__ — must fail the AnalysisStep check."""
+
+
+def test_full_analysis_satisfies_analysis_step() -> None:
+    from pipekit_cycle import AnalysisStep
+
+    assert isinstance(_FullAnalysis(), AnalysisStep)
+
+
+def test_non_callable_is_not_analysis_step() -> None:
+    from pipekit_cycle import AnalysisStep
+
+    assert not isinstance(_NotCallableAnalysis(), AnalysisStep)
