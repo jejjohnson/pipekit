@@ -112,6 +112,87 @@ def test_local_registry_round_trips_operator_state(tmp_path):
     assert loaded() == original()
 
 
+def test_local_registry_rejects_path_traversal_refs(tmp_path):
+    """Refs and tag names must not escape the registry root."""
+    reg = LocalModelRegistry(tmp_path / "models")
+    secret = tmp_path / "secret"
+    secret.mkdir()
+    (secret / "operator.json").write_text('{"class": "Const", "config": {"value": 1}}')
+    h = reg.store(Const(1))
+    for bad in ("../secret", "..", "a/b", "a\\b", "", "_tags"):
+        with pytest.raises(ValueError):
+            reg.load(bad)
+        with pytest.raises(ValueError):
+            reg.tag(h, bad)
+        with pytest.raises(ValueError):
+            reg.resolve_tag(bad)
+
+
+def test_local_registry_restore_merges_tags_instead_of_wiping(tmp_path):
+    """Re-storing identical content without tags must keep earlier tags."""
+    reg = LocalModelRegistry(tmp_path)
+    h = reg.store(Const(1), tags={"family": "alpha"})
+    h2 = reg.store(Const(1))  # same content, no tags kwarg
+    assert h == h2
+    assert reg.list(tags={"family": "alpha"}) == [h]
+    # New tags merge with (not replace) the old ones.
+    reg.store(Const(1), tags={"stage": "prod"})
+    assert reg.list(tags={"family": "alpha", "stage": "prod"}) == [h]
+
+
+def test_local_registry_empty_weights_normalized_to_absent(tmp_path):
+    """b'' and None hash identically, so they must store identically too."""
+    reg = LocalModelRegistry(tmp_path)
+    h_none = reg.store(Const(1))
+    h_empty = reg.store(Const(1), weights=b"")
+    assert h_none == h_empty
+    assert reg.load_weights(h_empty) is None
+
+
+def test_local_registry_writes_leave_no_tmp_files(tmp_path):
+    reg = LocalModelRegistry(tmp_path)
+    reg.store(Const(1), name="v1", tags={"a": 1})
+    leftovers = [p for p in tmp_path.rglob("*.tmp")]
+    assert leftovers == []
+
+
+def test_s3_registry_functional_round_trip_via_memory_fs():
+    """Exercise the fsspec backend end-to-end on the in-memory filesystem."""
+    pytest.importorskip("fsspec")
+    from fsspec.implementations.memory import MemoryFileSystem
+
+    from pipekit_experiment import S3ModelRegistry
+
+    MemoryFileSystem.store.clear()
+    reg = S3ModelRegistry("memory://registry/")
+    h = reg.store(Const(7), name="prod", tags={"family": "alpha"})
+    assert reg.load(h)() == 7
+    assert reg.load("prod")() == 7
+    assert reg.resolve_tag("prod") == h
+    assert reg.load_weights(h) is None
+    assert reg.list(tags={"family": "alpha"}) == [h]
+    with pytest.raises(FileExistsError):
+        reg.tag(h, "prod")
+    with pytest.raises(ValueError):
+        reg.load("../escape")
+    # Re-store without tags keeps the earlier tag metadata (parity with local).
+    reg.store(Const(7))
+    assert reg.list(tags={"family": "alpha"}) == [h]
+
+
+def test_s3_registry_weights_round_trip_via_memory_fs():
+    pytest.importorskip("fsspec")
+    from fsspec.implementations.memory import MemoryFileSystem
+
+    from pipekit_experiment import S3ModelRegistry
+
+    MemoryFileSystem.store.clear()
+    reg = S3ModelRegistry("memory://registry-weights/")
+    h = reg.store(Identity(), weights=b"\x01\x02")
+    assert reg.load_weights(h) == b"\x01\x02"
+    assert reg.load_weights(reg.store(Identity())) is None
+
+
 def test_s3_registry_import_error_without_fsspec(monkeypatch):
     """S3ModelRegistry constructor raises a clean error when fsspec absent."""
     import builtins
