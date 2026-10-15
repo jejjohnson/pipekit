@@ -531,7 +531,7 @@ class _BatchSource:
         # distributed-initialised (process_count > 1).
         sharded = sharding is not None
         # Additive hook: a dataset may build its own Grain iterator (e.g.
-        # `XarrayWindowDataset`'s block reader — coalesced reads, window
+        # geopatcher's `XarrayWindowDataset` block reader — coalesced reads, window
         # shuffle, multi-host sharding). It returns a checkpointable Grain
         # iterator, or None to decline (then we fall through to the generic
         # branches). Datasets without the method are unaffected.

@@ -35,7 +35,7 @@ def hash_config(*parts: Any) -> str:
 
     The shared content-hash framing for `TrainingDataset.content_hash`
     implementations (used by `SimulationDataset`, `CachedDataset`, and
-    `pipekit_train.xarray_window.XarrayWindowDataset`).
+    geotoolz-patcher's `geopatcher.integrations.train.XarrayWindowDataset`).
     """
     chunks: list[bytes | str] = []
     for p in parts:

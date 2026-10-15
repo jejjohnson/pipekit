@@ -108,7 +108,6 @@ packages/
     └── src/pipekit_train/
         ├── loop.py           # TrainingLoop + backend dispatch
         ├── dataset.py        # TrainingDataset, SimulationDataset, CachedDataset
-        ├── xarray_window.py  # XarrayWindowDataset (windowed Zarr)
         ├── sweep.py          # HyperSweep + ParameterGrid
         ├── loss.py           # Loss Protocol (carrier-agnostic)
         ├── callbacks.py      # Callback Protocol + concrete callbacks

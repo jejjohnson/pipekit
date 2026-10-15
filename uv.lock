@@ -4376,11 +4376,6 @@ s3 = [
     { name = "s3fs" },
     { name = "zarr" },
 ]
-xreader = [
-    { name = "grain" },
-    { name = "xarray" },
-    { name = "zarr" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -4390,7 +4385,6 @@ requires-dist = [
     { name = "fsspec", marker = "extra == 's3'", specifier = ">=2024.0" },
     { name = "gcsfs", marker = "extra == 'gcs'", specifier = ">=2024.0" },
     { name = "grain", marker = "extra == 'equinox'", specifier = ">=0.2" },
-    { name = "grain", marker = "extra == 'xreader'", specifier = ">=0.2" },
     { name = "jax", marker = "extra == 'equinox'", specifier = ">=0.4.30" },
     { name = "jaxtyping", marker = "extra == 'equinox'", specifier = ">=0.2" },
     { name = "keras", marker = "extra == 'keras'", specifier = ">=3.0" },
@@ -4406,13 +4400,11 @@ requires-dist = [
     { name = "pipekit-experiment", marker = "extra == 'experiment'", editable = "packages/pipekit-experiment" },
     { name = "s3fs", marker = "extra == 's3'", specifier = ">=2024.0" },
     { name = "torch", marker = "extra == 'lightning'", specifier = ">=2.0" },
-    { name = "xarray", marker = "extra == 'xreader'", specifier = ">=2024.0" },
     { name = "zarr", marker = "extra == 'cache'", specifier = ">=2.18" },
     { name = "zarr", marker = "extra == 'gcs'", specifier = ">=2.18" },
     { name = "zarr", marker = "extra == 's3'", specifier = ">=2.18" },
-    { name = "zarr", marker = "extra == 'xreader'", specifier = ">=2.18" },
 ]
-provides-extras = ["equinox", "lightning", "keras", "numpyro", "blackjax", "cycle", "experiment", "cache", "s3", "gcs", "xreader"]
+provides-extras = ["equinox", "lightning", "keras", "numpyro", "blackjax", "cycle", "experiment", "cache", "s3", "gcs"]
 
 [[package]]
 name = "platformdirs"

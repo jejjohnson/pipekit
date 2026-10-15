@@ -28,14 +28,16 @@ from pipekit_train.writer import JSONLWriter, MetricWriter
 
 
 def __getattr__(name: str):
-    # `XarrayWindowDataset` is re-exported lazily: importing it eagerly would
-    # pull `xarray` + `geopatcher` (the `[xreader]` extra) into every
-    # `import pipekit_train`, breaking the base install. PEP 562 defers it
-    # until first access.
+    # `XarrayWindowDataset` moved to geotoolz-patcher, which owns the temporal
+    # stencils it needs: keeping it here made pipekit import geopatcher, a
+    # cycle with geotoolz's dependency on pipekit. The old name stays as a
+    # pointer, not a re-export.
     if name == "XarrayWindowDataset":
-        from pipekit_train.xarray_window import XarrayWindowDataset
-
-        return XarrayWindowDataset
+        raise ImportError(
+            "XarrayWindowDataset moved to geopatcher: use"
+            " `from geopatcher.integrations.train import XarrayWindowDataset`"
+            " (install 'geotoolz-patcher[train]')."
+        )
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -62,7 +64,6 @@ __all__ = [
     "TrainingDataset",
     "TrainingLoop",
     "ValidationStep",
-    "XarrayWindowDataset",
 ]
 
 __version__ = "0.0.2"  # x-release-please-version
