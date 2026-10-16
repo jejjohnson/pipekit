@@ -131,6 +131,158 @@ the registry and the same `Cycle` forecasts with an emulator; add an
 observation operator and an analysis step and it assimilates
 (`DACycle`, `EnsembleDACycle`).
 
+## A bigger graph
+
+Everything above composes. This is an anomaly detector for a stack of
+multi-channel images: satellite scenes, microscope fields or telescope
+exposures read the same way. Six small domain operators do the science;
+pipekit does the rest: reading in parallel with retries and a cache,
+stacking and checking shapes, choosing a composite by the size of the
+stack, joining a second input, observing, and summarising, with four
+named outputs.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/graph-dark.svg">
+    <img alt="An anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs" src="docs/assets/graph-light.svg" width="760">
+  </picture>
+</p>
+
+It needs `pipekit-array` (for `StackAlong`) and NumPy besides the core.
+
+```python
+import numpy as np
+from numpy.typing import NDArray
+
+from pipekit import (
+    AssertShape,
+    Branch,
+    Cache,
+    Fanout,
+    Graph,
+    Input,
+    Lambda,
+    Operator,
+    Retry,
+    Tap,
+    ThreadMap,
+)
+from pipekit_array import StackAlong
+
+Array = NDArray[np.float64]
+C, H, W = 3, 64, 64  # channels, rows, columns
+
+
+# ── the domain operators: the only code you write ────────────────────────────
+class ReadTile(Operator):
+    """source id ↦ one exposure (C, H, W). A stand-in for your reader."""
+
+    def _apply(self, source: str) -> Array:
+        rng = np.random.default_rng(sum(map(ord, source)))
+        x = 100.0 + rng.normal(0.0, 1.0, (C, H, W))  #              str → (C, H, W)
+        x[0, 20:26, 30:36] += 8.0  # something real, in every exposure
+        return x
+
+
+class Composite(Operator):
+    """x̄_chw = reduce_t x_tchw, by mean or median over the stack."""
+
+    def __init__(self, *, how: str) -> None:
+        self.how = how
+
+    def _apply(self, stack: Array) -> Array:
+        reduce = np.median if self.how == "median" else np.mean
+        return reduce(stack, axis=0)  #                       (T, C, H, W) → (C, H, W)
+
+
+class ZScore(Operator):
+    """z = (x̄ − μ_b) / σ_b, against a background (μ_b, σ_b)."""
+
+    def __init__(self, *, sigma: float) -> None:
+        self.sigma = sigma  # σ_b
+
+    def _apply(self, composite: Array, background: Array) -> Array:
+        return (composite - background) / self.sigma  # (C, H, W)² → (C, H, W)
+
+
+class NormalizedDifference(Operator):
+    """r = (x_a − x_b) / (x_a + x_b), a ratio between two channels."""
+
+    def __init__(self, *, a: int, b: int) -> None:
+        self.a, self.b = a, b
+
+    def _apply(self, x: Array) -> Array:
+        xa, xb = x[self.a], x[self.b]
+        return (xa - xb) / (xa + xb)  #                           (C, H, W) → (H, W)
+
+
+class Score(Operator):
+    """s = max_c |z_c| + w · |r − r̄|: how unusual each pixel is."""
+
+    def __init__(self, *, weight: float) -> None:
+        self.weight = weight  # w
+
+    def _apply(self, z: Array, ratio: Array) -> Array:
+        return np.abs(z).max(axis=0) + self.weight * np.abs(ratio - ratio.mean())
+
+
+class Threshold(Operator):
+    """m = 1[s > k]: the anomaly mask."""
+
+    def __init__(self, *, k: float) -> None:
+        self.k = k
+
+    def _apply(self, score: Array) -> NDArray[np.bool_]:
+        return score > self.k  #                                     (H, W) → (H, W)
+
+
+# ── the graph: pipekit's pieces do the plumbing ──────────────────────────────
+sources, background = Input("sources"), Input("background")
+
+# read every source in parallel; retry flaky reads; never read one twice
+read = ThreadMap(
+    Cache(Retry(ReadTile(), attempts=3, base_delay=0.5, on=(OSError,))), n_workers=8
+)
+# list of (C, H, W) → (T, C, H, W), checked
+stack = (read | StackAlong(axis=0) | AssertShape((None, C, H, W)))(sources)
+
+# few exposures: the median resists outliers; many: the mean is cheaper
+composite = Branch(
+    lambda s: s.shape[0] < 5,
+    if_true=Composite(how="median"),
+    if_false=Composite(how="mean"),
+)(stack)
+
+z = ZScore(sigma=1.0)(composite, background)  # (C, H, W)
+ratio = NormalizedDifference(a=0, b=1)(composite)  # (H, W)
+score = Score(weight=10.0)(z, ratio)  # (H, W)
+mask = (Threshold(k=3.0) | Tap(lambda m: print(f"{int(m.sum())} pixels flagged")))(
+    score
+)
+summary = Fanout(
+    {
+        "flagged": Lambda(lambda m: int(m.sum())),
+        "fraction": Lambda(lambda m: float(m.mean())),
+    }
+)(mask)
+
+detector = Graph(
+    inputs={"sources": sources, "background": background},
+    outputs={"composite": composite, "score": score, "mask": mask, "summary": summary},
+)
+
+out = detector(
+    sources=[f"scene-{i:02d}" for i in range(6)],  # T = 6
+    background=np.full((C, H, W), 100.0),  # μ_b
+)
+# {"composite": (C, H, W), "score": (H, W), "mask": (H, W), "summary": {...}}
+```
+
+Every box in the figure is one line of the graph. `detector` is itself
+an `Operator`: called with its named inputs, it returns its named outputs,
+and every operator inside it keeps its own config, so changing the
+threshold or the reader is a constructor argument, not a rewrite.
+
 ## The packages
 
 <p align="center">

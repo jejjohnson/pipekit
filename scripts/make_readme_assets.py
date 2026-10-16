@@ -7,15 +7,14 @@ The SVGs are generated; edit this script and re-run it::
 It writes the icon (``icon.svg``), the logo (``logo-{light,dark}.svg``),
 one operator and its four shapes (``operator-{light,dark}.svg``), the
 workspace (``packages-{light,dark}.svg``), who builds on it
-(``ecosystem-{light,dark}.svg``) and, while the icon is being chosen,
-``icon-candidates.svg``. Standard library only; the style follows the
+(``ecosystem-{light,dark}.svg``) and a bigger graph, the README's anomaly
+detector (``graph-{light,dark}.svg``). Standard library only; the style follows the
 stack's other READMEs (gaussx, radtrax): a rounded square with a gradient
 and a white glyph, chips in a monospace face.
 """
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -167,11 +166,11 @@ def chips_row(x0, y, items, t, *, right, size=12.0, gap=8.0):
     return "".join(out), y + 26
 
 
-# ── icon candidates (128 x 128, the glyph in white on the gradient) ──────────
+# ── the icon (128 x 128, the glyph in white on the gradient) ─────────────────
 
 
 def glyph_chain(ox: float, oy: float) -> str:
-    """A · Three operators in a row: ``a | b | c``."""
+    """Three operators in a row: ``a | b | c``."""
     out = [path(f"M{ox + 12} {oy + 64} L{ox + 22} {oy + 64}", stroke="#FFFFFF", sw=4)]
     for i, x in enumerate((22, 54, 86)):
         out.append(
@@ -196,88 +195,8 @@ def glyph_chain(ox: float, oy: float) -> str:
     return "".join(out)
 
 
-def glyph_graph(ox: float, oy: float) -> str:
-    """B · A small graph: one input fans out to two operators and merges."""
-    a, b, c, d = (
-        (ox + 26, oy + 64),
-        (ox + 64, oy + 38),
-        (ox + 64, oy + 90),
-        (ox + 102, oy + 64),
-    )
-    out = []
-    for p, q in ((a, b), (a, c), (b, d), (c, d)):
-        out.append(
-            path(f"M{p[0]} {p[1]} L{q[0]} {q[1]}", stroke="#FFFFFF", sw=4, op=0.92)
-        )
-    out.append(circle(*a, 10, W92))
-    out.append(
-        f'<rect x="{b[0] - 13}" y="{b[1] - 11}" width="26" height="22" rx="6" {W92}/>'
-    )
-    out.append(
-        f'<rect x="{c[0] - 13}" y="{c[1] - 11}" width="26" height="22" rx="6" {W92}/>'
-    )
-    out.append(circle(*d, 10, W92))
-    return "".join(out)
-
-
-def glyph_loop(ox: float, oy: float) -> str:
-    """C · An operator with its state carried round: ``(x, s) → (x, s)``."""
-    cx, cy, r = ox + 64, oy + 64, 36
-    out = [f'<rect x="{cx - 18}" y="{cy - 14}" width="36" height="28" rx="7" {W92}/>']
-    a0, a1 = math.radians(-60), math.radians(220)
-    x0, y0 = cx + r * math.cos(a0), cy + r * math.sin(a0)
-    x1, y1 = cx + r * math.cos(a1), cy + r * math.sin(a1)
-    out.append(
-        path(
-            f"M{x0:.1f} {y0:.1f} A{r} {r} 0 1 1 {x1:.1f} {y1:.1f}",
-            stroke="#FFFFFF",
-            sw=4.5,
-        )
-    )
-    # arrowhead at the end of the arc, along its tangent (angle increasing)
-    dx, dy = -math.sin(a1), math.cos(a1)
-    tip = (x1 + 9 * dx, y1 + 9 * dy)
-    left = (x1 + 7 * dy, y1 - 7 * dx)
-    right = (x1 - 7 * dy, y1 + 7 * dx)
-    out.append(
-        f'<path d="M{tip[0]:.1f} {tip[1]:.1f} L{left[0]:.1f} {left[1]:.1f} '
-        f'L{right[0]:.1f} {right[1]:.1f} z" {W92}/>'
-    )
-    return "".join(out)
-
-
-def glyph_kit(ox: float, oy: float) -> str:
-    """D · A kit of blocks with one path snaking through them."""
-    out = []
-    cells = [(28, 30), (70, 30), (28, 72), (70, 72)]
-    for i, (x, y) in enumerate(cells):
-        out.append(
-            f'<rect x="{ox + x}" y="{oy + y}" width="30" height="26" rx="6" '
-            f"{W92 if i in (0, 1, 3) else W22}/>"
-        )
-    out.append(
-        path(
-            f"M{ox + 14} {oy + 43} L{ox + 28} {oy + 43} M{ox + 58} {oy + 43} "
-            f"L{ox + 70} {oy + 43} M{ox + 85} {oy + 56} L{ox + 85} {oy + 72} "
-            f"M{ox + 100} {oy + 85} L{ox + 114} {oy + 85}",
-            stroke="#FFFFFF",
-            sw=4,
-        )
-    )
-    return "".join(out)
-
-
-GLYPHS = {
-    "chain": glyph_chain,
-    "graph": glyph_graph,
-    "loop": glyph_loop,
-    "kit": glyph_kit,
-}
-ICON = "chain"  # the chosen glyph; the others stay as candidates
-
-
-def tile(ox: float, oy: float, glyph: str, gid: str) -> str:
-    return rect(ox + 4, oy + 4, 120, 120, rx=26, fill=f"url(#{gid})") + GLYPHS[glyph](
+def tile(ox: float, oy: float, gid: str) -> str:
+    return rect(ox + 4, oy + 4, 120, 120, rx=26, fill=f"url(#{gid})") + glyph_chain(
         ox, oy
     )
 
@@ -286,7 +205,7 @@ def icon() -> str:
     return svg(
         128,
         128,
-        f"<defs>{gradient('pk-icon')}</defs>" + tile(0, 0, ICON, "pk-icon"),
+        f"<defs>{gradient('pk-icon')}</defs>" + tile(0, 0, "pk-icon"),
         "pipekit",
     )
 
@@ -294,44 +213,13 @@ def icon() -> str:
 def logo(theme: str) -> str:
     t = THEMES[theme]
     gid = f"pk-{theme}"
-    body = f"<defs>{gradient(gid)}</defs>" + tile(6, 6, ICON, gid)
+    body = f"<defs>{gradient(gid)}</defs>" + tile(6, 6, gid)
     body += (
         f'<text x="154" y="92" font-family="{SANS}" font-size="72" font-weight="700" '
         f'letter-spacing="-1.5" fill="{t["ink"]}">pipe'
         f'<tspan fill="{t["accent"]}">kit</tspan></text>'
     )
     return svg(470, 140, body, "pipekit")
-
-
-def candidates() -> str:
-    names = [
-        ("chain", "A · a | b | c"),
-        ("graph", "B · graph"),
-        ("loop", "C · state carried"),
-        ("kit", "D · kit of blocks"),
-    ]
-    t = THEMES["light"]
-    body = f"<defs>{gradient('pk-c')}</defs>"
-    for i, (g, label) in enumerate(names):
-        ox = 20 + i * 190
-        body += tile(ox + 21, 16, g, "pk-c")
-        body += text(
-            ox + 85,
-            172,
-            escape(label),
-            size=14,
-            fill=t["ink"],
-            weight=600,
-            anchor="middle",
-        )
-        for j, s in enumerate((32, 16)):  # favicon sizes
-            k = s / 128
-            body += (
-                f'<g transform="translate({ox + 52 + j * 52} 186) scale({k})">'
-                + tile(0, 0, g, "pk-c")
-                + "</g>"
-            )
-    return svg(780, 236, body, "pipekit icon candidates")
 
 
 # ── one operator, four shapes ────────────────────────────────────────────────
@@ -765,7 +653,7 @@ def ecosystem(theme: str) -> str:
     b.append(rect(px, py, pw, ph, rx=18, fill=t["chip"], stroke=t["accent"], sw=2.6))
     b.append(
         f'<g transform="translate({px + 14} {py + 14}) scale(0.53)">'
-        + tile(0, 0, ICON, gid)
+        + tile(0, 0, gid)
         + "</g>"
     )
     b.append(
@@ -903,14 +791,319 @@ def ecosystem(theme: str) -> str:
     )
 
 
+# ── a bigger graph: the anomaly detector ─────────────────────────────────────
+
+
+def graph_figure(theme: str) -> str:
+    t = THEMES[theme]
+    W, H = 900, 1110
+    b = [f"<defs>{arrowhead('ga', t['edge'])}{arrowhead('gb', t['accent'])}</defs>"]
+    cx = 330  # the main column
+
+    def pill(x, y, w, label, *, out=False):
+        b.append(
+            rect(
+                x,
+                y,
+                w,
+                36,
+                rx=18,
+                fill=t["chip"],
+                stroke=t["accent"],
+                sw=2.6 if out else 1.6,
+            )
+        )
+        b.append(
+            text(
+                x + w / 2,
+                y + 23,
+                escape(label),
+                size=13,
+                fill=t["ink"],
+                weight=700,
+                anchor="middle",
+                family=MONO,
+            )
+        )
+
+    def op(x, y, w, h, name, sub=""):
+        b.append(rect(x, y, w, h, rx=10, fill=t["panel"], stroke=t["accent"], sw=1.6))
+        b.append(
+            text(
+                x + w / 2,
+                y + (h / 2 + 5 if not sub else 24),
+                escape(name),
+                size=13.5,
+                fill=t["ink"],
+                weight=700,
+                anchor="middle",
+                family=MONO,
+            )
+        )
+        if sub:
+            b.append(
+                text(
+                    x + w / 2,
+                    y + 44,
+                    escape(sub),
+                    size=11.5,
+                    fill=t["muted"],
+                    anchor="middle",
+                )
+            )
+
+    def down(x, y0, y1, shape=""):
+        b.append(path(f"M{x} {y0} L{x} {y1 - 4}", stroke=t["edge"], sw=2, marker="ga"))
+        if shape:
+            b.append(
+                text(
+                    x + 10,
+                    (y0 + y1) / 2 + 4,
+                    escape(shape),
+                    size=11.5,
+                    fill=t["muted"],
+                    family=MONO,
+                )
+            )
+
+    def to_output(y, x0, label):
+        b.append(
+            path(
+                f"M{x0} {y} L{676} {y}",
+                stroke=t["accent"],
+                sw=2,
+                dash="2 5",
+                marker="gb",
+            )
+        )
+        pill(680, y - 18, 150, label, out=True)
+
+    # inputs
+    pill(cx - 70, 20, 140, "sources")
+    pill(30, 20, 150, "background")
+    b.append(text(cx + 80, 43, "list[str]", size=11.5, fill=t["muted"], family=MONO))
+    b.append(text(30, 74, "(C, H, W)", size=11.5, fill=t["muted"], family=MONO))
+
+    # read: ThreadMap ⊃ Cache ⊃ Retry ⊃ ReadTile
+    down(cx, 56, 96)
+    nest = [
+        ("ThreadMap", "8 workers"),
+        ("Cache", "read once"),
+        ("Retry", "3 attempts on OSError"),
+    ]
+    x0, y0, w0, h0 = cx - 160, 96, 320, 210
+    for k, (name, note) in enumerate(nest):
+        d = 16 * k
+        b.append(
+            rect(
+                x0 + d,
+                y0 + 34 * k,
+                w0 - 2 * d,
+                h0 - 44 * k,
+                rx=14,
+                fill="none",
+                stroke=t["accent"],
+                sw=1.4,
+                dash="6 5",
+            )
+        )
+        b.append(
+            text(
+                x0 + d + 12,
+                y0 + 34 * k + 22,
+                name,
+                size=12.5,
+                fill=t["accent_ink"],
+                weight=700,
+                family=MONO,
+            )
+        )
+        b.append(
+            text(
+                x0 + w0 - d - 12,
+                y0 + 34 * k + 22,
+                escape(note),
+                size=11.5,
+                fill=t["muted"],
+                anchor="end",
+            )
+        )
+    op(cx - 70, y0 + 112, 140, 40, "ReadTile")
+    b.append(
+        text(cx + 172, y0 + h0 / 2 + 4, "one per source", size=11.5, fill=t["muted"])
+    )
+
+    # stack and check
+    down(cx, y0 + h0, 346, "list[(C, H, W)]")
+    op(cx - 80, 346, 160, 40, "StackAlong")
+    down(cx, 386, 416, "(T, C, H, W)")
+    op(cx - 80, 416, 160, 40, "AssertShape")
+
+    # branch
+    down(cx, 456, 490)
+    bx, by, bw, bh = cx - 150, 490, 300, 116
+    b.append(
+        rect(
+            bx,
+            by,
+            bw,
+            bh,
+            rx=14,
+            fill=t["panel"],
+            stroke=t["accent"],
+            sw=1.6,
+            dash="6 5",
+        )
+    )
+    b.append(
+        text(
+            bx + 14,
+            by + 24,
+            "Branch",
+            size=12.5,
+            fill=t["accent_ink"],
+            weight=700,
+            family=MONO,
+        )
+    )
+    b.append(
+        text(
+            bx + bw - 14,
+            by + 24,
+            "T &lt; 5 ?",
+            size=12,
+            fill=t["muted"],
+            anchor="end",
+            family=MONO,
+        )
+    )
+    for k, (lab, how) in enumerate((("yes", "median"), ("no", "mean"))):
+        xx = bx + 16 + k * 142
+        op(xx, by + 40, 126, 58, "Composite", f"{how} over T")
+        b.append(text(xx + 63, by + 36, lab, size=11, fill=t["muted"], anchor="middle"))
+    to_output(by + bh / 2, bx + bw + 4, "composite")
+
+    # two features from the composite
+    fy = 690
+    b.append(path(f"M{cx} {by + bh} L{cx} {650}", stroke=t["edge"], sw=2))
+    b.append(text(cx + 10, 636, "(C, H, W)", size=11.5, fill=t["muted"], family=MONO))
+    zx, rx_ = 150, 360
+    for x in (zx + 100, rx_ + 100):
+        b.append(
+            path(
+                f"M{cx} 650 L{x} 650 L{x} {fy - 4}", stroke=t["edge"], sw=2, marker="ga"
+            )
+        )
+    op(zx, fy, 200, 56, "ZScore", "z = (x̄ − μ_b) / σ_b")  # noqa: RUF001 (maths in a label)
+    op(rx_, fy, 200, 56, "NormalizedDifference", "r = (x_a − x_b)/(x_a + x_b)")  # noqa: RUF001 (maths in a label)
+    # background into ZScore
+    b.append(
+        path(
+            f"M105 56 L105 {fy + 28} L{zx - 4} {fy + 28}",
+            stroke=t["edge"],
+            sw=2,
+            marker="ga",
+        )
+    )
+
+    # score
+    sy = 806
+    for x in (zx + 100, rx_ + 100):
+        b.append(path(f"M{x} {fy + 56} L{x} 780 L{cx} 780", stroke=t["edge"], sw=2))
+    down(cx, 780, sy, "")
+    b.append(text(zx + 110, 774, "(C, H, W)", size=11.5, fill=t["muted"], family=MONO))
+    b.append(text(rx_ + 110, 774, "(H, W)", size=11.5, fill=t["muted"], family=MONO))
+    op(cx - 110, sy, 220, 56, "Score", "s = maxᶜ |z| + w · |r − r̄|")  # noqa: RUF001 (maths in a label)
+    to_output(sy + 28, cx + 114, "score")
+
+    # threshold, tapped
+    ty = 900
+    down(cx, sy + 56, ty, "(H, W)")
+    op(cx - 110, ty, 220, 56, "Threshold", "m = 1[s > k]")
+    b.append(
+        path(
+            f"M{cx - 114} {ty + 28} L{120} {ty + 28}",
+            stroke=t["edge"],
+            sw=2,
+            dash="3 4",
+            marker="ga",
+        )
+    )
+    b.append(
+        rect(
+            30, ty + 10, 86, 36, rx=8, fill="none", stroke=t["edge"], sw=1.4, dash="3 4"
+        )
+    )
+    b.append(
+        text(
+            73,
+            ty + 33,
+            "Tap",
+            size=12.5,
+            fill=t["muted"],
+            weight=700,
+            anchor="middle",
+            family=MONO,
+        )
+    )
+    b.append(text(73, ty + 64, "log count", size=11, fill=t["muted"], anchor="middle"))
+    to_output(ty + 28, cx + 114, "mask")
+
+    # fanout
+    fy2 = 998
+    down(cx, ty + 56, fy2)
+    b.append(
+        rect(cx - 150, fy2, 300, 76, rx=14, fill=t["panel"], stroke=t["accent"], sw=1.6)
+    )
+    b.append(
+        text(
+            cx - 136,
+            fy2 + 22,
+            "Fanout",
+            size=12.5,
+            fill=t["accent_ink"],
+            weight=700,
+            family=MONO,
+        )
+    )
+    for k, lab in enumerate(("flagged", "fraction")):
+        c, _ = chip(cx - 136 + k * 140, fy2 + 36, lab, t, size=12)
+        b.append(c)
+    to_output(fy2 + 38, cx + 154, "summary")
+
+    b.append(
+        text(
+            W - 20,
+            H - 12,
+            "dashed: wrappers and control · grey dotted: observers · "
+            "teal dotted: outputs",
+            size=11.5,
+            fill=t["muted"],
+            anchor="end",
+        )
+    )
+    return svg(
+        W,
+        H,
+        "".join(b),
+        "An anomaly detector as one pipekit Graph: sources are read in parallel "
+        "(ThreadMap around Cache around Retry around ReadTile), stacked and "
+        "checked, composited by a Branch (median for few exposures, mean for "
+        "many), turned into a z-score against a background input and a channel "
+        "ratio, scored, thresholded with a Tap, and summarised by a Fanout; "
+        "composite, score, mask and summary are its outputs",
+    )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    out: dict[str, str] = {"icon.svg": icon(), "icon-candidates.svg": candidates()}
+    out: dict[str, str] = {"icon.svg": icon()}
     for th in THEMES:
         out[f"logo-{th}.svg"] = logo(th)
         out[f"operator-{th}.svg"] = operator_figure(th)
         out[f"packages-{th}.svg"] = packages_figure(th)
         out[f"ecosystem-{th}.svg"] = ecosystem(th)
+        out[f"graph-{th}.svg"] = graph_figure(th)
     for name, s in out.items():
         (OUT / name).write_text(s, encoding="utf-8")
         print(name)
