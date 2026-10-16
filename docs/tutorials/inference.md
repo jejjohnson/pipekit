@@ -87,6 +87,9 @@ NOW: datetime = datetime(2026, 10, 16, 6, 0, tzinfo=UTC)
 # hours of history per prediction
 WINDOW: int = 24
 TIME_FORMAT: str = "%Y-%m-%dT%H:%MZ"
+# the fields every record must carry, and the units we can convert
+FIELDS: tuple[str, ...] = ("station", "time", "value", "unit")
+KNOWN_UNITS: set[str] = {"degC", "degF", "K"}
 
 
 def parse_time(stamp: str) -> datetime:
@@ -259,7 +262,8 @@ feed: list[Record] = raw_feed()
 Each step is a named operator; the steps are bundled with `|` and run
 once on today's feed, step by step, so every intermediate can be looked
 at. Records are validated one by one with `DropMalformed`, which logs
-the bad ones instead of failing the run; then deduplicated and
+the bad ones (a missing field, a bad time, an unknown station or unit,
+no value) instead of failing the run; then deduplicated and
 converted to °C. `ToGrid` puts them on an hourly grid; the QC chain blanks
 out-of-range values and stuck sensors, fills gaps of up to two hours and
 leaves longer ones missing. A station is usable only if its last six
@@ -267,19 +271,23 @@ hours are complete (`RecentlyValid`).
 
 ```python
 class DropMalformed(Operator):
-    """Keep records with a known station, a valid time and a numeric value."""
+    """Keep complete records: known station and unit, valid time, numeric value."""
 
     def __init__(self, *, on_reject=None) -> None:
         self.on_reject = on_reject
 
     def _is_valid(self, record: Record) -> bool:
+        for field in FIELDS:
+            if field not in record:
+                return False
         try:
             parse_time(record["time"])
-        except (KeyError, ValueError):
+        except ValueError:
             return False
         known_station = record["station"] in UNITS
+        known_unit = record["unit"] in KNOWN_UNITS
         numeric_value = isinstance(record["value"], int | float)
-        return known_station and numeric_value
+        return known_station and known_unit and numeric_value
 
     def _apply(self, records: list[Record]) -> list[Record]:
         kept: list[Record] = []
@@ -313,12 +321,16 @@ class ToCelsius(Operator):
         converted: list[Record] = []
         for record in records:
             value = record["value"]
+            unit = record["unit"]
             # °F ↦ (v − 32) · 5/9
-            if record["unit"] == "degF":
+            if unit == "degF":
                 value = (value - 32) * 5 / 9
             # K ↦ v − 273.15
-            elif record["unit"] == "K":
+            elif unit == "K":
                 value = value - 273.15
+            # never relabel a unit we cannot convert
+            elif unit != "degC":
+                raise ValueError(f"cannot convert unit {unit!r} to °C")
             converted.append({**record, "value": value, "unit": "degC"})
         return converted
 
@@ -422,7 +434,8 @@ def log_rejected(record: Record) -> None:
 
 # the steps
 
-# drop records with a bad time, an unknown station or no value; log each one
+# drop records with a missing field, a bad time, an unknown station or unit,
+# or no value; log each one
 drop_malformed = DropMalformed(on_reject=log_rejected)
 # keep the first record per (station, time)
 dedupe = Dedupe()
