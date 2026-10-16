@@ -12,10 +12,12 @@ when it was made.
 from __future__ import annotations
 
 import importlib
+import json
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Any
 
 from pipekit.hashing import sha256_hex, stable_json
@@ -69,8 +71,11 @@ class EvaluationReport:
         entries: One entry per scorer value; keys are unique.
         model_ref: What was evaluated (a registry hash, a URI), if known.
         dataset_ref: What it was evaluated on, if known.
-        config: Free-form settings of the run; JSON values hash exactly,
-            others by ``repr``.
+        config: Free-form settings of the run, kept as a read-only JSON
+            snapshot taken at construction; a value that is not JSON (a
+            ``Path``, an object) is stored as its ``repr``. Changing the
+            caller's config afterwards changes neither the report nor its
+            hash.
         timestamp: When the report was made (UTC). Not part of
             :attr:`content_hash`.
     """
@@ -80,6 +85,7 @@ class EvaluationReport:
     dataset_ref: str | None = None
     config: Mapping[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    _config_json: str = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         entries = tuple(self.entries)
@@ -95,7 +101,12 @@ class EvaluationReport:
                 "be unique within a report"
             )
         object.__setattr__(self, "entries", entries)
-        object.__setattr__(self, "config", dict(self.config))
+        # The canonical JSON is the snapshot: the hash and to_dict read it,
+        # so mutating a nested value the caller still holds cannot change a
+        # report that has already been hashed.
+        config_json = stable_json(dict(self.config))
+        object.__setattr__(self, "_config_json", config_json)
+        object.__setattr__(self, "config", MappingProxyType(json.loads(config_json)))
 
     @property
     def values(self) -> dict[str, float]:
@@ -116,7 +127,7 @@ class EvaluationReport:
             ),
             "model_ref": self.model_ref,
             "dataset_ref": self.dataset_ref,
-            "config": self.config,
+            "config": json.loads(self._config_json),
         }
         return sha256_hex(stable_json(payload))
 
@@ -185,7 +196,7 @@ class EvaluationReport:
             "entries": self.to_records(),
             "model_ref": self.model_ref,
             "dataset_ref": self.dataset_ref,
-            "config": self.config,
+            "config": json.loads(self._config_json),
             "timestamp": self.timestamp.isoformat(),
             "content_hash": self.content_hash,
         }
@@ -230,7 +241,14 @@ def evaluate(
 
     Returns:
         The report, one entry per value each scorer returned.
+
+    Raises:
+        ValueError: If two scorers share a name; checked before any scorer
+            runs, because two such scorers with different metric names
+            would otherwise merge into one namespace.
     """
+    scorers = list(scorers)
+    _check_unique_names(scorers)
     stage = None if stage is None else Stage(stage)
     entries: list[ReportEntry] = []
     for scorer in scorers:
@@ -245,6 +263,15 @@ def evaluate(
         dataset_ref=dataset_ref,
         config=config or {},
     )
+
+
+def _check_unique_names(scorers: Sequence[Scorer]) -> None:
+    names = [scorer.name for scorer in scorers]
+    dups = sorted({name for name in names if names.count(name) > 1})
+    if dups:
+        raise ValueError(
+            f"duplicate scorer names {dups}; each scorer needs its own name"
+        )
 
 
 def _same(a: float | None, b: float | None) -> bool:

@@ -68,13 +68,13 @@ def _as_stages(stages: Stage | str | Iterable[Stage | str]) -> frozenset[Stage]:
     return frozenset(Stage(s) for s in stages)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class ScorerTags:
     """A scorer's position in the taxonomy.
 
-    Strings are accepted wherever an enum member is, so
-    ``ScorerTags(lens="structural", stages={"final"})`` is valid; the
-    fields always hold enum members after construction.
+    Strings are accepted wherever an enum member is, and one stage may be
+    given on its own, so ``ScorerTags(lens="structural", stages="final")``
+    is valid; the fields always hold enum members after construction.
 
     Attributes:
         unit: What the scorer scores.
@@ -84,18 +84,27 @@ class ScorerTags:
             respect to the prediction (a requirement for use as a loss).
     """
 
-    unit: Unit = Unit.FIELD
-    lens: Lens = Lens.POINTWISE
-    stages: frozenset[Stage] = DEFAULT_STAGES
-    differentiable: bool = False
+    unit: Unit
+    lens: Lens
+    stages: frozenset[Stage]
+    differentiable: bool
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "unit", Unit(self.unit))
-        object.__setattr__(self, "lens", Lens(self.lens))
-        stages = _as_stages(self.stages)
-        if not stages:
+    # A hand-written __init__ so the accepted inputs (strings, one stage)
+    # are in the signature, while the fields keep their normalised types.
+    def __init__(
+        self,
+        unit: Unit | str = Unit.FIELD,
+        lens: Lens | str = Lens.POINTWISE,
+        stages: Stage | str | Iterable[Stage | str] = DEFAULT_STAGES,
+        differentiable: bool = False,
+    ) -> None:
+        normalised = _as_stages(stages)
+        if not normalised:
             raise ValueError("a scorer must run at one stage or more")
-        object.__setattr__(self, "stages", stages)
+        object.__setattr__(self, "unit", Unit(unit))
+        object.__setattr__(self, "lens", Lens(lens))
+        object.__setattr__(self, "stages", normalised)
+        object.__setattr__(self, "differentiable", bool(differentiable))
 
     def runs_at(self, stage: Stage | str) -> bool:
         """Whether the scorer may run at ``stage``."""
