@@ -199,7 +199,48 @@ def test_metric_scorer_flattens_each_result_shape(
     assert all(type(v) is float for v in scores.values())
 
 
-def test_metric_scorer_rejects_a_value_that_keeps_a_dimension() -> None:
-    scorer = MetricScorer(lambda p, r: {"by_lead": np.ones(3)}, name="skill")
+@pytest.mark.parametrize("value", [np.ones(3), np.ones(1), np.ones((1, 1))])
+def test_metric_scorer_rejects_a_value_that_keeps_a_dimension(value: Any) -> None:
+    # a singleton dimension (one lead time) is still a dimension
+    scorer = MetricScorer(lambda p, r: {"by_lead": value}, name="skill")
     with pytest.raises(ValueError, match="'by_lead' is not a scalar"):
         scorer(None, None)
+
+
+def test_metric_scorer_is_never_differentiable() -> None:
+    # its values become Python floats, which no autodiff can see through
+    assert tags_of(MetricScorer(rmse)).differentiable is False
+
+
+# --------------------------------------------------------------------------- #
+# What a scorer takes from an Estimate
+# --------------------------------------------------------------------------- #
+@dataclass
+class SampledEstimate(PointEstimate):
+    draws: Any = None
+
+    def sample(self, n: int, *, key: Any = None) -> Any:
+        return self.draws[:n]
+
+
+def test_probabilistic_scorer_refuses_to_score_only_the_point() -> None:
+    def spread(prediction: Any, reference: Any) -> float:
+        return float(np.std(prediction))
+
+    scorer = MetricScorer(spread, lens="probabilistic")
+    estimate = SampledEstimate(0.0, draws=np.array([-1.0, 1.0, -1.0, 1.0]))
+    with pytest.raises(ValueError, match="from_estimate="):
+        scorer(estimate, 0.0)
+    # raw carriers (an ensemble array) need no conversion
+    assert scorer(estimate.draws, 0.0) == {"value": 1.0}
+
+
+def test_from_estimate_says_what_the_metric_is_handed() -> None:
+    def spread(prediction: Any, reference: Any) -> float:
+        return float(np.std(prediction))
+
+    scorer = MetricScorer(
+        spread, lens="probabilistic", from_estimate=lambda e: e.sample(4)
+    )
+    estimate = SampledEstimate(0.0, draws=np.array([-1.0, 1.0, -1.0, 1.0]))
+    assert scorer(estimate, PointEstimate(0.0)) == {"value": 1.0}
