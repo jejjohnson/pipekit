@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from pipekit._base.operator import Carrier, Operator
+from pipekit._base.operator import _MISSING, Carrier, Operator
 
 
 class Node:
@@ -114,10 +114,22 @@ class Graph(Operator):
             output is a direct passthrough). The keys are the keys of
             the returned dict.
 
+    State:
+        A graph that contains a stateful node (a `StatefulOperator`, or
+        a `Sequential` / `Graph` that contains one) threads a carry state
+        the way `Sequential` does: call it as
+        ``graph(a=..., b=..., state=s)`` and it returns
+        ``(outputs, state)``. The state passes through the stateful nodes
+        in topological order (the order `describe` lists); stateless
+        nodes ignore it. Inside a stateful `Sequential` the graph receives
+        ``(carrier, state)`` positionally, like any stateful step.
+
     Raises:
         ValueError: if the graph contains a cycle, if an `Input`
-            referenced by a node isn't declared in ``inputs``, or if
-            a required input is missing at call time.
+            referenced by a node isn't declared in ``inputs``, if a
+            required input is missing at call time, or if a stateful
+            graph declares an input named ``state`` (the name is the
+            carry state's).
     """
 
     __config_mixin_auto__ = False  # custom get_config — topology, not kwargs
@@ -130,6 +142,18 @@ class Graph(Operator):
         self.inputs = inputs
         self.outputs = outputs
         self._order = self._topological_sort()
+        if self._is_stateful and "state" in inputs:
+            raise ValueError(
+                "A stateful Graph cannot declare an input named 'state': "
+                "`state=` is how its carry state is passed. Rename the input."
+            )
+
+    @property
+    def _is_stateful(self) -> bool:  # type: ignore[override]
+        """True if any node's operator is stateful (as for `Sequential`)."""
+        return any(
+            getattr(node.operator, "_is_stateful", False) for node in self._order
+        )
 
     def _topological_sort(self) -> list[Node]:
         """Return the topological ordering of non-input `Node`s.
@@ -169,8 +193,8 @@ class Graph(Operator):
             visit(output)
         return order
 
-    def _apply(self, *args: Carrier, **inputs: Carrier) -> dict[str, Any]:
-        """Evaluate the graph with the supplied inputs.
+    def _apply(self, *args: Carrier, **inputs: Carrier) -> Any:
+        """Evaluate the graph with the supplied inputs (and carry state).
 
         Accepts inputs either positionally (bound to declared `Input`s
         in declaration order) or by keyword. The positional form lets
@@ -179,17 +203,40 @@ class Graph(Operator):
         through `Operator.__call__`, which only splat positionally.
 
         Args:
-            *args: One value per declared `Input`, in declaration order.
-                Mutually exclusive with ``**inputs``.
-            **inputs: One value per declared `Input`, keyed by name.
+            *args: One value per declared `Input`, in declaration order,
+                then, for a stateful call, the state. Mutually exclusive
+                with ``**inputs``.
+            **inputs: One value per declared `Input`, keyed by name, and
+                ``state=`` for a stateful call (unless ``state`` is a
+                declared input of a stateless graph).
 
         Returns:
-            ``{output-name: result}`` for each declared output.
+            ``{output-name: result}`` for each declared output; for a
+            stateful call, ``(outputs, state)``.
+
+        Raises:
+            TypeError: if positional and keyword inputs are mixed, if the
+                number of positional arguments fits neither the inputs
+                nor the inputs plus a state, or if a stateful graph is
+                called without a state.
         """
         if args and inputs:
             raise TypeError(
                 "Graph._apply accepts either positional args (bound to inputs "
                 "in declaration order) or keyword inputs, not both."
+            )
+        state: Any = _MISSING
+        if args and len(args) == len(self.inputs) + 1:
+            # (carrier..., state): how a stateful Sequential or Graph calls it
+            *args_list, state = args
+            args = tuple(args_list)
+        if "state" in inputs and "state" not in self.inputs:
+            state = inputs.pop("state")
+        if self._is_stateful and state is _MISSING:
+            raise TypeError(
+                "Graph contains stateful operator(s) but was called without a "
+                "`state` argument. Supply the initial CarryState: "
+                "graph(..., state=s)."
             )
         if args:
             if len(args) != len(self.inputs):
@@ -211,9 +258,16 @@ class Graph(Operator):
             node_args = tuple(cache[id(p)] for p in node.parents)
             # Route through __call__ so nested operators (Graph, Sequential)
             # get their own dispatch, not just bare _apply.
-            cache[id(node)] = node.operator(*node_args)
+            if state is not _MISSING and getattr(node.operator, "_is_stateful", False):
+                # stateful nodes take the state last and hand it on, in order
+                cache[id(node)], state = node.operator(*node_args, state)
+            else:
+                cache[id(node)] = node.operator(*node_args)
 
-        return {name: cache[id(node)] for name, node in self.outputs.items()}
+        outputs = {name: cache[id(node)] for name, node in self.outputs.items()}
+        if state is _MISSING:
+            return outputs
+        return outputs, state
 
     def get_config(self) -> dict[str, Any]:
         """The whole topology: inputs, operators, nodes and outputs.

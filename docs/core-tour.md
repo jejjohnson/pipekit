@@ -430,6 +430,19 @@ MeanState.from_dict(st.to_dict()) == st             # → True
 pipe(4.0)   # TypeError: ... called without a `state` argument
 ```
 
+A `Graph` threads state the same way. Call it with `state=` and it returns
+`(outputs, state)`; the state passes through its stateful nodes in
+topological order (the order `describe()` lists):
+
+```python
+from pipekit import Graph, Input
+
+x = Input("x")
+g = Graph(inputs={"x": x}, outputs={"mean": StreamMean()(Scale(1.0)(x))})
+out, st = g(x=4.0, state=MeanState(0.0, 0))   # out == {"mean": 4.0}
+out, st = g(x=8.0, state=st)                  # out == {"mean": 6.0}
+```
+
 `pipekit-cycle`'s `Cycle`, `DACycle` and `EnsembleDACycle` and
 `pipekit-train`'s `TrainingLoop` are built on these two classes; see the
 [data-assimilation](tutorials/ensemble-da.md) and
@@ -450,8 +463,6 @@ packages define more such seams (`ForwardModel`, `AnalysisStep`,
 
 What the core does not do yet, so you can plan around it:
 
-- **`Graph` doesn't thread state.** Stateful operators work in a
-  `Sequential`; inside a `Graph` they fail for lack of a `state` argument.
 - **`CarryState` hashes its fields.** A state holding a list or an array is
   unhashable; don't put states in sets or use them as dict keys.
 - **Shape inference stops at `Sequential`.** `Graph`, `Fanout` and the
