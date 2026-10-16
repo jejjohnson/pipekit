@@ -135,8 +135,8 @@ g = Graph(inputs={"a": a, "b": b}, outputs={"product": Model()(fused)})
 g(a=scene_a, b=scene_b)["product"]
 ```
 
-**Today.** All of it, but a `Graph` does not thread state, so a stateful step
-belongs in a `Sequential` inside it, and shape inference stops at the graph's
+**Today.** All of it, stateful steps included: call the graph with `state=`
+and it returns `(outputs, state)`. Shape inference stops at the graph's
 edge.
 
 ## Machine learning

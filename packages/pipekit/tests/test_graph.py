@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Graph, Input, Node, Operator, Sequential
+from pipekit import (
+    CarryState,
+    Graph,
+    Input,
+    Node,
+    Operator,
+    Sequential,
+    StatefulOperator,
+)
 
 
 def test_calling_operator_on_input_returns_node(Scale_cls):
@@ -224,3 +232,103 @@ def test_node_rejects_non_node_parents(Scale_cls):
     """Constructing a Node with non-Node parents raises immediately."""
     with pytest.raises(TypeError, match="expected Node"):
         Node(operator=Scale_cls(2.0), parents=(42,))
+
+
+# ── state ────────────────────────────────────────────────────────────────────
+
+
+class Tally(CarryState):
+    """Which stateful steps ran, in order, and a running total."""
+
+    def __init__(self, seen: tuple[str, ...] = (), total: float = 0.0) -> None:
+        self.seen = seen
+        self.total = total
+
+
+class Accumulate(StatefulOperator):
+    """x ↦ x, and the state records the step's name and adds x to the total."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def _apply(self, x, state):
+        return x, Tally((*state.seen, self.name), state.total + x)
+
+
+def test_graph_threads_state_through_a_stateful_node(Scale_cls):
+    x = Input("x")
+    y = Accumulate("acc")(Scale_cls(2.0)(x))
+    g = Graph(inputs={"x": x}, outputs={"y": y})
+
+    out, state = g(x=3.0, state=Tally())
+    assert out == {"y": 6.0}
+    assert state.seen == ("acc",)
+    assert state.total == 6.0
+
+    # the returned state feeds the next call
+    _, state = g(x=1.0, state=state)
+    assert state.total == 8.0
+
+
+def test_graph_threads_state_in_topological_order(Scale_cls):
+    x = Input("x")
+    first = Accumulate("first")(x)
+    second = Accumulate("second")(Scale_cls(10.0)(first))
+    g = Graph(inputs={"x": x}, outputs={"y": second})
+    _, state = g(x=1.0, state=Tally())
+    assert state.seen == ("first", "second")
+    assert state.total == 11.0
+
+
+def test_stateful_graph_requires_a_state():
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": Accumulate("acc")(x)})
+    assert g._is_stateful
+    with pytest.raises(TypeError, match="without a `state`"):
+        g(x=1.0)
+
+
+def test_stateful_graph_cannot_name_an_input_state():
+    s = Input("state")
+    with pytest.raises(ValueError, match="named 'state'"):
+        Graph(inputs={"state": s}, outputs={"y": Accumulate("acc")(s)})
+
+
+def test_stateless_graph_keeps_an_input_named_state(Scale_cls):
+    s = Input("state")
+    g = Graph(inputs={"state": s}, outputs={"y": Scale_cls(2.0)(s)})
+    assert g(state=3.0) == {"y": 6.0}
+
+
+def test_stateless_graph_passes_a_given_state_through(Scale_cls):
+    """As for Sequential: supplying a state to a stateless graph returns it."""
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": Scale_cls(2.0)(x)})
+    out, state = g(x=1.0, state="unchanged")
+    assert out == {"y": 2.0}
+    assert state == "unchanged"
+
+
+def test_stateful_graph_inside_a_stateful_sequential(Scale_cls):
+    x = Input("x")
+    inner = Graph(inputs={"x": x}, outputs={"y": Accumulate("inner")(x)})
+    pipe = Sequential([Scale_cls(2.0), inner])
+    assert pipe._is_stateful
+    out, state = pipe(1.0, Tally())
+    assert out == {"y": 2.0}
+    assert state.seen == ("inner",)
+
+
+def test_stateful_graph_nested_in_a_graph():
+    x = Input("x")
+    inner = Graph(inputs={"x": x}, outputs={"y": Accumulate("inner")(x)})
+    outer_x = Input("x")
+    outer = Graph(
+        inputs={"x": outer_x},
+        outputs={"z": Accumulate("outer")(outer_x), "w": inner(outer_x)},
+    )
+    out, state = outer(x=2.0, state=Tally())
+    assert out == {"z": 2.0, "w": {"y": 2.0}}
+    # outputs are visited in declaration order, so "z" comes before "w"
+    assert state.seen == ("outer", "inner")
+    assert state.total == 4.0
