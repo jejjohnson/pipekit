@@ -23,8 +23,9 @@ from pipekit_evaluate.benchmark.reference import (
     Axis,
     ReferenceRule,
     ReferenceSource,
+    as_sources,
 )
-from pipekit_evaluate.report import EvaluationReport, ReportEntry, _check_unique_names
+from pipekit_evaluate.report import EvaluationReport, ReportEntry, _check_scorer_names
 from pipekit_evaluate.taxonomy import ScorerTags, tags_of
 
 
@@ -171,9 +172,9 @@ class Benchmark:
     def run(self) -> BenchmarkReport:
         """Fit every estimator, resolve each cell's reference, and score it."""
         self._check_unique_cells()
-        # Scores are namespaced by scorer name, so two scorers sharing one
-        # would overwrite each other's values in a cell.
-        _check_unique_names(self.scorers)
+        # Scores are namespaced by scorer name, so two scorers sharing one, or
+        # a name holding a key separator, would overwrite values in a cell.
+        _check_scorer_names(self.scorers)
         tags = {scorer.name: tags_of(scorer) for scorer in self.scorers}
         data = dict(self.task.datasets())
         if self.obs_key not in data:
@@ -212,6 +213,15 @@ class Benchmark:
             by_reference: dict[ReferenceSource, dict[str, float]] = {}
             notes: list[str] = []
             for source in sources:
+                scorers = [
+                    scorer
+                    for scorer in self.scorers
+                    if scores_against(scorer, source, primary=primary)
+                ]
+                # A further reference no scorer asks for is not resolved, so
+                # it cannot add a note either.
+                if source is not primary and not scorers:
+                    continue
                 reference, note = self._resolve(
                     source, est, data, predictions, oracle, validated
                 )
@@ -223,7 +233,7 @@ class Benchmark:
                     )
                     continue
                 by_reference[source] = self._score(
-                    predictions[key], reference, tags, cell, source, entries
+                    predictions[key], reference, scorers, tags, cell, source, entries
                 )
             by_cell[key] = CellResult(
                 cell,
@@ -245,22 +255,23 @@ class Benchmark:
             entries=tuple(entries),
         )
 
+    @staticmethod
     def _score(
-        self,
         prediction: Estimate,
         reference: object,
+        scorers: Sequence[Scorer],
         tags: Mapping[str, ScorerTags],
         cell: Cell,
         source: ReferenceSource,
         entries: list[ReportEntry],
     ) -> dict[str, float]:
-        """Every scorer's values against one reference, namespaced by scorer.
+        """The scorers' values against one reference, namespaced by scorer.
 
         Each value is also appended to ``entries`` as a tagged
         :class:`ReportEntry` for :meth:`BenchmarkReport.to_report`.
         """
         scores: dict[str, float] = {}
-        for scorer in self.scorers:
+        for scorer in scorers:
             for name, value in scorer(prediction, reference).items():
                 scores[f"{scorer.name}.{name}"] = value
                 entries.append(
@@ -378,3 +389,29 @@ class Benchmark:
         if key not in predictions:
             return None, f"no estimator at rung {rung}, complexity {complexity}"
         return predictions[key], ""
+
+
+def scores_against(
+    scorer: Scorer, source: ReferenceSource, *, primary: ReferenceSource
+) -> bool:
+    """Whether ``scorer`` is run against the reference ``source``.
+
+    A scorer names the reference kinds it can score against in an optional
+    ``references`` attribute (one source or several, as members or their
+    string values). Without one it is scored against the cell's primary
+    reference only, so a scorer written for one kind of reference (an
+    oracle's posterior ``Estimate``) is never handed another (the raw
+    known truth) because a rung gained a further reference.
+
+    Args:
+        scorer: Any scorer.
+        source: The reference source about to be scored against.
+        primary: The cell's primary reference source.
+
+    Returns:
+        ``True`` when the scorer should be run against ``source``.
+    """
+    declared = getattr(scorer, "references", None)
+    if declared is None:
+        return source is primary
+    return source in as_sources(declared)

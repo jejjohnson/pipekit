@@ -25,6 +25,7 @@ from pipekit_evaluate.benchmark import (
     ReferenceSource,
     Scorer,
     Task,
+    scores_against,
 )
 
 
@@ -82,6 +83,7 @@ class FakeTask:
 @dataclass
 class AbsError:
     name: str = "abs"
+    references: tuple[str, ...] | None = None
 
     def __call__(self, prediction: Estimate, reference: Any) -> Mapping[str, float]:
         ref = reference.point() if isinstance(reference, FakeEstimate) else reference
@@ -330,13 +332,15 @@ def test_explicit_oracle_in_estimators_is_not_run_twice() -> None:
 # --------------------------------------------------------------------------- #
 # Several references per cell (geostack Report 14, gate A4)
 # --------------------------------------------------------------------------- #
+# A scorer that can score against the known truth as well as the oracle.
+BOTH = AbsError(references=("oracle_posterior", "known_theta"))
+
+
 def test_amortized_rung_is_scored_against_oracle_and_truth_in_one_run() -> None:
     task = FakeTask()  # theta = 10
     oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
     amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
-    report = Benchmark(
-        task=task, estimators=[oracle, amortized], scorers=[AbsError()]
-    ).run()
+    report = Benchmark(task=task, estimators=[oracle, amortized], scorers=[BOTH]).run()
     # one row per cell, so label-keyed lookups stay unambiguous
     assert [r.cell.label for r in report.results] == ["L4/r2/c0", "L4/r5/c0"]
     r5 = report.results[1]
@@ -353,7 +357,7 @@ def test_to_dict_keeps_the_axis_references_and_notes() -> None:
     oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
     amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
     payload = (
-        Benchmark(task=task, estimators=[oracle, amortized], scorers=[AbsError()])
+        Benchmark(task=task, estimators=[oracle, amortized], scorers=[BOTH])
         .run()
         .to_dict()
     )
@@ -377,9 +381,7 @@ def test_a_further_reference_does_not_validate_a_cell() -> None:
     task = FakeTask()
     amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
     improve = FakeEstimator(rung=6, complexity=0, value=8.5)
-    report = Benchmark(
-        task=task, estimators=[amortized, improve], scorers=[AbsError()]
-    ).run()
+    report = Benchmark(task=task, estimators=[amortized, improve], scorers=[BOTH]).run()
     r5, r6 = report.results
     assert r5.scores == {}
     assert ReferenceSource.KNOWN_THETA in r5.by_reference
@@ -422,6 +424,67 @@ def test_cell_result_fills_by_reference_from_scores() -> None:
     assert result.by_reference == {ReferenceSource.KNOWN_THETA: {"abs.err": 1.0}}
 
 
+@dataclass
+class PosteriorSpread:
+    """A scorer written for an oracle posterior: it samples the reference."""
+
+    name: str = "spread"
+
+    def __call__(self, prediction: Estimate, reference: Any) -> Mapping[str, float]:
+        draws = reference.sample(4)
+        return {"gap": abs(prediction.point() - sum(draws) / len(draws))}
+
+
+def test_an_undeclared_scorer_is_scored_against_the_primary_only() -> None:
+    # without `references`, a posterior scorer is never handed the raw truth
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    report = Benchmark(
+        task=FakeTask(),
+        estimators=[amortized],
+        scorers=[PosteriorSpread()],
+        reference=oracle,
+    ).run()
+    (r5,) = report.results
+    assert r5.by_reference == {
+        ReferenceSource.ORACLE_POSTERIOR: {"spread.gap": pytest.approx(1.0)}
+    }
+    # the truth was not asked for, so it adds no note
+    assert r5.note == ""
+
+
+def test_each_reference_is_scored_by_the_scorers_that_declare_it() -> None:
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    truth_only = AbsError(name="truth", references=("known_theta",))
+    report = Benchmark(
+        task=FakeTask(),
+        estimators=[amortized],
+        scorers=[PosteriorSpread(), truth_only],
+        reference=oracle,
+    ).run()
+    (r5,) = report.results
+    assert r5.scores == {"spread.gap": pytest.approx(1.0)}
+    assert r5.by_reference[ReferenceSource.KNOWN_THETA] == {
+        "truth.err": pytest.approx(2.0)
+    }
+
+
+def test_metric_scorer_normalises_its_references() -> None:
+    scorer = MetricScorer(lambda p, r: 0.0, name="m", references="known_theta")
+    assert scorer.references == frozenset({ReferenceSource.KNOWN_THETA})
+    assert scores_against(
+        scorer, ReferenceSource.KNOWN_THETA, primary=ReferenceSource.ORACLE_POSTERIOR
+    )
+    assert not scores_against(
+        scorer,
+        ReferenceSource.ORACLE_POSTERIOR,
+        primary=ReferenceSource.ORACLE_POSTERIOR,
+    )
+    with pytest.raises(ValueError):
+        MetricScorer(lambda p, r: 0.0, name="m", references=["truth"])
+
+
 # --------------------------------------------------------------------------- #
 # One report type, two views (geostack Report 14, open question 2)
 # --------------------------------------------------------------------------- #
@@ -433,6 +496,7 @@ def test_to_report_tags_each_value_with_its_cell_and_reference() -> None:
         lambda p, r: abs(p - float(r)),
         name="abs",
         lens="structural",
+        references={"known_theta", "oracle_posterior"},
     )
     ladder = Benchmark(
         task=FakeTask(), estimators=[oracle, amortized], scorers=[scorer]

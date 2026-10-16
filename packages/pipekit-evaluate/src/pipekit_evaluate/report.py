@@ -34,7 +34,8 @@ class ReportEntry:
     """One named value from one scorer.
 
     Attributes:
-        scorer: The scorer's name.
+        scorer: The scorer's name; it may not contain ``.`` or ``:``, which
+            separate the parts of :attr:`key`.
         metric: The value's name within the scorer's output.
         value: The value.
         tags: The scorer's taxonomy tags.
@@ -51,6 +52,7 @@ class ReportEntry:
     reference: str | None = None
 
     def __post_init__(self) -> None:
+        _check_name(self.scorer)
         value = float(self.value)
         # -0.0 == 0.0, so diff() sees no change between them; storing +0.0
         # keeps the content hash in agreement with diff().
@@ -61,7 +63,10 @@ class ReportEntry:
         """The entry's identifier in its report.
 
         ``"<scorer>.<metric>"``, prefixed by ``"<cell>:<reference>:"`` for a
-        ladder run, as in ``"L4/r5/c0:known_theta:rmse.value"``.
+        ladder run, as in ``"L4/r5/c0:known_theta:rmse.value"``. Unambiguous
+        because neither a cell label, a reference source nor a scorer name
+        has a ``:``, and a scorer name has no ``.``: the scorer ends at the
+        first dot after the prefix, and the metric name may contain more.
         """
         parts = [p for p in (self.cell, self.reference) if p is not None]
         return ":".join([*parts, f"{self.scorer}.{self.metric}"])
@@ -139,11 +144,13 @@ class EvaluationReport:
         """A sha256 over the entries, the references and the config.
 
         Entry order and the timestamp do not change it, so two runs that
-        score the same values on the same references hash equal.
+        score the same values on the same references hash equal. An entry
+        without a cell or reference hashes as it did before those fields
+        existed, so an :func:`evaluate` report keeps its hash.
         """
         payload = {
             "entries": [
-                e.to_record() for e in sorted(self.entries, key=lambda e: e.key)
+                _hash_record(e) for e in sorted(self.entries, key=lambda e: e.key)
             ],
             "model_ref": self.model_ref,
             "dataset_ref": self.dataset_ref,
@@ -218,15 +225,23 @@ class EvaluationReport:
         return [e.to_record() for e in self.entries]
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-serialisable form, with the content hash."""
-        return {
-            "entries": self.to_records(),
-            "model_ref": self.model_ref,
-            "dataset_ref": self.dataset_ref,
-            "config": json.loads(self._config_json),
-            "timestamp": self.timestamp.isoformat(),
-            "content_hash": self.content_hash,
-        }
+        """A strict-JSON form, with the content hash.
+
+        A non-finite float (in a value or in the config) is written as the
+        string ``"NaN"``, ``"Infinity"`` or ``"-Infinity"``, so the result
+        passes ``json.dumps(..., allow_nan=False)``; :meth:`to_records` and
+        :meth:`to_pandas` keep the floats.
+        """
+        return _strict_json(
+            {
+                "entries": self.to_records(),
+                "model_ref": self.model_ref,
+                "dataset_ref": self.dataset_ref,
+                "config": json.loads(self._config_json),
+                "timestamp": self.timestamp.isoformat(),
+                "content_hash": self.content_hash,
+            }
+        )
 
     def to_pandas(self) -> Any:
         """One row per entry, as a ``pandas.DataFrame``.
@@ -270,12 +285,12 @@ def evaluate(
         The report, one entry per value each scorer returned.
 
     Raises:
-        ValueError: If two scorers share a name; checked before any scorer
-            runs, because two such scorers with different metric names
-            would otherwise merge into one namespace.
+        ValueError: If two scorers share a name, or a name contains ``.`` or
+            ``:``; checked before any scorer runs, because either would let
+            two scorers' values share a key.
     """
     scorers = list(scorers)
-    _check_unique_names(scorers)
+    _check_scorer_names(scorers)
     stage = None if stage is None else Stage(stage)
     entries: list[ReportEntry] = []
     for scorer in scorers:
@@ -292,13 +307,33 @@ def evaluate(
     )
 
 
-def _check_unique_names(scorers: Sequence[Scorer]) -> None:
+def _check_name(name: str) -> None:
+    reserved = sorted(set(name) & set(".:"))
+    if reserved:
+        raise ValueError(
+            f"scorer name {name!r} contains {reserved}; '.' and ':' separate "
+            "the parts of a report key"
+        )
+
+
+def _check_scorer_names(scorers: Sequence[Scorer]) -> None:
     names = [scorer.name for scorer in scorers]
+    for name in names:
+        _check_name(name)
     dups = sorted({name for name in names if names.count(name) > 1})
     if dups:
         raise ValueError(
             f"duplicate scorer names {dups}; each scorer needs its own name"
         )
+
+
+def _hash_record(entry: ReportEntry) -> dict[str, Any]:
+    """The entry's record without the ladder fields it does not set."""
+    record = entry.to_record()
+    for name in ("cell", "reference"):
+        if record[name] is None:
+            del record[name]
+    return record
 
 
 def _freeze(value: Any) -> Any:
@@ -316,6 +351,19 @@ def _thaw(value: Any) -> Any:
         return {k: _thaw(v) for k, v in value.items()}
     if isinstance(value, list | tuple):
         return [_thaw(v) for v in value]
+    return value
+
+
+def _strict_json(value: Any) -> Any:
+    """Replace non-finite floats with the strings JSON has no number for."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return (
+            "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+        )
+    if isinstance(value, dict):
+        return {k: _strict_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_strict_json(v) for v in value]
     return value
 
 

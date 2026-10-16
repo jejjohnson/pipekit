@@ -28,7 +28,7 @@ report.to_dict()["cells"]["L4/r5/c0"]["scores"]
 - **Reference rule** (`ReferenceRule`, `ReferenceSource`, `Axis`) — the
   §4.3 invariant as data, resolved along both the staged and the
   per-rung complexity axes.
-- **Several references per cell** — `ReferenceRule.also` names further references a rung is scored against beside its primary one; by default the amortized rung (5) is scored against the oracle's posterior and the known truth in one run, and `CellResult.by_reference` holds both.
+- **Several references per cell** — `ReferenceRule.also` names further references a rung is scored against beside its primary one; by default the amortized rung (5) has the oracle's posterior and the known truth. A scorer is run against the references it names in its optional `references` attribute (`MetricScorer(..., references={"oracle_posterior", "known_theta"})`), and against the primary one only when it names none, so a scorer written for a posterior is never handed the raw truth. `CellResult.by_reference` holds the scores against each.
 
 ## `Unit × Lens × Stage` scorers (implemented)
 
