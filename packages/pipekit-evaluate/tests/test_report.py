@@ -281,6 +281,8 @@ def test_to_dict_is_json_serialisable(report: EvaluationReport) -> None:
         "lens": "structural",
         "stages": ["final"],
         "differentiable": False,
+        "cell": None,
+        "reference": None,
     }
 
 
@@ -337,3 +339,22 @@ def test_to_dict_is_strict_json_for_non_finite_values() -> None:
     assert payload["config"] == {"floor": "-Infinity"}
     # the records keep the floats
     assert math.isnan(report.to_records()[0]["value"])
+
+
+def test_an_evaluate_entry_hashes_without_the_ladder_fields() -> None:
+    from pipekit.hashing import sha256_hex, stable_json
+
+    entry = ReportEntry("m", "value", 1.0)
+    report = EvaluationReport((entry,))
+    record = entry.to_record()
+    del record["cell"], record["reference"]
+    payload = {
+        "entries": [record],
+        "model_ref": None,
+        "dataset_ref": None,
+        "config": {},
+    }
+    assert report.content_hash == sha256_hex(stable_json(payload))
+    # a ladder entry's cell and reference are part of its hash
+    ladder = EvaluationReport((ReportEntry("m", "value", 1.0, cell="L4/r2/c0"),))
+    assert ladder.content_hash != report.content_hash

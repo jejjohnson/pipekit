@@ -4,7 +4,10 @@
 dataclass) and §4.3 (the reference rule). It is deliberately carrier- and
 scorer-agnostic: it fits each estimator, resolves the reference for that
 cell via :class:`~pipekit_evaluate.benchmark.reference.ReferenceRule`, and
-delegates the actual critique to the supplied :class:`Scorer`s. Writing a
+delegates the actual critique to the supplied :class:`Scorer`s. Its
+:class:`BenchmarkReport` converts into the tagged, content-hashed
+:class:`~pipekit_evaluate.report.EvaluationReport` that a plain
+:func:`~pipekit_evaluate.report.evaluate` call returns. Writing a
 ``pipekit_experiment.Run`` per cell is left to a later slice.
 """
 
@@ -22,6 +25,8 @@ from pipekit_evaluate.benchmark.reference import (
     ReferenceSource,
     as_sources,
 )
+from pipekit_evaluate.report import EvaluationReport, ReportEntry, _check_scorer_names
+from pipekit_evaluate.taxonomy import ScorerTags, tags_of
 
 
 @dataclass(frozen=True)
@@ -63,12 +68,16 @@ class BenchmarkReport:
         domain: The task domain.
         axis: The axis the references were resolved along.
         results: One :class:`CellResult` per estimator.
+        entries: Every scored value as a tagged :class:`ReportEntry` naming
+            its cell and reference, in scoring order; filled by
+            :meth:`Benchmark.run`.
     """
 
     task: str
     domain: str
     axis: Axis
     results: Sequence[CellResult]
+    entries: tuple[ReportEntry, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """A JSON-serialisable form that keeps every reference and note.
@@ -96,6 +105,37 @@ class BenchmarkReport:
                 for r in self.results
             },
         }
+
+    def to_report(
+        self,
+        *,
+        model_ref: str | None = None,
+        dataset_ref: str | None = None,
+        config: Mapping[str, Any] | None = None,
+    ) -> EvaluationReport:
+        """The run as an :class:`EvaluationReport`, one entry per scored value.
+
+        Each entry carries its cell label and reference source, so
+        ``report.filter(reference="known_theta")`` or
+        ``report.filter(lens="structural")`` cuts across the cube.
+
+        Args:
+            model_ref: What was evaluated, recorded on the report.
+            dataset_ref: What it was evaluated on, recorded on the report.
+            config: Settings recorded on the report and in its hash, beside
+                the run's ``task``, ``domain`` and ``axis``.
+
+        Returns:
+            The report; its config holds ``task``, ``domain`` and ``axis``
+            unless ``config`` sets them.
+        """
+        run = {"task": self.task, "domain": self.domain, "axis": self.axis.value}
+        return EvaluationReport(
+            self.entries,
+            model_ref=model_ref,
+            dataset_ref=dataset_ref,
+            config={**run, **(config or {})},
+        )
 
 
 @dataclass
@@ -132,6 +172,10 @@ class Benchmark:
     def run(self) -> BenchmarkReport:
         """Fit every estimator, resolve each cell's reference, and score it."""
         self._check_unique_cells()
+        # Scores are namespaced by scorer name, so two scorers sharing one, or
+        # a name holding a key separator, would overwrite values in a cell.
+        _check_scorer_names(self.scorers)
+        tags = {scorer.name: tags_of(scorer) for scorer in self.scorers}
         data = dict(self.task.datasets())
         if self.obs_key not in data:
             raise KeyError(
@@ -154,6 +198,7 @@ class Benchmark:
         # prediction.
         validated: dict[tuple[int, int], Estimate] = {}
         by_cell: dict[tuple[int, int], CellResult] = {}
+        entries: list[ReportEntry] = []
         for est in sorted(self.estimators, key=lambda e: (e.rung, e.complexity)):
             key = (est.rung, est.complexity)
             cell = Cell(self.level, est.rung, est.complexity)
@@ -187,7 +232,9 @@ class Benchmark:
                         note if source is primary else f"{source.value}: {note}"
                     )
                     continue
-                by_reference[source] = self._score(predictions[key], reference, scorers)
+                by_reference[source] = self._score(
+                    predictions[key], reference, scorers, tags, cell, source, entries
+                )
             by_cell[key] = CellResult(
                 cell,
                 primary,
@@ -205,17 +252,38 @@ class Benchmark:
             domain=self.task.domain,
             axis=self.axis,
             results=results,
+            entries=tuple(entries),
         )
 
     @staticmethod
     def _score(
-        prediction: Estimate, reference: object, scorers: Sequence[Scorer]
+        prediction: Estimate,
+        reference: object,
+        scorers: Sequence[Scorer],
+        tags: Mapping[str, ScorerTags],
+        cell: Cell,
+        source: ReferenceSource,
+        entries: list[ReportEntry],
     ) -> dict[str, float]:
-        """The scorers' values against one reference, namespaced by scorer."""
+        """The scorers' values against one reference, namespaced by scorer.
+
+        Each value is also appended to ``entries`` as a tagged
+        :class:`ReportEntry` for :meth:`BenchmarkReport.to_report`.
+        """
         scores: dict[str, float] = {}
         for scorer in scorers:
             for name, value in scorer(prediction, reference).items():
                 scores[f"{scorer.name}.{name}"] = value
+                entries.append(
+                    ReportEntry(
+                        scorer.name,
+                        name,
+                        value,
+                        tags[scorer.name],
+                        cell=cell.label,
+                        reference=source.value,
+                    )
+                )
         return scores
 
     def _check_unique_cells(self) -> None:

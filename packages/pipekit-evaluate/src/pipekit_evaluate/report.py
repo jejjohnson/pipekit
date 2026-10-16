@@ -6,7 +6,9 @@ Each :class:`ReportEntry` carries its scorer's place in the
 ``Unit x Lens x Stage`` taxonomy, so a report can be filtered by axis
 (``report.filter(lens="structural")``), compared with an earlier one
 (``report.diff(baseline)``) and identified by a content hash that ignores
-when it was made.
+when it was made. A benchmark-ladder run becomes the same report through
+:meth:`~pipekit_evaluate.benchmark.BenchmarkReport.to_report`, with each
+entry naming its cell and reference.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from typing import Any
 from pipekit.hashing import sha256_hex, stable_json
 
 from pipekit_evaluate.benchmark.protocols import Scorer
+from pipekit_evaluate.benchmark.reference import ReferenceSource
 from pipekit_evaluate.taxonomy import Lens, ScorerTags, Stage, Unit, tags_of
 
 
@@ -36,12 +39,17 @@ class ReportEntry:
         metric: The value's name within the scorer's output.
         value: The value.
         tags: The scorer's taxonomy tags.
+        cell: The benchmark cell label (``"L4/r5/c0"``) for a ladder run.
+        reference: The reference source (``"known_theta"``) for a ladder
+            run.
     """
 
     scorer: str
     metric: str
     value: float
     tags: ScorerTags = field(default_factory=ScorerTags)
+    cell: str | None = None
+    reference: str | None = None
 
     def __post_init__(self) -> None:
         _check_name(self.scorer)
@@ -52,12 +60,16 @@ class ReportEntry:
 
     @property
     def key(self) -> str:
-        """The entry's identifier in its report: ``"<scorer>.<metric>"``.
+        """The entry's identifier in its report.
 
-        Unambiguous because a scorer name has no ``.``: the scorer ends at
-        the first one, and the metric name may contain more.
+        ``"<scorer>.<metric>"``, prefixed by ``"<cell>:<reference>:"`` for a
+        ladder run, as in ``"L4/r5/c0:known_theta:rmse.value"``. Unambiguous
+        because neither a cell label, a reference source nor a scorer name
+        has a ``:``, and a scorer name has no ``.``: the scorer ends at the
+        first dot after the prefix, and the metric name may contain more.
         """
-        return f"{self.scorer}.{self.metric}"
+        parts = [p for p in (self.cell, self.reference) if p is not None]
+        return ":".join([*parts, f"{self.scorer}.{self.metric}"])
 
     def to_record(self) -> dict[str, Any]:
         """A flat, JSON-serialisable record of the entry."""
@@ -69,6 +81,8 @@ class ReportEntry:
             "lens": self.tags.lens.value,
             "stages": sorted(s.value for s in self.tags.stages),
             "differentiable": self.tags.differentiable,
+            "cell": self.cell,
+            "reference": self.reference,
         }
 
 
@@ -130,13 +144,14 @@ class EvaluationReport:
         """A sha256 over the entries, the references and the config.
 
         Entry order and the timestamp do not change it, so two runs that
-        score the same values on the same references hash equal.
+        score the same values on the same references hash equal. An entry
+        without a cell or reference hashes as it did before those fields
+        existed, so an :func:`evaluate` report keeps its hash.
         """
         payload = {
-            "entries": sorted(
-                (e.to_record() for e in self.entries),
-                key=lambda r: (r["scorer"], r["metric"]),
-            ),
+            "entries": [
+                _hash_record(e) for e in sorted(self.entries, key=lambda e: e.key)
+            ],
             "model_ref": self.model_ref,
             "dataset_ref": self.dataset_ref,
             "config": json.loads(self._config_json),
@@ -150,6 +165,8 @@ class EvaluationReport:
         lens: Lens | str | None = None,
         stage: Stage | str | None = None,
         scorer: str | None = None,
+        cell: str | None = None,
+        reference: ReferenceSource | str | None = None,
     ) -> EvaluationReport:
         """The entries that match every given axis value.
 
@@ -158,6 +175,8 @@ class EvaluationReport:
             lens: Keep entries of this lens.
             stage: Keep entries whose scorer runs at this stage.
             scorer: Keep entries of the scorer with this name.
+            cell: Keep entries of this benchmark cell label.
+            reference: Keep entries scored against this reference source.
 
         Returns:
             A report with the matching entries and this report's
@@ -166,6 +185,7 @@ class EvaluationReport:
         unit = None if unit is None else Unit(unit)
         lens = None if lens is None else Lens(lens)
         stage = None if stage is None else Stage(stage)
+        reference = None if reference is None else ReferenceSource(reference).value
         kept = tuple(
             e
             for e in self.entries
@@ -173,6 +193,8 @@ class EvaluationReport:
             and (lens is None or e.tags.lens is lens)
             and (stage is None or e.tags.runs_at(stage))
             and (scorer is None or e.scorer == scorer)
+            and (cell is None or e.cell == cell)
+            and (reference is None or e.reference == reference)
         )
         return replace(self, entries=kept)
 
@@ -303,6 +325,15 @@ def _check_scorer_names(scorers: Sequence[Scorer]) -> None:
         raise ValueError(
             f"duplicate scorer names {dups}; each scorer needs its own name"
         )
+
+
+def _hash_record(entry: ReportEntry) -> dict[str, Any]:
+    """The entry's record without the ladder fields it does not set."""
+    record = entry.to_record()
+    for name in ("cell", "reference"):
+        if record[name] is None:
+            del record[name]
+    return record
 
 
 def _freeze(value: Any) -> Any:

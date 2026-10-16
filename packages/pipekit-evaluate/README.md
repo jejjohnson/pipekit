@@ -62,4 +62,6 @@ report.diff(last_week)   # {key: (last week's value, this value)} for changed ke
 report.content_hash      # equal for two runs that score the same values
 ```
 
+A benchmark-ladder run becomes the same kind of report: `Benchmark(...).run().to_report()` gives one entry per scored value, keyed `"<cell>:<reference>:<scorer>.<metric>"`, so `report.filter(reference="known_theta")` cuts across the cube.
+
 The design is [geostack Report 14](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md), workstream A.
