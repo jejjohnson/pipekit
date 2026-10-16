@@ -22,7 +22,8 @@ The v0.1 public surface, grouped by module:
 - *(Group K is reserved in the master plan for a disk-cache backend;
   nothing ships under it yet.)*
 - **Group L — serialisation** (`serial`): `dumps`, `loads`,
-  `loads_sandboxed`, `register`, `unregister`, `allowed`.
+  `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`,
+  `allowed`.
 - **Group M — state primitives** (`state`): `StatefulOperator`,
   `CarryState`.
 - **Group N — structural protocols** (`protocols`): `Predictor`,
@@ -62,7 +63,15 @@ from pipekit.qc import (
     QCError,
     Quarantine,
 )
-from pipekit.serial import allowed, dumps, loads, loads_sandboxed, register, unregister
+from pipekit.serial import (
+    allowed,
+    dumps,
+    from_state_sandboxed,
+    loads,
+    loads_sandboxed,
+    register,
+    unregister,
+)
 from pipekit.signature import Signature, compute_output_signature
 from pipekit.state import CarryState, StatefulOperator
 
@@ -114,6 +123,7 @@ __all__ = [
     "compose_left",
     "compute_output_signature",
     "dumps",
+    "from_state_sandboxed",
     "juxt",
     "loads",
     "loads_sandboxed",
