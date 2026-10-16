@@ -10,6 +10,7 @@ from pipekit import (
     Node,
     Operator,
     Sequential,
+    Signature,
     StatefulOperator,
 )
 
@@ -332,3 +333,69 @@ def test_stateful_graph_nested_in_a_graph():
     # outputs are visited in declaration order, so "z" comes before "w"
     assert state.seen == ("outer", "inner")
     assert state.total == 4.0
+
+
+# ── signatures ───────────────────────────────────────────────────────────────
+class MeanOver(Operator):
+    """Mean over one named dimension: drops it from the signature."""
+
+    def __init__(self, dim: str) -> None:
+        self.dim = dim
+
+    def _apply(self, x):
+        return x
+
+    def compute_output_signature(self, signature):
+        return None if signature is None else signature.drop_dims((self.dim,))
+
+
+def _cube() -> Signature:
+    return Signature(dims=(("time", 12), ("y", 64), ("x", 64)), dtype="float32")
+
+
+def test_output_signatures_propagate_through_nodes(TwoInput_cls):
+    a = Input("a")
+    b = Input("b")
+    mean_a = MeanOver("time")(a)
+    mean_b = MeanOver("time")(b)
+    g = Graph(
+        inputs={"a": a, "b": b},
+        outputs={"anomaly": TwoInput_cls()(mean_a, mean_b), "mean_a": mean_a},
+    )
+    image = Signature(dims=(("y", 64), ("x", 64)), dtype="float32")
+    assert g.output_signatures({"a": _cube(), "b": _cube()}) == {
+        "anomaly": image,
+        "mean_a": image,
+    }
+    # inputs that disagree make a multi-input node unknown, not wrong
+    other = _cube().replace_dims({"x": 32})
+    assert g.output_signatures({"a": _cube(), "b": other})["anomaly"] is None
+
+
+def test_output_signatures_take_a_bare_signature_for_one_input():
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": MeanOver("time")(x)})
+    assert g.output_signatures(_cube())["y"].dims == (("y", 64), ("x", 64))
+
+
+def test_output_signatures_reject_undeclared_inputs():
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": MeanOver("time")(x)})
+    with pytest.raises(ValueError, match="undeclared"):
+        g.output_signatures({"z": _cube()})
+
+
+def test_summary_lists_nodes_and_outputs():
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": MeanOver("time")(x)})
+    table = g.summary(_cube())
+    assert "[0] MeanOver(x)" in table
+    assert "(time=12, y=64, x=64) float32" in table
+    assert "→ y = [0]" in table
+    assert "(y=64, x=64) float32" in table
+
+
+def test_a_graph_reports_no_single_signature_inside_a_pipeline():
+    x = Input("x")
+    g = Graph(inputs={"x": x}, outputs={"y": MeanOver("time")(x)})
+    assert g.compute_output_signature(_cube()) is None

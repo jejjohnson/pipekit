@@ -203,6 +203,10 @@ class _ProfileWrap(Operator):
     def get_config(self) -> dict[str, Any]:
         return {"inner": nested_config(self.inner)}
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The inner operator's: timing does not change the output."""
+        return self.inner.compute_output_signature(input_signature)
+
     def __repr__(self) -> str:
         return f"Profile.wrap({self.inner!r})"
 
