@@ -463,8 +463,6 @@ packages define more such seams (`ForwardModel`, `AnalysisStep`,
 
 What the core does not do yet, so you can plan around it:
 
-- **`CarryState` hashes its fields.** A state holding a list or an array is
-  unhashable; don't put states in sets or use them as dict keys.
 - **Shape inference stops at `Sequential`.** `Graph`, `Fanout` and the
   parallel maps report their input signature as their output; `Graph` has
   `describe()` but no `summary()`.

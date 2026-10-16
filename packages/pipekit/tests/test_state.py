@@ -59,11 +59,13 @@ def test_carry_state_eq_by_value_and_type():
     assert MeanState(sum=1.0, n=1) != OtherState()
 
 
-def test_carry_state_hash_consistent_with_eq():
+def test_carry_state_is_unhashable():
+    """Mutable and compared by value, so not hashable (even with plain fields)."""
     a = MeanState(sum=1.0, n=1)
-    b = MeanState(sum=1.0, n=1)
-    assert hash(a) == hash(b)
-    assert len({a, b}) == 1
+    with pytest.raises(TypeError, match="unhashable"):
+        hash(a)
+    # equality by value still holds
+    assert a == MeanState(sum=1.0, n=1)
 
 
 # ---------------------------------------------------------------------
