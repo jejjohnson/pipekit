@@ -269,6 +269,9 @@ The long form is [docs/concepts.md](docs/concepts.md).
 | Plug a library in without depending on pipekit | [docs/protocols.md](docs/protocols.md) |
 | Go from `git clone` to a running pipeline | [docs/getting-started.md](docs/getting-started.md) |
 | Install only the parts you need | [docs/installation.md](docs/installation.md) |
+| See every core operator, group by group | [docs/core-tour.md](docs/core-tour.md) |
+| Pick a shape for a deployment (batch, service, orchestrator, audit) | [docs/patterns.md](docs/patterns.md) |
+| Know why operators are classes, not functions | [docs/background/toolz.md](docs/background/toolz.md) |
 | Train an emulator end to end | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
 | Run a data-assimilation cycle | [docs/tutorials/da-cycle.md](docs/tutorials/da-cycle.md) |
 | Build a bigger graph, step by step | [docs/tutorials/anomaly-graph.md](docs/tutorials/anomaly-graph.md) |
