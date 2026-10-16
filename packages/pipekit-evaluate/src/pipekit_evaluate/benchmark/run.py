@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from pipekit_evaluate.benchmark.cube import Cell
 from pipekit_evaluate.benchmark.protocols import Estimate, Estimator, Scorer, Task
@@ -28,16 +29,28 @@ class CellResult:
 
     Attributes:
         cell: The ``(level, rung, complexity)`` cell.
-        reference: Which reference source this cell was scored against.
-        scores: Named metric values (namespaced by scorer), empty when the
-            cell is a generative rung or its reference was unavailable.
-        note: Human-readable explanation when ``scores`` is empty.
+        reference: The cell's primary reference source.
+        scores: Named metric values (namespaced by scorer) against the
+            primary reference, empty when the cell is not scored or its
+            primary reference was unavailable.
+        note: Human-readable explanation of every reference that could not
+            be resolved; empty when all of them were.
+        by_reference: The scores against every reference that resolved,
+            primary included, keyed by source. When only ``scores`` is
+            given, it is filled in as ``{reference: scores}``.
     """
 
     cell: Cell
     reference: ReferenceSource
     scores: Mapping[str, float] = field(default_factory=dict)
     note: str = ""
+    by_reference: Mapping[ReferenceSource, Mapping[str, float]] = field(
+        default_factory=dict
+    )
+
+    def __post_init__(self) -> None:
+        if not self.by_reference and self.scores:
+            object.__setattr__(self, "by_reference", {self.reference: self.scores})
 
 
 @dataclass(frozen=True)
@@ -56,9 +69,32 @@ class BenchmarkReport:
     axis: Axis
     results: Sequence[CellResult]
 
-    def to_dict(self) -> dict[str, dict[str, float]]:
-        """Flatten to ``{cell label: {metric: value}}`` for serialisation."""
-        return {r.cell.label: dict(r.scores) for r in self.results}
+    def to_dict(self) -> dict[str, Any]:
+        """A JSON-serialisable form that keeps every reference and note.
+
+        Returns:
+            ``{"task", "domain", "axis", "cells"}``, where ``cells`` maps
+            each cell label to its ``rung_name``, primary ``reference``,
+            ``scores`` by reference source (``{source: {metric: value}}``)
+            and ``note``.
+        """
+        return {
+            "task": self.task,
+            "domain": self.domain,
+            "axis": self.axis.value,
+            "cells": {
+                r.cell.label: {
+                    "rung_name": r.cell.rung_name,
+                    "reference": r.reference.value,
+                    "scores": {
+                        source.value: dict(scores)
+                        for source, scores in r.by_reference.items()
+                    },
+                    "note": r.note,
+                }
+                for r in self.results
+            },
+        }
 
 
 @dataclass
@@ -74,7 +110,8 @@ class Benchmark:
         axis: Which axis to resolve references along (default staged).
         reference_rule: The "simpler thing is ground truth" tables.
         reference: An explicit oracle estimator; when ``None`` the rung-2
-            estimator among ``estimators`` (lowest complexity) is used.
+            estimator among ``estimators`` with the highest complexity (the
+            richest kernel, such as NUTS rather than OI) is used.
         obs_key, truth_key, state_key: Keys into ``task.datasets()`` for the
             observations fed to estimators and the known-θ / simulator-state
             references.
@@ -109,31 +146,47 @@ class Benchmark:
 
         oracle = self._oracle_prediction(obs, predictions)
 
-        # Pass 2 — resolve the reference for each cell and score it. Process in
-        # ascending cell order so a cell is only considered "validated" (and
+        # Pass 2 — resolve each cell's references and score against each. Process
+        # in ascending cell order so a cell is only considered "validated" (and
         # thus usable as a BEST_VALIDATED_BELOW reference) once it has itself
-        # resolved a reference. ``validated`` maps a cell to its prediction.
+        # resolved its primary reference. ``validated`` maps a cell to its
+        # prediction.
         validated: dict[tuple[int, int], Estimate] = {}
         by_cell: dict[tuple[int, int], CellResult] = {}
         for est in sorted(self.estimators, key=lambda e: (e.rung, e.complexity)):
             key = (est.rung, est.complexity)
             cell = Cell(self.level, est.rung, est.complexity)
-            source = self.reference_rule.source(
+            primary = self.reference_rule.source(
                 est.rung, axis=self.axis, complexity=est.complexity
             )
-            reference, note = self._resolve(
-                source, est, data, predictions, oracle, validated
+            # An unscored cell has no sources; resolving its NONE primary
+            # still gives the note that says why.
+            sources = self.reference_rule.sources(
+                est.rung, axis=self.axis, complexity=est.complexity
+            ) or (primary,)
+            by_reference: dict[ReferenceSource, dict[str, float]] = {}
+            notes: list[str] = []
+            for source in sources:
+                reference, note = self._resolve(
+                    source, est, data, predictions, oracle, validated
+                )
+                if reference is None:
+                    # The primary's note reads as before; a further
+                    # reference's note says which reference it is about.
+                    notes.append(
+                        note if source is primary else f"{source.value}: {note}"
+                    )
+                    continue
+                by_reference[source] = self._score(predictions[key], reference)
+            by_cell[key] = CellResult(
+                cell,
+                primary,
+                scores=by_reference.get(primary, {}),
+                note="; ".join(notes),
+                by_reference=by_reference,
             )
-            if reference is None:
-                by_cell[key] = CellResult(cell, source, note=note)
-                continue
-            prediction = predictions[key]
-            scores: dict[str, float] = {}
-            for scorer in self.scorers:
-                for name, value in scorer(prediction, reference).items():
-                    scores[f"{scorer.name}.{name}"] = value
-            by_cell[key] = CellResult(cell, source, scores=scores)
-            validated[key] = prediction
+            if primary in by_reference:
+                validated[key] = predictions[key]
 
         # Emit one result per estimator, preserving the caller's order.
         results = [by_cell[(est.rung, est.complexity)] for est in self.estimators]
@@ -143,6 +196,14 @@ class Benchmark:
             axis=self.axis,
             results=results,
         )
+
+    def _score(self, prediction: Estimate, reference: object) -> dict[str, float]:
+        """Every scorer's values against one reference, namespaced by scorer."""
+        scores: dict[str, float] = {}
+        for scorer in self.scorers:
+            for name, value in scorer(prediction, reference).items():
+                scores[f"{scorer.name}.{name}"] = value
+        return scores
 
     def _check_unique_cells(self) -> None:
         """Reject two estimators occupying the same cube cell.
@@ -202,6 +263,11 @@ class Benchmark:
         cells resolved so far, used by ``BEST_VALIDATED_BELOW``.
         """
         if source is ReferenceSource.NONE:
+            if self.axis is Axis.COMPLEXITY and est.complexity <= 0:
+                return (
+                    None,
+                    "simplest step on its rung: no simpler step to compare against",
+                )
             return None, "generative rung: not scored against a reference"
         if source is ReferenceSource.KNOWN_THETA:
             return self._require(data, self.truth_key)

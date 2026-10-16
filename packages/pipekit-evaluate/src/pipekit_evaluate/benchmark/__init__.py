@@ -24,6 +24,7 @@ from pipekit_evaluate.benchmark.protocols import (
     Task,
 )
 from pipekit_evaluate.benchmark.reference import (
+    DEFAULT_ALSO,
     DEFAULT_COMPLEXITY,
     DEFAULT_STAGED,
     Axis,
@@ -38,6 +39,7 @@ from pipekit_evaluate.benchmark.run import (
 
 
 __all__ = [
+    "DEFAULT_ALSO",
     "DEFAULT_COMPLEXITY",
     "DEFAULT_STAGED",
     "LEVEL_NAMES",

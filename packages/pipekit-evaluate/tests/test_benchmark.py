@@ -15,6 +15,7 @@ from pipekit_evaluate.benchmark import (
     Axis,
     Benchmark,
     Cell,
+    CellResult,
     Estimate,
     Estimator,
     ReferenceRule,
@@ -160,7 +161,8 @@ def test_run_scores_against_resolved_references() -> None:
     assert r5.reference is ReferenceSource.ORACLE_POSTERIOR
     assert r5.scores["abs.err"] == pytest.approx(1.0)
 
-    assert report.to_dict()["L4/r2/c0"]["abs.err"] == pytest.approx(1.0)
+    cells = report.to_dict()["cells"]
+    assert cells["L4/r2/c0"]["scores"]["known_theta"]["abs.err"] == pytest.approx(1.0)
 
 
 def test_generative_rung_is_not_scored() -> None:
@@ -320,3 +322,98 @@ def test_explicit_oracle_in_estimators_is_not_run_twice() -> None:
     by_label = {r.cell.label: r for r in report.results}
     # rung 5 scored against the *same* oracle prediction (point 9.0): |8-9| = 1
     assert by_label["L4/r5/c0"].scores["abs.err"] == pytest.approx(1.0)
+
+
+# --------------------------------------------------------------------------- #
+# Several references per cell (geostack Report 14, gate A4)
+# --------------------------------------------------------------------------- #
+def test_amortized_rung_is_scored_against_oracle_and_truth_in_one_run() -> None:
+    task = FakeTask()  # theta = 10
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    report = Benchmark(
+        task=task, estimators=[oracle, amortized], scorers=[AbsError()]
+    ).run()
+    # one row per cell, so label-keyed lookups stay unambiguous
+    assert [r.cell.label for r in report.results] == ["L4/r2/c0", "L4/r5/c0"]
+    r5 = report.results[1]
+    assert r5.reference is ReferenceSource.ORACLE_POSTERIOR
+    assert r5.scores == {"abs.err": pytest.approx(1.0)}  # |8 - 9|, the primary
+    assert r5.by_reference[ReferenceSource.KNOWN_THETA] == {
+        "abs.err": pytest.approx(2.0)  # |8 - 10|
+    }
+    assert r5.note == ""
+
+
+def test_to_dict_keeps_the_axis_references_and_notes() -> None:
+    task = FakeTask(data={"obs": 1.0})  # no truth: KNOWN_THETA is unavailable
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    payload = (
+        Benchmark(task=task, estimators=[oracle, amortized], scorers=[AbsError()])
+        .run()
+        .to_dict()
+    )
+    assert (payload["task"], payload["domain"], payload["axis"]) == (
+        "toy",
+        "test",
+        "staged",
+    )
+    r5 = payload["cells"]["L4/r5/c0"]
+    assert r5["rung_name"] == "amortized_predictor"
+    assert r5["reference"] == "oracle_posterior"
+    assert r5["scores"] == {"oracle_posterior": {"abs.err": pytest.approx(1.0)}}
+    assert (
+        r5["note"] == "known_theta: reference key 'theta' absent from task.datasets()"
+    )
+    assert payload["cells"]["L4/r2/c0"]["scores"] == {}
+
+
+def test_a_further_reference_does_not_validate_a_cell() -> None:
+    # no oracle: rung 5's primary reference is missing, its truth is not
+    task = FakeTask()
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    improve = FakeEstimator(rung=6, complexity=0, value=8.5)
+    report = Benchmark(
+        task=task, estimators=[amortized, improve], scorers=[AbsError()]
+    ).run()
+    r5, r6 = report.results
+    assert r5.scores == {}
+    assert ReferenceSource.KNOWN_THETA in r5.by_reference
+    assert "no oracle" in r5.note
+    # rung 6 needs a validated rung below; rung 5 is not one
+    assert r6.scores == {}
+    assert "no validated rung below" in r6.note
+
+
+def test_reference_rule_sources_put_the_primary_first() -> None:
+    rule = ReferenceRule()
+    assert rule.sources(5) == (
+        ReferenceSource.ORACLE_POSTERIOR,
+        ReferenceSource.KNOWN_THETA,
+    )
+    assert rule.sources(2) == (ReferenceSource.KNOWN_THETA,)
+    # an unscored cell has no further references
+    assert rule.sources(1) == ()
+    assert rule.sources(5, axis=Axis.COMPLEXITY, complexity=0) == ()
+    # a further reference equal to the primary is not repeated
+    same = ReferenceRule(also={2: (ReferenceSource.KNOWN_THETA,)})
+    assert same.sources(2) == (ReferenceSource.KNOWN_THETA,)
+    assert ReferenceRule(also={}).sources(5) == (ReferenceSource.ORACLE_POSTERIOR,)
+
+
+def test_simplest_complexity_step_is_not_called_generative() -> None:
+    cheap = FakeEstimator(rung=2, complexity=0, value=9.0)
+    report = Benchmark(
+        task=FakeTask(), estimators=[cheap], scorers=[AbsError()], axis=Axis.COMPLEXITY
+    ).run()
+    (result,) = report.results
+    assert result.reference is ReferenceSource.NONE
+    assert result.note.startswith("simplest step on its rung")
+
+
+def test_cell_result_fills_by_reference_from_scores() -> None:
+    result = CellResult(
+        Cell("L4", 2), ReferenceSource.KNOWN_THETA, scores={"abs.err": 1.0}
+    )
+    assert result.by_reference == {ReferenceSource.KNOWN_THETA: {"abs.err": 1.0}}

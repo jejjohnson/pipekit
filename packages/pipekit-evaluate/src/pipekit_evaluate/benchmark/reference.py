@@ -8,7 +8,10 @@ scripts (``benchmark_ladder.md`` §4.3) runs along **both** axes of §2:
 
 Both are *data, not code branches*: the default tables below live on the
 :class:`ReferenceRule`, which a domain may override (e.g. an oracle-less
-domain falls back to known-θ coverage only).
+domain falls back to known-θ coverage only). Beside each rung's primary
+reference, a rung may name further references it is *also* scored against
+(:data:`DEFAULT_ALSO`): the amortized rung is judged against the oracle's
+posterior and, in the same run, against the known truth.
 """
 
 from __future__ import annotations
@@ -59,14 +62,26 @@ DEFAULT_COMPLEXITY: Mapping[int, ReferenceSource] = {
     6: ReferenceSource.BEST_VALIDATED_BELOW,
 }
 
+#: Further references per rung, scored beside the primary one on either
+#: axis. The amortized rung's oracle says how close it is to the exact
+#: posterior; the known truth says whether it is calibrated. Both belong on
+#: its row (geostack Report 17, workstream C).
+DEFAULT_ALSO: Mapping[int, tuple[ReferenceSource, ...]] = {
+    5: (ReferenceSource.KNOWN_THETA,),
+}
+
 
 @dataclass(frozen=True)
 class ReferenceRule:
     """Resolve the reference source for a rung along a given axis.
 
     Attributes:
-        staged: Per-rung reference sources on the staged axis.
-        complexity: Per-rung reference sources on the complexity axis.
+        staged: Per-rung primary reference sources on the staged axis.
+        complexity: Per-rung primary reference sources on the complexity
+            axis.
+        also: Per-rung further reference sources, scored beside the
+            primary one on either axis whenever the primary is not
+            :attr:`ReferenceSource.NONE`.
 
     A complexity step of ``0`` is the simplest step on its rung and has no
     simpler neighbour, so it is resolved as :attr:`ReferenceSource.NONE`
@@ -78,6 +93,9 @@ class ReferenceRule:
     )
     complexity: Mapping[int, ReferenceSource] = field(
         default_factory=lambda: dict(DEFAULT_COMPLEXITY)
+    )
+    also: Mapping[int, tuple[ReferenceSource, ...]] = field(
+        default_factory=lambda: dict(DEFAULT_ALSO)
     )
 
     def source(
@@ -100,3 +118,25 @@ class ReferenceRule:
                 return ReferenceSource.NONE
             return self.complexity.get(rung, ReferenceSource.SIMPLER_STEP)
         return self.staged.get(rung, ReferenceSource.NONE)
+
+    def sources(
+        self, rung: int, *, axis: Axis = Axis.STAGED, complexity: int = 0
+    ) -> tuple[ReferenceSource, ...]:
+        """Every reference source for ``rung`` along ``axis``, primary first.
+
+        Args:
+            rung: The staged-ladder rung (1-6).
+            axis: Which axis to resolve the primary reference along.
+            complexity: The complexity step, as for :meth:`source`.
+
+        Returns:
+            The primary source followed by the rung's :attr:`also` sources,
+            without repeats; empty when the primary source is
+            :attr:`ReferenceSource.NONE`, because an unscored cell has no
+            further references either.
+        """
+        primary = self.source(rung, axis=axis, complexity=complexity)
+        if primary is ReferenceSource.NONE:
+            return ()
+        extra = [s for s in self.also.get(rung, ()) if s is not primary]
+        return (primary, *dict.fromkeys(extra))

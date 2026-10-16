@@ -14,7 +14,8 @@ scorers — it does not replace the taxonomy below.
 from pipekit_evaluate.benchmark import Benchmark, Axis, ReferenceRule
 
 report = Benchmark(task=task, estimators=estimators, scorers=scorers).run()
-report.to_dict()  # {cell label: {metric: value}}
+report.to_dict()["cells"]["L4/r5/c0"]["scores"]
+# {"oracle_posterior": {...}, "known_theta": {...}}
 ```
 
 - **Protocols** (`Task`, `Estimator`, `Estimate`, `Oracle`, `Prior`,
@@ -27,6 +28,7 @@ report.to_dict()  # {cell label: {metric: value}}
 - **Reference rule** (`ReferenceRule`, `ReferenceSource`, `Axis`) — the
   §4.3 invariant as data, resolved along both the staged and the
   per-rung complexity axes.
+- **Several references per cell** — `ReferenceRule.also` names further references a rung is scored against beside its primary one; by default the amortized rung (5) is scored against the oracle's posterior and the known truth in one run, and `CellResult.by_reference` holds both.
 
 ## `Unit × Lens × Stage` scorers (implemented)
 
