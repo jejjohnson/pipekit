@@ -20,6 +20,7 @@ from pipekit_evaluate.benchmark.reference import (
     Axis,
     ReferenceRule,
     ReferenceSource,
+    as_sources,
 )
 
 
@@ -167,6 +168,15 @@ class Benchmark:
             by_reference: dict[ReferenceSource, dict[str, float]] = {}
             notes: list[str] = []
             for source in sources:
+                scorers = [
+                    scorer
+                    for scorer in self.scorers
+                    if scores_against(scorer, source, primary=primary)
+                ]
+                # A further reference no scorer asks for is not resolved, so
+                # it cannot add a note either.
+                if source is not primary and not scorers:
+                    continue
                 reference, note = self._resolve(
                     source, est, data, predictions, oracle, validated
                 )
@@ -177,7 +187,7 @@ class Benchmark:
                         note if source is primary else f"{source.value}: {note}"
                     )
                     continue
-                by_reference[source] = self._score(predictions[key], reference)
+                by_reference[source] = self._score(predictions[key], reference, scorers)
             by_cell[key] = CellResult(
                 cell,
                 primary,
@@ -197,10 +207,13 @@ class Benchmark:
             results=results,
         )
 
-    def _score(self, prediction: Estimate, reference: object) -> dict[str, float]:
-        """Every scorer's values against one reference, namespaced by scorer."""
+    @staticmethod
+    def _score(
+        prediction: Estimate, reference: object, scorers: Sequence[Scorer]
+    ) -> dict[str, float]:
+        """The scorers' values against one reference, namespaced by scorer."""
         scores: dict[str, float] = {}
-        for scorer in self.scorers:
+        for scorer in scorers:
             for name, value in scorer(prediction, reference).items():
                 scores[f"{scorer.name}.{name}"] = value
         return scores
@@ -308,3 +321,29 @@ class Benchmark:
         if key not in predictions:
             return None, f"no estimator at rung {rung}, complexity {complexity}"
         return predictions[key], ""
+
+
+def scores_against(
+    scorer: Scorer, source: ReferenceSource, *, primary: ReferenceSource
+) -> bool:
+    """Whether ``scorer`` is run against the reference ``source``.
+
+    A scorer names the reference kinds it can score against in an optional
+    ``references`` attribute (one source or several, as members or their
+    string values). Without one it is scored against the cell's primary
+    reference only, so a scorer written for one kind of reference (an
+    oracle's posterior ``Estimate``) is never handed another (the raw
+    known truth) because a rung gained a further reference.
+
+    Args:
+        scorer: Any scorer.
+        source: The reference source about to be scored against.
+        primary: The cell's primary reference source.
+
+    Returns:
+        ``True`` when the scorer should be run against ``source``.
+    """
+    declared = getattr(scorer, "references", None)
+    if declared is None:
+        return source is primary
+    return source in as_sources(declared)

@@ -16,7 +16,7 @@ posterior and, in the same run, against the known truth.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -65,10 +65,32 @@ DEFAULT_COMPLEXITY: Mapping[int, ReferenceSource] = {
 #: Further references per rung, scored beside the primary one on either
 #: axis. The amortized rung's oracle says how close it is to the exact
 #: posterior; the known truth says whether it is calibrated. Both belong on
-#: its row (geostack Report 17, workstream C).
+#: its row (geostack Report 17, workstream C). Only the scorers that name a
+#: further reference in their ``references`` attribute are run against it.
 DEFAULT_ALSO: Mapping[int, tuple[ReferenceSource, ...]] = {
     5: (ReferenceSource.KNOWN_THETA,),
 }
+
+
+def as_sources(
+    sources: ReferenceSource | str | Iterable[ReferenceSource | str],
+) -> frozenset[ReferenceSource]:
+    """Normalise one reference source or several to a set of members.
+
+    Args:
+        sources: A :class:`ReferenceSource`, its string value, or an
+            iterable of either.
+
+    Returns:
+        The sources as a frozenset of members.
+
+    Raises:
+        ValueError: If a string is not a :class:`ReferenceSource` value.
+    """
+    # A bare string is one source, not an iterable of characters.
+    if isinstance(sources, ReferenceSource | str):
+        sources = (sources,)
+    return frozenset(ReferenceSource(s) for s in sources)
 
 
 @dataclass(frozen=True)

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pipekit_evaluate.benchmark.protocols import Estimate
+from pipekit_evaluate.benchmark.reference import ReferenceSource, as_sources
 from pipekit_evaluate.taxonomy import DEFAULT_STAGES, Lens, ScorerTags, Stage, Unit
 
 
@@ -58,6 +59,9 @@ class MetricScorer:
         from_estimate: What to hand the metric for an :class:`Estimate`;
             ``None`` means its point estimate, which a probabilistic scorer
             refuses.
+        references: The benchmark reference sources the scorer is run
+            against, as members or their string values; ``None`` means the
+            cell's primary reference only.
     """
 
     metric: Callable[[Any, Any], Any]
@@ -66,6 +70,7 @@ class MetricScorer:
     lens: Lens | str = Lens.POINTWISE
     stages: Stage | str | Iterable[Stage | str] = DEFAULT_STAGES
     from_estimate: Callable[[Any], Any] | None = None
+    references: ReferenceSource | str | Iterable[ReferenceSource | str] | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -77,6 +82,8 @@ class MetricScorer:
         object.__setattr__(self, "unit", tags.unit)
         object.__setattr__(self, "lens", tags.lens)
         object.__setattr__(self, "stages", tags.stages)
+        if self.references is not None:
+            object.__setattr__(self, "references", as_sources(self.references))
 
     def __call__(self, prediction: Any, reference: Any) -> dict[str, float]:
         """Score ``prediction`` against ``reference``.
