@@ -122,3 +122,26 @@ def test_shared_state_is_read_only_between_steps_too():
     np.testing.assert_allclose(s_out, s)
     _, _, (hc, _) = ens.run(MEMBERS, s)
     np.testing.assert_allclose(hc[:, -1], MEMBERS + 4 * 0.5, rtol=1e-6)
+
+
+class Forcing(StatefulOperator):
+    """c ↦ c + s (reads the shared state, returns it unchanged)."""
+
+    def _apply(self, c, s):
+        return c + s, s
+
+
+@pytest.mark.parametrize("truncate", [None, 3])
+def test_shared_state_gradient_survives_truncation(truncate):
+    # out = c_{n-k} + k·s with c_{n-k} detached under truncate=k, else
+    # out = c_0 + n·s: d Σout / ds = (k or n) · M · D.
+    n = 8
+    ens = EnsembleScanCycle(
+        cycle=ScanCycle(step_op=Forcing(), n_steps=n, truncate=truncate)
+    )
+    grad = jax.grad(lambda s: jnp.sum(ens(MEMBERS, s)[0]))(jnp.asarray(0.5))
+    live = truncate if truncate is not None else n
+    np.testing.assert_allclose(grad, live * MEMBERS.size, rtol=1e-6)
+    # run() reads the state the same way
+    g_run = jax.grad(lambda s: jnp.sum(ens.run(MEMBERS, s)[0]))(jnp.asarray(0.5))
+    np.testing.assert_allclose(g_run, grad, rtol=1e-6)

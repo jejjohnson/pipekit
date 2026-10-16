@@ -285,16 +285,19 @@ class ScanCycle(StatefulOperator, JaxOperator):
 
 
 class _ReadOnlyState(StatefulOperator, JaxOperator):
-    """Run ``inner`` but hand the *incoming* state to the next step.
+    """Run ``inner`` against a fixed shared state held as a field.
 
-    ``(c, s) -> (inner(c, s)[0], s)``: whatever state the step returns is
-    dropped, so every step of the cycle reads the same shared state.
+    ``(c, _) -> (inner(c, shared)[0], None)``: the shared state never
+    enters the scan carry, so every step reads the same, differentiable
+    reference — ``truncate`` (which cuts the carry) cannot detach it —
+    and whatever state the step returns is dropped.
     """
 
     inner: Any
+    shared: Any
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
-        return self.inner(carrier, state)[0], state
+        return self.inner(carrier, self.shared)[0], None
 
     def get_config(self) -> dict[str, Any]:
         return {"inner": nested_config(self.inner)}
@@ -343,17 +346,17 @@ class EnsembleScanCycle(StatefulOperator, JaxOperator):
                 f"got {self.state_axis}."
             )
 
-    def _read_only_cycle(self) -> ScanCycle:
-        """The cycle with its step wrapped so state never changes between steps."""
+    def _read_only_cycle(self, state: Any) -> ScanCycle:
+        """The cycle with its step reading ``state`` directly (not via the carry)."""
         return dataclasses.replace(
-            self.cycle, step_op=_ReadOnlyState(self.cycle.step_op)
+            self.cycle, step_op=_ReadOnlyState(self.cycle.step_op, state)
         )
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         # carrier: every leaf has a leading member axis [M, ...]
         if self.state_axis is None:
-            cycle = self._read_only_cycle()
-            out = jax.vmap(lambda c: cycle(c, state)[0])(carrier)
+            cycle = self._read_only_cycle(state)
+            out = jax.vmap(lambda c: cycle(c, None)[0])(carrier)
             return out, state
         return jax.vmap(self.cycle)(carrier, state)
 
@@ -364,8 +367,8 @@ class EnsembleScanCycle(StatefulOperator, JaxOperator):
         ``carriers`` shaped ``[M, n_records, …]``.
         """
         if self.state_axis is None:
-            cycle = self._read_only_cycle()
-            c, _, hist = jax.vmap(lambda m: cycle.run(m, state))(carrier)
+            cycle = self._read_only_cycle(state)
+            c, _, hist = jax.vmap(lambda m: cycle.run(m, None))(carrier)
             return c, state, hist
         return jax.vmap(self.cycle.run)(carrier, state)
 
