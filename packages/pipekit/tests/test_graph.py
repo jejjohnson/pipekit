@@ -150,14 +150,56 @@ def test_graph_is_an_operator_and_composes_typewise(Scale_cls):
     assert len(composed) == 2
 
 
-def test_get_config_lists_outputs_by_class(Scale_cls):
+def test_get_config_records_the_whole_topology(Scale_cls, AddConst_cls):
     x = Input("x")
-    y = Scale_cls(2.0)(x)
-    g = Graph(inputs={"x": x}, outputs={"y": y})
+    h = Scale_cls(2.0)(x)
+    y = AddConst_cls(1.0)(h)
+    g = Graph(inputs={"x": x}, outputs={"y": y, "raw": x})
     cfg = g.get_config()
     assert cfg["inputs"] == ["x"]
-    assert cfg["outputs"]["y"]["class"] == "Scale"
-    assert cfg["outputs"]["y"]["config"] == {"factor": 2.0}
+    assert [op["class"] for op in cfg["operators"]] == ["Scale", "AddConst"]
+    assert cfg["operators"][0]["config"] == {"factor": 2.0}
+    assert cfg["nodes"] == [
+        {"operator": 0, "parents": [{"input": "x"}]},
+        {"operator": 1, "parents": [{"node": 0}]},
+    ]
+    assert cfg["outputs"] == {"y": {"node": 1}, "raw": {"input": "x"}}
+
+
+def test_state_differs_when_an_upstream_step_differs(Scale_cls, AddConst_cls):
+    """Two graphs that differ only upstream of their outputs must not collide."""
+
+    def build(factor: float) -> Graph:
+        x = Input("x")
+        y = AddConst_cls(1.0)(Scale_cls(factor)(x))
+        return Graph(inputs={"x": x}, outputs={"y": y})
+
+    assert build(2.0).state != build(3.0).state
+    assert build(2.0).state == build(2.0).state
+
+
+def test_get_config_records_a_shared_operator_once(Scale_cls, TwoInput_cls):
+    """An operator used by two nodes appears once in `operators`."""
+    a = Input("a")
+    b = Input("b")
+    scale = Scale_cls(2.0)
+    out = TwoInput_cls()(scale(a), scale(b))
+    cfg = Graph(inputs={"a": a, "b": b}, outputs={"out": out}).get_config()
+    assert [op["class"] for op in cfg["operators"]] == ["Scale", "TwoInput"]
+    assert [node["operator"] for node in cfg["nodes"]] == [0, 0, 1]
+    assert cfg["nodes"][2]["parents"] == [{"node": 0}, {"node": 1}]
+
+
+def test_get_config_distinguishes_wiring(TwoInput_cls):
+    """Swapping which input feeds which argument changes the config."""
+
+    def build(swap: bool) -> Graph:
+        a = Input("a")
+        b = Input("b")
+        out = TwoInput_cls()(b, a) if swap else TwoInput_cls()(a, b)
+        return Graph(inputs={"a": a, "b": b}, outputs={"out": out})
+
+    assert build(True).state != build(False).state
 
 
 def test_describe_includes_topology(Scale_cls, AddConst_cls):

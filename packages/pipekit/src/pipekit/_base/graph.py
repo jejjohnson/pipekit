@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit._base.operator import Carrier, Operator, nested_config
+from pipekit._base.operator import Carrier, Operator
 
 
 class Node:
@@ -216,23 +216,50 @@ class Graph(Operator):
         return {name: cache[id(node)] for name, node in self.outputs.items()}
 
     def get_config(self) -> dict[str, Any]:
-        """Best-effort config — node operators' configs, by output name.
+        """The whole topology: inputs, operators, nodes and outputs.
 
-        Graphs are inherently runtime-defined (the topology comes from
-        Python object identity), so this is a debug repr rather than
-        a faithful YAML round-trip. A YAML-format graph would store
-        the topology as a list of (op, parent-keys) records.
+        Every node is recorded, upstream ones included, so two graphs
+        that differ anywhere have different configs (and so different
+        `state` records and content hashes). The record::
+
+            {
+                "inputs": ["image", "reference"],
+                "operators": [<state>, ...],
+                "nodes": [{"operator": 0, "parents": [{"input": "image"}]}, ...],
+                "outputs": {"ndvi": {"node": 0}, "raw": {"input": "image"}},
+            }
+
+        ``operators`` lists each distinct operator once, by identity, in
+        first-use order, so an operator shared by several nodes is not
+        duplicated. ``nodes`` is in topological order; a parent or an
+        output refers either to a declared input by name or to an
+        earlier node by index.
         """
+        input_names = {id(node): name for name, node in self.inputs.items()}
+        node_index = {id(node): i for i, node in enumerate(self._order)}
+        operator_index: dict[int, int] = {}
+        operators: list[dict[str, Any]] = []
+        nodes: list[dict[str, Any]] = []
+
+        def ref(node: Node) -> dict[str, Any]:
+            if id(node) in input_names:
+                return {"input": input_names[id(node)]}
+            return {"node": node_index[id(node)]}
+
+        for node in self._order:
+            assert node.operator is not None  # guaranteed by _topological_sort
+            op_id = id(node.operator)
+            if op_id not in operator_index:
+                operator_index[op_id] = len(operators)
+                operators.append(node.operator.state)
+            parents = [ref(parent) for parent in node.parents]
+            nodes.append({"operator": operator_index[op_id], "parents": parents})
+
         return {
             "inputs": list(self.inputs),
-            "outputs": {
-                name: (
-                    nested_config(node.operator)
-                    if node.operator is not None
-                    else {"class": "Input", "config": {}}
-                )
-                for name, node in self.outputs.items()
-            },
+            "operators": operators,
+            "nodes": nodes,
+            "outputs": {name: ref(node) for name, node in self.outputs.items()},
         }
 
     def __repr__(self) -> str:
