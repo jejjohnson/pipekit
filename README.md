@@ -179,6 +179,13 @@ The full, runnable version, with the six operators and each step
 explained, is the tutorial
 [Build a bigger graph](docs/tutorials/anomaly-graph.md).
 
+More end-to-end examples, each with its pre- and post-processing and a
+script that runs as printed:
+[train, register and forecast](docs/tutorials/train-register-forecast.md),
+[inference](docs/tutorials/inference.md),
+[ensemble data assimilation](docs/tutorials/ensemble-da.md) and
+[ETL over many regions](docs/tutorials/etl-regions.md).
+
 ## The packages
 
 <p align="center">
@@ -265,6 +272,10 @@ The long form is [docs/concepts.md](docs/concepts.md).
 | Train an emulator end to end | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
 | Run a data-assimilation cycle | [docs/tutorials/da-cycle.md](docs/tutorials/da-cycle.md) |
 | Build a bigger graph, step by step | [docs/tutorials/anomaly-graph.md](docs/tutorials/anomaly-graph.md) |
+| Clean an archive, train, register and forecast | [docs/tutorials/train-register-forecast.md](docs/tutorials/train-register-forecast.md) |
+| Put a model in a pre- and post-processing chain | [docs/tutorials/inference.md](docs/tutorials/inference.md) |
+| Assimilate observations with an ensemble | [docs/tutorials/ensemble-da.md](docs/tutorials/ensemble-da.md) |
+| Run an ETL batch over many regions | [docs/tutorials/etl-regions.md](docs/tutorials/etl-regions.md) |
 | Browse the API | [jejjohnson.github.io/pipekit](https://jejjohnson.github.io/pipekit/) |
 
 ## Develop

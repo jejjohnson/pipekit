@@ -57,6 +57,10 @@ nav:
       - Train an emulator: tutorials/train-emulator.md
       - Run a DA cycle: tutorials/da-cycle.md
       - Build a bigger graph: tutorials/anomaly-graph.md
+      - Train, register, forecast: tutorials/train-register-forecast.md
+      - Run inference: tutorials/inference.md
+      - Ensemble data assimilation: tutorials/ensemble-da.md
+      - ETL over many regions: tutorials/etl-regions.md
   - API Reference:
       - pipekit: api/pipekit.md
       - pipekit-array: api/pipekit-array.md
