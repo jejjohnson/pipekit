@@ -24,6 +24,7 @@ by ``eqx.filter_grad``), and handle arbitrary pytree carriers — dicts,
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from collections.abc import Callable
 from typing import Any, ClassVar
@@ -281,6 +282,98 @@ class ScanCycle(StatefulOperator, JaxOperator):
             "checkpoint": self.checkpoint,
             "truncate": self.truncate,
         }
+
+
+class _ReadOnlyState(StatefulOperator, JaxOperator):
+    """Run ``inner`` against a fixed shared state held as a field.
+
+    ``(c, _) -> (inner(c, shared)[0], None)``: the shared state never
+    enters the scan carry, so every step reads the same, differentiable
+    reference — ``truncate`` (which cuts the carry) cannot detach it —
+    and whatever state the step returns is dropped.
+    """
+
+    inner: Any
+    shared: Any
+
+    def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
+        return self.inner(carrier, self.shared)[0], None
+
+    def get_config(self) -> dict[str, Any]:
+        return {"inner": nested_config(self.inner)}
+
+
+class EnsembleScanCycle(StatefulOperator, JaxOperator):
+    """Run a `ScanCycle` on every ensemble member at once, with ``jax.vmap``.
+
+    The carrier is a pytree whose leaves share a leading member axis of
+    size ``M``; one compiled program advances all members.
+
+    .. code-block:: text
+
+        cⱼ ← cycle(cⱼ, s),    j = 1 … M   (in parallel)
+
+    State handling (``state_axis``):
+
+    - ``None`` (default) — one state shared by all members and treated
+      as **read-only**: every step of every member reads the incoming
+      state; the state a step returns is discarded (also between the
+      steps of the cycle), and the incoming state is returned unchanged.
+    - ``0`` — one state per member, stacked on a leading axis like the
+      carrier; each member threads its own state.
+
+    Not a drop-in for `pipekit_cycle.EnsembleCycle` when the step
+    *writes* shared state: ``EnsembleCycle`` threads one state through
+    the members sequentially (member ``j``'s output state feeds member
+    ``j + 1``), which a ``vmap`` cannot reproduce. Use ``state_axis=0``
+    or ``EnsembleCycle`` for that.
+
+    Attributes:
+        cycle: The per-member `ScanCycle`.
+        state_axis: ``None`` (shared, read-only) or ``0`` (per member).
+
+    Raises:
+        ValueError: If ``state_axis`` is not ``None`` or ``0``.
+    """
+
+    cycle: ScanCycle
+    state_axis: int | None = eqx.field(static=True, default=None)
+
+    def __check_init__(self) -> None:
+        if self.state_axis not in (None, 0):
+            raise ValueError(
+                "EnsembleScanCycle.state_axis must be None or 0, "
+                f"got {self.state_axis}."
+            )
+
+    def _read_only_cycle(self, state: Any) -> ScanCycle:
+        """The cycle with its step reading ``state`` directly (not via the carry)."""
+        return dataclasses.replace(
+            self.cycle, step_op=_ReadOnlyState(self.cycle.step_op, state)
+        )
+
+    def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
+        # carrier: every leaf has a leading member axis [M, ...]
+        if self.state_axis is None:
+            cycle = self._read_only_cycle(state)
+            out = jax.vmap(lambda c: cycle(c, None)[0])(carrier)
+            return out, state
+        return jax.vmap(self.cycle)(carrier, state)
+
+    def run(self, carrier: Any, state: Any) -> tuple[Any, Any, Any]:
+        """Like `ScanCycle.run`, per member: histories gain a leading ``M`` axis.
+
+        Returns ``(members, state, (carriers, states))`` with
+        ``carriers`` shaped ``[M, n_records, …]``.
+        """
+        if self.state_axis is None:
+            cycle = self._read_only_cycle(state)
+            c, _, hist = jax.vmap(lambda m: cycle.run(m, None))(carrier)
+            return c, state, hist
+        return jax.vmap(self.cycle.run)(carrier, state)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"cycle": nested_config(self.cycle), "state_axis": self.state_axis}
 
 
 class Rollout(JaxOperator):

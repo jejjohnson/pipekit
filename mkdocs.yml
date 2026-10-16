@@ -64,6 +64,7 @@ nav:
       - Run inference: tutorials/inference.md
       - Ensemble data assimilation: tutorials/ensemble-da.md
       - ETL over many regions: tutorials/etl-regions.md
+      - Run pipelines under jit: tutorials/pipekit-under-jit.md
   - API Reference:
       - pipekit: api/pipekit.md
       - pipekit-array: api/pipekit-array.md
