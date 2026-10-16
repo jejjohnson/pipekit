@@ -32,6 +32,10 @@ passes a Python float back into the constructor, and a Python float is
 not an inexact array — without the converter the reloaded parameter is
 silently treated as a constant by ``eqx.filter_grad``.
 `pipekit_jax.testing.check_jax_operator` catches this.
+
+Compiling: use ``eqx.filter_jit(op)`` (or ``jax.jit`` on a function that
+takes ``op`` as an argument). ``jax.jit(op)`` hashes the callable, and an
+``eqx.Module`` with array fields is unhashable.
 """
 
 from __future__ import annotations
