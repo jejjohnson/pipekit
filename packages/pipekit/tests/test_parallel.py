@@ -75,12 +75,31 @@ def test_processmap_returns_results_in_order():
     assert op([1, 2, 3, 4]) == [2, 4, 6, 8]
 
 
-def test_processmap_log_and_continue():
+def test_processmap_log_and_continue(caplog):
     op = ProcessMap(SometimesFail(), n_workers=2, on_error="log_and_continue")
-    out = op([1, -1, 2])
+    with caplog.at_level("WARNING", logger="pipekit.parallel"):
+        out = op([1, -1, 2])
     assert out[0] == 1
     assert out[1] is None
     assert out[2] == 2
+    # reported through logging, with the traceback, not printed to stderr
+    (record,) = caplog.records
+    assert record.name == "pipekit.parallel"
+    assert "item 1 failed with ValueError" in record.getMessage()
+    assert record.exc_info is not None
+
+
+def test_asyncmap_inside_a_running_loop_points_to_run():
+    import asyncio
+
+    op = AsyncMap(Double())
+
+    async def handler():
+        with pytest.raises(RuntimeError, match=r"await async_map\.run"):
+            op([1, 2])
+        return await op.run([1, 2])
+
+    assert asyncio.run(handler()) == [2, 4]
 
 
 def test_processmap_raises_by_default():

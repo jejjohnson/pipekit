@@ -82,8 +82,8 @@ batch = clean | features | model             # the same steps, no observers
 snap.captures["clean"], prof.report()        # what the exploration saw
 ```
 
-**Today.** All of it. `ShapeTrace` logs shape and dtype only; a carrier with
-more to say (units, a coordinate system) needs a subclass.
+**Today.** All of it. `ShapeTrace(extra=...)` adds a line for whatever else a
+carrier carries (units, a coordinate system).
 
 ### 2. ETL over many inputs
 
@@ -97,9 +97,9 @@ some of them broken in ways you only find at scale.
 Run `check_pickleable(pipeline)` before fanning out: closures do not cross
 process boundaries.
 
-**Today.** All of it. `log_and_continue` prints to `stderr` rather than to
-`logging`, so a run that must report its failures collects them itself (the
-tutorial keeps a reject list per region).
+**Today.** All of it. `log_and_continue` reports each failure as a warning,
+with its traceback, on the `pipekit.parallel` logger, so the run's logging
+setup decides where failures go.
 
 ### 3. Validation as operators
 

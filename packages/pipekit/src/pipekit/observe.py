@@ -139,11 +139,19 @@ class ShapeTrace(Operator):
             call. ``"diff_only"`` is the typical notebook mode.
         label: Optional prefix for the printed line (useful when
             multiple `ShapeTrace` instances co-exist in one pipeline).
+        extra: Optional callable ``carrier -> str | None`` whose result
+            is printed as a second, indented line: what a carrier
+            carries besides shape and dtype (a coordinate system,
+            units). ``None`` or ``""`` prints nothing. In
+            ``"diff_only"`` mode a change in it counts as a change.
 
     Example::
 
         trace = ShapeTrace(mode="diff_only", label="post-resample")
         pipe = Resample() | trace | NDVI()
+
+        # print the coordinate system too
+        ShapeTrace(extra=lambda gt: f"crs={gt.crs}")
     """
 
     forbid_in_yaml: ClassVar[bool] = True
@@ -154,6 +162,7 @@ class ShapeTrace(Operator):
         printer: Callable[[str], None] = print,
         mode: str = "every",
         label: str | None = None,
+        extra: Callable[[Any], str | None] | None = None,
     ) -> None:
         if mode not in ("every", "diff_only"):
             raise ValueError(
@@ -162,17 +171,21 @@ class ShapeTrace(Operator):
         self.printer = printer
         self.mode = mode
         self.label = label
-        self._last: tuple[Any, Any] | None = None
+        self.extra = extra
+        self._last: tuple[Any, Any, Any] | None = None
 
     def _apply(self, x: Any) -> Any:
         shape = getattr(x, "shape", None)
         dtype = getattr(x, "dtype", None)
-        current = (tuple(shape) if shape is not None else None, dtype)
+        more = self.extra(x) if self.extra is not None else None
+        current = (tuple(shape) if shape is not None else None, dtype, more)
         if self.mode == "diff_only" and current == self._last:
             return x
         self._last = current
         prefix = f"[{self.label}] " if self.label else ""
         self.printer(f"{prefix}shape={current[0]} dtype={current[1]}")
+        if more:
+            self.printer(f"{prefix}  {more}")
         return x
 
     def get_config(self) -> dict[str, Any]:

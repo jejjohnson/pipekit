@@ -199,7 +199,7 @@ The carrier flows through unchanged; something useful happens on the side.
 |---|---|
 | `Tap(fn, name=…)` | call `fn` on the carrier; return the carrier |
 | `Snapshot()` + `.at(key)` | capture intermediates by name in `snapshot.captures` |
-| `ShapeTrace(printer=print, mode="every" \| "diff_only", label=None)` | log `shape` and `dtype` at each step |
+| `ShapeTrace(printer=print, mode="every" \| "diff_only", label=None, extra=None)` | log `shape` and `dtype` at each step; `extra(carrier)` adds a line (a coordinate system, units) |
 | `Profile()` + `.wrap(op)` | time each call; `profile.report()` gives calls, total and mean per operator |
 | `Histogram(bins=10, to_array=list)` + `.at(key)` | capture distributions; `to_array` turns the carrier into numbers |
 
@@ -362,8 +362,8 @@ pipe = ThreadMap(Cache(Scale(2.0) | Tap(print) | Branch(bool, Identity())))
 ```
 
 **Async.** `AsyncMap(...)(items)` drives its own event loop, so it works in
-scripts but not inside a running loop (a FastAPI or LitServe handler). There,
-await its `run` method:
+scripts. Inside a running loop (a FastAPI or LitServe handler) it raises a
+`RuntimeError` that says to await its `run` method instead:
 
 ```python
 async def handler(items):
@@ -499,14 +499,16 @@ packages define more such seams (`ForwardModel`, `AnalysisStep`,
 
 ## Limits today
 
-What the core does not do yet, so you can plan around it:
+The limits this page used to list have been fixed:
+- nested pipelines round-trip;
+- a `Graph`'s `state` records every node, threads carry state and has a
+  `summary`;
+- containers report the signature of what they return;
+- `CarryState` is consistently unhashable;
+- `ProcessMap` reports failures through `logging`;
+- `AsyncMap` explains itself inside a running loop;
+- `ShapeTrace` takes an extra line.
 
-- **`ProcessMap(on_error="log_and_continue")` prints to `stderr`.** It leaves
-  `None` in the failed item's slot; it does not use `logging`.
-- **`ShapeTrace` logs `shape` and `dtype` only.** A carrier with extra
-  metadata worth printing (a coordinate system, units) needs a subclass that
-  overrides `_apply`.
-
-The design questions behind these, and the plan for them, are tracked in the
+The design questions still open are tracked in the
 [GeoStack design reports](https://github.com/jejjohnson/geostack/tree/main/docs/reports)
 and pipekit's issues.

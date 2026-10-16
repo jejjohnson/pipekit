@@ -195,11 +195,12 @@ class Operator(ConfigMixin):
         Default is passthrough — most carrier-agnostic operators preserve
         shape and dtype. Subclasses that reshape / reduce / retype override.
         Returning ``None`` signals "this operator does not track shape"
-        (carriers without named dimensions); `Sequential.summary` raises
-        a clean error rather than blowing up downstream.
+        (carriers without named dimensions); `Sequential.summary` and
+        `Graph.summary` show ``?`` for it, and every later step in a
+        `Sequential` is unknown too.
 
-        Note: the annotation is `Any` for v0.1; it narrows to
-        `Signature | None` once Group I (shape inference) lands.
+        The annotation is `Any` rather than `Signature | None` so domain
+        libraries can thread their own signature types.
         """
         return input_signature
 
