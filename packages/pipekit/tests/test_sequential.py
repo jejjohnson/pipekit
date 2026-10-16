@@ -78,8 +78,16 @@ def test_get_config_lists_nested_operators(Scale_cls, AddConst_cls):
     cfg = pipe.get_config()
     assert cfg == {
         "operators": [
-            {"class": "Scale", "config": {"factor": 2.0}},
-            {"class": "AddConst", "config": {"value": 1.0}},
+            {
+                "module": Scale_cls.__module__,
+                "class": "Scale",
+                "config": {"factor": 2.0},
+            },
+            {
+                "module": AddConst_cls.__module__,
+                "class": "AddConst",
+                "config": {"value": 1.0},
+            },
         ],
     }
 

@@ -86,15 +86,34 @@ def test_from_state_rejects_unknown_class():
         Operator.from_state({"module": "no.such.module", "class": "Nope", "config": {}})
 
 
-def test_from_state_rejects_non_primitive_config(Scale_cls):
-    """Operators whose config nests objects aren't round-trippable via from_state."""
+def test_from_state_rejects_values_that_are_not_json(Scale_cls):
+    """A config value that is not JSON (here, an object) cannot be rebuilt."""
     bad = {
         "module": Scale_cls.__module__,
         "class": "Scale",
-        "config": {"factor": {"nested": "dict"}},  # dicts are rejected
+        "config": {"factor": object()},
     }
-    with pytest.raises(RuntimeError, match="non-primitive values"):
+    with pytest.raises(RuntimeError, match="not a JSON value"):
         Operator.from_state(bad)
+
+
+def test_from_state_rejects_a_nested_payload_without_a_module(Scale_cls):
+    """Nested payloads written before nested round-trips had no `module`."""
+    legacy = {
+        "module": "pipekit._base.sequential",
+        "class": "Sequential",
+        "config": {"operators": [{"class": "Scale", "config": {"factor": 2.0}}]},
+    }
+    with pytest.raises(RuntimeError, match="without a `module`"):
+        Operator.from_state(legacy)
+
+
+def test_from_state_checks_the_top_level_class(Scale_cls):
+    """`Sequential.from_state` refuses a record that is not a Sequential."""
+    from pipekit import Sequential
+
+    with pytest.raises(TypeError, match="is not a Sequential"):
+        Sequential.from_state(Scale_cls(2.0).state)
 
 
 def test_from_state_validates_record_shape():

@@ -32,6 +32,7 @@ from typing import Any, ClassVar
 from pipekit._base.operator import (
     Operator,
     callable_name,
+    exception_config,
     nested_config,
     require_operator,
 )
@@ -204,7 +205,7 @@ class Try(Operator):
         return {
             "primary": nested_config(self.primary),
             "fallback": nested_config(self.fallback),
-            "on": [exc.__name__ for exc in self.on],
+            "on": [exception_config(exc) for exc in self.on],
         }
 
     def __repr__(self) -> str:
@@ -281,7 +282,7 @@ class Coalesce(Operator):
         return {
             "sources": [nested_config(op) for op in self.sources],
             "is_ok": callable_name(self.is_ok),
-            "on": [exc.__name__ for exc in self.on],
+            "on": [exception_config(exc) for exc in self.on],
         }
 
     def __repr__(self) -> str:
@@ -362,7 +363,7 @@ class Retry(Operator):
             "op": nested_config(self.op),
             "attempts": self.attempts,
             "base_delay": self.base_delay,
-            "on": [exc.__name__ for exc in self.on],
+            "on": [exception_config(exc) for exc in self.on],
         }
 
     def __repr__(self) -> str:

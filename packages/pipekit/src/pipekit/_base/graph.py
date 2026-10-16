@@ -30,7 +30,7 @@ See master plan Report 2, Group A.3.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 from pipekit._base.operator import Carrier, Operator
 
@@ -261,6 +261,42 @@ class Graph(Operator):
             "nodes": nodes,
             "outputs": {name: ref(node) for name, node in self.outputs.items()},
         }
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> Self:
+        """Rebuild a graph from the topology `get_config` records.
+
+        Re-creates each `Input`, then calls each node's operator on its
+        parents in the recorded order, which wires the nodes exactly as
+        they were; an operator shared by several nodes stays one object.
+
+        Args:
+            config: A `get_config` record whose ``operators`` have already
+                been rebuilt into `Operator` instances.
+
+        Raises:
+            ValueError: if a reference names an undeclared input or a node
+                that comes later in the order.
+        """
+        inputs = {name: Input(name) for name in config["inputs"]}
+        operators: list[Operator] = config["operators"]
+        built: list[Node] = []
+
+        def lookup(ref: dict[str, Any]) -> Node:
+            if "input" in ref:
+                if ref["input"] not in inputs:
+                    raise ValueError(f"Graph config: undeclared input {ref!r}.")
+                return inputs[ref["input"]]
+            index = ref["node"]
+            if not 0 <= index < len(built):
+                raise ValueError(f"Graph config: {ref!r} is not an earlier node.")
+            return built[index]
+
+        for spec in config["nodes"]:
+            parents = [lookup(ref) for ref in spec["parents"]]
+            built.append(operators[spec["operator"]](*parents))
+        outputs = {name: lookup(ref) for name, ref in config["outputs"].items()}
+        return cls(inputs=inputs, outputs=outputs)
 
     def __repr__(self) -> str:
         ins = ", ".join(self.inputs)
