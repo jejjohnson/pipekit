@@ -233,9 +233,11 @@ def test_state_rejects_complex_config_with_actionable_message():
     )
 
 
-def test_state_rejects_dict_config():
-    with pytest.raises(TypeError, match="dicts"):
-        _ = WithOptions(options={"axis": 0}).state
+def test_state_round_trips_dict_config():
+    """Plain str-keyed dicts rebuild through `from_state` since pipekit#74."""
+    op = WithOptions(options={"axis": 0, "names": ["a", "b"]})
+    rebuilt = Operator.from_state(json.loads(json.dumps(op.state)))
+    assert rebuilt.options == {"axis": 0, "names": ["a", "b"]}
 
 
 def test_check_accepts_static_tuple_reloaded_as_list():

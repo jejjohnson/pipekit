@@ -46,7 +46,6 @@ from typing import Any
 import equinox as eqx
 import numpy as np
 from pipekit import Operator
-from pipekit._base.operator import _is_json_primitive
 
 from pipekit_jax.weights import WeightsMixin
 
@@ -69,26 +68,6 @@ def jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: jsonable(v) for k, v in value.items()}
     return value
-
-
-def _is_nested_operator(value: Any) -> bool:
-    """Whether ``value`` is a nested-operator payload.
-
-    One of: ``{"class", "config"}``; a non-empty list / tuple of them; or a
-    non-empty str-keyed mapping of them (``{name: nested_config(op)}``,
-    the shape pipekit's branch containers use).
-    """
-    if isinstance(value, list | tuple):
-        return bool(value) and all(_is_nested_operator(v) for v in value)
-    if not isinstance(value, dict):
-        return False
-    if set(value) == {"class", "config"}:
-        # A real payload: a class name and a config mapping — not an
-        # ordinary option that happens to use those two keys.
-        return isinstance(value["class"], str) and isinstance(value["config"], dict)
-    return bool(value) and all(
-        isinstance(k, str) and _is_nested_operator(v) for k, v in value.items()
-    )
 
 
 def _json_safe(value: Any) -> bool:
@@ -117,19 +96,33 @@ def _debug_repr(value: Any) -> Any:
     return f"<{type(value).__module__}.{type(value).__qualname__}>"
 
 
-def _round_trips(value: Any) -> bool:
-    """Whether a config value is acceptable in a JSON ``state`` record.
+def _has_legacy_payload(value: Any) -> bool:
+    """Whether ``value`` holds a dict shaped ``{"class", "config"}``.
 
-    JSON primitives (and lists / tuples of them) round-trip through
-    ``Operator.from_state``. Nested-operator payloads are pipekit's
-    documented debug form for containers (``Sequential``, ``Cycle``, …):
-    they are rebuilt by a YAML / Hydra loader, not ``from_state``, so
-    they are allowed — provided everything inside them is JSON-encodable
-    (a nested complex array or callable is not).
+    ``Operator.from_state`` refuses that shape: it is the nested-operator
+    payload written before nested round-trips existed (nested operators
+    are now full ``{"module", "class", "config"}`` records), so an
+    ordinary option dict that happens to use those two keys cannot
+    round-trip either.
     """
-    return _is_json_primitive(value) or (
-        _is_nested_operator(value) and _json_safe(value)
-    )
+    if isinstance(value, list | tuple):
+        return any(_has_legacy_payload(v) for v in value)
+    if not isinstance(value, dict):
+        return False
+    if set(value) == {"class", "config"}:
+        return True
+    return any(_has_legacy_payload(v) for v in value.values())
+
+
+def _round_trips(value: Any) -> bool:
+    """Whether a config value survives ``json.dumps`` → ``Operator.from_state``.
+
+    Anything JSON-encodable does: primitives, lists, str-keyed dicts and
+    nested operators' ``state`` records, which ``from_state`` rebuilds
+    recursively. Complex values and callables do not, and neither does a
+    dict shaped like a pre-round-trip nested payload (`_has_legacy_payload`).
+    """
+    return _json_safe(value) and not _has_legacy_payload(value)
 
 
 class JaxOperator(Operator, WeightsMixin, eqx.Module):
@@ -143,15 +136,14 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
     - **Config**: ``get_config()`` is auto-derived from the generated
       ``__init__`` and coerced to JSON builtins (`jsonable`), so
       ``op.state`` survives ``json.dumps`` and ``Operator.from_state``.
-      Real numbers, strings, booleans and (nested) lists / tuples of
-      them round-trip; ``op.state`` raises ``TypeError`` for complex
-      values and plain dicts, which ``from_state`` cannot rebuild, and for
+      Real numbers, strings, booleans, (nested) lists / tuples and
+      str-keyed dicts of them round-trip, and so do nested operators
+      (their ``state`` records, which ``from_state`` rebuilds);
+      ``op.state`` raises ``TypeError`` for complex values, and for
       array fields whose converter would not restore their dtype (JSON
       drops dtypes: a ``float16`` field needs a casting converter).
-      Nested-operator payloads (``{"class", "config"}``) are allowed —
-      pipekit's debug form for operators that hold operators. Operators
-      holding those, or non-array Python objects (callables, modules
-      without a JSON form), should set ``forbid_in_yaml = True`` and
+      Operators holding non-array Python objects (callables, modules
+      without a JSON form) should set ``forbid_in_yaml = True`` and
       persist through `serialize_weights` / `with_weights`.
     - **Leaves**: inexact-array fields are differentiable; mark
       config-only fields ``eqx.field(static=True)``; give learnable
@@ -187,10 +179,11 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
             if bad:
                 raise TypeError(
                     f"{type(self).__name__}: config field(s) {bad} cannot round-trip "
-                    "through JSON and Operator.from_state (complex values and "
-                    "dicts are not supported). Store them as real lists / tuples "
-                    "of pairs, or set `forbid_in_yaml = True` and persist arrays "
-                    "with serialize_weights()."
+                    "through JSON and Operator.from_state (complex values, and "
+                    "dicts keyed exactly {'class', 'config'}, are not supported). "
+                    "Store them as real numbers or lists of pairs, or set "
+                    "`forbid_in_yaml = True` and persist arrays with "
+                    "serialize_weights()."
                 )
             lossy = self._dtype_lossy_fields()
             if lossy:

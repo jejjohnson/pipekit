@@ -19,8 +19,6 @@ import jax.numpy as jnp
 import numpy as np
 from pipekit import Operator
 
-from pipekit_jax.operator import _is_nested_operator
-
 
 def _assert_tree_allclose(actual: Any, expected: Any, what: str) -> None:
     assert jax.tree.structure(actual) == jax.tree.structure(expected), (
@@ -121,23 +119,15 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
     if type(op).forbid_in_yaml:
         return
     state = json.loads(json.dumps(op.state))
-    nested = {k for k, v in state["config"].items() if _is_nested_operator(v)}
-    if nested:
-        # Nested-operator payloads are rebuilt by a YAML / Hydra loader, not
-        # from_state. Rebuild the operator from its own JSON fields and the
-        # live nested children, so the local fields are still checked. This
-        # needs the config keys to be constructor fields; a custom
-        # get_config with other keys can only be checked for its encoding.
-        init_fields = {f.name for f in dataclasses.fields(op) if f.init}
-        if not set(state["config"]) <= init_fields:
-            return
-        kwargs = {
-            k: (getattr(op, k) if k in nested else v)
-            for k, v in state["config"].items()
-        }
-        rebuilt = type(op)(**kwargs)
-    else:
-        rebuilt = Operator.from_state(state)
+    init_fields = {f.name for f in dataclasses.fields(op) if f.init}
+    if not set(state["config"]) <= init_fields:
+        # A custom get_config whose keys are not constructor fields (one
+        # that groups children under a name, say) is checked for its
+        # encoding only.
+        return
+    # Nested children rebuild from their own state records, so the whole
+    # operator, local fields and children alike, comes back from JSON.
+    rebuilt = Operator.from_state(state)
     rebuilt_params = [
         leaf for leaf in jax.tree.leaves(rebuilt) if eqx.is_inexact_array(leaf)
     ]
