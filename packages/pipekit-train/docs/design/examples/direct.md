@@ -14,7 +14,7 @@ import pipekit_train as pt
 import pipekit_experiment as pe
 import geocatalog as gc
 import geopatcher as gp
-import geotoolz as gz
+import geoops as gz
 
 # 1. Preprocess pipeline — re-used at inference time.
 preprocess = pk.Sequential([

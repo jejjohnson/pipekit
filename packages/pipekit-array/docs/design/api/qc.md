@@ -8,7 +8,7 @@ version: 0.1.0
 Four pass-through assertions that look inside the array. They sit
 above `pipekit.qc` (which stays carrier-agnostic — see its module
 docstring's explicit deferral to pipekit-array) and below
-`geotoolz.qc` / `xr_toolz.qa` (which subclass these with
+`geoops.qc` / `xr_toolz.qa` (which subclass these with
 carrier-specific defaults).
 
 All four follow the same pass-through shape:
