@@ -361,3 +361,8 @@ def test_forward_model_wrappers_are_reported_as_pickle_hazards():
 def test_rollout_rejects_a_non_operator_step():
     with pytest.raises(TypeError, match="Operator or a ForwardModel"):
         Rollout(step=lambda c: c, n_steps=1)
+
+
+def test_rollout_rejects_a_stateful_step():
+    with pytest.raises(TypeError, match="ScanCycle"):
+        Rollout(step=Relax(), n_steps=1)

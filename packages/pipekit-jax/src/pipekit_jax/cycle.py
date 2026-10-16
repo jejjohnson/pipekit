@@ -88,7 +88,14 @@ def _coerce_step(step_op: Any) -> StatefulOperator:
 
 def _coerce_carrier_step(step: Any) -> Operator:
     """Return ``step`` as a carrier-only operator (wrapping a `ForwardModel`)."""
-    if isinstance(step, ForwardModel) and not isinstance(step, StatefulOperator):
+    if isinstance(step, StatefulOperator):
+        # A stateful step needs (carrier, state); Rollout calls step(carrier).
+        raise TypeError(
+            f"Rollout steps carrier -> carrier, but {type(step).__name__} is a "
+            "StatefulOperator (carrier, state) -> (carrier, state). Use "
+            "ScanCycle for stateful steps."
+        )
+    if isinstance(step, ForwardModel):
         return _ForwardModelCarrierStep(step)
     if isinstance(step, Operator):
         return step
@@ -301,7 +308,8 @@ class Rollout(JaxOperator):
             save_every) instead of O(n).
 
     Raises:
-        TypeError: If ``step`` is neither an operator nor a `ForwardModel`.
+        TypeError: If ``step`` is a `StatefulOperator` (use `ScanCycle`),
+            or neither an operator nor a `ForwardModel`.
         ValueError: If ``n_steps < 0``, ``save_every < 1``, or
             ``n_steps`` is not a multiple of ``save_every``.
     """
