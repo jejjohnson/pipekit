@@ -67,14 +67,21 @@ def test_from_hydra_cfg_rejects_non_operator_target():
 
 
 def test_to_yaml_round_trip():
-    """to_yaml → from_yaml reconstructs an Operator with the same config."""
-    pytest.importorskip("hydra_zen")
-    pytest.importorskip("omegaconf")
+    """to_yaml → from_yaml (Hydra) reconstructs an Operator with the same config."""
+    pytest.importorskip("hydra")
     op: Operator = Const(99)
     text = HydraConfigLoader.to_yaml(op)
     reconstructed = HydraConfigLoader.from_yaml(text)
     assert isinstance(reconstructed, Const)
     assert reconstructed() == 99
+
+
+def test_to_yaml_writes_a_flat_operator_as_one_mapping():
+    pytest.importorskip("yaml")
+    assert (
+        HydraConfigLoader.to_yaml(Const(7))
+        == "_target_: pipekit.blocks.Const\nvalue: 7\n"
+    )
 
 
 # ── from_yaml_sandboxed ──────────────────────────────────────────────────────
@@ -223,3 +230,46 @@ config:
     graph = HydraConfigLoader.from_yaml_sandboxed(text)
     assert isinstance(graph, Graph)
     assert graph(x=8.0) == {"quarter": 2.0}
+
+
+# ── to_yaml for nested pipelines ─────────────────────────────────────────────
+def _nested_pipelines() -> dict[str, Operator]:
+    from pipekit import Cache, Fanout, Graph, Input, Retry, Sequential, ThreadMap
+
+    x = Input("x")
+    shared = Halve(2.0)
+    graph = Graph(inputs={"x": x}, outputs={"y": shared(shared(x)), "raw": x})
+    retried = Retry(Halve(), attempts=3, base_delay=0.0, on=(KeyError, ValueError))
+    return {
+        "wrappers": ThreadMap(Cache(retried), n_workers=2),
+        "fanout_with_graph": Fanout({"a": Identity(), "g": graph}),
+        "sequential": Sequential([Halve(4.0), Identity()]),
+        "graph": graph,
+    }
+
+
+@pytest.mark.parametrize("name", list(_nested_pipelines()))
+def test_to_yaml_round_trips_through_the_sandbox(name, allow):
+    pytest.importorskip("yaml")
+    from pipekit import Cache, Fanout, Graph, Retry, Sequential, ThreadMap
+
+    allow(Cache, Fanout, Graph, Identity, Retry, Sequential, ThreadMap, Halve)
+    op = _nested_pipelines()[name]
+    back = HydraConfigLoader.from_yaml_sandboxed(HydraConfigLoader.to_yaml(op))
+    assert back.state == op.state
+
+
+@pytest.mark.parametrize("name", list(_nested_pipelines()))
+def test_to_yaml_round_trips_through_hydra(name):
+    pytest.importorskip("hydra")
+    op = _nested_pipelines()[name]
+    back = HydraConfigLoader.from_yaml(HydraConfigLoader.to_yaml(op))
+    assert back.state == op.state
+
+
+def test_to_yaml_refuses_a_closure_anywhere():
+    pytest.importorskip("yaml")
+    from pipekit import Cache, Lambda
+
+    with pytest.raises(ValueError, match="Lambda"):
+        HydraConfigLoader.to_yaml(Cache(Identity() | Lambda(abs)))

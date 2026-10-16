@@ -31,6 +31,7 @@ import sys
 from typing import Any
 
 from pipekit import Operator, from_state_sandboxed
+from pipekit._base.operator import resolve_loaded
 
 
 # Hydra's own keys: instructions to `instantiate`, not constructor arguments.
@@ -117,10 +118,34 @@ class HydraConfigLoader:
 
     @staticmethod
     def to_yaml(op: Operator) -> str:
-        """Render ``op`` as Hydra-compatible YAML text via hydra-zen."""
-        hz = _require_hydra_zen()
-        cfg = HydraConfigLoader.to_hydra_cfg(op)
-        return hz.to_yaml(cfg)
+        """Render ``op``, nested operators included, as ``_target_`` YAML.
+
+        Written from ``op.state``: each operator becomes a mapping with
+        its ``_target_`` and its config, nested operators become nested
+        mappings, an exception class becomes
+        ``{_target_: hydra.utils.get_class, path: module.Name}``, and an
+        operator whose config is not a constructor call (a `Graph`) is
+        written as ``_target_: <Class>.from_config`` with a ``config:``
+        mapping. The text loads back with `from_yaml` (Hydra) or
+        `from_yaml_sandboxed` to an operator with the same `state`.
+
+        Raises:
+            ImportError: if PyYAML isn't installed.
+            TypeError: if ``op`` isn't an `Operator`.
+            ValueError: if any operator in the tree holds a closure
+                (``forbid_in_yaml``): its config could not be loaded back.
+        """
+        if not isinstance(op, Operator):
+            raise TypeError(f"to_yaml expects an Operator, got {type(op).__name__}.")
+        try:
+            import yaml
+        except ImportError as e:
+            raise ImportError(
+                "to_yaml requires PyYAML. Install with "
+                "`pip install pipekit-experiment[hydra]`."
+            ) from e
+        document = _to_targets(op.state)
+        return yaml.safe_dump(document, sort_keys=False)
 
     @staticmethod
     def from_yaml(text: str) -> Operator:
@@ -177,6 +202,31 @@ class HydraConfigLoader:
                 "from_yaml_sandboxed expects a YAML mapping with a `_target_`."
             )
         return from_state_sandboxed(_to_state(document, "<root>"))
+
+
+def _to_targets(value: Any) -> Any:
+    """Translate a pipekit state tree into a ``_target_`` tree (`to_yaml`)."""
+    if isinstance(value, (list, tuple)):
+        return [_to_targets(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if set(value) == {"exception"}:
+        return {"_target_": _GET_CLASS, "path": value["exception"]}
+    if set(value) != {"module", "class", "config"}:
+        return {key: _to_targets(item) for key, item in value.items()}
+
+    op_type = resolve_loaded(value["module"], value["class"])
+    if op_type.forbid_in_yaml:
+        raise ValueError(
+            f"to_yaml cannot write {op_type.__name__}: it holds a closure "
+            "(forbid_in_yaml), so its config could not be loaded back."
+        )
+    target = f"{value['module']}.{value['class']}"
+    config = _to_targets(value["config"])
+    if op_type.from_config.__func__ is not Operator.from_config.__func__:
+        # its config is not a constructor call: build it through from_config
+        return {"_target_": f"{target}.from_config", "config": config}
+    return {"_target_": target, **config}
 
 
 def _yaml_12_bool_loader(yaml: Any) -> Any:
