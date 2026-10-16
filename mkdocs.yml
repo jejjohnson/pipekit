@@ -53,6 +53,9 @@ nav:
   - Concepts: concepts.md
   - Protocols: protocols.md
   - Installation: installation.md
+  - Tour of the core: core-tour.md
+  - Patterns: patterns.md
+  - Background: background/toolz.md
   - Tutorials:
       - Train an emulator: tutorials/train-emulator.md
       - Run a DA cycle: tutorials/da-cycle.md
