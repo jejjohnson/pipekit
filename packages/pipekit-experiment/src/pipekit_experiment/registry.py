@@ -40,12 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from pipekit import Operator
-from pipekit.hashing import sha256_hex, stable_json
-
-
-def _hash_payload(config: dict[str, Any], weights: bytes | None) -> str:
-    """Content hash of ``(operator state, optional weight bytes)``."""
-    return sha256_hex(stable_json(config), b"\x00", weights or b"")
+from pipekit.hashing import pipeline_hash, stable_json
 
 
 def _check_component(value: str, kind: str) -> str:
@@ -148,7 +143,7 @@ class _ModelRegistryBase:
             # make load_weights() depend on write order.
             weights = None
         state = model_op.state
-        h = _hash_payload(state, weights)
+        h = pipeline_hash(model_op, weights)
         self._write_text(stable_json(state), h, "operator.json")
         if weights is not None:
             self._write_bytes(weights, h, "weights.bin")
