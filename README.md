@@ -43,68 +43,92 @@ Python with no dependencies and nothing in it is about geoscience.
 
 ```bash
 uv add "pipekit @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit"
+uv add numpy jaxtyping
 ```
 
 ```python
 import numpy as np
-from numpy.typing import NDArray
+from jaxtyping import Float
 
-from pipekit import Graph, Input, Operator, Tap, dumps, loads
+from pipekit import Graph, Input, Operator, Sequential, Tap, dumps, loads
+
+# ── shapes ──
+# N  samples
+Vector = Float[np.ndarray, " N"]
 
 
 class Standardize(Operator):
-    """x ↦ (x − μ) / σ."""
+    """Centre and scale by a fixed mean μ and spread σ."""
 
     def __init__(self, *, mean: float, std: float) -> None:
-        self.mean = mean  # μ
-        self.std = std  # σ
+        # μ
+        self.mean = mean
+        # σ
+        self.std = std
 
-    def _apply(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        # z = (x − μ) / σ                                         (N,) → (N,)
+    def _apply(self, x: Vector) -> Vector:
+        # z = (x − μ) / σ
         return (x - self.mean) / self.std
 
 
 class Clip(Operator):
-    """z ↦ min(max(z, lo), hi)."""
+    """Clip to the interval [lo, hi]."""
 
     def __init__(self, *, lo: float, hi: float) -> None:
         self.lo = lo
         self.hi = hi
 
-    def _apply(self, z: NDArray[np.float64]) -> NDArray[np.float64]:
-        # z̃ = min(max(z, lo), hi)                                 (N,) → (N,)
+    def _apply(self, z: Vector) -> Vector:
+        # z̃ = min(max(z, lo), hi)
         return np.clip(z, self.lo, self.hi)
 
 
 class Difference(Operator):
-    """(a, b) ↦ a − b."""
+    """Subtract the second input from the first."""
 
-    def _apply(
-        self, a: NDArray[np.float64], b: NDArray[np.float64]
-    ) -> NDArray[np.float64]:
-        # d = a − b                                         (N,), (N,) → (N,)
+    def _apply(self, a: Vector, b: Vector) -> Vector:
+        # d = a − b
         return a - b
 
 
+def show(v: Vector) -> None:
+    print("clean:", v)
+
+
 # 1 · compose with |: a Sequential, itself an Operator
-clean: Operator = Standardize(mean=10.0, std=2.0) | Clip(lo=-3.0, hi=3.0)
-x: NDArray[np.float64] = np.array([4.0, 10.0, 30.0])  # (N,) = (3,)
-z: NDArray[np.float64] = clean(x)  # (3,): [-3., 0., 3.]
+
+# z = (x − 10) / 2
+standardize = Standardize(mean=10.0, std=2.0)
+# z̃ = min(max(z, −3), 3)
+clip = Clip(lo=-3.0, hi=3.0)
+clean: Sequential = standardize | clip
+
+x: Vector = np.array([4.0, 10.0, 30.0])
+# [-3., 0., 3.]
+z: Vector = clean(x)
 
 # 2 · wire a Graph: named inputs, shared operators, named outputs
-a, b = Input("a"), Input("b")
-graph = Graph(
-    inputs={"a": a, "b": b},
-    outputs={"anomaly": Difference()(clean(a), clean(b))},
-)
-out: dict[str, NDArray[np.float64]] = graph(a=x, b=x + 2.0)  # {"anomaly": (3,)}
+
+difference = Difference()
+a = Input("a")
+b = Input("b")
+a_clean = clean(a)
+b_clean = clean(b)
+anomaly = difference(a_clean, b_clean)
+graph = Graph(inputs={"a": a, "b": b}, outputs={"anomaly": anomaly})
+
+# {"anomaly": d}, one value per sample
+out: dict[str, Vector] = graph(a=x, b=x + 2.0)
 
 # 3 · observe without changing the flow
-traced: Operator = clean | Tap(lambda v: print("clean:", v))
+
+traced: Sequential = clean | Tap(show)
 
 # 4 · configuration is data: an operator round-trips through JSON
-text: str = dumps(Standardize(mean=10.0, std=2.0))
-same: Operator = loads(text)  # Standardize(mean=10.0, std=2.0)
+
+text: str = dumps(standardize)
+# Standardize(mean=10.0, std=2.0)
+same: Operator = loads(text)
 ```
 
 The same interface steps through time. With `pipekit-cycle`, a forward
@@ -112,18 +136,27 @@ model is an operator and a `Cycle` runs it:
 
 ```python
 import numpy as np
-from numpy.typing import NDArray
+from jaxtyping import Float
 
 import pipekit_cycle as pc
 
-
-# dx/dt = −k x, one explicit Euler step: x_{t+1} = x_t − Δt · k · x_t
-def decay(x: NDArray[np.float64], dt: float) -> NDArray[np.float64]:
-    return x - dt * 0.1 * x  # (N,) → (N,)
+# N  state variables
+State = Float[np.ndarray, " N"]
 
 
-forecast = pc.Cycle(step_op=pc.CallableForward(decay, dt=1.0), n_steps=24)
-x24, _ = forecast(np.ones(3), None)  # x₂₄ = (1 − 0.1)²⁴ ≈ 0.080   (3,)
+def decay(x: State, dt: float) -> State:
+    """One explicit Euler step of dx/dt = −k x, with k = 0.1."""
+    # x_{t+1} = x_t − Δt · k · x_t
+    return x - dt * 0.1 * x
+
+
+# x_t ↦ x_{t+1}, Δt = 1
+step = pc.CallableForward(decay, dt=1.0)
+# x_0 ↦ x_24
+forecast = pc.Cycle(step_op=step, n_steps=24)
+
+# x₂₄ = (1 − 0.1)²⁴ x₀ ≈ 0.080 x₀
+x24, _ = forecast(np.ones(3), None)
 ```
 
 Swap `CallableForward` for `NeuralForward` around a trained model from
@@ -151,27 +184,63 @@ named outputs.
 The wiring, once the six domain operators are written:
 
 ```python
-# ReadTile … Threshold are the six domain operators; log_count, count and
-# fraction are one-line functions. All of them are in the tutorial.
-sources, background = Input("sources"), Input("background")
+# ReadTile … Threshold, CountFlagged and FlaggedFraction are the tutorial's
+# operators; few_exposures and log_flagged are its two named functions.
 
-read = ThreadMap(Cache(Retry(ReadTile(), attempts=3, base_delay=0.5, on=(OSError,))))
-stack = (read | StackAlong(axis=0) | AssertShape((None, C, H, W)))(sources)
-composite = Branch(
-    lambda s: s.shape[0] < 5,
+# the steps
+
+# on OSError, read again: up to 3 attempts
+retried_read = Retry(ReadTile(), attempts=3, base_delay=0.5, on=(OSError,))
+# keep each source's exposure, so no source is read twice
+cached_read = Cache(retried_read)
+# [s_1, …, s_T] ↦ [x_1, …, x_T], on 8 threads
+read = ThreadMap(cached_read, n_workers=8)
+# [x_1, …, x_T] ↦ X ∈ ℝ^{T×C×H×W}
+stack_exposures = StackAlong(axis=0)
+check_shape = AssertShape((None, C, H, W))
+# x̄ = median_t X when T < 5, else mean_t X
+choose_composite = Branch(
+    few_exposures,
     if_true=Composite(how="median"),
     if_false=Composite(how="mean"),
-)(stack)  # (T, C, H, W) → (C, H, W)
+)
+# z = (x̄ − μ_b) / σ_b
+z_score = ZScore(sigma=1.0)
+# r = (x̄_0 − x̄_1) / (x̄_0 + x̄_1)
+channel_ratio = NormalizedDifference(a=0, b=1)
+# s = max_c |z_c| + w · |r − r̄|
+score_pixels = Score(weight=10.0)
+# m = 1[s > k], logged on the way through
+threshold = Threshold(k=3.0)
+report = Tap(log_flagged)
+# m ↦ {"flagged": n, "fraction": f}
+summarise = Fanout({"flagged": CountFlagged(), "fraction": FlaggedFraction()})
 
-z = ZScore(sigma=1.0)(composite, background)  # (C, H, W)
-ratio = NormalizedDifference(a=0, b=1)(composite)  # (H, W)
-score = Score(weight=10.0)(z, ratio)  # (H, W)
-mask = (Threshold(k=3.0) | Tap(log_count))(score)  # (H, W)
-summary = Fanout({"flagged": Lambda(count), "fraction": Lambda(fraction)})(mask)
+# the bundles
+
+load: Sequential = read | stack_exposures | check_shape
+flag: Sequential = threshold | report
+
+# wired as a graph
+
+sources_in = Input("sources")
+background_in = Input("background")
+stack_node = load(sources_in)
+composite_node = choose_composite(stack_node)
+z_node = z_score(composite_node, background_in)
+ratio_node = channel_ratio(composite_node)
+score_node = score_pixels(z_node, ratio_node)
+mask_node = flag(score_node)
+summary_node = summarise(mask_node)
 
 detector = Graph(
-    inputs={"sources": sources, "background": background},
-    outputs={"composite": composite, "score": score, "mask": mask, "summary": summary},
+    inputs={"sources": sources_in, "background": background_in},
+    outputs={
+        "composite": composite_node,
+        "score": score_node,
+        "mask": mask_node,
+        "summary": summary_node,
+    },
 )
 ```
 
