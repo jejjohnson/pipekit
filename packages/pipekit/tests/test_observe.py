@@ -166,3 +166,39 @@ def test_observer_reprs_are_readable():
     assert repr(Snapshot().at("k")).startswith("Snapshot.at(")
     assert repr(ShapeTrace()).startswith("ShapeTrace(")
     assert repr(Histogram(bins=4)).startswith("Histogram(")
+
+
+def test_shapetrace_prints_an_extra_line():
+    lines: list[str] = []
+
+    class Tile:
+        shape = (2, 3)
+        dtype = "float32"
+        crs = "EPSG:4326"
+
+    def crs_of(tile):
+        return f"crs={tile.crs}"
+
+    op = ShapeTrace(printer=lines.append, label="read", extra=crs_of)
+    op(Tile())
+    assert lines == ["[read] shape=(2, 3) dtype=float32", "[read]   crs=EPSG:4326"]
+
+
+def test_shapetrace_diff_only_notices_a_change_in_the_extra_line():
+    lines: list[str] = []
+
+    class Tile:
+        shape = (2, 3)
+        dtype = "float32"
+
+        def __init__(self, crs):
+            self.crs = crs
+
+    def crs_of(tile):
+        return f"crs={tile.crs}"
+
+    op = ShapeTrace(printer=lines.append, mode="diff_only", extra=crs_of)
+    op(Tile("EPSG:4326"))
+    op(Tile("EPSG:4326"))
+    op(Tile("EPSG:32630"))
+    assert len(lines) == 4  # two calls printed, two lines each

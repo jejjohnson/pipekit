@@ -22,12 +22,15 @@ See master plan Report 2, Group J.
 from __future__ import annotations
 
 import asyncio
-import sys
+import logging
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any
 
 from pipekit._base.operator import Operator, nested_config, require_operator
+
+
+log = logging.getLogger(__name__)
 
 
 class ThreadMap(Operator):
@@ -78,7 +81,8 @@ class ProcessMap(Operator):
         op: The inner `Operator` invoked per item.
         n_workers: Maximum concurrent processes.
         on_error: ``"raise"`` (default) re-raises the first worker
-            error; ``"log_and_continue"`` logs to ``stderr`` and
+            error; ``"log_and_continue"`` logs it as a warning on the
+            ``pipekit.parallel`` logger (with the traceback) and
             substitutes ``None`` for the failing item.
 
     Returns from ``__call__(iterable)``: a list of results in input order.
@@ -115,9 +119,12 @@ class ProcessMap(Operator):
                 except Exception as exc:
                     if self.on_error == "raise":
                         raise
-                    print(
-                        f"ProcessMap: item {i} failed with {type(exc).__name__}: {exc}",
-                        file=sys.stderr,
+                    log.warning(
+                        "ProcessMap: item %d failed with %s: %s",
+                        i,
+                        type(exc).__name__,
+                        exc,
+                        exc_info=exc,
                     )
                     results.append(None)
             return results
@@ -143,8 +150,9 @@ class AsyncMap(Operator):
 
     `AsyncMap.__call__` is itself synchronous — it drives an event loop
     via ``asyncio.run`` so callers don't need to be async. For callers
-    already inside an event loop, use `AsyncMap.run` directly (an
-    ``async def`` method).
+    already inside an event loop (a FastAPI or LitServe handler), use
+    ``await op.run(items)``: calling the operator there raises a
+    `RuntimeError` that says so.
 
     Args:
         op: The inner `Operator` invoked per item.
@@ -163,7 +171,16 @@ class AsyncMap(Operator):
         self.semaphore = semaphore
 
     def _apply(self, iterable: Iterable[Any]) -> list[Any]:
-        return asyncio.run(self.run(iterable))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # no loop running: drive one ourselves
+            return asyncio.run(self.run(iterable))
+        raise RuntimeError(
+            "AsyncMap was called inside a running event loop (a server "
+            "handler, a notebook cell running async code). Use "
+            "`await async_map.run(items)` there instead."
+        )
 
     async def run(self, iterable: Iterable[Any]) -> list[Any]:
         """Async entry-point. Use this when already inside an event loop."""
