@@ -9,7 +9,8 @@ aren't recoverable from a class name.
 
 `JaxModelOp` adds two methods on top of the same wrapper surface:
 
-- `serialize_weights() -> bytes` — `eqx.tree_serialise_leaves` of
+- `serialize_weights() -> bytes` — a leaf-signature header plus
+  `eqx.tree_serialise_leaves` of
   the wrapped module's array leaves. Suitable for the registry's
   ``weights`` blob.
 - `with_weights(blob: bytes) -> JaxModelOp` — load the bytes back
@@ -28,18 +29,19 @@ needs to build a fresh module of the same shape before calling
 
 from __future__ import annotations
 
-import io
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import equinox as eqx
 from pipekit import Operator
+
+from pipekit_jax.weights import WeightsMixin
 
 
 if TYPE_CHECKING:
     pass
 
 
-class JaxModelOp(Operator):
+class JaxModelOp(WeightsMixin, Operator):
     """Wrap an `eqx.Module` as a `pipekit.Operator` with weight round-trip.
 
     Drop-in replacement for the in-package
@@ -78,91 +80,12 @@ class JaxModelOp(Operator):
     def get_config(self) -> dict[str, Any]:
         return {"module_class": type(self.module).__qualname__}
 
-    # --- Weight round-trip --------------------------------------------
+    # --- Weight round-trip (shared via WeightsMixin) -------------------
+    # The persisted tree is the wrapped module, not the wrapper: an
+    # eqx.Module's array leaves round-trip, the Operator shell doesn't.
 
-    def serialize_weights(self) -> bytes:
-        """Serialise the wrapped module's array leaves to bytes.
+    def _weights_tree(self) -> Any:
+        return self.module
 
-        Uses ``equinox.tree_serialise_leaves``, which writes each
-        array leaf's raw bytes plus a tree-shape header. The
-        complementary `with_weights` reads the same format.
-        """
-        buf = io.BytesIO()
-        eqx.tree_serialise_leaves(buf, self.module)
-        return buf.getvalue()
-
-    def with_weights(self, blob: bytes) -> JaxModelOp:
-        """Return a new `JaxModelOp` with weights loaded from ``blob``.
-
-        ``self.module`` is used as the **skeleton** / template — its
-        non-array leaves (activations, dtypes, layer sizes) determine
-        the structure into which the persisted bytes are loaded. The
-        bytes must come from a `serialize_weights` call on a module
-        with the same PyTree structure (typically the same module
-        class with the same constructor arguments).
-
-        Args:
-            blob: Bytes produced by `serialize_weights`.
-
-        Returns:
-            A fresh `JaxModelOp` whose ``module`` carries the
-            persisted weight values.
-
-        Raises:
-            ValueError: if ``blob`` doesn't deserialise into a tree
-                with the same structure as ``self.module``.
-            RuntimeError: from newer equinox versions when a
-                deserialised leaf's shape/dtype doesn't match the
-                skeleton (``eqx.tree_deserialise_leaves``).
-        """
-        if not isinstance(blob, (bytes, bytearray)):
-            raise TypeError(
-                "JaxModelOp.with_weights(blob): blob must be bytes "
-                f"(produced by serialize_weights); got {type(blob).__name__}."
-            )
-        buf = io.BytesIO(blob)
-        new_module = eqx.tree_deserialise_leaves(buf, self.module)
-        return JaxModelOp(new_module)
-
-    # --- Registry round-trip ------------------------------------------
-
-    def from_registry(self, registry: Any, ref: str) -> JaxModelOp:
-        """Reload weights stored under ``ref`` from ``registry`` into
-        ``self`` as the skeleton, returning a fresh `JaxModelOp`.
-
-        This is the inverse of:
-
-            registry.store(trained_op, weights=trained_op.serialize_weights())
-
-        Args:
-            registry: Anything satisfying
-                ``pipekit_experiment.ModelRegistry`` (which includes
-                ``load_weights(ref) -> bytes | None``).
-            ref: Hash or tag identifying the stored model.
-
-        Returns:
-            A new `JaxModelOp` with the persisted weights loaded
-            into a copy of ``self.module``.
-
-        Raises:
-            TypeError: if ``registry`` doesn't expose a way to read
-                the raw weight bytes.
-            ValueError: if the stored weights don't match
-                ``self.module``'s structure.
-        """
-        loader = getattr(registry, "load_weights", None)
-        if loader is None:
-            raise TypeError(
-                "JaxModelOp.from_registry: registry must satisfy the "
-                "ModelRegistry protocol (missing `load_weights`). Got "
-                f"{type(registry).__name__}."
-            )
-        blob = loader(ref)
-        if blob is None:
-            raise ValueError(
-                f"JaxModelOp.from_registry: no weights blob stored "
-                f"for ref={ref!r}. The model was registered without "
-                "weights bytes — pass weights=op.serialize_weights() "
-                "to registry.store() when persisting a JaxModelOp."
-            )
-        return self.with_weights(blob)
+    def _from_weights_tree(self, tree: Any) -> JaxModelOp:
+        return JaxModelOp(tree)

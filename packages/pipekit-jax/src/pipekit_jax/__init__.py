@@ -2,6 +2,10 @@
 
 Public surface:
 
+- `JaxOperator` — base class for operators that are both a
+  ``pipekit.Operator`` and an ``eqx.Module`` (JSON config, pytree
+  leaves, weight round trip). Contract checks live in
+  `pipekit_jax.testing.check_jax_operator`.
 - `JaxModelOp` — wraps an ``eqx.Module`` as a ``pipekit.Operator``,
   with ``serialize_weights`` / ``with_weights`` / ``from_registry``
   methods so trained weights round-trip byte-identically through any
@@ -28,6 +32,7 @@ from typing import Any
 from pipekit_jax import pytree as pytree  # registers Sequential / Graph
 from pipekit_jax.adjoints import to_diffrax_adjoint, truncated_scan
 from pipekit_jax.model_op import JaxModelOp
+from pipekit_jax.operator import JaxOperator
 
 
 def __getattr__(name: str) -> Any:
@@ -43,6 +48,7 @@ def __getattr__(name: str) -> Any:
 __all__ = [
     "DiffraxForwardModel",
     "JaxModelOp",
+    "JaxOperator",
     "to_diffrax_adjoint",
     "truncated_scan",
 ]

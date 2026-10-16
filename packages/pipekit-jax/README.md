@@ -10,6 +10,10 @@ JAX / Equinox carrier integration for `pipekit`:
   a diffrax ODE/SDE solve (behind the `[diffrax]` extra).
 - **`to_diffrax_adjoint` / `truncated_scan`** — JAX-side interpreters
   for the carrier-agnostic adjoint specs in `pipekit_cycle.adjoints`.
+- **`JaxOperator`** — base class for operators that are both a
+  `pipekit.Operator` and an `eqx.Module` (JSON config, pytree leaves,
+  weight round trip); `pipekit_jax.testing.check_jax_operator` asserts
+  the contract in downstream test suites.
 - **Pytree containers** — importing `pipekit_jax` registers
   `pipekit.Sequential`, `pipekit.Graph` and `JaxModelOp` as JAX pytrees,
   so gradients reach learnable leaves on operators inside a pipeline.
