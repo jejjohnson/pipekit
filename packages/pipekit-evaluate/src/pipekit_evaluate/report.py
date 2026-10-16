@@ -144,11 +144,13 @@ class EvaluationReport:
         """A sha256 over the entries, the references and the config.
 
         Entry order and the timestamp do not change it, so two runs that
-        score the same values on the same references hash equal.
+        score the same values on the same references hash equal. An entry
+        without a cell or reference hashes as it did before those fields
+        existed, so an :func:`evaluate` report keeps its hash.
         """
         payload = {
             "entries": [
-                e.to_record() for e in sorted(self.entries, key=lambda e: e.key)
+                _hash_record(e) for e in sorted(self.entries, key=lambda e: e.key)
             ],
             "model_ref": self.model_ref,
             "dataset_ref": self.dataset_ref,
@@ -323,6 +325,15 @@ def _check_scorer_names(scorers: Sequence[Scorer]) -> None:
         raise ValueError(
             f"duplicate scorer names {dups}; each scorer needs its own name"
         )
+
+
+def _hash_record(entry: ReportEntry) -> dict[str, Any]:
+    """The entry's record without the ladder fields it does not set."""
+    record = entry.to_record()
+    for name in ("cell", "reference"):
+        if record[name] is None:
+            del record[name]
+    return record
 
 
 def _freeze(value: Any) -> Any:
