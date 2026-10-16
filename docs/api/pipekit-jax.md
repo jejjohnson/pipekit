@@ -31,6 +31,33 @@ round trip that keeps learnable fields learnable).
 
 ::: pipekit_jax.weights
 
+## ScanCycle and Rollout
+
+`jax.lax.scan`-based time stepping. `ScanCycle` is the jit-native
+counterpart of `pipekit_cycle.Cycle` — same `(carrier, state)` contract
+and history convention, one scan regardless of `n_steps`, history
+returned by `ScanCycle.run`. `Rollout` is the carrier-only form,
+returning a trajectory sampled every `save_every` steps.
+`checkpoint=True` rematerialises in chunks so `grad` stores O(√n)
+carries instead of O(n).
+
+Measured on a 2-vCPU CPU VM (5-point diffusion step on a 128² grid):
+
+| steps | compile `Cycle` (unrolled) | compile `ScanCycle` | grad compile `Cycle` | grad compile `ScanCycle` |
+|---:|---:|---:|---:|---:|
+| 10 | 0.19 s | 0.12 s | 2.9 s | 0.26 s |
+| 50 | — | — | 356 s | 0.28 s |
+| 100 | 1.04 s | 0.14 s | — | — |
+| 1000 | 19.0 s | 0.13 s | did not finish in 10 min | — |
+
+| steps | grad temp memory, `checkpoint=False` | `checkpoint=True` |
+|---:|---:|---:|
+| 100 | 6.6 MiB | 1.7 MiB |
+| 1000 | 62.9 MiB | 4.4 MiB |
+| 4000 | 250.4 MiB | 8.3 MiB |
+
+::: pipekit_jax.cycle
+
 ## JaxModelOp
 
 ::: pipekit_jax.model_op
