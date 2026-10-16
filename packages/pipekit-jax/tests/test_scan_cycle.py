@@ -303,3 +303,61 @@ def test_rollout_is_a_pipekit_operator_with_config():
     r = Rollout(step=Damp(a=0.5), n_steps=4, save_every=2)
     assert isinstance(r, Operator)
     assert r.get_config()["step"]["class"] == "Damp"
+
+
+# ---------------------------------------------------------------------
+# Review fixes (#69)
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("stride", [1, 3])
+def test_truncated_history_keeps_each_entrys_local_gradient(stride):
+    # truncated_scan cuts the carry but leaves each output's own gradient:
+    # a trajectory loss over run()'s history must match it.
+    k, n = 2, 9
+    c0 = C0 + 1.0
+
+    def via_run(a):
+        cyc = ScanCycle(
+            step_op=Decay(a=a), n_steps=n, history_stride=stride, truncate=k
+        )
+        hist = cyc.run(c0, S0)[2][0]
+        return jnp.sum(hist**2)
+
+    def via_truncated_scan(a):
+        _, ys = truncated_scan(lambda c, _: (a * c, a * c), c0, jnp.arange(n), k=k)
+        return jnp.sum(ys[::stride] ** 2)
+
+    np.testing.assert_allclose(via_run(0.9), via_truncated_scan(0.9), rtol=1e-6)
+    np.testing.assert_allclose(
+        jax.grad(via_run)(0.9), jax.grad(via_truncated_scan)(0.9), rtol=1e-6
+    )
+
+
+@pytest.mark.parametrize("value", [jnp.arange(3), jnp.array([True, False])])
+def test_zero_step_histories_keep_the_carrier_dtype(value):
+    class Same(StatefulOperator):
+        def _apply(self, c, s):
+            return c, s
+
+    _, _, (hc, _) = ScanCycle(step_op=Same(), n_steps=0).run(value, None)
+    assert hc.shape == (0, *value.shape) and hc.dtype == value.dtype
+
+    traj = Rollout(step=Damp(a=1.0), n_steps=0)(value)
+    assert traj.dtype == value.dtype and traj.shape == (1, *value.shape)
+    empty = Rollout(step=Damp(a=1.0), n_steps=0, include_initial=False)(value)
+    assert empty.dtype == value.dtype and empty.shape == (0, *value.shape)
+
+
+def test_forward_model_wrappers_are_reported_as_pickle_hazards():
+    from pipekit import check_pickleable
+
+    model = Oscillator(omega=jnp.asarray(2.0))
+    assert check_pickleable(ScanCycle(step_op=model, n_steps=2))
+    assert check_pickleable(Rollout(step=model, n_steps=2))
+    assert check_pickleable(Rollout(step=Damp(a=0.5), n_steps=2)) == []
+
+
+def test_rollout_rejects_a_non_operator_step():
+    with pytest.raises(TypeError, match="Operator or a ForwardModel"):
+        Rollout(step=lambda c: c, n_steps=1)

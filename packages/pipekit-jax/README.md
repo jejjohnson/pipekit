@@ -17,7 +17,9 @@ JAX / Equinox carrier integration for `pipekit`:
 - **`ScanCycle` / `Rollout`** — `jax.lax.scan`-based time stepping:
   the jit-native counterpart of `pipekit_cycle.Cycle` (compile time flat
   in the number of steps; history returned, not stored) and a
-  carrier-only trajectory rollout, both with O(√n)-memory checkpointing.
+  carrier-only trajectory rollout. With `checkpoint=True`, `ScanCycle`
+  keeps O(√n) carries for `grad`; `Rollout` keeps one per saved point,
+  O(n / save_every + save_every).
 - **Pytree containers** — importing `pipekit_jax` registers
   `pipekit.Sequential`, `pipekit.Graph` and `JaxModelOp` as JAX pytrees,
   so gradients reach learnable leaves on operators inside a pipeline.

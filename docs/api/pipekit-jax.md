@@ -38,8 +38,11 @@ counterpart of `pipekit_cycle.Cycle` — same `(carrier, state)` contract
 and history convention, one scan regardless of `n_steps`, history
 returned by `ScanCycle.run`. `Rollout` is the carrier-only form,
 returning a trajectory sampled every `save_every` steps.
-`checkpoint=True` rematerialises in chunks so `grad` stores O(√n)
-carries instead of O(n).
+`checkpoint=True` rematerialises in chunks on the backward pass: a
+`ScanCycle` call stores O(√n) carries instead of O(n); `ScanCycle.run`
+and `Rollout` store one carry per recorded / saved point plus one block,
+O(n / stride + stride), so they reach O(√n) only when the stride is
+about √n.
 
 Measured on a 2-vCPU CPU VM (5-point diffusion step on a 128² grid):
 

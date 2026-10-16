@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 import equinox as eqx
 import jax
@@ -46,10 +46,29 @@ class _ForwardModelStep(StatefulOperator, JaxOperator):
     ``eqx.filter_grad`` through the cycle.
     """
 
+    # The model is arbitrary user code (callables, diffrax vector fields):
+    # flag it so `pipekit.check_pickleable` reports it, as
+    # `pipekit_cycle`'s adapter does.
+    forbid_in_yaml: ClassVar[bool] = True
+
     model: Any
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         return self.model.step(carrier, self.model.dt), state
+
+    def get_config(self) -> dict[str, Any]:
+        return {"model_class": type(self.model).__name__}
+
+
+class _ForwardModelCarrierStep(JaxOperator):
+    """A `ForwardModel` as a carrier-only operator: ``c -> step(c, dt)``."""
+
+    forbid_in_yaml: ClassVar[bool] = True
+
+    model: Any
+
+    def _apply(self, carrier: Any) -> Any:
+        return self.model.step(carrier, self.model.dt)
 
     def get_config(self) -> dict[str, Any]:
         return {"model_class": type(self.model).__name__}
@@ -65,6 +84,23 @@ def _coerce_step(step_op: Any) -> StatefulOperator:
         "step_op must be a StatefulOperator or a ForwardModel, "
         f"got {type(step_op).__name__}."
     )
+
+
+def _coerce_carrier_step(step: Any) -> Operator:
+    """Return ``step`` as a carrier-only operator (wrapping a `ForwardModel`)."""
+    if isinstance(step, ForwardModel) and not isinstance(step, StatefulOperator):
+        return _ForwardModelCarrierStep(step)
+    if isinstance(step, Operator):
+        return step
+    raise TypeError(
+        f"step must be a pipekit Operator or a ForwardModel, got {type(step).__name__}."
+    )
+
+
+def _empty_history(x: Any) -> Any:
+    """A length-0 stack of ``x``, keeping its dtype."""
+    x = jnp.asarray(x)
+    return jnp.zeros((0, *x.shape), dtype=x.dtype)
 
 
 def _scan_steps(
@@ -136,7 +172,9 @@ class ScanCycle(StatefulOperator, JaxOperator):
         truncate: If set to ``k``, gradients flow through the carry of
             the trailing ``k`` steps only (the carry leaving step ``i``
             is ``stop_gradient``-ed when ``i < n_steps - k``), matching
-            `pipekit_jax.truncated_scan`. Forward values are unchanged.
+            `pipekit_jax.truncated_scan`: history entries recorded by
+            `run` keep the gradient of their own step, as scan outputs
+            do. Forward values are unchanged.
 
     Raises:
         TypeError: If ``step_op`` is neither a `StatefulOperator` nor a
@@ -166,14 +204,17 @@ class ScanCycle(StatefulOperator, JaxOperator):
         if self.truncate is not None and self.truncate < 1:
             raise ValueError(f"ScanCycle.truncate must be >= 1, got {self.truncate}.")
 
+    def _cut(self, carry: tuple[Any, Any], i: Any) -> tuple[Any, Any]:
+        """Stop gradients through the carry leaving step ``i`` (``truncate``)."""
+        if self.truncate is None:
+            return carry
+        cut = i < self.n_steps - self.truncate
+        return jax.tree.map(
+            lambda x: jnp.where(cut, jax.lax.stop_gradient(x), x), carry
+        )
+
     def _step(self, carry: tuple[Any, Any], i: Any) -> tuple[Any, Any]:
-        carry = self.step_op(*carry)
-        if self.truncate is not None:
-            cut = i < self.n_steps - self.truncate
-            carry = jax.tree.map(
-                lambda x: jnp.where(cut, jax.lax.stop_gradient(x), x), carry
-            )
-        return carry
+        return self._cut(self.step_op(*carry), i)
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         chunk = max(1, math.isqrt(self.n_steps)) if self.checkpoint else None
@@ -189,16 +230,18 @@ class ScanCycle(StatefulOperator, JaxOperator):
         step, k, n = self._step, self.history_stride, self.n_steps
         carry = (carrier, state)
         if n == 0:
-            empty = jax.tree.map(lambda x: jnp.zeros((0, *jnp.shape(x))), carry)
-            return carrier, state, empty
+            return carrier, state, jax.tree.map(_empty_history, carry)
 
         def body(c: Any, i: Any) -> tuple[Any, None]:
             return step(c, i), None
 
         def group(c: Any, j: Any) -> tuple[Any, Any]:
-            # one recorded step (global index j·k), then k - 1 unrecorded ones
-            c = step(c, j * k)
-            recorded = c
+            # one recorded step (global index j·k), then k - 1 unrecorded ones.
+            # Record *before* the truncation cut, like truncated_scan's
+            # outputs: an entry keeps the gradient of its own step even
+            # when the carry it passes on is cut.
+            recorded = self.step_op(*c)
+            c = self._cut(recorded, j * k)
             if k > 1:
                 c, _ = jax.lax.scan(body, c, j * k + jnp.arange(1, k))
             return c, recorded
@@ -212,8 +255,9 @@ class ScanCycle(StatefulOperator, JaxOperator):
             carry, hist = jax.lax.scan(group, carry, jnp.arange(full))
             history.append(hist)
         if rem:
-            carry = step(carry, full * k)
-            history.append(_stack([carry]))
+            recorded = self.step_op(*carry)
+            history.append(_stack([recorded]))
+            carry = self._cut(recorded, full * k)
             carry = _scan_steps(step, carry, full * k + 1, rem - 1)
         hist = (
             history[0]
@@ -245,7 +289,9 @@ class Rollout(JaxOperator):
 
     Args:
         step: A pipekit operator ``carrier -> carrier``, or a
-            `pipekit_cycle.ForwardModel` (called as ``step(c, dt)``).
+            `pipekit_cycle.ForwardModel` (wrapped to call ``step(c, dt)``;
+            the wrapper is flagged ``forbid_in_yaml`` so
+            `pipekit.check_pickleable` reports it).
         n_steps: Number of steps; must be a multiple of ``save_every``.
         save_every: Record every ``save_every``-th state.
         include_initial: Prepend ``c₀`` to the trajectory.
@@ -255,11 +301,12 @@ class Rollout(JaxOperator):
             save_every) instead of O(n).
 
     Raises:
+        TypeError: If ``step`` is neither an operator nor a `ForwardModel`.
         ValueError: If ``n_steps < 0``, ``save_every < 1``, or
             ``n_steps`` is not a multiple of ``save_every``.
     """
 
-    step: Any
+    step: Any = eqx.field(converter=_coerce_carrier_step)
     n_steps: int = eqx.field(static=True, default=1)
     save_every: int = eqx.field(static=True, default=1)
     include_initial: bool = eqx.field(static=True, default=True)
@@ -276,16 +323,9 @@ class Rollout(JaxOperator):
                 f"save_every ({self.save_every})."
             )
 
-    def _advance(self, c: Any) -> Any:
-        if isinstance(self.step, ForwardModel) and not isinstance(
-            self.step, StatefulOperator
-        ):
-            return self.step.step(c, self.step.dt)
-        return self.step(c)
-
     def _apply(self, carrier: Any) -> Any:
         def inner(c: Any, _: Any) -> tuple[Any, None]:
-            return self._advance(c), None
+            return self.step(c), None
 
         def outer(c: Any, _: Any) -> tuple[Any, Any]:
             c, _ = jax.lax.scan(inner, c, None, length=self.save_every)
@@ -298,7 +338,7 @@ class Rollout(JaxOperator):
         if n_saves:
             _, traj = jax.lax.scan(outer, carrier, None, length=n_saves)
         else:
-            traj = jax.tree.map(lambda x: jnp.zeros((0, *jnp.shape(x))), carrier)
+            traj = jax.tree.map(_empty_history, carrier)
         if not self.include_initial:
             return traj
         return jax.tree.map(
@@ -307,9 +347,7 @@ class Rollout(JaxOperator):
 
     def get_config(self) -> dict[str, Any]:
         return {
-            "step": nested_config(self.step)
-            if isinstance(self.step, Operator)
-            else {"class": type(self.step).__name__, "config": {}},
+            "step": nested_config(self.step),
             "n_steps": self.n_steps,
             "save_every": self.save_every,
             "include_initial": self.include_initial,
