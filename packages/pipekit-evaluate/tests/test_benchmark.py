@@ -432,7 +432,7 @@ def test_to_report_tags_each_value_with_its_cell_and_reference() -> None:
     scorer = MetricScorer(
         lambda p, r: abs(p - float(r)),
         name="abs",
-        lens="probabilistic",
+        lens="structural",
     )
     ladder = Benchmark(
         task=FakeTask(), estimators=[oracle, amortized], scorers=[scorer]
@@ -449,7 +449,7 @@ def test_to_report_tags_each_value_with_its_cell_and_reference() -> None:
     assert report.filter(cell="L4/r5/c0", reference="oracle_posterior").values == {
         "L4/r5/c0:oracle_posterior:abs.value": pytest.approx(1.0)
     }
-    assert all(e.tags.lens is Lens.PROBABILISTIC for e in report.entries)
+    assert all(e.tags.lens is Lens.STRUCTURAL for e in report.entries)
     assert report.model_ref == "h5"
     assert report.config == {"task": "toy", "domain": "test", "axis": "staged"}
 
