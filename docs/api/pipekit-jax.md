@@ -10,8 +10,8 @@ adjoint interpreters `to_diffrax_adjoint` / `truncated_scan`.
 
 ## Pytree containers
 
-Importing `pipekit_jax` registers `pipekit.Sequential` and
-`pipekit.Graph` as JAX pytrees, so `jax.grad` / `eqx.filter_grad` /
+Importing `pipekit_jax` registers `pipekit.Sequential`,
+`pipekit.Graph` and `JaxModelOp` as JAX pytrees, so `jax.grad` / `eqx.filter_grad` /
 `jax.vmap` see through a pipeline to the leaves of the operators it
 holds.
 

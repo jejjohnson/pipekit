@@ -1,12 +1,14 @@
 """Register pipekit's composition containers as JAX pytrees.
 
-Importing `pipekit_jax` registers `pipekit.Sequential` and
-`pipekit.Graph` with `jax.tree_util`, so JAX transformations see
-*through* a pipeline to the leaves of the operators it holds:
+Importing `pipekit_jax` registers `pipekit.Sequential`, `pipekit.Graph`
+and `pipekit_jax.JaxModelOp` with `jax.tree_util`, so JAX transformations
+see *through* a pipeline to the leaves of the operators it holds:
 
 - ``Sequential`` — children are its operators, in order.
 - ``Graph`` — children are the node operators in topological order;
-  the topology (inputs, node wiring, outputs) is static aux data.
+  the topology (inputs, node wiring, outputs) is static aux data that
+  holds no operators or parameters.
+- `JaxModelOp` — the child is its wrapped ``eqx.Module``.
 
 Without the registration a container is a single opaque leaf, and a
 learnable coefficient on an operator inside it is a constant to
@@ -15,8 +17,8 @@ registration is an import side effect of this package, like enabling a
 ``jax.config`` flag.
 
 What the leaves are depends on the operators. An operator that is
-itself a pytree (an ``eqx.Module`` subclass such as `JaxModelOp`)
-contributes its own leaves. A plain `pipekit.Operator` is one opaque
+itself a pytree (an ``eqx.Module`` subclass, or `JaxModelOp` via its
+module) contributes its own leaves. A plain `pipekit.Operator` is one opaque
 leaf — fine under ``eqx.filter_jit`` / ``eqx.filter_grad`` (non-array
 leaves are static there), but not as a direct argument to
 ``jax.jit``.
@@ -47,11 +49,13 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax
 from pipekit import Graph, Sequential
-from pipekit._base.graph import Node
+from pipekit._base.graph import Input, Node
+
+from pipekit_jax.model_op import JaxModelOp
 
 
 # ---------------------------------------------------------------------
@@ -76,26 +80,73 @@ def _sequential_unflatten(_: None, operators: Any) -> Sequential:
 # Graph
 # ---------------------------------------------------------------------
 
-
-def _graph_flatten(graph: Graph) -> tuple[list[Any], Graph]:
-    # The aux data must compare equal across flatten → unflatten round
-    # trips, or `tree_map` / `eqx.filter_jit` see two different
-    # treedefs. `Graph` compares by identity, so every rebuilt graph
-    # points back at the one original template.
-    template = getattr(graph, "_pytree_template", graph)
-    return [node.operator for node in graph._order], template
+# A reference to a graph vertex: ("in", input_name) or ("node", index into
+# the topological order).
+_Ref = tuple[str, Any]
 
 
-def _graph_unflatten(template: Graph, operators: Any) -> Graph:
-    remap: dict[int, Node] = {id(i): i for i in template.inputs.values()}
-    for node, op in zip(template._order, operators, strict=True):
-        parents = tuple(remap[id(p)] for p in node.parents)
-        remap[id(node)] = Node(operator=op, parents=parents)
+class _GraphTopology(NamedTuple):
+    """Wiring of a `Graph` with no operators in it — the pytree aux data.
+
+    Plain tuples of strings and ints: hashable, compared by value, and
+    holding no reference to the source graph or its parameters. Two
+    graphs with the same wiring therefore share a treedef (no retrace),
+    and rebuilding a graph never keeps the original alive.
+    """
+
+    inputs: tuple[str, ...]
+    parents: tuple[tuple[_Ref, ...], ...]  # per node, in topological order
+    outputs: tuple[tuple[str, _Ref], ...]
+
+
+def _graph_flatten(graph: Graph) -> tuple[list[Any], _GraphTopology]:
+    input_name = {id(node): name for name, node in graph.inputs.items()}
+    index = {id(node): i for i, node in enumerate(graph._order)}
+
+    def ref(node: Node) -> _Ref:
+        if id(node) in input_name:
+            return ("in", input_name[id(node)])
+        return ("node", index[id(node)])
+
+    topology = _GraphTopology(
+        inputs=tuple(graph.inputs),
+        parents=tuple(tuple(ref(p) for p in node.parents) for node in graph._order),
+        outputs=tuple((name, ref(node)) for name, node in graph.outputs.items()),
+    )
+    return [node.operator for node in graph._order], topology
+
+
+def _graph_unflatten(topology: _GraphTopology, operators: Any) -> Graph:
+    inputs = {name: Input(name) for name in topology.inputs}
+    nodes: list[Node] = []
+
+    def resolve(r: _Ref) -> Node:
+        kind, key = r
+        return inputs[key] if kind == "in" else nodes[key]
+
+    for op, parents in zip(operators, topology.parents, strict=True):
+        nodes.append(Node(operator=op, parents=tuple(resolve(p) for p in parents)))
     new = object.__new__(Graph)
-    new.inputs = template.inputs
-    new.outputs = {name: remap[id(node)] for name, node in template.outputs.items()}
-    new._order = [remap[id(node)] for node in template._order]
-    new._pytree_template = template
+    new.inputs = inputs
+    new.outputs = {name: resolve(r) for name, r in topology.outputs}
+    new._order = nodes
+    return new
+
+
+# ---------------------------------------------------------------------
+# JaxModelOp — a plain Operator wrapping an eqx.Module
+# ---------------------------------------------------------------------
+
+
+def _model_op_flatten(op: JaxModelOp) -> tuple[list[Any], None]:
+    return [op.module], None
+
+
+def _model_op_unflatten(_: None, children: Any) -> JaxModelOp:
+    # Bypass __init__: its isinstance(module, eqx.Module) check would
+    # reject the placeholder leaves JAX passes during transformations.
+    new = object.__new__(JaxModelOp)
+    new.module = children[0]
     return new
 
 
@@ -103,6 +154,7 @@ jax.tree_util.register_pytree_node(
     Sequential, _sequential_flatten, _sequential_unflatten
 )
 jax.tree_util.register_pytree_node(Graph, _graph_flatten, _graph_unflatten)
+jax.tree_util.register_pytree_node(JaxModelOp, _model_op_flatten, _model_op_unflatten)
 
 
 __all__: list[str] = []

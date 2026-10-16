@@ -223,3 +223,77 @@ def test_pipekit_core_does_not_import_jax():
         "assert 'jax' not in sys.modules, 'pipekit core imported jax'\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+# ---------------------------------------------------------------------
+# Aux data is topology only (review: #67)
+# ---------------------------------------------------------------------
+
+
+def test_identically_wired_graphs_share_a_treedef_and_compile_once():
+    traces = []
+
+    @eqx.filter_jit
+    def run(container, x):
+        traces.append(1)
+        return container(x=x)["y"]
+
+    a, b = _diamond(), _diamond()  # built separately, same wiring
+    assert jax.tree.structure(a) == jax.tree.structure(b)
+    run(a, X)
+    run(b, X)
+    assert len(traces) == 1
+
+
+def test_rebuilt_graph_does_not_keep_the_original_alive():
+    import gc
+    import weakref
+
+    g = _diamond()
+    ref = weakref.ref(g)
+    rebuilt = jax.tree.map(lambda leaf: leaf + 1.0, g)
+    del g
+    gc.collect()
+    assert ref() is None
+    _allclose(rebuilt(x=X)["y"], (3.0 * X) + 1.5 * (4.0 * X))  # a: 3, 4; b: 1.5
+
+
+def test_differently_wired_graphs_have_different_treedefs():
+    x = Input("x")
+    straight = Graph(inputs={"x": x}, outputs={"y": Scale(jnp.asarray(1.0))(x)})
+    x2 = Input("x")
+    passthrough = Graph(
+        inputs={"x": x2}, outputs={"y": x2, "z": Scale(jnp.asarray(1.0))(x2)}
+    )
+    assert jax.tree.structure(straight) != jax.tree.structure(passthrough)
+
+
+# ---------------------------------------------------------------------
+# JaxModelOp exposes its module (review: #67)
+# ---------------------------------------------------------------------
+
+
+def test_filter_grad_reaches_jax_model_op_weights_inside_a_pipeline():
+    from pipekit_jax import JaxModelOp
+
+    mlp = eqx.nn.MLP(
+        in_size=5, out_size=5, width_size=8, depth=1, key=jax.random.key(0)
+    )
+    pipe = Sequential([JaxModelOp(mlp), Scale(jnp.asarray(2.0))])
+
+    grads = eqx.filter_grad(lambda p: jnp.sum(p(X) ** 2))(pipe)
+    direct = eqx.filter_grad(lambda m: jnp.sum((2.0 * m(X)) ** 2))(mlp)
+    _allclose(
+        eqx.filter(grads.operators[0].module, eqx.is_array),
+        eqx.filter(direct, eqx.is_array),
+    )
+
+
+def test_jax_model_op_partition_combine_round_trip():
+    from pipekit_jax import JaxModelOp
+
+    op = JaxModelOp(eqx.nn.Linear(5, 5, key=jax.random.key(1)))
+    params, static = eqx.partition(op, eqx.is_inexact_array)
+    rebuilt = eqx.combine(params, static)
+    assert isinstance(rebuilt, JaxModelOp)
+    _allclose(rebuilt(X), op(X))
