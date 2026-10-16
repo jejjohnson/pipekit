@@ -18,8 +18,8 @@ report.to_dict()["cells"]["L4/r5/c0"]["scores"]
 # {"oracle_posterior": {...}, "known_theta": {...}}
 ```
 
-- **Protocols** (`Task`, `Estimator`, `Estimate`, `Oracle`, `Prior`,
-  `Scorer`) — runtime-checkable, satisfied structurally by domain packages
+- **Protocols** (`Task`, `Estimator`, `Estimate`, `CovarianceEstimate`,
+  `Oracle`, `Prior`, `Scorer`) — runtime-checkable, satisfied structurally by domain packages
   (`plumax`, `somax`, `xtremax`) without importing `pipekit-evaluate`. The
   `Task` reuses `pipekit-cycle`'s `ForwardModel` / `ObservationOperator`
   (install the `cycle` extra for the concrete types).
