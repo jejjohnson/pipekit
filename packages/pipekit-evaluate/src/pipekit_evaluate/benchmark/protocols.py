@@ -68,6 +68,24 @@ class Estimate(Protocol):
 
 
 @runtime_checkable
+class CovarianceEstimate(Estimate, Protocol):
+    """An :class:`Estimate` that also reports its posterior covariance.
+
+    A separate protocol rather than a member of :class:`Estimate`, so every
+    existing estimate keeps satisfying :class:`Estimate`. A scorer that needs
+    second moments (Gaussian coverage, a Mahalanobis distance, a spread-skill
+    ratio) checks ``isinstance(estimate, CovarianceEstimate)`` instead of
+    probing attributes or drawing samples.
+
+    Members:
+        covariance(): The posterior covariance of :meth:`point`'s quantity,
+            as a ``(d, d)`` matrix for a ``(d,)`` point.
+    """
+
+    def covariance(self) -> Any: ...
+
+
+@runtime_checkable
 class Task(Protocol):
     """One benchmark scenario: prior + simulator + obs operator + data.
 

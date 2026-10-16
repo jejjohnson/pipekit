@@ -89,6 +89,7 @@ hierarchies satisfy these structurally.
 | `Prior` | `sample(n, key)`, `log_prob(theta)` | Prior over task parameters θ |
 | `Task` | `name`, `domain`, `prior()`, `simulator()`, `observation_operator()`, `datasets()` | One benchmark scenario — reuses `ForwardModel` / `ObservationOperator` as its simulator |
 | `Estimate` | `point()`, `sample(n, key)`, `log_prob(theta)` | A point and/or posterior produced by an estimator |
+| `CovarianceEstimate` | `Estimate` + `covariance()` | An estimate that reports its posterior covariance, for coverage and spread scorers |
 | `Estimator` | `rung`, `complexity`, `fit(task)`, `__call__(obs)` | Any rung mapping observations → an `Estimate` |
 | `Oracle` | `reference_for(task)` | The designated reference estimator for a task |
 | `Scorer` | `name`, `__call__(prediction, reference)`; optional `unit`, `lens`, `stages`, `differentiable` tags, read by `tags_of` | One `(Unit, Lens)` scorer — named metric values |

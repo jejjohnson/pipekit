@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import pytest
 from pipekit_evaluate import Lens, MetricScorer
 from pipekit_evaluate.benchmark import (
@@ -17,6 +18,7 @@ from pipekit_evaluate.benchmark import (
     Benchmark,
     Cell,
     CellResult,
+    CovarianceEstimate,
     Estimate,
     Estimator,
     ReferenceRule,
@@ -483,3 +485,50 @@ def test_duplicate_scorer_names_are_rejected() -> None:
             estimators=[FakeEstimator(2, 0, 9.0)],
             scorers=[AbsError(), AbsError()],
         ).run()
+
+
+# --------------------------------------------------------------------------- #
+# Estimates with a covariance
+# --------------------------------------------------------------------------- #
+@dataclass
+class GaussEstimate(FakeEstimate):
+    cov: Any = None
+
+    def covariance(self) -> Any:
+        return self.cov
+
+
+@dataclass
+class Mahalanobis:
+    """Squared Mahalanobis distance of the truth from a Gaussian estimate."""
+
+    name: str = "maha"
+
+    def __call__(self, prediction: Estimate, reference: Any) -> Mapping[str, float]:
+        if not isinstance(prediction, CovarianceEstimate):
+            return {}
+        r = np.asarray(reference, dtype=float) - np.asarray(prediction.point())
+        return {"d2": float(r @ np.linalg.solve(prediction.covariance(), r))}
+
+
+def test_covariance_estimate_is_a_separate_protocol() -> None:
+    gauss = GaussEstimate(1.0, cov=[[1.0]])
+    assert isinstance(gauss, CovarianceEstimate)
+    assert isinstance(gauss, Estimate)
+    # an estimate without a covariance still satisfies Estimate
+    assert isinstance(FakeEstimate(1.0), Estimate)
+    assert not isinstance(FakeEstimate(1.0), CovarianceEstimate)
+
+
+def test_a_scorer_reads_the_covariance_through_the_protocol() -> None:
+    @dataclass
+    class GaussOracle(FakeEstimator):
+        def __call__(self, obs: Any) -> GaussEstimate:
+            return GaussEstimate(np.array([1.0, 2.0]), cov=np.diag([1.0, 4.0]))
+
+    task = FakeTask(data={"obs": 1.0, "theta": np.zeros(2)})
+    report = Benchmark(
+        task=task, estimators=[GaussOracle(2, 0, 0.0)], scorers=[Mahalanobis()]
+    ).run()
+    # (0 - 1)^2 / 1 + (0 - 2)^2 / 4 = 2
+    assert report.results[0].scores == {"maha.d2": pytest.approx(2.0)}

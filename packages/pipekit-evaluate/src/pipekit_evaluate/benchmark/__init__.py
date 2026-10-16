@@ -16,6 +16,7 @@ from pipekit_evaluate.benchmark.cube import (
     Cell,
 )
 from pipekit_evaluate.benchmark.protocols import (
+    CovarianceEstimate,
     Estimate,
     Estimator,
     Oracle,
@@ -49,6 +50,7 @@ __all__ = [
     "BenchmarkReport",
     "Cell",
     "CellResult",
+    "CovarianceEstimate",
     "Estimate",
     "Estimator",
     "Oracle",
