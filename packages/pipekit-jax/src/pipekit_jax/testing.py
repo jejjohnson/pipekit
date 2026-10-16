@@ -29,6 +29,15 @@ def _assert_tree_allclose(actual: Any, expected: Any, what: str) -> None:
         )
 
 
+def _array_signature(tree: Any) -> list[tuple[tuple[int, ...], Any]]:
+    """(shape, dtype) of every array leaf, in order."""
+    return [
+        (tuple(leaf.shape), leaf.dtype)
+        for leaf in jax.tree.leaves(tree)
+        if eqx.is_array(leaf)
+    ]
+
+
 def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
     """Assert that ``op`` behaves as a JAX-native pipekit operator.
 
@@ -39,14 +48,16 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
        call, with ``op`` passed as an argument (so its leaves are traced).
     3. Batching (when ``vmap``): stacking every input array along a new
        leading axis and ``jax.vmap``-ing gives the stacked eager outputs.
+       Non-array inputs (strings, callables, metadata) are held static.
     4. Leaves visible: every inexact-array field of ``op`` is a leaf of
        ``jax.tree.leaves(op)``, and ``eqx.filter_grad`` of a scalar loss
        returns a gradient for each of them.
     5. Config round trip (unless ``forbid_in_yaml``): ``op.state``
        survives ``json.dumps`` → ``Operator.from_state``; the rebuilt
-       operator has the same pytree structure, the same number of
-       inexact-array leaves (a learnable field that came back as a
-       Python float fails here), and the same outputs.
+       operator has the same number of inexact-array leaves (a learnable
+       field that came back as a Python float fails here), the same
+       array leaves (shape / dtype), and the same outputs. Static fields
+       may change container type (a tuple reloads as a list).
 
     Args:
         op: The operator under test.
@@ -64,13 +75,17 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
     _assert_tree_allclose(jitted, expected, "eager vs filter_jit")
 
     if vmap:
-        batched_inputs = jax.tree.map(lambda x: jnp.stack([x, x]), inputs)
-        batched = jax.vmap(lambda *xs: op(*xs))(*batched_inputs)
-        _assert_tree_allclose(
-            batched,
-            jax.tree.map(lambda y: jnp.stack([y, y]), expected),
-            "vmap over a leading axis",
-        )
+        # Batch only the array leaves; static inputs (strings, callables,
+        # metadata) are closed over unbatched.
+        dynamic, static = eqx.partition(inputs, eqx.is_array)
+        if jax.tree.leaves(dynamic):
+            batched_dynamic = jax.tree.map(lambda x: jnp.stack([x, x]), dynamic)
+            batched = jax.vmap(lambda d: op(*eqx.combine(d, static)))(batched_dynamic)
+            _assert_tree_allclose(
+                batched,
+                jax.tree.map(lambda y: jnp.stack([y, y]), expected),
+                "vmap over a leading axis",
+            )
 
     params = [leaf for leaf in jax.tree.leaves(op) if eqx.is_inexact_array(leaf)]
     if params:
@@ -90,9 +105,6 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
         return
     state = json.loads(json.dumps(op.state))
     rebuilt = Operator.from_state(state)
-    assert jax.tree.structure(rebuilt) == jax.tree.structure(op), (
-        "config round trip changed the pytree structure"
-    )
     rebuilt_params = [
         leaf for leaf in jax.tree.leaves(rebuilt) if eqx.is_inexact_array(leaf)
     ]
@@ -100,5 +112,10 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
         f"config round trip turned {len(params) - len(rebuilt_params)} learnable "
         "field(s) into constants — declare them with "
         "eqx.field(converter=jnp.asarray)"
+    )
+    # Compare the array leaves, not the treedef: static fields are part of
+    # the treedef, and JSON legitimately turns a static tuple into a list.
+    assert _array_signature(rebuilt) == _array_signature(op), (
+        "config round trip changed the operator's array leaves (shape / dtype)"
     )
     _assert_tree_allclose(rebuilt(*inputs), expected, "config round trip")

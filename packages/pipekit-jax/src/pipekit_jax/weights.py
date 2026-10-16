@@ -63,7 +63,8 @@ class WeightsMixin:
         Raises:
             TypeError: if ``blob`` is not bytes.
             ValueError: if ``blob`` doesn't deserialise into a tree
-                with the same structure as the skeleton.
+                with the same structure as the skeleton, including a blob
+                with more array leaves than the skeleton requests.
             RuntimeError: from newer equinox versions when a
                 deserialised leaf's shape/dtype doesn't match the
                 skeleton (``eqx.tree_deserialise_leaves``).
@@ -75,6 +76,17 @@ class WeightsMixin:
             )
         buf = io.BytesIO(blob)
         tree = eqx.tree_deserialise_leaves(buf, self._weights_tree())
+        unread = len(blob) - buf.tell()
+        if unread:
+            # The skeleton asked for fewer leaves than were saved (e.g. an
+            # optional bias that is None in the skeleton): a partial restore
+            # would silently drop weights.
+            raise ValueError(
+                f"{type(self).__name__}.with_weights: {unread} bytes of the blob "
+                "were not consumed — the saved tree has more array leaves than "
+                "the skeleton. Build the skeleton with the same structure as the "
+                "operator that was serialised."
+            )
         return self._from_weights_tree(tree)
 
     def from_registry(self, registry: Any, ref: str) -> Any:

@@ -178,3 +178,79 @@ def test_check_flags_a_learnable_field_lost_on_reload():
 def test_check_flags_non_jittable_operator():
     with pytest.raises(jax.errors.ConcretizationTypeError):
         check_jax_operator(Branchy(), U)
+
+
+# ---------------------------------------------------------------------
+# Review fixes (#68)
+# ---------------------------------------------------------------------
+
+
+class SpectralGain(JaxOperator):
+    """û ↦ g ⊙ û with a complex learnable gain."""
+
+    g: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.g * u
+
+
+class SpectralGainForbidden(SpectralGain):
+    forbid_in_yaml: ClassVar[bool] = True
+
+
+class WithOptions(JaxOperator):
+    options: dict = eqx.field(static=True)
+
+    def _apply(self, u):
+        return u
+
+
+class OnGrid(JaxOperator):
+    """Static tuple config — reloads from JSON as a list."""
+
+    grid: tuple = eqx.field(static=True)
+    a: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.a * u * self.grid[0]
+
+
+class Mode(JaxOperator):
+    """A static (string) positional input next to an array input."""
+
+    def _apply(self, u, mode):
+        return u if mode == "identity" else -u
+
+
+def test_state_rejects_complex_config_with_actionable_message():
+    op = SpectralGain(g=jnp.full(4, 1 + 2j))
+    with pytest.raises(TypeError, match="forbid_in_yaml"):
+        _ = op.state
+    # flagged operators keep their (debug) state and pass the contract check
+    _ = SpectralGainForbidden(g=jnp.full(16, 1 + 2j)).state
+    check_jax_operator(
+        SpectralGainForbidden(g=jnp.full(16, 0.5 + 0j)), U.astype(jnp.complex64)
+    )
+
+
+def test_state_rejects_dict_config():
+    with pytest.raises(TypeError, match="dicts"):
+        _ = WithOptions(options={"axis": 0}).state
+
+
+def test_check_accepts_static_tuple_reloaded_as_list():
+    check_jax_operator(OnGrid(grid=(4, 2.0), a=0.5), U)
+
+
+def test_check_holds_non_array_inputs_static_under_vmap():
+    check_jax_operator(Mode(), U, "identity")
+    check_jax_operator(Mode(), U, "negate")
+
+
+def test_with_weights_rejects_a_blob_with_extra_leaves():
+    from pipekit_jax import JaxModelOp
+
+    saved = JaxModelOp(eqx.nn.Linear(4, 4, use_bias=True, key=jax.random.key(0)))
+    skeleton = JaxModelOp(eqx.nn.Linear(4, 4, use_bias=False, key=jax.random.key(1)))
+    with pytest.raises(ValueError, match="not consumed"):
+        skeleton.with_weights(saved.serialize_weights())

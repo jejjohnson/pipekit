@@ -41,6 +41,7 @@ from typing import Any
 import equinox as eqx
 import numpy as np
 from pipekit import Operator
+from pipekit._base.operator import _is_json_primitive
 
 from pipekit_jax.weights import WeightsMixin
 
@@ -73,8 +74,11 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
     - **Config**: ``get_config()`` is auto-derived from the generated
       ``__init__`` and coerced to JSON builtins (`jsonable`), so
       ``op.state`` survives ``json.dumps`` and ``Operator.from_state``.
-      Operators holding non-array Python objects (callables, modules
-      without a JSON form) should set ``forbid_in_yaml = True`` and
+      Real numbers, strings, booleans and (nested) lists / tuples of
+      them round-trip; ``op.state`` raises ``TypeError`` for complex
+      values and dicts, which ``from_state`` cannot rebuild. Operators
+      holding those, or non-array Python objects (callables, modules
+      without a JSON form), should set ``forbid_in_yaml = True`` and
       persist through `serialize_weights` / `with_weights`.
     - **Leaves**: inexact-array fields are differentiable; mark
       config-only fields ``eqx.field(static=True)``; give learnable
@@ -86,3 +90,25 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
     def get_config(self) -> dict[str, Any]:
         """JSON-builtin constructor config (arrays → scalars / lists)."""
         return {k: jsonable(v) for k, v in super().get_config().items()}
+
+    @property
+    def state(self) -> dict[str, Any]:
+        """JSON-serialisable state record, validated for a round trip.
+
+        Raises:
+            TypeError: if a config value cannot survive ``json.dumps`` →
+                ``Operator.from_state`` (complex numbers, dicts) and the
+                class is not marked ``forbid_in_yaml``.
+        """
+        record = super().state
+        if not type(self).forbid_in_yaml:
+            bad = [k for k, v in record["config"].items() if not _is_json_primitive(v)]
+            if bad:
+                raise TypeError(
+                    f"{type(self).__name__}: config field(s) {bad} cannot round-trip "
+                    "through JSON and Operator.from_state (complex values and "
+                    "dicts are not supported). Store them as real lists / tuples "
+                    "of pairs, or set `forbid_in_yaml = True` and persist arrays "
+                    "with serialize_weights()."
+                )
+        return record
