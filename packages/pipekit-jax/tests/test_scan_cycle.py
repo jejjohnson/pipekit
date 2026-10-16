@@ -366,3 +366,9 @@ def test_rollout_rejects_a_non_operator_step():
 def test_rollout_rejects_a_stateful_step():
     with pytest.raises(TypeError, match="ScanCycle"):
         Rollout(step=Relax(), n_steps=1)
+
+
+def test_rollout_rejects_a_sequential_holding_a_stateful_step():
+    """A composite is stateful when any step is; reject it at construction too."""
+    with pytest.raises(TypeError, match="Sequential is stateful"):
+        Rollout(step=Sequential([Relax()]), n_steps=1)
