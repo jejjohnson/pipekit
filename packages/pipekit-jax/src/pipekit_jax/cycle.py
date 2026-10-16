@@ -89,12 +89,13 @@ def _coerce_step(step_op: Any) -> StatefulOperator:
 
 def _coerce_carrier_step(step: Any) -> Operator:
     """Return ``step`` as a carrier-only operator (wrapping a `ForwardModel`)."""
-    if isinstance(step, StatefulOperator):
+    # `_is_stateful` also catches a Sequential that contains a stateful step.
+    if isinstance(step, StatefulOperator) or getattr(step, "_is_stateful", False):
         # A stateful step needs (carrier, state); Rollout calls step(carrier).
         raise TypeError(
-            f"Rollout steps carrier -> carrier, but {type(step).__name__} is a "
-            "StatefulOperator (carrier, state) -> (carrier, state). Use "
-            "ScanCycle for stateful steps."
+            f"Rollout steps carrier -> carrier, but {type(step).__name__} is "
+            "stateful: (carrier, state) -> (carrier, state). Use ScanCycle for "
+            "stateful steps."
         )
     if isinstance(step, ForwardModel):
         return _ForwardModelCarrierStep(step)
