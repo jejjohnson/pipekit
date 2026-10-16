@@ -63,6 +63,25 @@ def jsonable(value: Any) -> Any:
     return value
 
 
+def _is_nested_operator(value: Any) -> bool:
+    """A ``{"class", "config"}`` payload (or a list of them) for a nested operator."""
+    if isinstance(value, list | tuple):
+        return bool(value) and all(_is_nested_operator(v) for v in value)
+    return isinstance(value, dict) and set(value) == {"class", "config"}
+
+
+def _round_trips(value: Any) -> bool:
+    """Whether a config value is acceptable in a JSON ``state`` record.
+
+    JSON primitives (and lists / tuples of them) round-trip through
+    ``Operator.from_state``. Nested-operator payloads are pipekit's
+    documented debug form for containers (``Sequential``, ``Cycle``, …):
+    they serialise but are rebuilt by a YAML / Hydra loader, not
+    ``from_state``, so they are allowed too.
+    """
+    return _is_json_primitive(value) or _is_nested_operator(value)
+
+
 class JaxOperator(Operator, WeightsMixin, eqx.Module):
     """Base class for pipekit operators whose fields are Equinox fields.
 
@@ -76,7 +95,9 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
       ``op.state`` survives ``json.dumps`` and ``Operator.from_state``.
       Real numbers, strings, booleans and (nested) lists / tuples of
       them round-trip; ``op.state`` raises ``TypeError`` for complex
-      values and dicts, which ``from_state`` cannot rebuild. Operators
+      values and plain dicts, which ``from_state`` cannot rebuild.
+      Nested-operator payloads (``{"class", "config"}``) are allowed —
+      pipekit's debug form for operators that hold operators. Operators
       holding those, or non-array Python objects (callables, modules
       without a JSON form), should set ``forbid_in_yaml = True`` and
       persist through `serialize_weights` / `with_weights`.
@@ -102,7 +123,7 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
         """
         record = super().state
         if not type(self).forbid_in_yaml:
-            bad = [k for k, v in record["config"].items() if not _is_json_primitive(v)]
+            bad = [k for k, v in record["config"].items() if not _round_trips(v)]
             if bad:
                 raise TypeError(
                     f"{type(self).__name__}: config field(s) {bad} cannot round-trip "

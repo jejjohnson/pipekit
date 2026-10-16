@@ -254,3 +254,23 @@ def test_with_weights_rejects_a_blob_with_extra_leaves():
     skeleton = JaxModelOp(eqx.nn.Linear(4, 4, use_bias=False, key=jax.random.key(1)))
     with pytest.raises(ValueError, match="not consumed"):
         skeleton.with_weights(saved.serialize_weights())
+
+
+class Holds(JaxOperator):
+    """An operator whose config nests another operator (like Cycle)."""
+
+    inner: JaxOperator
+
+    def get_config(self):
+        from pipekit._base.operator import nested_config
+
+        return {"inner": nested_config(self.inner)}
+
+    def _apply(self, u):
+        return self.inner(u)
+
+
+def test_state_allows_nested_operator_payloads():
+    record = Holds(inner=Diffuse(dx=0.1, kappa=0.01)).state
+    json.dumps(record)
+    assert record["config"]["inner"]["class"] == "Diffuse"
