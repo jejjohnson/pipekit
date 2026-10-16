@@ -17,6 +17,20 @@ holds.
 
 ::: pipekit_jax.pytree
 
+## JaxOperator
+
+Base class for operators that are both a `pipekit.Operator` and an
+`eqx.Module`: JSON-safe config, pytree leaves, and the weight-blob
+round trip. Use `check_jax_operator` in a library's test suite to
+assert the contract (eager ≡ jit, batching, visible leaves, a config
+round trip that keeps learnable fields learnable).
+
+::: pipekit_jax.operator
+
+::: pipekit_jax.testing
+
+::: pipekit_jax.weights
+
 ## JaxModelOp
 
 ::: pipekit_jax.model_op
