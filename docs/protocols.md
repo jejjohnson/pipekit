@@ -91,7 +91,7 @@ hierarchies satisfy these structurally.
 | `Estimate` | `point()`, `sample(n, key)`, `log_prob(theta)` | A point and/or posterior produced by an estimator |
 | `Estimator` | `rung`, `complexity`, `fit(task)`, `__call__(obs)` | Any rung mapping observations → an `Estimate` |
 | `Oracle` | `reference_for(task)` | The designated reference estimator for a task |
-| `Scorer` | `name`, `__call__(prediction, reference)` | One `(Unit, Lens)` scorer — named metric values |
+| `Scorer` | `name`, `__call__(prediction, reference)`; optional `unit`, `lens`, `stages`, `differentiable` tags, read by `tags_of` | One `(Unit, Lens)` scorer — named metric values |
 
 ## Conventions
 

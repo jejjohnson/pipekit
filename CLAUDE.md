@@ -16,7 +16,7 @@ The packages, in dependency order:
 | `pipekit-array`      | partial       | Array-API operators (Phase A: namespace dispatch + MeanScalar + Stack/Concat). Phases B-D pending. |
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
-| `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule). Scorer taxonomy planned.  |
+| `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule), scorer taxonomy, `MetricScorer`. |
 | `pipekit-train`      | implemented   | Training pipelines + Equinox adapter. Design at `packages/pipekit-train/docs/design/`. |
 | `pipekit-jax`        | implemented   | `JaxModelOp` — eqx.Module wrapper with weight-blob round-trip through `ModelRegistry`. |
 
@@ -99,8 +99,8 @@ packages/
 │   │   ├── artifacts.py      # TrainingArtifact, InferenceArtifact
 │   │   └── adapters/         # dvc, hydra, metaflow (one module per tool)
 │   └── tests/
-├── pipekit-evaluate/         # Benchmark ladder (cube/protocols/reference/run);
-│                             # scorer taxonomy still planned
+├── pipekit-evaluate/         # Benchmark ladder (cube/protocols/reference/run),
+│                             # taxonomy.py (Unit/Lens/Stage), scorers.py
 ├── pipekit-jax/              # JaxModelOp, DiffraxForwardModel, adjoint
 │                             # interpreters (truncated_scan, to_diffrax_adjoint)
 └── pipekit-train/            # Training loop + adapters. Full design at

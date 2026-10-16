@@ -6,7 +6,7 @@ runtime-checkable structural interfaces that domain packages
 ``pipekit-evaluate``. They are the orchestration layer described in
 ``packages/pipekit-evaluate/docs/design/benchmark_ladder.md`` §4 — the
 "who plays which rung" contracts — and sit on top of (not inside) the
-planned ``Unit x Lens x Stage`` scorer taxonomy.
+``Unit x Lens x Stage`` scorer taxonomy (:mod:`pipekit_evaluate.taxonomy`).
 
 A benchmark ``Task`` reuses ``pipekit_cycle``'s ``ForwardModel`` /
 ``ObservationOperator`` as its simulator and observation operator, so a
@@ -147,6 +147,11 @@ class Scorer(Protocol):
     This is the seam onto the ``Unit x Lens x Stage`` taxonomy: a concrete
     scorer *is* a ``(Unit, Lens)`` pair. The benchmark layer only requires
     a name and a callable that returns a mapping of named metric values.
+    A scorer places itself in the taxonomy through the optional attributes
+    ``unit``, ``lens``, ``stages`` and ``differentiable``, which are not
+    protocol members; :func:`pipekit_evaluate.taxonomy.tags_of` reads them
+    with their defaults, and :class:`pipekit_evaluate.scorers.MetricScorer`
+    sets them on any metric operator.
 
     Members:
         name: Short scorer identifier, used to namespace its metrics.

@@ -1,8 +1,6 @@
 # pipekit-evaluate
 
-> **Status — v0.0 / early.** The `benchmark` subpackage (the
-> orchestration layer of the benchmark ladder) has landed; the
-> `Unit × Lens × Stage` scorer taxonomy is still planned.
+> **Status — v0.0 / early.** The `benchmark` subpackage (the orchestration layer of the benchmark ladder) and the `Unit × Lens × Stage` scorer taxonomy have landed.
 
 ## `benchmark` — the orchestration layer (implemented)
 
@@ -30,17 +28,25 @@ report.to_dict()  # {cell label: {metric: value}}
   §4.3 invariant as data, resolved along both the staged and the
   per-rung complexity axes.
 
-## `Unit × Lens × Stage` scorers (planned)
+## `Unit × Lens × Stage` scorers (implemented)
 
-A multidimensional scorer taxonomy with three orthogonal axes:
+A scorer places itself on three orthogonal axes:
 
-- **Unit** (what's scored): Field / Statistic / Trajectory / Event / Budget
-- **Lens** (kind of critique): Point-wise / Probabilistic / Spectral /
-  Structural / Detection / Physical-constraint
-- **Stage** (lifecycle): Training / Validation / Final / Monitoring
+- **Unit** (what's scored): field, statistic, trajectory, event, budget.
+- **Lens** (what kind of failure it can see): point-wise, probabilistic, spectral, structural, detection, physical-constraint.
+- **Stage** (where it may run): training, validation, final, monitoring.
 
-The scorers depend on `pipekit-array` (for the array reductions)
-and on `xr_toolz.lagrangian` / `xr_toolz.events` (for the
-trajectory- and event-flavoured units).
+The tags live on the scorer, not on the metric: metrics stay in the carrier libraries (`xrtoolz.metrics`, `geotoolz`), which never import `pipekit-evaluate`. `MetricScorer` wraps any `(prediction, reference) -> result` metric operator, tags it, and flattens its result (a Dataset, a mapping or a scalar) into named floats. `tags_of` reads any scorer's tags; an untagged scorer is a point-wise field score for validation and final evaluation.
 
-See [Report 11 — pipekit-evaluate](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_11_pipekit_evaluate.md).
+```python
+import pipekit_evaluate as pev
+from xrtoolz.metrics import RMSE, SSIM
+
+scorers = [
+    pev.MetricScorer(RMSE("ch4", dims="x")),
+    pev.MetricScorer(SSIM("ch4", ["y", "x"]), lens="structural", stages={"final"}),
+]
+pev.tags_of(scorers[1]).lens  # Lens.STRUCTURAL
+```
+
+The design is [geostack Report 14](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md), workstream A.

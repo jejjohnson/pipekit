@@ -30,7 +30,7 @@ uv add pipekit-array              # Array-API operators
 uv add pipekit-jax                # JaxModelOp (Equinox round-trip)
 ```
 
-`pipekit-evaluate` is scaffolded; no v0.1 surface yet.
+`pipekit-evaluate` is pre-alpha: it ships the benchmark ladder and the `Unit × Lens × Stage` scorer taxonomy.
 
 ### `pipekit` core
 

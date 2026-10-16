@@ -4,8 +4,8 @@ This subpackage implements the domain-independent framework described in
 ``packages/pipekit-evaluate/docs/design/benchmark_ladder.md``: the
 ``level x rung x complexity`` cube, the carrier-agnostic protocols, and the
 "simpler thing is ground truth" reference rule. It sits *on top of* the
-planned ``Unit x Lens x Stage`` scorer taxonomy — it selects and invokes
-scorers, it does not replace them.
+``Unit x Lens x Stage`` scorer taxonomy (:mod:`pipekit_evaluate.taxonomy`)
+— it selects and invokes scorers, it does not replace them.
 """
 
 from __future__ import annotations

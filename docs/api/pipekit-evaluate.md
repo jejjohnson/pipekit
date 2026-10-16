@@ -3,9 +3,18 @@
 Multidimensional evaluation framework. The `benchmark` subpackage ships
 the orchestration layer of the benchmark ladder — the
 `level x rung x complexity` cube, the carrier-agnostic protocols, and
-the "simpler thing is ground truth" reference rule. The
-`Unit x Lens x Stage` scorer taxonomy is still planned. Design doc:
+the "simpler thing is ground truth" reference rule. The `taxonomy`
+module carries the `Unit x Lens x Stage` tags, and `MetricScorer` turns
+any metric operator into a tagged scorer. Design doc:
 `packages/pipekit-evaluate/docs/design/benchmark_ladder.md`.
+
+## Taxonomy
+
+::: pipekit_evaluate.taxonomy
+
+## Scorers
+
+::: pipekit_evaluate.scorers
 
 ## Protocols
 
