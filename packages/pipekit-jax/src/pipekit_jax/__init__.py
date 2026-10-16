@@ -6,9 +6,10 @@ Public surface:
   ``pipekit.Operator`` and an ``eqx.Module`` (JSON config, pytree
   leaves, weight round trip). Contract checks live in
   `pipekit_jax.testing.check_jax_operator`.
-- `ScanCycle` / `Rollout` — ``jax.lax.scan``-based time stepping:
-  the jit-native counterpart of ``pipekit_cycle.Cycle`` (history
-  returned by ``ScanCycle.run``) and a carrier-only trajectory rollout.
+- `ScanCycle` / `EnsembleScanCycle` / `Rollout` — ``jax.lax.scan``-based
+  time stepping: the jit-native counterpart of ``pipekit_cycle.Cycle``
+  (history returned by ``ScanCycle.run``), its ``vmap``-ed ensemble form,
+  and a carrier-only trajectory rollout.
 - `JaxModelOp` — wraps an ``eqx.Module`` as a ``pipekit.Operator``,
   with ``serialize_weights`` / ``with_weights`` / ``from_registry``
   methods so trained weights round-trip byte-identically through any
@@ -34,7 +35,7 @@ from typing import Any
 
 from pipekit_jax import pytree as pytree  # registers Sequential / Graph
 from pipekit_jax.adjoints import to_diffrax_adjoint, truncated_scan
-from pipekit_jax.cycle import Rollout, ScanCycle
+from pipekit_jax.cycle import EnsembleScanCycle, Rollout, ScanCycle
 from pipekit_jax.model_op import JaxModelOp
 from pipekit_jax.operator import JaxOperator
 
@@ -51,6 +52,7 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "DiffraxForwardModel",
+    "EnsembleScanCycle",
     "JaxModelOp",
     "JaxOperator",
     "Rollout",
