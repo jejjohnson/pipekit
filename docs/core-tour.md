@@ -25,7 +25,8 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
 | Parallelism | `parallel` | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable` | many items, one operator |
-| Serialisation | `serial` | `dumps`, `loads`, `loads_sandboxed`, `register`, `unregister`, `allowed` | configuration as data; untrusted pipelines |
+| Serialisation | `serial` | `dumps`, `loads`, `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`, `allowed` | configuration as data; untrusted pipelines |
+| Hashing | `hashing` | `pipeline_hash` | one key for "the same pipeline again": a registry, a cache, an orchestrator task |
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
 
@@ -342,14 +343,17 @@ they can.
 
 | Name | What it does |
 |---|---|
-| `dumps(op)` | JSON-encode `op.state`, keys sorted |
-| `loads(s)` | rebuild through `Operator.from_state`; the defining module must be imported |
+| `dumps(op)` | JSON-encode `op.state`, keys sorted, nested operators included |
+| `loads(s)` | rebuild the whole tree through `Operator.from_state`; the defining modules must be imported |
 | `register(cls)` | add a class to the sandbox allowlist (also a class decorator) |
 | `unregister(cls)`, `allowed()` | remove from, and list, the allowlist |
-| `loads_sandboxed(s)` | `loads`, but `PermissionError` for anything not registered |
+| `loads_sandboxed(s)` | `loads`, but `PermissionError` for any class in the tree that is not registered |
+| `from_state_sandboxed(state)` | the same check on a record already in memory |
 
 The sandboxed loader is for pipelines you did not write (uploaded by users,
-read from a queue): only classes you registered can be built.
+read from a queue): only classes you registered can be built, at any depth,
+and every class is checked before anything is constructed. Nothing is
+allowed by default, pipekit's own containers included.
 
 ```python
 import pipekit as pk
@@ -363,10 +367,30 @@ pk.loads_sandboxed(pk.dumps(Scale(2.0)))   # → Scale(factor=2.0)
 pk.loads(pk.dumps(pk.Lambda(abs)))         # RuntimeError: marked forbid_in_yaml
 ```
 
-Today only flat operators round-trip through `dumps` / `loads`; see
-[the limits](#limits-today). Nested pipelines can be written as Hydra YAML
-with `_target_` keys and built with `pipekit-experiment`'s
-`HydraConfigLoader.from_yaml`.
+Nested pipelines round-trip too. A child operator appears in its parent's
+config as its own `state` record, a `Graph` records every node and its
+wiring, and an exception class (`Try.on`, `Retry.on`) is written as
+`{"exception": "builtins.KeyError"}`. `pipeline_hash` hashes that whole
+record, so two pipelines share a hash exactly when they are configured the
+same:
+
+```python
+from pipekit import Cache, Retry, Sequential, ThreadMap, pipeline_hash
+
+pipe = ThreadMap(Cache(Retry(Scale(2.0), attempts=3, base_delay=0.5, on=(OSError,))))
+back = pk.loads(pk.dumps(pipe))
+back.state == pipe.state                      # → True
+pipeline_hash(back) == pipeline_hash(pipe)    # → True
+
+pk.register(Sequential)
+pk.loads_sandboxed(pk.dumps(Sequential([Scale(2.0), pk.Identity()])))
+# PermissionError: '__main__.Scale' is not in the allowlist (checked first)
+```
+
+`pipekit-experiment`'s `HydraConfigLoader` does the same with `_target_`
+YAML: `to_yaml(op)` writes any pipeline, `from_yaml` loads it through
+Hydra, and `from_yaml_sandboxed` loads untrusted YAML through the allowlist
+without ever calling Hydra's `instantiate`.
 
 ## State
 
@@ -426,18 +450,8 @@ packages define more such seams (`ForwardModel`, `AnalysisStep`,
 
 What the core does not do yet, so you can plan around it:
 
-- **Nested pipelines don't round-trip.** `loads` rebuilds flat operators;
-  anything that nests an operator (`Sequential`, `Try`, `Cache`, `Fanout`,
-  the parallel maps) dumps a debug payload that `loads` rejects. A nested
-  pipeline written by hand as Hydra YAML does load
-  (`pipekit_experiment.adapters.hydra.HydraConfigLoader.from_yaml`, with the
-  `[hydra]` extra), but dumping a *built* one gives the same debug payload,
-  so the YAML has to stay the source of truth.
 - **`Graph` doesn't thread state.** Stateful operators work in a
   `Sequential`; inside a `Graph` they fail for lack of a `state` argument.
-- **A `Graph`'s `state` leaves out its upstream steps.** It records the
-  inputs and the operators that produce the outputs, so two graphs that differ
-  in an upstream step have equal `state` and equal hashes.
 - **`CarryState` hashes its fields.** A state holding a list or an array is
   unhashable; don't put states in sets or use them as dict keys.
 - **Shape inference stops at `Sequential`.** `Graph`, `Fanout` and the

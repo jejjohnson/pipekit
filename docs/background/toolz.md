@@ -169,25 +169,24 @@ a worker process and rebuilt. Every deployment shape in the
 [patterns](../patterns.md) (an ETL job, a web service, a tile server, a
 regulatory artifact, an orchestrator) needs serialisation in some form.
 
-pipekit gives every operator a `get_config()` and a JSON `dumps` / `loads`.
-Today the round-trip works for flat operators; a nested pipeline such as a
-`Sequential` dumps, but `loads` refuses it and points to a YAML or Hydra
-loader:
+pipekit gives every operator a `get_config()`, and a pipeline's `state` is
+its whole configuration: each nested operator as its own record, and for a
+`Graph` every node and its wiring. That record round-trips through JSON, and
+through `_target_` YAML with `pipekit-experiment`'s `HydraConfigLoader`:
 
-```python title="What round-trips today, from a real run."
+```python title="A nested pipeline round-trips, from a real run."
 import pipekit as pk
-from pipekit import Const, Identity, Sequential
+from pipekit import Cache, Const, Identity, Sequential
 
-pk.loads(pk.dumps(Const(3)))                   # → Const(value=3)
-pk.loads(pk.dumps(Sequential([Identity()])))   # RuntimeError: from_state cannot
-# reconstruct Sequential: config contains non-primitive values ['operators'].
-# Use a YAML / Hydra loader for nested-operator configs.
+pipe = Cache(Sequential([Const(3), Identity()]))
+back = pk.loads(pk.dumps(pipe))
+back.state == pipe.state                         # → True
+pk.pipeline_hash(back) == pk.pipeline_hash(pipe)  # → True
 ```
 
-That loader exists for one direction: `pipekit-experiment`'s
-`HydraConfigLoader.from_yaml` builds a nested pipeline from a hand-written
-YAML with `_target_` keys. The other direction is the open piece of this gap:
-dumping a *built* nested pipeline (or a `Graph`) to a config that loads back.
+Only operators that hold a closure (`Lambda`, `Tap`, a `Branch` predicate)
+stay out: they are flagged `forbid_in_yaml`, and `loads` refuses them
+wherever they sit in the tree.
 
 ### Dual-mode dispatch
 

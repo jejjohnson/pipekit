@@ -32,9 +32,9 @@ workaround), **missing** (needs code that does not exist yet).
 | 6 | [Cycles: time stepping and assimilation](#6-cycles-time-stepping-and-assimilation) | `StatefulOperator`, `pipekit-cycle` | today | [DA cycle](tutorials/da-cycle.md), [ensemble DA](tutorials/ensemble-da.md) |
 | 7 | [An inference service](#7-an-inference-service) | `AsyncMap.run`, `BatchedMap`, the config hash | today | [inference](tutorials/inference.md) |
 | 8 | [Promotion by tag](#8-promotion-by-tag) | `LocalModelRegistry.tag` | today | — |
-| 9 | [Pipelines from users](#9-pipelines-from-users) | `register`, `loads_sandboxed` | partly | — |
-| 10 | [A pinned artifact](#10-a-pinned-artifact) | `InferenceArtifact`, `TrainingArtifact` | partly | — |
-| 11 | [Orchestrator tasks with deterministic keys](#11-orchestrator-tasks-with-deterministic-keys) | `pipekit.hashing` | partly | [ETL over many regions](tutorials/etl-regions.md) |
+| 9 | [Pipelines from users](#9-pipelines-from-users) | `register`, `loads_sandboxed`, `from_yaml_sandboxed` | today | — |
+| 10 | [A pinned artifact](#10-a-pinned-artifact) | `InferenceArtifact`, `TrainingArtifact`, `to_yaml` | today | — |
+| 11 | [Orchestrator tasks with deterministic keys](#11-orchestrator-tasks-with-deterministic-keys) | `pipeline_hash` | today | [ETL over many regions](tutorials/etl-regions.md) |
 | 12 | [A/B comparison](#12-ab-comparison) | `Fanout` | partly | — |
 | 13 | [Scheduled families, backfills and what-if reruns](#13-scheduled-families-backfills-and-what-if-reruns) | the config hash | today | — |
 | 14 | [The feedback loop](#14-the-feedback-loop) | `pipekit-train`, registry | today | [train, register, forecast](tutorials/train-register-forecast.md) |
@@ -228,22 +228,36 @@ registry.store(Threshold(k=3.0)) == v1     # → True: same config, same hash
 **The problem.** Users (or another team, or a queue) send pipelines as data.
 Building arbitrary classes from a string is code execution.
 
-**The pattern.** Register the classes you allow, and build untrusted input
-with `loads_sandboxed`, which raises `PermissionError` for anything else.
-Operators holding closures are `forbid_in_yaml` and never deserialise.
+**The pattern.** Register the classes you allow, containers included, and
+build untrusted input with `loads_sandboxed` (JSON) or
+`HydraConfigLoader.from_yaml_sandboxed` (`_target_` YAML). Every class in the
+tree is checked before anything is built, and anything unregistered raises
+`PermissionError`. Operators holding closures are `forbid_in_yaml` and never
+deserialise, registered or not.
 
 ```python
 import pipekit as pk
+from pipekit_experiment.adapters.hydra import HydraConfigLoader
 
+pk.register(pk.Sequential)
 pk.register(Threshold)
-pk.loads_sandboxed('{"class": "Threshold", "config": {"k": 2.0}, "module": "__main__"}')
-# → Threshold(k=2.0); any unregistered class → PermissionError
+
+text = """
+_target_: pipekit.Sequential
+operators:
+  - _target_: __main__.Threshold
+    k: 2.0
+"""
+# a Sequential holding Threshold(k=2.0)
+detector = HydraConfigLoader.from_yaml_sandboxed(text)
 ```
 
-**Partly.** The sandbox works on flat operators. A nested pipeline does not
-round-trip through `dumps` / `loads` yet, so a user-sent *pipeline* (rather
-than a user-sent step) needs Hydra YAML built by `HydraConfigLoader`, which
-has no allowlist of its own.
+The YAML loader never calls Hydra's `instantiate`, which would call any
+dotted path (`_target_: os.system`): it translates the YAML into a state
+record and builds that through the allowlist. Interpolations (`${...}`) are
+not resolved, so a sandboxed config cannot read the environment.
+
+**Today.** All of it.
 
 ## Reproducibility and operations
 
@@ -259,9 +273,12 @@ pinned_model_hashes, backend_info, deps_lock, metadata)` records what ran;
 dataset's hash, the model's hash, the tracker run). Keep the artifact with
 the output.
 
-**Partly.** The artifact classes ship, and `TrainingLoop.run()` returns a
-`TrainingArtifact` when `pipekit-experiment` is installed. The `pipeline_yaml` field must be written by hand (or by
-hydra-zen) for a nested pipeline, for the same reason as pattern 9.
+For the `pipeline_yaml` field, `HydraConfigLoader.to_yaml(pipeline)` writes
+the pipeline that actually ran, however deeply nested, and `from_yaml` loads
+it back with the same `state`.
+
+**Today.** All of it. `TrainingLoop.run()` returns a `TrainingArtifact` when
+`pipekit-experiment` is installed.
 
 ### 11. Orchestrator tasks with deterministic keys
 
@@ -275,23 +292,23 @@ with the same pipeline and input finds its output and skips; a change to
 either gives a new key.
 
 ```python
-from pipekit.hashing import sha256_hex, stable_json
+from pipekit import pipeline_hash
 
 
-def task_key(op, input_id: str) -> str:
-    return sha256_hex(stable_json({"op": op.state, "input": input_id}))[:16]
+def task_key(op: Operator, input_id: str) -> str:
+    """One key per (pipeline configuration, input)."""
+    return f"{pipeline_hash(op)[:16]}-{input_id}"
 
 
-task_key(Threshold(k=3.0), "2026-10-16") == task_key(Threshold(k=3.0), "2026-10-16")  # → True
-task_key(Threshold(k=3.0), "2026-10-16") == task_key(Threshold(k=2.5), "2026-10-16")  # → False
+# the same pipeline on the same day: the same key, so the rerun skips
+task_key(Threshold(k=3.0), "2026-10-16") == task_key(Threshold(k=3.0), "2026-10-16")
+# one argument changed: a new key
+task_key(Threshold(k=3.0), "2026-10-16") != task_key(Threshold(k=2.5), "2026-10-16")
 ```
 
-**Partly.** A `Sequential` hashes its whole nested `state`, and the registry
-uses the same primitives. A `Graph` does not: its `state` records the inputs
-and the operators that produce its outputs, not the steps upstream of them,
-so two graphs that differ only in an upstream step get the same key. Until
-that is fixed, key a graph by a version string you bump, or by the hashes of
-the operators you built it from.
+**Today.** All of it. `pipeline_hash` hashes the whole configuration: every
+nested operator and, in a `Graph`, every node and its wiring. It is the hash
+the registry stores under, so a task key and a registry entry agree.
 
 ### 12. A/B comparison
 
@@ -348,8 +365,8 @@ sister packages, each in one place.
 
 | Concern | Lives in |
 |---|---|
-| Operators, composition, parallel maps, flat JSON, the sandbox allowlist | `pipekit` |
-| Hashing primitives | `pipekit.hashing` |
+| Operators, composition, parallel maps, nested JSON, the sandbox allowlist | `pipekit` |
+| `pipeline_hash` and the hashing primitives | `pipekit.hashing` |
 | Content-addressed storage, tags, artifacts, YAML loading | `pipekit-experiment` |
 | Training loops and backends | `pipekit-train` |
 | Time stepping and assimilation | `pipekit-cycle` |
@@ -369,13 +386,14 @@ Nothing is parallel by default; each deployment picks its primitive.
 | GPU inference | `BatchedMap`, or the model batches |
 | Across machines | the orchestrator, calling pickleable operators |
 
-### YAML is the shared language, read-only for now
+### YAML is the shared language, both ways
 
 Every operator, in any library, subclasses `Operator`, so a Hydra YAML with
-`_target_` paths can name steps from several libraries side by side, and
-`HydraConfigLoader.from_yaml` builds the nested pipeline. The other direction,
-dumping a pipeline built in Python as YAML, does not exist yet: keep the YAML
-as the source of truth for pipelines that must travel (patterns 9, 10, 11).
+`_target_` paths can name steps from several libraries side by side.
+`HydraConfigLoader.from_yaml` builds the nested pipeline, `to_yaml` writes one
+built in Python, and `from_yaml_sandboxed` loads YAML you did not write. A
+pipeline can start in Python or in YAML; either way the other form is one
+call away.
 
 ### JAX speeds the model, not the pipeline
 

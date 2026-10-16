@@ -182,12 +182,16 @@ Every operator implements `get_config() -> dict[str, Any]` (often
 auto-derived from `__init__` parameter names). The framework uses
 this for:
 
-- **Serialisation** — `pipekit.serial.dumps(op)` →
-  `loads(yaml_text)`. Pipelines round-trip cleanly through YAML.
-- **Content hashing** — `op.content_hash` is a stable hash of the
-  config. Same operator + same config = same hash, deterministically.
-  This is the identifier `pipekit-experiment.ModelRegistry` uses to
-  index trained models.
+- **Serialisation** — `pipekit.dumps(op)` → `pipekit.loads(json_text)`
+  rebuilds a whole pipeline, nested operators and `Graph`s included;
+  `pipekit-experiment`'s `HydraConfigLoader.to_yaml` / `from_yaml` do
+  the same through `_target_` YAML. For pipelines you did not write,
+  `loads_sandboxed` and `from_yaml_sandboxed` build only registered
+  classes.
+- **Content hashing** — `pipekit.pipeline_hash(op)` is a stable hash of
+  the whole configuration. Same pipeline + same config = same hash,
+  deterministically. It is the identifier `pipekit-experiment`'s
+  `ModelRegistry` stores models under.
 
 Operators that carry user closures (`Lambda`, `Tap`, custom
 callbacks) opt out with `forbid_in_yaml: ClassVar[bool] = True` —
