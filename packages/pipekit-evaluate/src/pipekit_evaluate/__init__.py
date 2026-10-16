@@ -3,8 +3,9 @@
 The ``benchmark`` subpackage ships the orchestration layer of the
 benchmark ladder (the ``level x rung x complexity`` cube, the
 carrier-agnostic protocols, and the reference rule). The ``taxonomy``
-module carries the ``Unit x Lens x Stage`` tags, and ``scorers`` turns
-any metric operator into a tagged scorer.
+module carries the ``Unit x Lens x Stage`` tags, ``scorers`` turns any
+metric operator into a tagged scorer, and ``report`` collects a run's
+tagged scores into a content-hashed :class:`EvaluationReport`.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from pipekit_evaluate.benchmark import (
     Scorer,
     Task,
 )
+from pipekit_evaluate.report import EvaluationReport, ReportEntry, evaluate
 from pipekit_evaluate.scorers import MetricScorer
 from pipekit_evaluate.taxonomy import (
     DEFAULT_STAGES,
@@ -47,17 +49,20 @@ __all__ = [
     "CellResult",
     "Estimate",
     "Estimator",
+    "EvaluationReport",
     "Lens",
     "MetricScorer",
     "Oracle",
     "Prior",
     "ReferenceRule",
     "ReferenceSource",
+    "ReportEntry",
     "Scorer",
     "ScorerTags",
     "Stage",
     "Task",
     "Unit",
     "benchmark",
+    "evaluate",
     "tags_of",
 ]

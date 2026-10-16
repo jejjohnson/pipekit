@@ -1,6 +1,6 @@
 # pipekit-evaluate
 
-> **Status — v0.0 / early.** The `benchmark` subpackage (the orchestration layer of the benchmark ladder) and the `Unit × Lens × Stage` scorer taxonomy have landed.
+> **Status — v0.0 / early.** The `benchmark` subpackage (the orchestration layer of the benchmark ladder), the `Unit × Lens × Stage` scorer taxonomy and the evaluation report have landed.
 
 ## `benchmark` — the orchestration layer (implemented)
 
@@ -47,6 +47,17 @@ scorers = [
     pev.MetricScorer(SSIM("ch4", ["y", "x"]), lens="structural", stages={"final"}),
 ]
 pev.tags_of(scorers[1]).lens  # Lens.STRUCTURAL
+```
+
+## `EvaluationReport` (implemented)
+
+`evaluate` runs every scorer on one prediction and one reference and returns an `EvaluationReport`: one tagged entry per value, keyed `"<scorer>.<metric>"`. The report filters by axis, diffs against an earlier report, and has a content hash over its entries, references and config that ignores entry order and the timestamp.
+
+```python
+report = pev.evaluate(prediction, truth, scorers, model_ref=model_hash)
+report.filter(lens="structural").to_pandas()
+report.diff(last_week)   # {key: (last week's value, this value)} for changed keys
+report.content_hash      # equal for two runs that score the same values
 ```
 
 The design is [geostack Report 14](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md), workstream A.
