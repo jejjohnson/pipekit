@@ -18,6 +18,8 @@ import jax.numpy as jnp
 import numpy as np
 from pipekit import Operator
 
+from pipekit_jax.operator import _is_nested_operator
+
 
 def _assert_tree_allclose(actual: Any, expected: Any, what: str) -> None:
     assert jax.tree.structure(actual) == jax.tree.structure(expected), (
@@ -57,7 +59,10 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
        operator has the same number of inexact-array leaves (a learnable
        field that came back as a Python float fails here), the same
        array leaves (shape / dtype), and the same outputs. Static fields
-       may change container type (a tuple reloads as a list).
+       may change container type (a tuple reloads as a list). For an
+       operator whose config nests operators (``{"class", "config"}``
+       payloads), only the JSON encoding is checked: those payloads are
+       rebuilt by a YAML / Hydra loader, not ``from_state``.
 
     Args:
         op: The operator under test.
@@ -104,6 +109,10 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
     if type(op).forbid_in_yaml:
         return
     state = json.loads(json.dumps(op.state))
+    if any(_is_nested_operator(v) for v in state["config"].values()):
+        # Nested-operator payloads serialise (checked above) but only a
+        # YAML / Hydra loader rebuilds them; from_state rejects them.
+        return
     rebuilt = Operator.from_state(state)
     rebuilt_params = [
         leaf for leaf in jax.tree.leaves(rebuilt) if eqx.is_inexact_array(leaf)

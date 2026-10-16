@@ -9,7 +9,8 @@ aren't recoverable from a class name.
 
 `JaxModelOp` adds two methods on top of the same wrapper surface:
 
-- `serialize_weights() -> bytes` — `eqx.tree_serialise_leaves` of
+- `serialize_weights() -> bytes` — a leaf-signature header plus
+  `eqx.tree_serialise_leaves` of
   the wrapped module's array leaves. Suitable for the registry's
   ``weights`` blob.
 - `with_weights(blob: bytes) -> JaxModelOp` — load the bytes back

@@ -50,14 +50,17 @@ def jsonable(value: Any) -> Any:
     """Coerce a config value to JSON builtins.
 
     Arrays (JAX or NumPy) become a Python scalar (0-d) or nested lists;
-    tuples / lists / dicts are converted recursively; everything else is
-    returned unchanged.
+    tuples (including named tuples) become plain tuples and lists plain
+    lists, converted recursively — JSON drops the subclass anyway; dicts
+    are converted recursively; everything else is returned unchanged.
     """
     if isinstance(value, np.ndarray | np.generic) or eqx.is_array(value):
         arr = np.asarray(value)
         return arr.item() if arr.ndim == 0 else arr.tolist()
-    if isinstance(value, tuple | list):
-        return type(value)(jsonable(v) for v in value)
+    if isinstance(value, tuple):
+        return tuple(jsonable(v) for v in value)
+    if isinstance(value, list):
+        return [jsonable(v) for v in value]
     if isinstance(value, dict):
         return {k: jsonable(v) for k, v in value.items()}
     return value
@@ -70,16 +73,30 @@ def _is_nested_operator(value: Any) -> bool:
     return isinstance(value, dict) and set(value) == {"class", "config"}
 
 
+def _json_safe(value: Any) -> bool:
+    """Whether ``json.dumps`` can encode ``value`` (str-keyed dicts allowed)."""
+    if value is None or isinstance(value, bool | int | float | str):
+        return True
+    if isinstance(value, list | tuple):
+        return all(_json_safe(v) for v in value)
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and _json_safe(v) for k, v in value.items())
+    return False
+
+
 def _round_trips(value: Any) -> bool:
     """Whether a config value is acceptable in a JSON ``state`` record.
 
     JSON primitives (and lists / tuples of them) round-trip through
     ``Operator.from_state``. Nested-operator payloads are pipekit's
     documented debug form for containers (``Sequential``, ``Cycle``, …):
-    they serialise but are rebuilt by a YAML / Hydra loader, not
-    ``from_state``, so they are allowed too.
+    they are rebuilt by a YAML / Hydra loader, not ``from_state``, so
+    they are allowed — provided everything inside them is JSON-encodable
+    (a nested complex array or callable is not).
     """
-    return _is_json_primitive(value) or _is_nested_operator(value)
+    return _is_json_primitive(value) or (
+        _is_nested_operator(value) and _json_safe(value)
+    )
 
 
 class JaxOperator(Operator, WeightsMixin, eqx.Module):

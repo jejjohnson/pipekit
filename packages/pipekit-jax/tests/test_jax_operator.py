@@ -252,8 +252,15 @@ def test_with_weights_rejects_a_blob_with_extra_leaves():
 
     saved = JaxModelOp(eqx.nn.Linear(4, 4, use_bias=True, key=jax.random.key(0)))
     skeleton = JaxModelOp(eqx.nn.Linear(4, 4, use_bias=False, key=jax.random.key(1)))
-    with pytest.raises(ValueError, match="not consumed"):
+    with pytest.raises(ValueError, match="structure"):
         skeleton.with_weights(saved.serialize_weights())
+    # a legacy (header-less) blob is caught by the unread-bytes check
+    import io
+
+    buf = io.BytesIO()
+    eqx.tree_serialise_leaves(buf, saved.module)
+    with pytest.raises(ValueError, match="not consumed"):
+        skeleton.with_weights(buf.getvalue())
 
 
 class Holds(JaxOperator):
@@ -274,3 +281,69 @@ def test_state_allows_nested_operator_payloads():
     record = Holds(inner=Diffuse(dx=0.1, kappa=0.01)).state
     json.dumps(record)
     assert record["config"]["inner"]["class"] == "Diffuse"
+
+
+# ---------------------------------------------------------------------
+# Review fixes, round 2 (#68)
+# ---------------------------------------------------------------------
+
+
+class TwoFields(JaxOperator):
+    a: jax.Array = eqx.field(converter=jnp.asarray)
+    b: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.a * u + self.b
+
+
+class TwoFieldsSwapped(JaxOperator):
+    """Same leaf count / shapes / dtypes as TwoFields, fields in the other order."""
+
+    b: jax.Array = eqx.field(converter=jnp.asarray)
+    a: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.a * u + self.b
+
+
+def test_with_weights_refuses_a_skeleton_with_a_different_field_layout():
+    saved = TwoFields(a=jnp.full(3, 2.0), b=jnp.full(3, 5.0))
+    skeleton = TwoFieldsSwapped(b=jnp.zeros(3), a=jnp.zeros(3))
+    with pytest.raises(ValueError, match="structure"):
+        skeleton.with_weights(saved.serialize_weights())
+    # the matching skeleton still restores exactly
+    restored = TwoFields(a=jnp.zeros(3), b=jnp.zeros(3)).with_weights(
+        saved.serialize_weights()
+    )
+    np.testing.assert_array_equal(restored.a, saved.a)
+    np.testing.assert_array_equal(restored.b, saved.b)
+
+
+def test_with_weights_still_loads_legacy_blobs_without_a_header():
+    import io
+
+    saved = TwoFields(a=jnp.full(3, 2.0), b=jnp.full(3, 5.0))
+    buf = io.BytesIO()
+    eqx.tree_serialise_leaves(buf, saved)  # the pre-header format
+    restored = TwoFields(a=jnp.zeros(3), b=jnp.zeros(3)).with_weights(buf.getvalue())
+    np.testing.assert_array_equal(restored.b, saved.b)
+
+
+def test_jsonable_turns_named_tuples_into_plain_tuples():
+    from typing import NamedTuple
+
+    class Shape(NamedTuple):
+        nx: int
+        ny: int
+
+    assert jsonable(Shape(4, 2)) == (4, 2)
+    assert jsonable([Shape(1, 2)]) == [(1, 2)]
+
+
+def test_state_rejects_a_nested_payload_hiding_a_complex_value():
+    with pytest.raises(TypeError, match="cannot round-trip"):
+        _ = Holds(inner=SpectralGain(g=jnp.full(4, 1 + 2j))).state
+
+
+def test_check_accepts_operators_with_nested_operator_payloads():
+    check_jax_operator(Holds(inner=Diffuse(dx=0.1, kappa=0.01)), U)

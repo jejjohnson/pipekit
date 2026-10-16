@@ -7,6 +7,21 @@ instance with the same pytree structure, whose non-array leaves
 (activations, dtypes, sizes, static config) cannot be recovered from
 bytes alone.
 
+Equinox loads leaves *positionally*, so a skeleton whose fields are in a
+different order — but with the same number of leaves and compatible
+shapes — would silently receive weights in the wrong fields. The blob
+therefore starts with a signature header: the key path, shape and dtype
+of every array leaf. `with_weights` compares it with the skeleton before
+loading.
+
+Blob layout::
+
+    b"PKJXW1\\n" | header length (8 bytes, little endian) | JSON signature
+               | equinox.tree_serialise_leaves payload
+
+Blobs without the magic prefix (written before the header existed) are
+still accepted and loaded positionally.
+
 Two hooks pick *which* pytree is persisted:
 
 - ``_weights_tree()`` — the tree to serialise (default: ``self``).
@@ -20,9 +35,24 @@ itself.
 from __future__ import annotations
 
 import io
+import json
 from typing import Any
 
 import equinox as eqx
+import jax
+
+
+_MAGIC = b"PKJXW1\n"
+
+
+def leaf_signature(tree: Any) -> list[list[Any]]:
+    """``[key path, shape, dtype]`` of every array leaf of ``tree``, in order."""
+    flat, _ = jax.tree_util.tree_flatten_with_path(tree)
+    return [
+        [jax.tree_util.keystr(path), list(leaf.shape), str(leaf.dtype)]
+        for path, leaf in flat
+        if eqx.is_array(leaf)
+    ]
 
 
 class WeightsMixin:
@@ -37,11 +67,15 @@ class WeightsMixin:
     def serialize_weights(self) -> bytes:
         """Serialise the persisted tree's array leaves to bytes.
 
-        Uses ``equinox.tree_serialise_leaves``, which writes each
-        array leaf's raw bytes plus a tree-shape header. The
-        complementary `with_weights` reads the same format.
+        A signature header (key path, shape and dtype of every array
+        leaf) precedes the ``equinox.tree_serialise_leaves`` payload, so
+        `with_weights` can refuse a skeleton with a different layout.
         """
+        header = json.dumps(leaf_signature(self._weights_tree())).encode()
         buf = io.BytesIO()
+        buf.write(_MAGIC)
+        buf.write(len(header).to_bytes(8, "little"))
+        buf.write(header)
         eqx.tree_serialise_leaves(buf, self._weights_tree())
         return buf.getvalue()
 
@@ -62,27 +96,46 @@ class WeightsMixin:
 
         Raises:
             TypeError: if ``blob`` is not bytes.
-            ValueError: if ``blob`` doesn't deserialise into a tree
-                with the same structure as the skeleton, including a blob
-                with more array leaves than the skeleton requests.
+            ValueError: if the blob's leaf signature (key paths, shapes,
+                dtypes) differs from the skeleton's, or — for a legacy
+                blob without a signature — if it holds more array leaves
+                than the skeleton requests.
             RuntimeError: from newer equinox versions when a
                 deserialised leaf's shape/dtype doesn't match the
                 skeleton (``eqx.tree_deserialise_leaves``).
         """
+        name = type(self).__name__
         if not isinstance(blob, (bytes, bytearray)):
             raise TypeError(
-                f"{type(self).__name__}.with_weights(blob): blob must be bytes "
+                f"{name}.with_weights(blob): blob must be bytes "
                 f"(produced by serialize_weights); got {type(blob).__name__}."
             )
+        skeleton = self._weights_tree()
         buf = io.BytesIO(blob)
-        tree = eqx.tree_deserialise_leaves(buf, self._weights_tree())
+        if bytes(blob[: len(_MAGIC)]) == _MAGIC:
+            buf.seek(len(_MAGIC))
+            size = int.from_bytes(buf.read(8), "little")
+            saved = json.loads(buf.read(size))
+            expected = leaf_signature(skeleton)
+            if saved != expected:
+                diff = next(
+                    ((s, e) for s, e in zip(saved, expected, strict=False) if s != e),
+                    (f"{len(saved)} array leaves", f"{len(expected)} array leaves"),
+                )
+                raise ValueError(
+                    f"{name}.with_weights: the blob's tree structure does not "
+                    f"match the skeleton (saved {diff[0]!r}, skeleton "
+                    f"{diff[1]!r}). Build the skeleton with the same structure, "
+                    "field order and shapes as the operator that was serialised."
+                )
+        tree = eqx.tree_deserialise_leaves(buf, skeleton)
         unread = len(blob) - buf.tell()
         if unread:
             # The skeleton asked for fewer leaves than were saved (e.g. an
             # optional bias that is None in the skeleton): a partial restore
             # would silently drop weights.
             raise ValueError(
-                f"{type(self).__name__}.with_weights: {unread} bytes of the blob "
+                f"{name}.with_weights: {unread} bytes of the blob "
                 "were not consumed — the saved tree has more array leaves than "
                 "the skeleton. Build the skeleton with the same structure as the "
                 "operator that was serialised."
