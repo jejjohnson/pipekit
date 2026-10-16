@@ -13,6 +13,10 @@ Public surface:
 - `to_diffrax_adjoint` / `truncated_scan` — JAX-side interpreters for
   the carrier-agnostic adjoint specs in ``pipekit_cycle.adjoints``.
 
+Importing this package also registers ``pipekit.Sequential`` and
+``pipekit.Graph`` as JAX pytrees (`pipekit_jax.pytree`), so ``jax.grad``
+/ ``eqx.filter_grad`` reach the leaves of operators inside a pipeline.
+
 See master plan Report 11 (companion of pipekit-train) and
 `pipekit-train/docs/design/boundaries.md §13.1` for the v0.1
 caveat this package closes.
@@ -20,6 +24,7 @@ caveat this package closes.
 
 from typing import Any
 
+from pipekit_jax import pytree as pytree  # registers Sequential / Graph
 from pipekit_jax.adjoints import to_diffrax_adjoint, truncated_scan
 from pipekit_jax.model_op import JaxModelOp
 
