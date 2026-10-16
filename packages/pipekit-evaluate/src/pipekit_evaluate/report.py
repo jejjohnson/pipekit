@@ -43,7 +43,10 @@ class ReportEntry:
     tags: ScorerTags = field(default_factory=ScorerTags)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "value", float(self.value))
+        value = float(self.value)
+        # -0.0 == 0.0, so diff() sees no change between them; storing +0.0
+        # keeps the content hash in agreement with diff().
+        object.__setattr__(self, "value", 0.0 if value == 0.0 else value)
 
     @property
     def key(self) -> str:
@@ -72,7 +75,8 @@ class EvaluationReport:
         model_ref: What was evaluated (a registry hash, a URI), if known.
         dataset_ref: What it was evaluated on, if known.
         config: Free-form settings of the run, kept as a read-only JSON
-            snapshot taken at construction; a value that is not JSON (a
+            snapshot taken at construction: mappings at every depth are
+            read-only, lists become tuples, and a value that is not JSON (a
             ``Path``, an object) is stored as its ``repr``. Changing the
             caller's config afterwards changes neither the report nor its
             hash.
@@ -104,9 +108,11 @@ class EvaluationReport:
         # The canonical JSON is the snapshot: the hash and to_dict read it,
         # so mutating a nested value the caller still holds cannot change a
         # report that has already been hashed.
-        config_json = stable_json(dict(self.config))
+        # Thawing first lets a frozen config (from filter or replace) hash
+        # exactly as the plain config it was made from.
+        config_json = stable_json(_thaw(self.config))
         object.__setattr__(self, "_config_json", config_json)
-        object.__setattr__(self, "config", MappingProxyType(json.loads(config_json)))
+        object.__setattr__(self, "config", _freeze(json.loads(config_json)))
 
     @property
     def values(self) -> dict[str, float]:
@@ -272,6 +278,24 @@ def _check_unique_names(scorers: Sequence[Scorer]) -> None:
         raise ValueError(
             f"duplicate scorer names {dups}; each scorer needs its own name"
         )
+
+
+def _freeze(value: Any) -> Any:
+    """Make decoded JSON read-only at every depth."""
+    if isinstance(value, dict):
+        return MappingProxyType({k: _freeze(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
+def _thaw(value: Any) -> Any:
+    """Turn mappings and sequences back into the dicts and lists JSON encodes."""
+    if isinstance(value, Mapping):
+        return {k: _thaw(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_thaw(v) for v in value]
+    return value
 
 
 def _same(a: float | None, b: float | None) -> bool:

@@ -231,10 +231,34 @@ def test_config_is_snapshotted_at_construction(report: EvaluationReport) -> None
     snap = replace(report, config={"window": window})
     before = snap.content_hash
     window["sizes"].append(17)  # the caller mutates what it still holds
-    assert snap.config == {"window": {"sizes": [9]}}
+    assert snap.to_dict()["config"] == {"window": {"sizes": [9]}}
     assert snap.content_hash == before
+
+
+def test_config_is_read_only_at_every_depth(report: EvaluationReport) -> None:
+    snap = replace(report, config={"window": {"sizes": [9]}})
+    assert snap.config["window"]["sizes"] == (9,)
     with pytest.raises(TypeError):
         snap.config["window"] = {}  # type: ignore[index]
+    with pytest.raises(TypeError):
+        snap.config["window"]["sizes"] = [17]  # type: ignore[index]
+    with pytest.raises(AttributeError):
+        snap.config["window"]["sizes"].append(17)
+
+
+def test_a_frozen_config_hashes_like_the_plain_one(report: EvaluationReport) -> None:
+    snap = replace(report, config={"window": {"sizes": [9, 17]}, "seed": 0})
+    # filter and replace pass the frozen config back through the constructor
+    assert snap.filter().content_hash == snap.content_hash
+    assert snap.filter().to_dict()["config"] == snap.to_dict()["config"]
+
+
+def test_signed_zero_hashes_like_zero() -> None:
+    plus = EvaluationReport((ReportEntry("m", "bias", 0.0),))
+    minus = EvaluationReport((ReportEntry("m", "bias", -0.0),))
+    assert minus.diff(plus) == {}
+    assert minus.content_hash == plus.content_hash
+    assert math.copysign(1.0, minus.entries[0].value) == 1.0
 
 
 def test_to_dict_serialises_a_non_json_config(report: EvaluationReport) -> None:
