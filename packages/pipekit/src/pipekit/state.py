@@ -82,6 +82,12 @@ class CarryState:
     bring their own ``CarryState`` shape (`pipekit-cycle.DAState`,
     `IterationState`, `WindowState`, ...).
 
+    States compare by value (same type, same fields) but are not
+    hashable: they are mutable (a stateful step may update one in
+    place) and routinely hold arrays and dicts, so a value hash would be
+    wrong after a mutation, or fail outright. Don't use a state as a dict
+    key or a set member; key by something stable instead.
+
     The base supplies JSON-roundtrip discipline:
 
     - `to_dict` returns the instance's ``__dict__`` (so any attributes
@@ -119,5 +125,6 @@ class CarryState:
             return NotImplemented
         return vars(self) == vars(other)
 
-    def __hash__(self) -> int:
-        return hash((type(self), tuple(sorted(vars(self).items()))))
+    # Mutable, compared by value: unhashable, as Python's own rule for
+    # such classes has it (and as `extras` dicts made most states anyway).
+    __hash__ = None  # type: ignore[assignment]
