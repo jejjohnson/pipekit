@@ -24,7 +24,7 @@ from pipekit_evaluate.benchmark.reference import (
     ReferenceRule,
     ReferenceSource,
 )
-from pipekit_evaluate.report import EvaluationReport, ReportEntry
+from pipekit_evaluate.report import EvaluationReport, ReportEntry, _check_unique_names
 from pipekit_evaluate.taxonomy import ScorerTags, tags_of
 
 
@@ -116,7 +116,7 @@ class BenchmarkReport:
 
         Each entry carries its cell label and reference source, so
         ``report.filter(reference="known_theta")`` or
-        ``report.filter(lens="probabilistic")`` cuts across the cube.
+        ``report.filter(lens="structural")`` cuts across the cube.
 
         Args:
             model_ref: What was evaluated, recorded on the report.
@@ -171,7 +171,9 @@ class Benchmark:
     def run(self) -> BenchmarkReport:
         """Fit every estimator, resolve each cell's reference, and score it."""
         self._check_unique_cells()
-        self._check_unique_scorers()
+        # Scores are namespaced by scorer name, so two scorers sharing one
+        # would overwrite each other's values in a cell.
+        _check_unique_names(self.scorers)
         tags = {scorer.name: tags_of(scorer) for scorer in self.scorers}
         data = dict(self.task.datasets())
         if self.obs_key not in data:
@@ -272,19 +274,6 @@ class Benchmark:
                     )
                 )
         return scores
-
-    def _check_unique_scorers(self) -> None:
-        """Reject two scorers with one name.
-
-        Scores are namespaced by scorer name, so two scorers sharing one
-        would overwrite each other's values in a cell.
-        """
-        names = [scorer.name for scorer in self.scorers]
-        dups = sorted({n for n in names if names.count(n) > 1})
-        if dups:
-            raise ValueError(
-                f"duplicate scorer names {dups}; each scorer needs its own name"
-            )
 
     def _check_unique_cells(self) -> None:
         """Reject two estimators occupying the same cube cell.
