@@ -194,8 +194,56 @@ def test_duplicate_scorer_names_are_rejected(
     plume: tuple[np.ndarray, np.ndarray, np.ndarray],
 ) -> None:
     truth, shifted, _ = plume
-    with pytest.raises(ValueError, match="duplicate report entries"):
+    with pytest.raises(ValueError, match="duplicate scorer names"):
         evaluate(shifted, truth, [MetricScorer(rmse), MetricScorer(rmse)])
+
+
+def test_duplicate_scorer_names_are_rejected_before_any_scorer_runs() -> None:
+    # disjoint metric keys would never collide as entries, but would merge
+    # two scorers into one namespace
+    calls: list[str] = []
+
+    def first(p: object, r: object) -> dict[str, float]:
+        calls.append("first")
+        return {"a": 1.0}
+
+    def second(p: object, r: object) -> dict[str, float]:
+        calls.append("second")
+        return {"b": 2.0}
+
+    scorers = [MetricScorer(first, name="m"), MetricScorer(second, name="m")]
+    with pytest.raises(ValueError, match=r"duplicate scorer names \['m'\]"):
+        evaluate(None, None, scorers)
+    assert calls == []
+
+
+def test_entries_with_one_key_are_rejected() -> None:
+    entry = ReportEntry("m", "value", 1.0)
+    with pytest.raises(ValueError, match="duplicate report entries"):
+        EvaluationReport((entry, entry))
+
+
+# --------------------------------------------------------------------------- #
+# The config snapshot
+# --------------------------------------------------------------------------- #
+def test_config_is_snapshotted_at_construction(report: EvaluationReport) -> None:
+    window = {"sizes": [9]}
+    snap = replace(report, config={"window": window})
+    before = snap.content_hash
+    window["sizes"].append(17)  # the caller mutates what it still holds
+    assert snap.config == {"window": {"sizes": [9]}}
+    assert snap.content_hash == before
+    with pytest.raises(TypeError):
+        snap.config["window"] = {}  # type: ignore[index]
+
+
+def test_to_dict_serialises_a_non_json_config(report: EvaluationReport) -> None:
+    from pathlib import PurePosixPath
+
+    snap = replace(report, config={"root": PurePosixPath("/data")})
+    payload = json.loads(json.dumps(snap.to_dict()))
+    assert payload["config"] == {"root": "PurePosixPath('/data')"}
+    assert payload["content_hash"] == snap.content_hash
 
 
 def test_to_dict_is_json_serialisable(report: EvaluationReport) -> None:
