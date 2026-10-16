@@ -157,7 +157,7 @@ class ScanCycle(StatefulOperator, JaxOperator):
     ``i % history_stride == 0`` — so there are ``⌈n_steps / stride⌉``
     entries.
 
-    Args:
+    Attributes:
         step_op: A `StatefulOperator` ``(carrier, state) -> (carrier,
             state)``, or a `pipekit_cycle.ForwardModel` (wrapped so the
             state passes through unchanged).
@@ -287,7 +287,7 @@ class Rollout(JaxOperator):
     The trajectory is stacked along a new leading axis with
     ``jax.tree.map``, so any pytree carrier works.
 
-    Args:
+    Attributes:
         step: A pipekit operator ``carrier -> carrier``, or a
             `pipekit_cycle.ForwardModel` (wrapped to call ``step(c, dt)``;
             the wrapper is flagged ``forbid_in_yaml`` so
