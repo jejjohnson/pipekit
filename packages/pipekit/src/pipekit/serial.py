@@ -6,12 +6,15 @@ an allowlist.
 
 - `dumps(op) -> str` — JSON-encode ``op.state``.
 - `loads(s) -> Operator` — round-trip via `Operator.from_state`. Any
-  imported `Operator` subclass resolves; non-primitive config values
-  raise (use a YAML / Hydra loader for nested-operator configs).
+  imported `Operator` subclass resolves, at any depth: a `Sequential`,
+  `Graph`, `Cache`, `Try`, `Fanout` or parallel map comes back with its
+  children. Operators that hold closures (``forbid_in_yaml``) refuse.
 - `register(cls)` — add an `Operator` subclass to the sandboxed
   loader's allowlist.
 - `loads_sandboxed(s) -> Operator` — like ``loads`` but rejects any
-  class not in the allowlist. Use this for untrusted input
+  class, at any depth, not in the allowlist. Nothing is allowed by
+  default, pipekit's own containers included: register `Sequential`,
+  `Graph`, … as well as your steps. Use this for untrusted input
   (use case 6: user-uploaded pipelines).
 
 YAML / Hydra loaders are intentionally not shipped here — they live
@@ -23,18 +26,19 @@ See master plan Report 2, Group L.
 from __future__ import annotations
 
 import json
+from typing import Any
 
-from pipekit._base.operator import Operator
+from pipekit._base.operator import Operator, build_operator
 
 
 def dumps(op: Operator) -> str:
     """JSON-encode an operator's state record.
 
     Round-trip: ``loads(dumps(op))`` reconstructs an operator with the
-    same config. Operators with `forbid_in_yaml = True` emit
-    debug-only payloads — their constructors typically need closure
-    arguments that aren't in the config, so the round-trip raises
-    `TypeError` from the constructor at ``loads`` time.
+    same config, nested operators included. Operators with
+    `forbid_in_yaml = True` emit debug-only payloads (their constructors
+    need closures that aren't in the config), so ``loads`` refuses them
+    with `RuntimeError`, wherever they sit in the tree.
 
     Args:
         op: The operator to encode.
@@ -62,8 +66,9 @@ def loads(s: str) -> Operator:
 
     Raises:
         ValueError: if the JSON is malformed.
-        TypeError: if the named class isn't a loaded `Operator` subclass.
-        RuntimeError: if the config contains non-primitive values.
+        TypeError: if a named class isn't a loaded `Operator` subclass.
+        RuntimeError: if a class in the tree is ``forbid_in_yaml``, or a
+            config holds a value that is not JSON.
     """
     state = json.loads(s)
     if not isinstance(state, dict):
@@ -108,14 +113,17 @@ def allowed() -> tuple[str, ...]:
 
 
 def loads_sandboxed(s: str) -> Operator:
-    """Like `loads`, but reject any class not in the allowlist.
+    """Like `loads`, but reject any class, at any depth, not in the allowlist.
 
     Use for untrusted input (user-uploaded pipelines, use case 6).
     Domain libraries register their operators via `register`; the
-    sandboxed loader refuses to construct anything else.
+    sandboxed loader refuses to construct anything else. Every class in
+    the tree is checked before any operator is built, so a refused
+    pipeline constructs nothing. Exception classes (`Try.on`,
+    `Retry.on`) resolve only among already-imported modules.
 
     Raises:
-        PermissionError: if the named class isn't registered.
+        PermissionError: if any class in the tree isn't registered.
         ValueError / TypeError / RuntimeError: as `loads`.
     """
     state = json.loads(s)
@@ -135,10 +143,31 @@ def loads_sandboxed(s: str) -> Operator:
             "loads_sandboxed: state must include a string `class` field, "
             f"got {type(cls).__name__}."
         )
+    # Check every class in the tree first, so a refused pipeline
+    # constructs nothing.
+    _check_allowed(state)
+    return build_operator(state, _resolve_allowed)
+
+
+def _check_allowed(value: Any) -> None:
+    """Raise `PermissionError` for the first unregistered class in ``value``."""
+    if isinstance(value, list):
+        for item in value:
+            _check_allowed(item)
+        return
+    if not isinstance(value, dict):
+        return
+    if set(value) == {"module", "class", "config"}:
+        _resolve_allowed(value["module"], value["class"])
+    for item in value.values():
+        _check_allowed(item)
+
+
+def _resolve_allowed(module: Any, cls: Any) -> type[Operator]:
     key = f"{module}.{cls}"
     if key not in _ALLOWED:
         raise PermissionError(
             f"loads_sandboxed: {key!r} is not in the allowlist. "
             f"Registered classes: {allowed()}."
         )
-    return Operator.from_state(state)
+    return _ALLOWED[key]

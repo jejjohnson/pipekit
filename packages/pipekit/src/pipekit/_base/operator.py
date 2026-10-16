@@ -12,17 +12,19 @@ behaviours every operator inherits:
    `__config_mixin_auto__ = False` or exclude fields with
    `__config_exclude__ = ("foo",)`.
 3. **JSON-safe `state` / `from_state`** — a serialisable record that
-   round-trips through any subclass of `Operator` that's been imported.
+   round-trips through any subclass of `Operator` that's been imported,
+   nested operators included: a child operator appears in its parent's
+   config as its own `state` record, and `from_state` rebuilds the tree
+   from the leaves up.
 
 Operators that themselves hold non-serialisable runtime state — user
 closures (`Tap`, `Lambda`, `Branch`, …) or runtime arrays — set
 `forbid_in_yaml = True` to signal that `get_config()` is a debug repr,
-not a faithful round-trip; `from_state` refuses flagged classes and
-`parallel.check_pickleable` surfaces flagged instances as pickling
-hazards. Operators that merely *nest* other operators (`Cache`, `Try`,
-the parallel maps, …) do not set the flag: nesting is discovered
-structurally by `check_pickleable`, and their nested-dict configs are
-already rejected cleanly by `from_state`'s primitive check.
+not a faithful round-trip; `from_state` refuses flagged classes, at any
+depth, and `parallel.check_pickleable` surfaces flagged instances as
+pickling hazards. Operators that merely *nest* other operators (`Cache`,
+`Try`, the parallel maps, …) do not set the flag: they round-trip, and
+nesting is discovered structurally by `check_pickleable`.
 
 See master plan Report 2, Group A.
 """
@@ -30,7 +32,9 @@ See master plan Report 2, Group A.
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, ClassVar
+import sys
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 
 if TYPE_CHECKING:
@@ -210,55 +214,45 @@ class Operator(ConfigMixin):
 
     @classmethod
     def from_state(cls, state: dict[str, Any]) -> Operator:
-        """Reconstruct an operator from a `state` record.
+        """Reconstruct an operator, and any operators nested in it, from `state`.
 
-        Walks `cls` plus all transitive subclasses so calling
-        `Operator.from_state(state)` resolves any imported subclass.
-        Config values must be JSON primitives (None / bool / int / float
-        / str / list / tuple of the same); operators that nest other
-        operators in their config emit debug payloads and are not
-        round-trippable through this path — use a YAML / Hydra loader
-        instead.
+        Resolves classes among `cls` and all its transitive subclasses,
+        so ``Operator.from_state(state)`` resolves any imported subclass;
+        nothing is imported. Config values are rebuilt recursively: a
+        nested `state` record becomes an operator, an
+        ``{"exception": "module.Name"}`` record becomes that (already
+        imported) exception class, lists and dicts are rebuilt item by
+        item, and JSON primitives pass through. The class's
+        `from_config` then builds the operator.
 
         Raises:
-            ValueError: if the state record is malformed.
-            TypeError: if the class isn't a loaded `Operator` subclass.
-            RuntimeError: if the class is marked ``forbid_in_yaml`` or the
-                config contains non-primitive values.
+            ValueError: if a state record is malformed.
+            TypeError: if a class isn't a loaded `Operator` subclass, or an
+                exception record doesn't name a loaded exception class.
+            RuntimeError: if any class in the tree is marked
+                ``forbid_in_yaml``, or a config holds a value that is not
+                JSON (or a nested payload without a ``module``, as
+                written before nested round-trips existed).
         """
-        module_name = state.get("module")
-        class_name = state.get("class")
-        config = state.get("config", {})
-        if not isinstance(module_name, str):
-            raise ValueError("Operator state must include a module name")
-        if not isinstance(class_name, str):
-            raise ValueError("Operator state must include a class name")
-        if not isinstance(config, dict):
-            raise ValueError("Operator state config must be a dictionary")
+        module_name, class_name, _ = _check_record(state)
+        op_type = resolve_loaded(module_name, class_name)
+        if not issubclass(op_type, cls):
+            raise TypeError(f"{module_name}.{class_name} is not a {cls.__name__}.")
+        return build_operator(state, resolve_loaded)
 
-        for op_type in (cls, *_operator_subclasses(cls)):
-            if op_type.__module__ == module_name and op_type.__name__ == class_name:
-                if op_type.forbid_in_yaml:
-                    # A flagged operator's get_config() is a debug payload —
-                    # its keys need not match the constructor, so calling
-                    # op_type(**config) would raise a confusing TypeError.
-                    raise RuntimeError(
-                        f"from_state cannot reconstruct {op_type.__name__}: "
-                        "it is marked forbid_in_yaml (its config is a debug "
-                        "payload, not a faithful round-trip). Rebuild it in "
-                        "code instead."
-                    )
-                non_primitive = [
-                    k for k, v in config.items() if not _is_json_primitive(v)
-                ]
-                if non_primitive:
-                    raise RuntimeError(
-                        f"from_state cannot reconstruct {op_type.__name__}: "
-                        f"config contains non-primitive values {non_primitive}. "
-                        "Use a YAML / Hydra loader for nested-operator configs."
-                    )
-                return op_type(**config)
-        raise TypeError(f"{module_name}.{class_name} is not a loaded Operator")
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> Self:
+        """Build an operator from its decoded `get_config()` record.
+
+        The default calls ``cls(**config)``, which is right for every
+        operator whose config keys are its constructor's arguments.
+        Operators whose config is not a constructor call (`Graph`,
+        whose config is a topology) override this.
+
+        Args:
+            config: The config with nested operators already rebuilt.
+        """
+        return cls(**config)
 
     def __repr__(self) -> str:
         params = ", ".join(f"{k}={v!r}" for k, v in self.get_config().items())
@@ -280,14 +274,131 @@ class Operator(ConfigMixin):
 
 
 def nested_config(op: Operator) -> dict[str, Any]:
-    """Debug-config payload for an operator nested inside another's config.
+    """Config payload for an operator nested inside another's config.
 
-    The canonical ``{"class": ..., "config": ...}`` shape every container
-    operator (`Sequential`, `Cache`, `Branch`, the parallel maps, …) emits
-    for its children. One helper instead of one inline dict per module, so
-    the payload shape can never drift between operators.
+    The child's full `state` record (``module``, ``class``, ``config``),
+    which `Operator.from_state` rebuilds. Every container operator
+    (`Sequential`, `Cache`, `Branch`, the parallel maps, …) emits its
+    children through this one helper, so the payload can never drift
+    between operators.
     """
-    return {"class": type(op).__name__, "config": op.get_config()}
+    return op.state
+
+
+def exception_config(exc: type[BaseException]) -> dict[str, str]:
+    """Config payload for an exception class (`Try.on`, `Retry.on`).
+
+    ``{"exception": "module.QualName"}``, which `Operator.from_state`
+    resolves back to the class among already-imported modules.
+    """
+    return {"exception": f"{exc.__module__}.{exc.__qualname__}"}
+
+
+Resolver = Callable[[str, str], "type[Operator]"]
+
+
+def build_operator(state: dict[str, Any], resolve: Resolver) -> Operator:
+    """Rebuild an operator tree from a `state` record.
+
+    The engine behind `Operator.from_state` and the sandboxed loader:
+    ``resolve(module, class)`` maps each class name in the tree to a
+    class (and may refuse, by raising); everything else is shared.
+
+    Args:
+        state: A ``{"module", "class", "config"}`` record.
+        resolve: Maps a module and class name to an `Operator` subclass.
+
+    Raises:
+        ValueError / TypeError / RuntimeError: as `Operator.from_state`.
+    """
+    module_name, class_name, config = _check_record(state)
+    op_type = resolve(module_name, class_name)
+    if op_type.forbid_in_yaml:
+        # A flagged operator's get_config() is a debug payload: its keys
+        # need not match the constructor.
+        raise RuntimeError(
+            f"from_state cannot reconstruct {op_type.__name__}: it is marked "
+            "forbid_in_yaml (its config is a debug payload, not a faithful "
+            "round-trip). Rebuild it in code instead."
+        )
+    decoded: dict[str, Any] = {}
+    for key, value in config.items():
+        decoded[key] = _decode(value, resolve, f"{op_type.__name__}.{key}")
+    return op_type.from_config(decoded)
+
+
+def _check_record(state: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """Validate a state record's shape; return its module, class and config."""
+    module_name = state.get("module")
+    class_name = state.get("class")
+    config = state.get("config", {})
+    if not isinstance(module_name, str):
+        raise ValueError("Operator state must include a module name")
+    if not isinstance(class_name, str):
+        raise ValueError("Operator state must include a class name")
+    if not isinstance(config, dict):
+        raise ValueError("Operator state config must be a dictionary")
+    return module_name, class_name, config
+
+
+def _decode(value: Any, resolve: Resolver, where: str) -> Any:
+    """Rebuild one config value: operators, exception classes, containers."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        items: list[Any] = []
+        for i, item in enumerate(value):
+            items.append(_decode(item, resolve, f"{where}[{i}]"))
+        # keep a tuple a tuple: a state built in memory round-trips exactly
+        if isinstance(value, tuple):
+            return tuple(items)
+        return items
+    if isinstance(value, dict):
+        keys = set(value)
+        if keys == {"module", "class", "config"}:
+            return build_operator(value, resolve)
+        if keys == {"class", "config"}:
+            raise RuntimeError(
+                f"from_state cannot reconstruct {where}: it is a nested "
+                "operator payload without a `module`, written before nested "
+                "round-trips existed. Dump the pipeline again."
+            )
+        if keys == {"exception"}:
+            return _resolve_exception(value["exception"])
+        rebuilt: dict[str, Any] = {}
+        for key, item in value.items():
+            rebuilt[key] = _decode(item, resolve, f"{where}[{key!r}]")
+        return rebuilt
+    raise RuntimeError(
+        f"from_state cannot reconstruct {where}: {type(value).__name__} is "
+        "not a JSON value."
+    )
+
+
+def _resolve_exception(path: Any) -> type[BaseException]:
+    """``"module.QualName"`` ↦ an exception class from an imported module."""
+    if not isinstance(path, str) or "." not in path:
+        raise ValueError(f"Exception record must be 'module.Name', got {path!r}.")
+    module_name, _, qualname = path.rpartition(".")
+    # Already-imported modules only: loading a pipeline never imports code.
+    target: Any = sys.modules.get(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part, None)
+    if not (isinstance(target, type) and issubclass(target, BaseException)):
+        raise TypeError(f"{path} is not a loaded exception class.")
+    return target
+
+
+def resolve_loaded(module_name: str, class_name: str) -> type[Operator]:
+    """The loaded `Operator` subclass named ``module.class``; nothing is imported.
+
+    Raises:
+        TypeError: if no loaded `Operator` subclass has that name.
+    """
+    for op_type in (Operator, *_operator_subclasses(Operator)):
+        if op_type.__module__ == module_name and op_type.__name__ == class_name:
+            return op_type
+    raise TypeError(f"{module_name}.{class_name} is not a loaded Operator")
 
 
 def callable_name(fn: Any) -> str:
@@ -321,18 +432,3 @@ def _operator_subclasses(cls: type[Operator]) -> tuple[type[Operator], ...]:
         subclasses.append(subclass)
         subclasses.extend(_operator_subclasses(subclass))
     return tuple(subclasses)
-
-
-def _is_json_primitive(value: Any) -> bool:
-    """Return ``True`` if ``value`` is a safe `from_state` constructor payload.
-
-    Accepts JSON primitives (None / bool / int / float / str) and
-    list / tuple of the same, recursively. Rejects dicts — operators
-    that nest other operators in their config emit ``{"class", "config"}``
-    debug payloads that the plain constructor can't consume.
-    """
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return True
-    if isinstance(value, (list, tuple)):
-        return all(_is_json_primitive(v) for v in value)
-    return False

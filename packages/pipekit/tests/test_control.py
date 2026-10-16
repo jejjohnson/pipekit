@@ -156,7 +156,10 @@ def test_try_is_not_forbid_in_yaml():
 def test_try_config_serialises_exception_names():
     op = Try(primary=Identity(), fallback=Identity(), on=(ValueError, KeyError))
     cfg = op.get_config()
-    assert cfg["on"] == ["ValueError", "KeyError"]
+    assert cfg["on"] == [
+        {"exception": "builtins.ValueError"},
+        {"exception": "builtins.KeyError"},
+    ]
 
 
 # -----------------------------------------------------------------------------
