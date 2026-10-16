@@ -151,7 +151,11 @@ class Scorer(Protocol):
     ``unit``, ``lens``, ``stages`` and ``differentiable``, which are not
     protocol members; :func:`pipekit_evaluate.taxonomy.tags_of` reads them
     with their defaults, and :class:`pipekit_evaluate.scorers.MetricScorer`
-    sets them on any metric operator.
+    sets them on any metric operator. A further optional attribute,
+    ``references``, names the reference sources a scorer can be run
+    against in the benchmark ladder; without it a scorer is run against
+    each cell's primary reference only
+    (:func:`pipekit_evaluate.benchmark.run.scores_against`).
 
     Members:
         name: Short scorer identifier, used to namespace its metrics.

@@ -30,11 +30,13 @@ from pipekit_evaluate.benchmark.reference import (
     Axis,
     ReferenceRule,
     ReferenceSource,
+    as_sources,
 )
 from pipekit_evaluate.benchmark.run import (
     Benchmark,
     BenchmarkReport,
     CellResult,
+    scores_against,
 )
 
 
@@ -57,4 +59,6 @@ __all__ = [
     "ReferenceSource",
     "Scorer",
     "Task",
+    "as_sources",
+    "scores_against",
 ]

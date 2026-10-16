@@ -304,3 +304,38 @@ def test_to_pandas_names_the_missing_dependency(
     monkeypatch.setitem(sys.modules, "pandas", None)
     with pytest.raises(ImportError, match="needs pandas"):
         report.to_pandas()
+
+
+# --------------------------------------------------------------------------- #
+# Unambiguous keys and strict JSON
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("name", ["a.b", "a:b"])
+def test_scorer_names_cannot_hold_a_key_separator(name: str) -> None:
+    # ("a.b", "c") and ("a", "b.c") would otherwise share the key "a.b.c"
+    with pytest.raises(ValueError, match="separate the parts of a report key"):
+        ReportEntry(name, "c", 1.0)
+    with pytest.raises(ValueError, match="separate the parts of a report key"):
+        evaluate(None, None, [MetricScorer(lambda p, r: 1.0, name=name)])
+
+
+def test_metric_names_may_hold_dots() -> None:
+    report = EvaluationReport((ReportEntry("a", "b.c", 1.0),))
+    assert report.values == {"a.b.c": 1.0}
+
+
+def test_to_dict_is_strict_json_for_non_finite_values() -> None:
+    entries = tuple(
+        ReportEntry("m", name, value)
+        for name, value in [("nan", math.nan), ("up", math.inf), ("down", -math.inf)]
+    )
+    report = EvaluationReport(entries, config={"floor": -math.inf})
+    payload = report.to_dict()
+    text = json.dumps(payload, allow_nan=False)
+    assert [e["value"] for e in json.loads(text)["entries"]] == [
+        "NaN",
+        "Infinity",
+        "-Infinity",
+    ]
+    assert payload["config"] == {"floor": "-Infinity"}
+    # the records keep the floats
+    assert math.isnan(report.to_records()[0]["value"])
