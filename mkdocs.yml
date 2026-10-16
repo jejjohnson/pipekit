@@ -56,6 +56,7 @@ nav:
   - Tutorials:
       - Train an emulator: tutorials/train-emulator.md
       - Run a DA cycle: tutorials/da-cycle.md
+      - Build a bigger graph: tutorials/anomaly-graph.md
   - API Reference:
       - pipekit: api/pipekit.md
       - pipekit-array: api/pipekit-array.md
