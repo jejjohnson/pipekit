@@ -36,6 +36,7 @@ silently treated as a constant by ``eqx.filter_grad``.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 import equinox as eqx
@@ -67,10 +68,21 @@ def jsonable(value: Any) -> Any:
 
 
 def _is_nested_operator(value: Any) -> bool:
-    """A ``{"class", "config"}`` payload (or a list of them) for a nested operator."""
+    """Whether ``value`` is a nested-operator payload.
+
+    One of: ``{"class", "config"}``; a non-empty list / tuple of them; or a
+    non-empty str-keyed mapping of them (``{name: nested_config(op)}``,
+    the shape pipekit's branch containers use).
+    """
     if isinstance(value, list | tuple):
         return bool(value) and all(_is_nested_operator(v) for v in value)
-    return isinstance(value, dict) and set(value) == {"class", "config"}
+    if not isinstance(value, dict):
+        return False
+    if set(value) == {"class", "config"}:
+        return True
+    return bool(value) and all(
+        isinstance(k, str) and _is_nested_operator(v) for k, v in value.items()
+    )
 
 
 def _json_safe(value: Any) -> bool:
@@ -112,7 +124,9 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
       ``op.state`` survives ``json.dumps`` and ``Operator.from_state``.
       Real numbers, strings, booleans and (nested) lists / tuples of
       them round-trip; ``op.state`` raises ``TypeError`` for complex
-      values and plain dicts, which ``from_state`` cannot rebuild.
+      values and plain dicts, which ``from_state`` cannot rebuild, and for
+      array fields whose converter would not restore their dtype (JSON
+      drops dtypes: a ``float16`` field needs a casting converter).
       Nested-operator payloads (``{"class", "config"}``) are allowed —
       pipekit's debug form for operators that hold operators. Operators
       holding those, or non-array Python objects (callables, modules
@@ -149,4 +163,35 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
                     "of pairs, or set `forbid_in_yaml = True` and persist arrays "
                     "with serialize_weights()."
                 )
+            lossy = self._dtype_lossy_fields()
+            if lossy:
+                raise TypeError(
+                    f"{type(self).__name__}: array field(s) {lossy} would reload "
+                    "with a different dtype: JSON drops dtypes and the field's "
+                    "converter does not restore it. Give the field a casting "
+                    "converter, e.g. eqx.field(converter=lambda x: "
+                    "jnp.asarray(x, jnp.float16)), or set `forbid_in_yaml = True` "
+                    "and persist arrays with serialize_weights()."
+                )
         return record
+
+    def _dtype_lossy_fields(self) -> list[str]:
+        """Array config fields whose JSON round trip changes their dtype.
+
+        Rebuilds each array field the way ``from_state`` does (its JSON
+        value passed through the field's converter) and compares dtypes.
+        A field without a converter reloads as a Python scalar / list;
+        `check_jax_operator` reports that case as a lost learnable leaf.
+        """
+        lossy = []
+        for f in dataclasses.fields(self):
+            converter = f.metadata.get("converter")
+            if not f.init or converter is None:
+                continue
+            value = getattr(self, f.name)
+            if not eqx.is_array(value):
+                continue
+            rebuilt = converter(jsonable(value))
+            if not eqx.is_array(rebuilt) or rebuilt.dtype != value.dtype:
+                lossy.append(f.name)
+        return lossy

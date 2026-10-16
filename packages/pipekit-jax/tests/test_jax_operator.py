@@ -347,3 +347,95 @@ def test_state_rejects_a_nested_payload_hiding_a_complex_value():
 
 def test_check_accepts_operators_with_nested_operator_payloads():
     check_jax_operator(Holds(inner=Diffuse(dx=0.1, kappa=0.01)), U)
+
+
+# ---------------------------------------------------------------------
+# Review fixes, round 3 (#68)
+# ---------------------------------------------------------------------
+
+
+class TwoFieldsLookalike(JaxOperator):
+    """A different class with TwoFields' exact field names, shapes and dtypes."""
+
+    a: jax.Array = eqx.field(converter=jnp.asarray)
+    b: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.b * u - self.a
+
+
+def test_with_weights_refuses_a_different_class_with_identical_leaves():
+    saved = TwoFields(a=jnp.full(3, 2.0), b=jnp.full(3, 5.0))
+    lookalike = TwoFieldsLookalike(a=jnp.zeros(3), b=jnp.zeros(3))
+    with pytest.raises(ValueError, match="node types"):
+        lookalike.with_weights(saved.serialize_weights())
+
+
+def test_jax_model_op_refuses_a_different_module_class_with_identical_leaves():
+    from pipekit_jax import JaxModelOp
+
+    class LinearLookalike(eqx.Module):
+        weight: jax.Array
+        bias: jax.Array
+
+        def __call__(self, x):
+            return self.weight @ x + self.bias
+
+    saved = JaxModelOp(eqx.nn.Linear(4, 4, key=jax.random.key(0)))
+    skeleton = JaxModelOp(LinearLookalike(jnp.zeros((4, 4)), jnp.zeros(4)))
+    with pytest.raises(ValueError, match="node types"):
+        skeleton.with_weights(saved.serialize_weights())
+
+
+class Branches(JaxOperator):
+    """Named child operators, configured as {"branches": {name: nested_config}}."""
+
+    left: JaxOperator
+    right: JaxOperator
+
+    def get_config(self):
+        from pipekit._base.operator import nested_config
+
+        return {
+            "branches": {
+                "left": nested_config(self.left),
+                "right": nested_config(self.right),
+            }
+        }
+
+    def _apply(self, u):
+        return self.left(u) + self.right(u)
+
+
+def test_state_and_check_accept_mappings_of_nested_operators():
+    op = Branches(left=Diffuse(dx=0.1, kappa=0.01), right=Weighted(w=jnp.ones(16)))
+    record = op.state
+    assert set(record["config"]["branches"]) == {"left", "right"}
+    check_jax_operator(op, U)
+
+
+class HalfDefault(JaxOperator):
+    w: jax.Array = eqx.field(converter=jnp.asarray)
+
+    def _apply(self, u):
+        return self.w * u
+
+
+class HalfCasting(JaxOperator):
+    w: jax.Array = eqx.field(converter=lambda x: jnp.asarray(x, jnp.float16))
+
+    def _apply(self, u):
+        return self.w * u
+
+
+def test_state_refuses_a_field_whose_dtype_json_would_lose():
+    with pytest.raises(TypeError, match="different dtype"):
+        _ = HalfDefault(w=jnp.ones(4, dtype=jnp.float16)).state
+
+
+def test_casting_converter_round_trips_the_dtype():
+    op = HalfCasting(w=jnp.full(16, 0.5))
+    assert op.w.dtype == jnp.float16
+    rebuilt = Operator.from_state(json.loads(json.dumps(op.state)))
+    assert rebuilt.w.dtype == jnp.float16
+    check_jax_operator(op, U.astype(jnp.float16))

@@ -8,11 +8,15 @@ instance with the same pytree structure, whose non-array leaves
 bytes alone.
 
 Equinox loads leaves *positionally*, so a skeleton whose fields are in a
-different order — but with the same number of leaves and compatible
-shapes — would silently receive weights in the wrong fields. The blob
-therefore starts with a signature header: the key path, shape and dtype
-of every array leaf. `with_weights` compares it with the skeleton before
-loading.
+different order, or a different class with the same field names — but
+the same number of leaves and compatible shapes — would silently receive
+weights it was never trained with. The blob therefore starts with a
+signature header (`tree_signature`): the node types of the tree
+(``module.QualName`` of every pytree node, from the root down) and the
+key path, shape and dtype of every array leaf. `with_weights` compares
+it with the skeleton before loading. Node types are read from the
+treedef, not its repr, so static fields (activation functions, ...)
+never put process-specific addresses into the signature.
 
 Blob layout::
 
@@ -45,6 +49,27 @@ import jax
 _MAGIC = b"PKJXW1\n"
 
 
+def _node_types(treedef: Any) -> Any:
+    """Nested ``[type name, [children...]]`` of a treedef; ``None`` for a leaf."""
+    data = treedef.node_data()
+    if data is None:
+        return None
+    node_type = data[0]
+    return [
+        f"{node_type.__module__}.{node_type.__qualname__}",
+        [_node_types(child) for child in treedef.children()],
+    ]
+
+
+def tree_signature(tree: Any) -> dict[str, Any]:
+    """Node types plus `leaf_signature` of ``tree``: what a weight blob records."""
+    arrays_only = eqx.filter(tree, eqx.is_array)
+    return {
+        "nodes": _node_types(jax.tree.structure(arrays_only)),
+        "leaves": leaf_signature(tree),
+    }
+
+
 def leaf_signature(tree: Any) -> list[list[Any]]:
     """``[key path, shape, dtype]`` of every array leaf of ``tree``, in order."""
     flat, _ = jax.tree_util.tree_flatten_with_path(tree)
@@ -71,7 +96,7 @@ class WeightsMixin:
         leaf) precedes the ``equinox.tree_serialise_leaves`` payload, so
         `with_weights` can refuse a skeleton with a different layout.
         """
-        header = json.dumps(leaf_signature(self._weights_tree())).encode()
+        header = json.dumps(tree_signature(self._weights_tree())).encode()
         buf = io.BytesIO()
         buf.write(_MAGIC)
         buf.write(len(header).to_bytes(8, "little"))
@@ -96,8 +121,8 @@ class WeightsMixin:
 
         Raises:
             TypeError: if ``blob`` is not bytes.
-            ValueError: if the blob's leaf signature (key paths, shapes,
-                dtypes) differs from the skeleton's, or — for a legacy
+            ValueError: if the blob's signature (node types, key paths,
+                shapes, dtypes) differs from the skeleton's, or — for a legacy
                 blob without a signature — if it holds more array leaves
                 than the skeleton requests.
             RuntimeError: from newer equinox versions when a
@@ -116,11 +141,27 @@ class WeightsMixin:
             buf.seek(len(_MAGIC))
             size = int.from_bytes(buf.read(8), "little")
             saved = json.loads(buf.read(size))
-            expected = leaf_signature(skeleton)
-            if saved != expected:
+            expected = tree_signature(skeleton)
+            if saved["nodes"] != expected["nodes"]:
+                raise ValueError(
+                    f"{name}.with_weights: the blob's tree structure does not "
+                    "match the skeleton: the pytree node types differ (saved "
+                    f"root {saved['nodes'][0]!r}, skeleton root "
+                    f"{expected['nodes'][0]!r}). Load weights only into the "
+                    "class and structure they were saved from."
+                )
+            saved_leaves, expected_leaves = saved["leaves"], expected["leaves"]
+            if saved_leaves != expected_leaves:
                 diff = next(
-                    ((s, e) for s, e in zip(saved, expected, strict=False) if s != e),
-                    (f"{len(saved)} array leaves", f"{len(expected)} array leaves"),
+                    (
+                        (a, b)
+                        for a, b in zip(saved_leaves, expected_leaves, strict=False)
+                        if a != b
+                    ),
+                    (
+                        f"{len(saved_leaves)} array leaves",
+                        f"{len(expected_leaves)} array leaves",
+                    ),
                 )
                 raise ValueError(
                     f"{name}.with_weights: the blob's tree structure does not "
