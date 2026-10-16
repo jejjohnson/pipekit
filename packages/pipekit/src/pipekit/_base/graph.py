@@ -357,6 +357,107 @@ class Graph(Operator):
         outs = ", ".join(self.outputs)
         return f"Graph(inputs=[{ins}], outputs=[{outs}])"
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: a graph returns a dict of outputs, not one carrier.
+
+        Use `output_signatures` for each output's signature, and
+        `summary` for the whole table.
+        """
+        return None
+
+    def output_signatures(self, input_signatures: Any) -> dict[str, Any]:
+        """Each output's signature, propagated node by node without data.
+
+        Args:
+            input_signatures: ``{input name: Signature}``; a missing name
+                means unknown. A single-input graph also takes the bare
+                signature.
+
+        Returns:
+            ``{output name: Signature | None}``; ``None`` where an
+            operator does not track shape, or where a multi-input node's
+            inputs disagree (see `summary`).
+        """
+        signatures = self._node_signatures(input_signatures)
+        return {name: signatures[id(node)] for name, node in self.outputs.items()}
+
+    def summary(self, input_signatures: Any = None) -> str:
+        """A Keras-style table of the nodes, their input and output signatures.
+
+        Nodes are listed in topological order. Signatures propagate
+        through each node's `compute_output_signature`; a node with
+        several inputs gets its operator's signature for them only when
+        they all agree (an elementwise join), and ``?`` otherwise, since
+        `compute_output_signature` takes one input. The outputs follow.
+
+        Args:
+            input_signatures: As for `output_signatures`; ``None`` lists
+                the structure with every signature unknown.
+        """
+        signatures = self._node_signatures(input_signatures)
+        names = {id(node): name for name, node in self.inputs.items()}
+
+        def label(node: Node) -> str:
+            if id(node) in names:
+                return names[id(node)]
+            return f"[{self._order.index(node)}]"
+
+        def show(signature: Any) -> str:
+            if signature is None:
+                return "?"
+            # a Signature's compact "(y=64, x=64) float32" form
+            fmt = getattr(signature, "format", None)
+            return fmt() if callable(fmt) else repr(signature)
+
+        rows: list[tuple[str, str, str]] = []
+        for i, node in enumerate(self._order):
+            parents = ", ".join(label(parent) for parent in node.parents)
+            sig_in = ", ".join(show(signatures[id(p)]) for p in node.parents) or "-"
+            name = f"[{i}] {type(node.operator).__name__}({parents})"
+            rows.append((name, sig_in, show(signatures[id(node)])))
+        for out_name, node in self.outputs.items():
+            rows.append(
+                (f"→ {out_name} = {label(node)}", "", show(signatures[id(node)]))
+            )
+
+        w_name = max([len("Node"), *(len(r[0]) for r in rows)])
+        w_in = max([len("Input sig"), *(len(r[1]) for r in rows)])
+        header = f"{'Node'.ljust(w_name)}  {'Input sig'.ljust(w_in)}  Output sig"
+        body = [f"{n.ljust(w_name)}  {i.ljust(w_in)}  {o}" for n, i, o in rows]
+        return "\n".join([header, "-" * len(header), *body])
+
+    def _node_signatures(self, input_signatures: Any) -> dict[int, Any]:
+        """``id(node) → Signature | None`` for every input and node."""
+        if input_signatures is None:
+            input_signatures = {}
+        elif not isinstance(input_signatures, dict):
+            if len(self.inputs) != 1:
+                raise TypeError(
+                    "This graph has several inputs: pass "
+                    "{input name: Signature}, not a single signature."
+                )
+            input_signatures = {next(iter(self.inputs)): input_signatures}
+        unknown = sorted(set(input_signatures) - set(self.inputs))
+        if unknown:
+            raise ValueError(f"Signatures given for undeclared input(s) {unknown}.")
+
+        signatures: dict[int, Any] = {}
+        for name, node in self.inputs.items():
+            signatures[id(node)] = input_signatures.get(name)
+        for node in self._order:
+            assert node.operator is not None  # guaranteed by _topological_sort
+            parents = [signatures[id(parent)] for parent in node.parents]
+            if not parents:
+                joined = None
+            elif all(parent == parents[0] for parent in parents):
+                joined = parents[0]
+            else:
+                # inputs disagree: compute_output_signature takes one input
+                signatures[id(node)] = None
+                continue
+            signatures[id(node)] = node.operator.compute_output_signature(joined)
+        return signatures
+
     def describe(self) -> str:
         """Return a short topology description.
 

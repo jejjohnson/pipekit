@@ -57,6 +57,10 @@ class ThreadMap(Operator):
         with ThreadPoolExecutor(max_workers=self.n_workers) as ex:
             return list(ex.map(self.op, items))
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: the output is a list of results, not one carrier."""
+        return None
+
     def get_config(self) -> dict[str, Any]:
         return {
             "op": nested_config(self.op),
@@ -118,6 +122,10 @@ class ProcessMap(Operator):
                     results.append(None)
             return results
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: the output is a list of results, not one carrier."""
+        return None
+
     def get_config(self) -> dict[str, Any]:
         return {
             "op": nested_config(self.op),
@@ -170,6 +178,10 @@ class AsyncMap(Operator):
                 return await asyncio.to_thread(self.op, item)
 
         return await asyncio.gather(*(_one(it) for it in items))
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: the output is a list of results, not one carrier."""
+        return None
 
     def get_config(self) -> dict[str, Any]:
         return {
@@ -228,6 +240,10 @@ class BatchedMap(Operator):
             else:
                 out.append(result)
         return out
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: the output is a list of results, not one carrier."""
+        return None
 
     def get_config(self) -> dict[str, Any]:
         return {

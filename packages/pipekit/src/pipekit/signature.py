@@ -103,3 +103,26 @@ def compute_output_signature(
     if fn is None:
         return None
     return fn(input_signature)
+
+
+def common_signature(*signatures: Signature | None) -> Signature | None:
+    """The signature every branch agrees on, or ``None`` if any differ.
+
+    For operators that may run one of several children (`Try`,
+    `Branch`, `Switch`, `Coalesce`): the output's signature is known
+    only when every child would give the same one.
+
+    Examples:
+        >>> s = Signature(dims=(("x", 4),), dtype="float32")
+        >>> common_signature(s, s) == s
+        True
+        >>> common_signature(s, None) is None
+        True
+    """
+    if not signatures or signatures[0] is None:
+        return None
+    first = signatures[0]
+    for signature in signatures[1:]:
+        if signature != first:
+            return None
+    return first

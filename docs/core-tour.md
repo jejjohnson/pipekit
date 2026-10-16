@@ -286,8 +286,46 @@ sig.drop_dims(("time",))      # → Signature((y=256, x=256) float32)
 sig.replace_dims({"x": 128})  # → Signature((time=12, y=256, x=128) float32)
 ```
 
-In the core only `Sequential` propagates signatures; the payoff grows as the
-operators you write (and domain libraries) declare theirs.
+Containers report what they return:
+- `Cache`, `Retry` and `Profile.wrap` report their inner operator's signature.
+- `Try`, `Branch`, `Switch` and `Coalesce` report the signature their
+  branches agree on, else `None`.
+- `Fanout` and the parallel maps report `None`, because they return a dict
+  or a list.
+
+A `Graph` propagates signatures node by node: `output_signatures` gives
+each output's, and `summary` prints the table. A node with several inputs
+gets its operator's signature only when the inputs agree; otherwise it shows
+`?`:
+
+```python
+from pipekit import Graph, Input, Operator
+
+
+class MeanOver(Operator):
+    """Mean over one named dimension: drops it from the signature."""
+
+    def __init__(self, dim: str) -> None:
+        self.dim = dim
+
+    def _apply(self, x):
+        return x.mean(axis=0)
+
+    def compute_output_signature(self, signature):
+        return None if signature is None else signature.drop_dims((self.dim,))
+
+
+x = Input("x")
+g = Graph(inputs={"x": x}, outputs={"climatology": MeanOver("time")(x)})
+print(g.summary(sig))
+# Node                 Input sig                        Output sig
+# ----------------------------------------------------------------
+# [0] MeanOver(x)      (time=12, y=256, x=256) float32  (y=256, x=256) float32
+# → climatology = [0]                                   (y=256, x=256) float32
+```
+
+The payoff grows as the operators you write (and domain libraries) declare
+theirs.
 
 ## Parallelism
 
@@ -463,9 +501,6 @@ packages define more such seams (`ForwardModel`, `AnalysisStep`,
 
 What the core does not do yet, so you can plan around it:
 
-- **Shape inference stops at `Sequential`.** `Graph`, `Fanout` and the
-  parallel maps report their input signature as their output; `Graph` has
-  `describe()` but no `summary()`.
 - **`ProcessMap(on_error="log_and_continue")` prints to `stderr`.** It leaves
   `None` in the failed item's slot; it does not use `logging`.
 - **`ShapeTrace` logs `shape` and `dtype` only.** A carrier with extra

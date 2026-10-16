@@ -59,6 +59,10 @@ class Fanout(Operator):
             "branches": {name: nested_config(op) for name, op in self.branches.items()}
         }
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """``None``: the output is a dict of branches, not one carrier."""
+        return None
+
     def __repr__(self) -> str:
         names = ", ".join(self.branches)
         return f"Fanout([{names}])"

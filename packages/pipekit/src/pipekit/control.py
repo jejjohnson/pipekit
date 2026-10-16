@@ -37,6 +37,7 @@ from pipekit._base.operator import (
     require_operator,
 )
 from pipekit.blocks import Identity
+from pipekit.signature import common_signature
 
 
 class Branch(Operator):
@@ -82,6 +83,13 @@ class Branch(Operator):
             "if_true": nested_config(self.if_true),
             "if_false": nested_config(self.if_false),
         }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The signature both branches agree on (else ``None``)."""
+        return common_signature(
+            self.if_true.compute_output_signature(input_signature),
+            self.if_false.compute_output_signature(input_signature),
+        )
 
     def __repr__(self) -> str:
         return (
@@ -139,6 +147,14 @@ class Switch(Operator):
             "cases": {str(k): nested_config(op) for k, op in self.cases.items()},
             "default": nested_config(self.default),
         }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The signature every case and the default agree on (else ``None``)."""
+        signatures = [
+            op.compute_output_signature(input_signature)
+            for op in (*self.cases.values(), self.default)
+        ]
+        return common_signature(*signatures)
 
     def __repr__(self) -> str:
         cases = ", ".join(f"{k!r}: {op!r}" for k, op in self.cases.items())
@@ -207,6 +223,13 @@ class Try(Operator):
             "fallback": nested_config(self.fallback),
             "on": [exception_config(exc) for exc in self.on],
         }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The signature primary and fallback agree on (else ``None``)."""
+        return common_signature(
+            self.primary.compute_output_signature(input_signature),
+            self.fallback.compute_output_signature(input_signature),
+        )
 
     def __repr__(self) -> str:
         on = ", ".join(exc.__name__ for exc in self.on)
@@ -284,6 +307,13 @@ class Coalesce(Operator):
             "is_ok": callable_name(self.is_ok),
             "on": [exception_config(exc) for exc in self.on],
         }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The signature every source agrees on (else ``None``)."""
+        signatures = [
+            op.compute_output_signature(input_signature) for op in self.sources
+        ]
+        return common_signature(*signatures)
 
     def __repr__(self) -> str:
         return f"Coalesce({self.sources!r}, is_ok={callable_name(self.is_ok)})"
@@ -365,6 +395,10 @@ class Retry(Operator):
             "base_delay": self.base_delay,
             "on": [exception_config(exc) for exc in self.on],
         }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The wrapped operator's: retrying does not change the output."""
+        return self.op.compute_output_signature(input_signature)
 
     def __repr__(self) -> str:
         on = ", ".join(exc.__name__ for exc in self.on)
