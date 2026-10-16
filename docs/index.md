@@ -77,7 +77,7 @@ final_state, _ = forecast(x0, None)
 | `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A landed; B-D pending).                   |
 | `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
 | `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |
-| `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder; `Unit × Lens × Stage` tags and `MetricScorer`.     |
+| `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. |
 | `pipekit-train`      | ✅ implemented | Training pipelines — datasets, losses, loop, Equinox adapter.        |
 | `pipekit-jax`        | ✅ implemented | `JaxModelOp` — `eqx.Module` wrapper with registry weight round-trip. |
 
