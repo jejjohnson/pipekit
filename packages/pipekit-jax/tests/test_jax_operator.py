@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 
@@ -439,3 +439,121 @@ def test_casting_converter_round_trips_the_dtype():
     rebuilt = Operator.from_state(json.loads(json.dumps(op.state)))
     assert rebuilt.w.dtype == jnp.float16
     check_jax_operator(op, U.astype(jnp.float16))
+
+
+# ---------------------------------------------------------------------
+# Review fixes, round 4 (#68)
+# ---------------------------------------------------------------------
+
+
+class Balanced(JaxOperator):
+    options: dict = eqx.field(static=True)
+
+    def _apply(self, u):
+        return u
+
+
+def test_class_config_keys_alone_do_not_make_a_nested_payload():
+    with pytest.raises(TypeError, match="cannot round-trip"):
+        _ = Balanced(options={"class": "balanced", "config": 1}).state
+
+
+class HoldsWithBias(JaxOperator):
+    """A container with a nested child *and* a local learnable field."""
+
+    inner: JaxOperator
+    bias: jax.Array
+
+    def get_config(self):
+        from pipekit._base.operator import nested_config
+
+        return {"inner": nested_config(self.inner), "bias": jsonable(self.bias)}
+
+    def _apply(self, u):
+        return self.inner(u) + self.bias
+
+
+class HoldsWithBiasConverted(HoldsWithBias):
+    bias: jax.Array = eqx.field(converter=jnp.asarray)
+
+
+def test_check_still_validates_local_fields_of_containers():
+    inner = Diffuse(dx=0.1, kappa=0.01)
+    with pytest.raises(AssertionError, match="converter"):
+        check_jax_operator(HoldsWithBias(inner=inner, bias=jnp.asarray(0.5)), U)
+    check_jax_operator(HoldsWithBiasConverted(inner=inner, bias=0.5), U)
+
+
+class Tempered(JaxOperator):
+    w: jax.Array = eqx.field(converter=jnp.asarray)
+    temperature: float = 1.0  # a non-static Python scalar: configuration
+
+    def _apply(self, u):
+        return self.w * u / self.temperature
+
+
+def test_weights_carry_arrays_only_and_keep_skeleton_config():
+    trained = Tempered(w=jnp.full(4, 3.0), temperature=2.0)
+    restored = Tempered(w=jnp.zeros(4), temperature=0.5).with_weights(
+        trained.serialize_weights()
+    )
+    np.testing.assert_array_equal(restored.w, trained.w)
+    assert restored.temperature == 0.5
+
+
+class HiddenParam(JaxOperator):
+    a: jax.Array = eqx.field(static=True)
+
+    def _apply(self, u):
+        return self.a * u
+
+
+def test_check_flags_an_inexact_array_hidden_in_a_static_field():
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # equinox warns about array statics
+        op = HiddenParam(a=jnp.asarray(2.0))
+    with pytest.raises(AssertionError, match="static"):
+        check_jax_operator(op, U)
+
+
+def test_flagged_complex_operator_round_trips_through_a_registry(tmp_path):
+    from pipekit_experiment import LocalModelRegistry
+
+    op = SpectralGainForbidden(g=jnp.full(4, 1 + 2j))
+    json.dumps(op.state)  # JSON-safe debug record
+    registry = LocalModelRegistry(root=str(tmp_path))
+    ref = registry.store(op, weights=op.serialize_weights())
+    restored = SpectralGainForbidden(g=jnp.zeros(4, dtype=op.g.dtype)).from_registry(
+        registry, ref
+    )
+    np.testing.assert_array_equal(restored.g, op.g)
+
+
+class GraphHolder(JaxOperator):
+    graph: Any
+
+    def _apply(self, u):
+        return self.graph(x=u)["y"]
+
+
+def _scale_graph(chain: bool):
+    from pipekit import Graph, Input
+
+    # Same nodes, outputs, leaf count and shapes; only the wiring differs.
+    x = Input("x")
+    first = Weighted(w=jnp.full(16, 2.0))(x)
+    second = Weighted(w=jnp.full(16, 3.0))(first if chain else x)
+    return Graph(inputs={"x": x}, outputs={"y": second, "z": first})
+
+
+def test_weights_refuse_a_graph_with_different_wiring():
+    saved = GraphHolder(graph=_scale_graph(chain=True))
+    rewired = GraphHolder(graph=_scale_graph(chain=False))
+    with pytest.raises(ValueError, match="node types"):
+        rewired.with_weights(saved.serialize_weights())
+    same = GraphHolder(graph=_scale_graph(chain=True)).with_weights(
+        saved.serialize_weights()
+    )
+    np.testing.assert_allclose(same(U), saved(U))

@@ -12,11 +12,14 @@ different order, or a different class with the same field names — but
 the same number of leaves and compatible shapes — would silently receive
 weights it was never trained with. The blob therefore starts with a
 signature header (`tree_signature`): the node types of the tree
-(``module.QualName`` of every pytree node, from the root down) and the
-key path, shape and dtype of every array leaf. `with_weights` compares
-it with the skeleton before loading. Node types are read from the
-treedef, not its repr, so static fields (activation functions, ...)
-never put process-specific addresses into the signature.
+(``module.QualName`` of every pytree node, from the root down, with the
+structural aux data of non-Equinox nodes such as a `pipekit.Graph`'s
+wiring) and the key path, shape and dtype of every array leaf. Only
+array leaves are stored; every non-array value comes from the skeleton.
+`with_weights` compares the signature with the skeleton before loading.
+Node types are read from the treedef, not its repr, and aux data is
+encoded by `_stable`, so nothing process-specific (memory addresses)
+enters the signature.
 
 Blob layout::
 
@@ -49,14 +52,40 @@ import jax
 _MAGIC = b"PKJXW1\n"
 
 
+def _stable(value: Any) -> Any:
+    """A process-independent JSON form of pytree aux data.
+
+    Primitives as-is, containers recursively, functions / classes by
+    ``module.qualname`` and any other object by its type — never a repr
+    that could embed a memory address.
+    """
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    if isinstance(value, list | tuple):
+        return [_stable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _stable(v) for k, v in value.items()}
+    if hasattr(value, "__qualname__"):
+        return f"{getattr(value, '__module__', '?')}.{value.__qualname__}"
+    return f"{type(value).__module__}.{type(value).__qualname__}"
+
+
 def _node_types(treedef: Any) -> Any:
-    """Nested ``[type name, [children...]]`` of a treedef; ``None`` for a leaf."""
+    """Nested ``[type name, aux, [children...]]`` of a treedef; ``None`` for a leaf.
+
+    Aux data that encodes *structure* is included — `pipekit.Graph` keeps
+    its whole wiring there, dicts their keys. An ``eqx.Module``'s aux is
+    its static field values, i.e. configuration; like every non-array
+    value it comes from the skeleton, so it is left out.
+    """
     data = treedef.node_data()
     if data is None:
         return None
-    node_type = data[0]
+    node_type, aux = data
+    structural = None if issubclass(node_type, eqx.Module) else _stable(aux)
     return [
         f"{node_type.__module__}.{node_type.__qualname__}",
+        structural,
         [_node_types(child) for child in treedef.children()],
     ]
 
@@ -101,7 +130,9 @@ class WeightsMixin:
         buf.write(_MAGIC)
         buf.write(len(header).to_bytes(8, "little"))
         buf.write(header)
-        eqx.tree_serialise_leaves(buf, self._weights_tree())
+        # Array leaves only: non-array values (a Python-float temperature,
+        # a flag) are configuration and come from the skeleton.
+        eqx.tree_serialise_leaves(buf, eqx.filter(self._weights_tree(), eqx.is_array))
         return buf.getvalue()
 
     def with_weights(self, blob: bytes) -> Any:
@@ -169,7 +200,13 @@ class WeightsMixin:
                     f"{diff[1]!r}). Build the skeleton with the same structure, "
                     "field order and shapes as the operator that was serialised."
                 )
-        tree = eqx.tree_deserialise_leaves(buf, skeleton)
+            arrays = eqx.tree_deserialise_leaves(
+                buf, eqx.filter(skeleton, eqx.is_array)
+            )
+            tree = eqx.combine(arrays, skeleton)
+        else:
+            # Legacy blob: written with Equinox's default filter.
+            tree = eqx.tree_deserialise_leaves(buf, skeleton)
         unread = len(blob) - buf.tell()
         if unread:
             # The skeleton asked for fewer leaves than were saved (e.g. an

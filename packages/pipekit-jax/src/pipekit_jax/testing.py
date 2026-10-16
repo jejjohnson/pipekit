@@ -9,6 +9,7 @@ it ships::
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import Any
 
@@ -61,8 +62,9 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
        array leaves (shape / dtype), and the same outputs. Static fields
        may change container type (a tuple reloads as a list). For an
        operator whose config nests operators (``{"class", "config"}``
-       payloads), only the JSON encoding is checked: those payloads are
-       rebuilt by a YAML / Hydra loader, not ``from_state``.
+       payloads), the children are taken from the live operator and the
+       rest is rebuilt from JSON, so local fields are still checked.
+    6. No ``static`` field holds an inexact array (it could never train).
 
     Args:
         op: The operator under test.
@@ -92,6 +94,16 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
                 "vmap over a leading axis",
             )
 
+    hidden = [
+        f.name
+        for f in dataclasses.fields(op)
+        if f.metadata.get("static")
+        and any(eqx.is_inexact_array(x) for x in jax.tree.leaves(getattr(op, f.name)))
+    ]
+    assert not hidden, (
+        f"field(s) {hidden} hold inexact arrays but are static, so they are not "
+        "pytree leaves and can never be trained — drop static=True"
+    )
     params = [leaf for leaf in jax.tree.leaves(op) if eqx.is_inexact_array(leaf)]
     if params:
 
@@ -109,11 +121,23 @@ def check_jax_operator(op: Any, *inputs: Any, vmap: bool = True) -> None:
     if type(op).forbid_in_yaml:
         return
     state = json.loads(json.dumps(op.state))
-    if any(_is_nested_operator(v) for v in state["config"].values()):
-        # Nested-operator payloads serialise (checked above) but only a
-        # YAML / Hydra loader rebuilds them; from_state rejects them.
-        return
-    rebuilt = Operator.from_state(state)
+    nested = {k for k, v in state["config"].items() if _is_nested_operator(v)}
+    if nested:
+        # Nested-operator payloads are rebuilt by a YAML / Hydra loader, not
+        # from_state. Rebuild the operator from its own JSON fields and the
+        # live nested children, so the local fields are still checked. This
+        # needs the config keys to be constructor fields; a custom
+        # get_config with other keys can only be checked for its encoding.
+        init_fields = {f.name for f in dataclasses.fields(op) if f.init}
+        if not set(state["config"]) <= init_fields:
+            return
+        kwargs = {
+            k: (getattr(op, k) if k in nested else v)
+            for k, v in state["config"].items()
+        }
+        rebuilt = type(op)(**kwargs)
+    else:
+        rebuilt = Operator.from_state(state)
     rebuilt_params = [
         leaf for leaf in jax.tree.leaves(rebuilt) if eqx.is_inexact_array(leaf)
     ]

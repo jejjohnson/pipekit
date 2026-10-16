@@ -79,7 +79,9 @@ def _is_nested_operator(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     if set(value) == {"class", "config"}:
-        return True
+        # A real payload: a class name and a config mapping — not an
+        # ordinary option that happens to use those two keys.
+        return isinstance(value["class"], str) and isinstance(value["config"], dict)
     return bool(value) and all(
         isinstance(k, str) and _is_nested_operator(v) for k, v in value.items()
     )
@@ -94,6 +96,21 @@ def _json_safe(value: Any) -> bool:
     if isinstance(value, dict):
         return all(isinstance(k, str) and _json_safe(v) for k, v in value.items())
     return False
+
+
+def _debug_repr(value: Any) -> Any:
+    """A JSON-safe stand-in for a config value with no JSON form."""
+    if isinstance(value, list | tuple):
+        return [v if _json_safe(v) else _debug_repr(v) for v in value]
+    if isinstance(value, dict):
+        return {
+            str(k): v if _json_safe(v) else _debug_repr(v) for k, v in value.items()
+        }
+    if isinstance(value, complex):
+        return f"<complex {value!r}>"
+    if hasattr(value, "__qualname__"):
+        return f"<{getattr(value, '__module__', '?')}.{value.__qualname__}>"
+    return f"<{type(value).__module__}.{type(value).__qualname__}>"
 
 
 def _round_trips(value: Any) -> bool:
@@ -153,6 +170,14 @@ class JaxOperator(Operator, WeightsMixin, eqx.Module):
                 class is not marked ``forbid_in_yaml``.
         """
         record = super().state
+        if type(self).forbid_in_yaml:
+            # Not round-trippable by design, but still JSON-encodable so a
+            # registry can store the record next to the weight blob.
+            record["config"] = {
+                k: v if _json_safe(v) else _debug_repr(v)
+                for k, v in record["config"].items()
+            }
+            return record
         if not type(self).forbid_in_yaml:
             bad = [k for k, v in record["config"].items() if not _round_trips(v)]
             if bad:
