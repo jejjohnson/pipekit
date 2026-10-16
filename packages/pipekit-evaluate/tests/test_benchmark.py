@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from pipekit_evaluate import Lens, MetricScorer
 from pipekit_evaluate.benchmark import (
     Axis,
     Benchmark,
@@ -417,3 +418,68 @@ def test_cell_result_fills_by_reference_from_scores() -> None:
         Cell("L4", 2), ReferenceSource.KNOWN_THETA, scores={"abs.err": 1.0}
     )
     assert result.by_reference == {ReferenceSource.KNOWN_THETA: {"abs.err": 1.0}}
+
+
+# --------------------------------------------------------------------------- #
+# One report type, two views (geostack Report 14, open question 2)
+# --------------------------------------------------------------------------- #
+def test_to_report_tags_each_value_with_its_cell_and_reference() -> None:
+    oracle = FakeEstimator(rung=2, complexity=0, value=9.0)
+    amortized = FakeEstimator(rung=5, complexity=0, value=8.0)
+    # MetricScorer hands the metric each estimate's point value
+    scorer = MetricScorer(
+        lambda p, r: abs(p - float(r)),
+        name="abs",
+        lens="probabilistic",
+    )
+    ladder = Benchmark(
+        task=FakeTask(), estimators=[oracle, amortized], scorers=[scorer]
+    ).run()
+    report = ladder.to_report(model_ref="h5")
+
+    assert report.values == {
+        "L4/r2/c0:known_theta:abs.value": pytest.approx(1.0),
+        "L4/r5/c0:oracle_posterior:abs.value": pytest.approx(1.0),
+        "L4/r5/c0:known_theta:abs.value": pytest.approx(2.0),
+    }
+    truth = report.filter(reference=ReferenceSource.KNOWN_THETA)
+    assert {e.cell for e in truth.entries} == {"L4/r2/c0", "L4/r5/c0"}
+    assert report.filter(cell="L4/r5/c0", reference="oracle_posterior").values == {
+        "L4/r5/c0:oracle_posterior:abs.value": pytest.approx(1.0)
+    }
+    assert all(e.tags.lens is Lens.PROBABILISTIC for e in report.entries)
+    assert report.model_ref == "h5"
+    assert report.config == {"task": "toy", "domain": "test", "axis": "staged"}
+
+
+def test_to_report_hash_is_equal_for_two_runs() -> None:
+    def run() -> str:
+        return (
+            Benchmark(
+                task=FakeTask(),
+                estimators=[FakeEstimator(2, 0, 9.0), FakeEstimator(5, 0, 8.0)],
+                scorers=[AbsError()],
+            )
+            .run()
+            .to_report()
+            .content_hash
+        )
+
+    assert run() == run()
+
+
+def test_to_report_config_adds_to_the_run() -> None:
+    ladder = Benchmark(
+        task=FakeTask(), estimators=[FakeEstimator(2, 0, 9.0)], scorers=[AbsError()]
+    ).run()
+    config = ladder.to_report(config={"seed": 0}).config
+    assert config == {"task": "toy", "domain": "test", "axis": "staged", "seed": 0}
+
+
+def test_duplicate_scorer_names_are_rejected() -> None:
+    with pytest.raises(ValueError, match="duplicate scorer names"):
+        Benchmark(
+            task=FakeTask(),
+            estimators=[FakeEstimator(2, 0, 9.0)],
+            scorers=[AbsError(), AbsError()],
+        ).run()

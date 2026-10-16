@@ -209,6 +209,8 @@ def test_to_dict_is_json_serialisable(report: EvaluationReport) -> None:
         "lens": "structural",
         "stages": ["final"],
         "differentiable": False,
+        "cell": None,
+        "reference": None,
     }
 
 
