@@ -1,235 +1,241 @@
-# pipekit
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img alt="pipekit" src="docs/assets/logo-light.svg" width="320">
+  </picture>
+</p>
 
-[![Tests](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml)
-[![Lint](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml)
-[![Type Check](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml)
-[![Deploy Docs](https://github.com/jejjohnson/pipekit/actions/workflows/pages.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/pages.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
+<p align="center">
+  <a href="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml"><img alt="Type Check" src="https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml/badge.svg"></a>
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
+  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
+</p>
 
-**Composable scientific pipelines. Train, register, deploy — one
-operator interface end-to-end.**
+<p align="center">
+  <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
+  <a href="docs/concepts.md"><b>Concepts</b></a> ·
+  <a href="docs/protocols.md"><b>Protocols</b></a> ·
+  <a href="docs/tutorials/train-emulator.md"><b>Tutorials</b></a>
+</p>
 
-`pipekit` is a uv workspace of seven Python packages that together
-turn the pieces of a scientific ML workflow into composable
-`Operator`s: data loading, QC, training, data assimilation, model
-registry, reproducibility. The same operator that returns a trained
-emulator drops into a forecast `Cycle` as a step function. The same
-content-hash that identifies your trained model also indexes your
-registry. No glue scripts, no separate "train" and "serve" codebases
-— one mental model, one composition surface.
+**Composable scientific pipelines: one operator interface, from loading
+data to training, assimilating and deploying.**
 
-```python
-from pipekit_cycle import Cycle, NeuralForward
-from pipekit_experiment import LocalModelRegistry
+Every step of a scientific workflow becomes an `Operator`: one method,
+`_apply`, that takes a carrier and returns one. The carrier is whatever
+your science uses (a NumPy array, an xarray Dataset, a DataFrame, an
+AnnData, a dict of arrays) and pipekit never looks inside it. Operators
+compose with `|`, wire into graphs, wrap in retries, caches and
+observers, and carry state through time steps and training loops, and
+each of those is itself an Operator. pipekit was built for the
+[GeoStack](https://github.com/jejjohnson/geostack), but the core is pure
+Python with no dependencies and nothing in it is about geoscience.
 
-# Reload a trained model by name and forecast 24 steps with it
-# as the forward model — same Operator interface as inference.
-registry = LocalModelRegistry("/models")
-op = registry.load("methane_emulator_v3")
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/operator-dark.svg">
+    <img alt="A pipekit Operator takes a carrier and returns one through a single _apply method; it composes into a Sequential (a | b | c), a Graph with named inputs and outputs, wrappers such as Retry, Cache and Tap, and stateful steps such as Cycle and TrainingLoop, each itself an Operator" src="docs/assets/operator-light.svg" width="100%">
+  </picture>
+</p>
 
-forecast = Cycle(step_op=NeuralForward(op, dt=3600.0), n_steps=24)
-final_state, _ = forecast(x0, None)
-```
-
----
-
-## 🧭 Where to start
-
-| If you want to…                             | Read this                                              |
-|---------------------------------------------|--------------------------------------------------------|
-| Understand the mental model in 10 minutes   | [docs/concepts.md](docs/concepts.md)                   |
-| Plug your library in without depending on pipekit | [docs/protocols.md](docs/protocols.md)            |
-| Get from `git clone` to a running pipeline  | [docs/getting-started.md](docs/getting-started.md)     |
-| Install only the parts you need             | [docs/installation.md](docs/installation.md)           |
-| Train an emulator end-to-end                | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
-| Run a data-assimilation cycle               | [docs/tutorials/da-cycle.md](docs/tutorials/da-cycle.md) |
-| Browse the API reference                    | [jejjohnson.github.io/pipekit](https://jejjohnson.github.io/pipekit/) |
-| See what's planned for each package         | The design docs under `packages/*/docs/design/`        |
-
----
-
-## 📦 Packages
-
-```mermaid
-graph TB
-    subgraph Domain["Domain libraries (external)"]
-        GT[geotoolz]
-        XT[xr_toolz]
-        FX[filterx / vardax / plumax]
-    end
-
-    subgraph Workspace["pipekit workspace"]
-        PA[pipekit-array<br/>Array API operators]
-        PJ[pipekit-jax<br/>JaxModelOp]
-        PT[pipekit-train<br/>Training pipelines]
-        PC[pipekit-cycle<br/>Time-stepping + DA]
-        PE[pipekit-experiment<br/>Registry + tracker]
-        PV[pipekit-evaluate<br/>Benchmark ladder]
-        PK[pipekit<br/>core: Operator/Sequential/Graph]
-    end
-
-    GT --> PA
-    XT --> PA
-    PA --> PK
-    PJ --> PK
-    PT --> PK
-    PC --> PK
-    PE --> PK
-    PV --> PK
-    FX -.adapters.-> PC
-    PT -.train→serve.-> PC
-    PT -.artifacts.-> PE
-
-    style PK fill:#4f46e5,color:#fff
-    style PA fill:#7c3aed,color:#fff
-    style PC fill:#7c3aed,color:#fff
-    style PT fill:#7c3aed,color:#fff
-    style PE fill:#7c3aed,color:#fff
-    style PJ fill:#7c3aed,color:#fff
-```
-
-| Package              | Status        | Purpose                                                                  |
-|----------------------|---------------|--------------------------------------------------------------------------|
-| `pipekit`            | ✅ implemented | Core: `Operator`, `Sequential`, `Graph`, control, observe, …             |
-| `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A: namespace + MeanScalar + Stack/Concat).    |
-| `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.                 |
-| `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.      |
-| `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder (cube, protocols, reference rule). Scorer taxonomy planned. |
-| `pipekit-train`      | ✅ implemented | Training pipelines — datasets, losses, loop, Equinox adapter.            |
-| `pipekit-jax`        | ✅ implemented | `JaxModelOp` — `eqx.Module` wrapper with registry weight round-trip.     |
-
-Each package has its own `README` under [`packages/`](packages/)
-with a module inventory and quickstart. Design docs (for the
-substantial packages) live under `packages/<pkg>/docs/design/`.
-
-The master plan lives in
-[`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):
-Report 2 covers pipekit core, 3 the sister-library story, 10
-pipekit-cycle, 11 pipekit-train, 12 pipekit-experiment.
-
----
-
-## 🚀 Quick start
+## Quick start
 
 ```bash
-# Prerequisites: uv (https://github.com/astral-sh/uv)
+uv add "pipekit @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit"
+```
+
+```python
+import numpy as np
+from numpy.typing import NDArray
+
+from pipekit import Graph, Input, Operator, Tap, dumps, loads
+
+
+class Standardize(Operator):
+    """x ↦ (x − μ) / σ."""
+
+    def __init__(self, *, mean: float, std: float) -> None:
+        self.mean = mean  # μ
+        self.std = std  # σ
+
+    def _apply(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        # z = (x − μ) / σ                                         (N,) → (N,)
+        return (x - self.mean) / self.std
+
+
+class Clip(Operator):
+    """z ↦ min(max(z, lo), hi)."""
+
+    def __init__(self, *, lo: float, hi: float) -> None:
+        self.lo = lo
+        self.hi = hi
+
+    def _apply(self, z: NDArray[np.float64]) -> NDArray[np.float64]:
+        # z̃ = min(max(z, lo), hi)                                 (N,) → (N,)
+        return np.clip(z, self.lo, self.hi)
+
+
+class Difference(Operator):
+    """(a, b) ↦ a − b."""
+
+    def _apply(
+        self, a: NDArray[np.float64], b: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        # d = a − b                                         (N,), (N,) → (N,)
+        return a - b
+
+
+# 1 · compose with |: a Sequential, itself an Operator
+clean: Operator = Standardize(mean=10.0, std=2.0) | Clip(lo=-3.0, hi=3.0)
+x: NDArray[np.float64] = np.array([4.0, 10.0, 30.0])  # (N,) = (3,)
+z: NDArray[np.float64] = clean(x)  # (3,): [-3., 0., 3.]
+
+# 2 · wire a Graph: named inputs, shared operators, named outputs
+a, b = Input("a"), Input("b")
+graph = Graph(
+    inputs={"a": a, "b": b},
+    outputs={"anomaly": Difference()(clean(a), clean(b))},
+)
+out: dict[str, NDArray[np.float64]] = graph(a=x, b=x + 2.0)  # {"anomaly": (3,)}
+
+# 3 · observe without changing the flow
+traced: Operator = clean | Tap(lambda v: print("clean:", v))
+
+# 4 · configuration is data: an operator round-trips through JSON
+text: str = dumps(Standardize(mean=10.0, std=2.0))
+same: Operator = loads(text)  # Standardize(mean=10.0, std=2.0)
+```
+
+The same interface steps through time. With `pipekit-cycle`, a forward
+model is an operator and a `Cycle` runs it:
+
+```python
+import numpy as np
+from numpy.typing import NDArray
+
+import pipekit_cycle as pc
+
+
+# dx/dt = −k x, one explicit Euler step: x_{t+1} = x_t − Δt · k · x_t
+def decay(x: NDArray[np.float64], dt: float) -> NDArray[np.float64]:
+    return x - dt * 0.1 * x  # (N,) → (N,)
+
+
+forecast = pc.Cycle(step_op=pc.CallableForward(decay, dt=1.0), n_steps=24)
+x24, _ = forecast(np.ones(3), None)  # x₂₄ = (1 − 0.1)²⁴ ≈ 0.080   (3,)
+```
+
+Swap `CallableForward` for `NeuralForward` around a trained model from
+the registry and the same `Cycle` forecasts with an emulator; add an
+observation operator and an analysis step and it assimilates
+(`DACycle`, `EnsembleDACycle`).
+
+## The packages
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/packages-dark.svg">
+    <img alt="The pipekit workspace: six sister packages (cycle, train, experiment, evaluate, array, jax) on the dependency-free pipekit core" src="docs/assets/packages-light.svg" width="100%">
+  </picture>
+</p>
+
+A uv workspace of seven packages. Install only what you need: each one
+builds on the core and on none of the others, except `pipekit-jax` on
+`pipekit-cycle`; tool integrations are opt-in extras.
+
+| Package | Status | What it gives you |
+|---|---|---|
+| `pipekit` | implemented | The core: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`), observers (`Tap`, `Snapshot`, `Profile`), `Cache`, QC asserts, parallel maps, JSON `dumps` / `loads`, `StatefulOperator` |
+| `pipekit-cycle` | implemented | Time stepping and data assimilation: `Cycle`, `DACycle`, `EnsembleDACycle`, `SmootherCycle`, and the `ForwardModel`, `ObservationOperator` and `AnalysisStep` protocols |
+| `pipekit-train` | implemented | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends behind extras |
+| `pipekit-experiment` | implemented | A content-addressed model registry (`LocalModelRegistry`, `S3ModelRegistry`, keyed by a hash of config and weights) and tracker protocols, with DVC, Hydra, Metaflow and MLflow adapters |
+| `pipekit-jax` | implemented | `JaxModelOp` (an `eqx.Module` with registry round-trip), `DiffraxForwardModel`, adjoints; builds on `pipekit-cycle` |
+| `pipekit-array` | partial | Array API dispatch: one operator on NumPy, JAX, CuPy, PyTorch or dask (`array_namespace`, `StackAlong`, `ConcatenateAlong`) |
+| `pipekit-evaluate` | partial | A benchmark ladder: `Benchmark`, `MetricScorer`, `EvaluationReport` |
+
+Each package has its own README under [`packages/`](packages/) and,
+for the larger ones, design notes under `packages/<pkg>/docs/design/`.
+
+## Who builds on it
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/ecosystem-dark.svg">
+    <img alt="pipekit in the middle: on the left the GeoStack packages that build on it today (geotoolz, xrtoolz, vardax, plumax, radtrax's geo extra); on the right, illustrative carriers from other sciences (genomics, astronomy, climate, imaging, simulation)" src="docs/assets/ecosystem-light.svg" width="100%">
+  </picture>
+</p>
+
+In the GeoStack, [geotoolz](https://github.com/jejjohnson/geotoolz) and
+[xrtoolz](https://github.com/jejjohnson/xrtoolz) narrow the carrier to a
+`GeoTensor` and an xarray object;
+[vardax](https://github.com/jejjohnson/vardax) and
+[plumax](https://github.com/jejjohnson/plumax) run their assimilation and
+models through `pipekit-cycle`; [radtrax](https://github.com/jejjohnson/radtrax)
+ships its retrievals as operators behind its `[geo]` extra.
+
+Nothing there is specific to the Earth. A genomics pipeline on AnnData,
+an astronomy reduction on astropy tables, or a microscopy workflow on
+image arrays gets the same composition, observation, caching and
+serialisation by writing its own operators; the right-hand side of the
+figure is that invitation, not a list of integrations. Libraries can
+also plug in without importing pipekit at all, by satisfying its
+runtime-checkable protocols (`ForwardModel`, `AnalysisStep`,
+`ObservationNoise`, `ModelRegistry`, …; see
+[docs/protocols.md](docs/protocols.md)).
+
+## The six things to know
+
+1. **An `Operator` has one method**, `_apply(self, carrier) -> carrier`.
+   pipekit never inspects the carrier; domain packages narrow it.
+2. **Composition is `|`.** `a | b | c` is a `Sequential`; branching and
+   merging flows are a `Graph` built by calling operators on `Input`s.
+3. **Wrappers are operators too.** `Retry`, `Try`, `Cache`, `Tap`,
+   `ThreadMap` and the QC asserts take an operator and return one, so
+   they nest anywhere.
+4. **State is explicit.** A `StatefulOperator` maps
+   `(carrier, state) → (carrier, state)`; `Cycle`, `DACycle` and
+   `TrainingLoop` are built on it.
+5. **Configuration is data.** An operator's keyword-only constructor
+   arguments are its config; `dumps` writes it as JSON and `loads`
+   rebuilds the operator. The model registry hashes config and weights
+   together, so the same model has the same key.
+6. **Libraries plug in by protocol.** Algorithm libraries satisfy
+   runtime-checkable protocols structurally and never have to import
+   pipekit ([docs/protocols.md](docs/protocols.md)).
+
+The long form is [docs/concepts.md](docs/concepts.md).
+
+## Where to start
+
+| If you want to… | Read |
+|---|---|
+| Understand the model in ten minutes | [docs/concepts.md](docs/concepts.md) |
+| Plug a library in without depending on pipekit | [docs/protocols.md](docs/protocols.md) |
+| Go from `git clone` to a running pipeline | [docs/getting-started.md](docs/getting-started.md) |
+| Install only the parts you need | [docs/installation.md](docs/installation.md) |
+| Train an emulator end to end | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
+| Run a data-assimilation cycle | [docs/tutorials/da-cycle.md](docs/tutorials/da-cycle.md) |
+| Browse the API | [jejjohnson.github.io/pipekit](https://jejjohnson.github.io/pipekit/) |
+
+## Develop
+
+```bash
 git clone https://github.com/jejjohnson/pipekit.git
 cd pipekit
 make install      # uv sync --all-groups + pre-commit hooks
-make test         # run the full pytest suite (~500 tests)
-make docs-serve   # preview the MkDocs site locally
+make test         # every package's tests
+make lint         # ruff check . (the whole repo)
+make typecheck    # ty on every package
+make docs-serve   # MkDocs preview
 ```
 
-For per-package installs (once published to PyPI) see
-[docs/installation.md](docs/installation.md).
+Conventional Commits drive releases (release-please, one version per
+package). The rules for contributors and coding agents are in
+[`AGENTS.md`](AGENTS.md), review follows [`CODE_REVIEW.md`](CODE_REVIEW.md),
+and the local workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md). The
+figures are generated: edit `scripts/make_readme_assets.py` and run it.
 
----
+## License
 
-## 🧠 The six things to know
-
-1. **An `Operator` is a class with one method** — `_apply(self,
-   carrier) -> carrier`. The carrier is whatever you want (array,
-   `xr.Dataset`, dataclass, dict). pipekit doesn't care; sister
-   packages narrow it for their domain.
-2. **Composition is `|`** — `op1 | op2 | op3` returns a `Sequential`.
-   Non-linear flows use `Graph` with named nodes.
-3. **State is explicit** — `StatefulOperator` carries
-   `(carrier, state) → (carrier, state)`. That's the substrate for
-   `Cycle`, `TrainingLoop`, DA.
-4. **Backends dispatch on the input** — `pipekit-array`'s
-   `array_namespace(x)` picks numpy / JAX / CuPy / PyTorch / dask
-   from the array's namespace. One operator runs on all five.
-5. **Everything content-hashes** — `op.content_hash` is a stable
-   hash of the config. Same operator + same config = same hash.
-   That's how `pipekit-experiment.ModelRegistry` indexes trained
-   models.
-6. **Libraries plug in via Protocols** — algorithm libraries
-   (filterax, vardax, …) never import pipekit; they satisfy
-   runtime-checkable Protocols (`ForwardModel`, `AnalysisStep`,
-   `ObservationNoise`, …) structurally. See
-   [docs/protocols.md](docs/protocols.md) for the full inventory.
-
-For the long-form version see [docs/concepts.md](docs/concepts.md).
-
----
-
-## 📂 Repository layout
-
-```
-pipekit/
-├── packages/
-│   ├── pipekit/                  # Core framework (no internal deps)
-│   ├── pipekit-array/            # Array-API operators (Phase A landed)
-│   ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
-│   ├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
-│   ├── pipekit-evaluate/         # Benchmark ladder (scorer taxonomy planned)
-│   ├── pipekit-train/            # Training pipelines + Equinox adapter
-│   └── pipekit-jax/              # JaxModelOp — eqx.Module ↔ ModelRegistry
-├── docs/                         # MkDocs documentation source
-│   ├── index.md                  # Site homepage
-│   ├── concepts.md               # Mental model
-│   ├── getting-started.md        # First pipeline / cycle / model
-│   ├── installation.md           # Per-package install matrix
-│   ├── tutorials/                # End-to-end walkthroughs
-│   ├── api/                      # mkdocstrings-generated reference
-│   └── notebooks/                # Executed Jupyter notebooks
-├── .github/                      # Workflows, issue templates, dependabot, …
-├── pyproject.toml                # Workspace config (uv workspace, ruff, pytest)
-├── uv.lock                       # Reproducible lockfile
-├── Makefile                      # Self-documenting task runner
-├── mkdocs.yml                    # Documentation site configuration
-├── AGENTS.md                     # Standing instructions for AI coding agents
-├── CLAUDE.md                     # Claude-Code-specific architecture notes
-└── CHANGELOG.md                  # Auto-generated changelog (release-please)
-```
-
-The workspace root `pyproject.toml` ships no Python code — it only
-declares the `[tool.uv.workspace]` membership and shared tool config.
-
----
-
-## 🧰 Tooling
-
-| Concern              | Tool                                                                                  |
-|----------------------|---------------------------------------------------------------------------------------|
-| Package manager      | [`uv`](https://github.com/astral-sh/uv) with workspace + lockfile                     |
-| Lint & format        | [`ruff`](https://github.com/astral-sh/ruff) (line-length 88, py312)                   |
-| Type checking        | [`ty`](https://github.com/astral-sh/ty)                                               |
-| Tests                | `pytest` (+ `pytest-cov`)                                                             |
-| Docs                 | MkDocs + Material + `mkdocstrings` + `mkdocs-jupyter`                                 |
-| Pre-commit           | `.pre-commit-config.yaml` + `pre-commit-ci`                                           |
-| Releases             | [release-please](https://github.com/googleapis/release-please) (conventional commits) |
-| Security             | CodeQL                                                                                |
-| Dependency updates   | Dependabot                                                                            |
-
-Every concern is wired into CI on every PR. See
-[`.github/workflows/`](.github/workflows/) for the full pipeline.
-
----
-
-## 🪪 Conventions
-
-- **Conventional commits** — release-please reads commit history to
-  generate `CHANGELOG.md` and version bumps. PR titles must start
-  with a lowercase subject (`feat:`, `fix:`, `docs:`, …).
-- **Google-style docstrings** — enforced by `mkdocstrings` config.
-- **Surgical changes** — see [`AGENTS.md`](AGENTS.md) for the
-  Karpathy-style guardrails every agent (and human) should follow.
-- **Per-package lint never sufficient** — `ruff check .` runs on the
-  whole repo because some lint issues only show up across packages
-  (test conftest collisions, …).
-
----
-
-## 📖 Further reading
-
-- [Documentation site](https://jejjohnson.github.io/pipekit/) — full
-  docs, API reference, tutorials.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — local dev workflow.
-- [`CODE_REVIEW.md`](CODE_REVIEW.md) — review standards.
-- [`AGENTS.md`](AGENTS.md) — guidance for AI coding agents.
-- [Design docs](packages/) — under `packages/<pkg>/docs/design/`
-  for the substantial packages.
+MIT; see [LICENSE](LICENSE).
