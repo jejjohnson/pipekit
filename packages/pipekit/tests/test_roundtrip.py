@@ -170,3 +170,18 @@ def test_sandbox_needs_the_container_registered_too():
             loads_sandboxed(dumps(Sequential([Built(1)])))
     finally:
         unregister(Built)
+
+
+def test_from_state_sandboxed_takes_a_record_in_memory():
+    from pipekit import from_state_sandboxed
+
+    state = Sequential([Built(1)]).state
+    with pytest.raises(PermissionError, match="Sequential"):
+        from_state_sandboxed(state)
+    register(Sequential)
+    register(Built)
+    try:
+        assert from_state_sandboxed(state).state == state
+    finally:
+        unregister(Sequential)
+        unregister(Built)

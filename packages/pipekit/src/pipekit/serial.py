@@ -11,6 +11,9 @@ an allowlist.
   children. Operators that hold closures (``forbid_in_yaml``) refuse.
 - `register(cls)` — add an `Operator` subclass to the sandboxed
   loader's allowlist.
+- `from_state_sandboxed(state) -> Operator` — the same check on a
+  state record already in memory (what other front ends, such as a YAML
+  loader, build on).
 - `loads_sandboxed(s) -> Operator` — like ``loads`` but rejects any
   class, at any depth, not in the allowlist. Nothing is allowed by
   default, pipekit's own containers included: register `Sequential`,
@@ -131,6 +134,20 @@ def loads_sandboxed(s: str) -> Operator:
         raise ValueError(
             f"loads_sandboxed expects a JSON object, got a {type(state).__name__}."
         )
+    return from_state_sandboxed(state)
+
+
+def from_state_sandboxed(state: dict[str, Any]) -> Operator:
+    """Build an operator tree from a state record, allowlisted classes only.
+
+    The check behind `loads_sandboxed`, for a record already in memory
+    (a YAML front end builds on it). Every class in the tree is checked
+    before anything is built, so a refused pipeline constructs nothing.
+
+    Raises:
+        PermissionError: if any class in the tree isn't registered.
+        ValueError / TypeError / RuntimeError: as `loads`.
+    """
     module = state.get("module")
     cls = state.get("class")
     if not isinstance(module, str):
@@ -143,8 +160,6 @@ def loads_sandboxed(s: str) -> Operator:
             "loads_sandboxed: state must include a string `class` field, "
             f"got {type(cls).__name__}."
         )
-    # Check every class in the tree first, so a refused pipeline
-    # constructs nothing.
     _check_allowed(state)
     return build_operator(state, _resolve_allowed)
 
