@@ -17,16 +17,24 @@ The helpers are deliberately tiny and dependency-free:
 - `sha256_hex` — hex digest over a sequence of chunks; callers control
   the framing (separators, optional parts) so existing digests stay
   byte-for-byte stable.
+- `pipeline_hash` — the content hash of a whole pipeline (and optional
+  weights): the one the pipekit-experiment registries store under, and
+  the key for anything that must recognise "the same pipeline again"
+  (an orchestrator task, a cache, an artifact).
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 
-__all__ = ["sha256_hex", "stable_json", "stable_repr"]
+if TYPE_CHECKING:
+    from pipekit._base.operator import Operator
+
+
+__all__ = ["pipeline_hash", "sha256_hex", "stable_json", "stable_repr"]
 
 
 def stable_json(obj: Any) -> str:
@@ -82,3 +90,34 @@ def sha256_hex(*chunks: bytes | str) -> str:
     for chunk in chunks:
         h.update(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
     return h.hexdigest()
+
+
+def pipeline_hash(op: Operator, weights: bytes | None = None) -> str:
+    """Content hash of a pipeline's whole configuration, and optional weights.
+
+    ``sha256(stable_json(op.state) ‖ 0x00 ‖ weights)``. ``op.state``
+    records every nested operator and, for a `Graph`, every node and
+    its wiring, so two pipelines get the same hash exactly when they
+    are configured the same. It is the hash the pipekit-experiment
+    registries store under, so ``registry.store(op)`` returns
+    ``pipeline_hash(op)``.
+
+    Operators that hold closures (``forbid_in_yaml``) are hashed by
+    their debug config, which names the callable but not its code: two
+    different lambdas can share a hash.
+
+    Args:
+        op: The operator (or pipeline) to hash.
+        weights: Optional weight bytes; ``None`` and ``b""`` hash alike.
+
+    Returns:
+        The 64-character lowercase hex digest.
+
+    Examples:
+        >>> from pipekit import Const
+        >>> pipeline_hash(Const(1)) == pipeline_hash(Const(1))
+        True
+        >>> pipeline_hash(Const(1)) == pipeline_hash(Const(2))
+        False
+    """
+    return sha256_hex(stable_json(op.state), b"\x00", weights or b"")

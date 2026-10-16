@@ -209,21 +209,32 @@ def test_s3_registry_import_error_without_fsspec(monkeypatch):
         S3ModelRegistry("s3://x/")
 
 
-def test_hash_payload_digest_unchanged():
-    """The shared hashing helpers reproduce the pre-refactor framing."""
+def test_hash_framing_unchanged():
+    """`pipeline_hash` reproduces the registry's original framing exactly."""
     import hashlib
 
-    from pipekit.hashing import stable_json
-    from pipekit_experiment.registry import _hash_payload
+    from pipekit import Identity
+    from pipekit.hashing import pipeline_hash, stable_json
 
-    config = {"class": "Identity", "config": {}}
+    op = Identity()
     h = hashlib.sha256()
-    h.update(stable_json(config).encode("utf-8"))
+    h.update(stable_json(op.state).encode("utf-8"))
     h.update(b"\x00")
     h.update(b"weights")
-    assert _hash_payload(config, b"weights") == h.hexdigest()
+    assert pipeline_hash(op, b"weights") == h.hexdigest()
 
     h2 = hashlib.sha256()
-    h2.update(stable_json(config).encode("utf-8"))
+    h2.update(stable_json(op.state).encode("utf-8"))
     h2.update(b"\x00")
-    assert _hash_payload(config, None) == h2.hexdigest()
+    assert pipeline_hash(op) == h2.hexdigest()
+
+
+def test_store_returns_pipeline_hash(tmp_path):
+    """What the registry stores under is what `pipeline_hash` computes."""
+    from pipekit import Identity
+    from pipekit.hashing import pipeline_hash
+
+    registry = LocalModelRegistry(tmp_path)
+    op = Identity() | Identity()
+    assert registry.store(op) == pipeline_hash(op)
+    assert registry.store(op, weights=b"w") == pipeline_hash(op, b"w")

@@ -28,9 +28,10 @@ The v0.1 public surface, grouped by module:
 - **Group N — structural protocols** (`protocols`): `Predictor`,
   `FittableTransformer`.
 
-Shared internals: `pipekit.hashing` holds the stable-hash primitives
-(`stable_json`, `stable_repr`, `sha256_hex`) reused by `Cache`, the
-pipekit-train datasets, and the pipekit-experiment registries.
+Hashing: `pipeline_hash(op)` is the content hash of a whole pipeline,
+the one the pipekit-experiment registries store under. `pipekit.hashing`
+also holds the stable-hash primitives (`stable_json`, `stable_repr`,
+`sha256_hex`) reused by `Cache` and the pipekit-train datasets.
 
 See the master plan (Report 2) for the full v0.1 inventory.
 """
@@ -43,6 +44,7 @@ from pipekit.cache import Cache, Memoize
 from pipekit.combine import Fanout
 from pipekit.compose import complement, compose, compose_left, juxt, pipe
 from pipekit.control import Branch, Coalesce, Retry, Switch, Try
+from pipekit.hashing import pipeline_hash
 from pipekit.observe import Histogram, Profile, ShapeTrace, Snapshot, Tap
 from pipekit.parallel import (
     AsyncMap,
@@ -116,6 +118,7 @@ __all__ = [
     "loads",
     "loads_sandboxed",
     "pipe",
+    "pipeline_hash",
     "register",
     "unregister",
 ]
