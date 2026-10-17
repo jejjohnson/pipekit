@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.0.2...pipekit-train-v0.1.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **train:** `from pipekit_train import XarrayWindowDataset` and `pipekit_train.xarray_window` are gone; use `from geopatcher.integrations.train import XarrayWindowDataset` with `geotoolz-patcher[train]`. The `pipekit-train[xreader]` extra is removed.
+
+### Code Refactoring
+
+* **train:** move XarrayWindowDataset to geopatcher.integrations.train ([#57](https://github.com/jejjohnson/pipekit/issues/57)) ([96c8c6b](https://github.com/jejjohnson/pipekit/commit/96c8c6b9436f12ba9e3d2d2dc92a51afcb2512a1))
+
 ## [0.0.2](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.0.1...pipekit-train-v0.0.2) (2026-07-11)
 
 

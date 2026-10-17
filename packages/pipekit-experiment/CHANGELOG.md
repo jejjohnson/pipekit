@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.0.2...pipekit-experiment-v0.0.3) (2026-10-17)
+
+
+### Features
+
+* **experiment:** load untrusted _target_ YAML through the allowlist ([#76](https://github.com/jejjohnson/pipekit/issues/76)) ([0fdbce3](https://github.com/jejjohnson/pipekit/commit/0fdbce374b7d95873dedb08ac615aa408ee95357))
+* **experiment:** to_yaml writes nested pipelines as _target_ YAML ([#77](https://github.com/jejjohnson/pipekit/issues/77)) ([1c15cfe](https://github.com/jejjohnson/pipekit/commit/1c15cfed8be9b56b82fbc95e68997a636829600d))
+
 ## [0.0.2](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.0.1...pipekit-experiment-v0.0.2) (2026-07-11)
 
 
