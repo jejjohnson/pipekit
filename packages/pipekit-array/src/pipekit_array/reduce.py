@@ -43,7 +43,8 @@ class MeanScalar(Operator):
         axis: int | tuple[int, ...] | None = None,
         keepdims: bool = False,
     ) -> None:
-        self.axis = axis
+        # a tuple of axes reloads from JSON as a list, which `xp.mean` rejects
+        self.axis = tuple(axis) if isinstance(axis, list) else axis
         self.keepdims = keepdims
 
     def _apply(self, x: Any) -> Any:

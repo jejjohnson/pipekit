@@ -19,7 +19,9 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from pipekit import Operator
+from pipekit._base.operator import nested_config
 
+from pipekit_cycle.da import _component_config
 from pipekit_cycle.protocols import ForwardModel
 
 
@@ -124,13 +126,7 @@ class CompositeForward(Operator):
         return None
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "components": [
-                {"class": type(c).__name__, "dt": getattr(c, "dt", None)}
-                for c in self.components
-            ],
-            "dt": self.dt,
-        }
+        return {"components": [_component_config(c) for c in self.components]}
 
 
 class NeuralForward(Operator):
@@ -185,10 +181,4 @@ class NeuralForward(Operator):
         return self._state_signature
 
     def get_config(self) -> dict[str, Any]:
-        return {
-            "model_op": {
-                "class": type(self.model_op).__name__,
-                "config": self.model_op.get_config(),
-            },
-            "dt": self._dt,
-        }
+        return {"model_op": nested_config(self.model_op), "dt": self._dt}
