@@ -238,3 +238,144 @@ def test_store_returns_pipeline_hash(tmp_path):
     op = Identity() | Identity()
     assert registry.store(op) == pipeline_hash(op)
     assert registry.store(op, weights=b"w") == pipeline_hash(op, b"w")
+
+
+# ---------------------------------------------------------------------
+# Gate E1 — registry round-trip: a loaded operator has the same content
+# hash and bitwise-equal outputs; tampered content fails to load.
+# ---------------------------------------------------------------------
+
+
+@pytest.fixture(params=["local", "s3"])
+def registry_and_writer(request, tmp_path):
+    """A registry of each backend, and a raw writer into its storage."""
+    if request.param == "local":
+        reg = LocalModelRegistry(tmp_path / "models")
+
+        def write_raw(data: bytes, *parts: str) -> None:
+            reg.root.joinpath(*parts).write_bytes(data)
+
+        return reg, write_raw
+    fsspec = pytest.importorskip("fsspec")
+    from fsspec.implementations.memory import MemoryFileSystem
+    from pipekit_experiment import S3ModelRegistry
+
+    MemoryFileSystem.store.clear()
+    reg = S3ModelRegistry("memory://registry-e1/")
+
+    def write_raw(data: bytes, *parts: str) -> None:
+        with fsspec.open("memory://registry-e1/" + "/".join(parts), "wb") as f:
+            f.write(data)
+
+    return reg, write_raw
+
+
+def _sequential() -> Operator:
+    pytest.importorskip("numpy")
+    pytest.importorskip("pipekit_array")
+    from pipekit import Cache, Fanout
+    from pipekit.qc import AssertShape
+    from pipekit_array import MeanScalar
+
+    return (
+        Identity()
+        | AssertShape((4, 3))
+        | Cache(MeanScalar(axis=0, keepdims=True))
+        | Fanout({"mean": MeanScalar(), "columns": Identity()})
+    )
+
+
+def _graph() -> Operator:
+    pytest.importorskip("numpy")
+    pytest.importorskip("pipekit_array")
+    from pipekit import Graph, Input
+    from pipekit.qc import AssertShape
+    from pipekit_array import MeanScalar
+
+    x = Input("x")
+    checked = AssertShape((4, 3))(x)
+    columns = MeanScalar(axis=0, keepdims=True)(checked)
+    overall = MeanScalar()(columns)
+    return Graph(inputs={"x": x}, outputs={"columns": columns, "mean": overall})
+
+
+def _assert_bitwise_equal(actual, expected) -> None:
+    import numpy as np
+
+    assert actual.keys() == expected.keys()
+    for key in expected:
+        a, e = np.asarray(actual[key]), np.asarray(expected[key])
+        assert a.dtype == e.dtype and a.shape == e.shape, key
+        assert a.tobytes() == e.tobytes(), key
+
+
+@pytest.mark.parametrize("build", [_sequential, _graph], ids=["sequential", "graph"])
+@pytest.mark.parametrize("weights", [None, b"\x00\x01opaque"], ids=["bare", "weights"])
+def test_registry_round_trip_keeps_hash_and_outputs(
+    registry_and_writer, build, weights
+):
+    import numpy as np
+    from pipekit.hashing import pipeline_hash
+
+    reg, _ = registry_and_writer
+    op = build()
+    x = np.arange(12, dtype=np.float64).reshape(4, 3) / 7.0
+
+    h = reg.store(op, name="e1", weights=weights)
+    for ref in (h, "e1"):
+        loaded = reg.load(ref)
+        assert pipeline_hash(loaded, reg.load_weights(ref)) == h
+        _assert_bitwise_equal(loaded(x), op(x))
+
+
+@pytest.mark.parametrize("target", ["operator.json", "weights.bin"])
+def test_registry_load_rejects_tampered_content(registry_and_writer, target):
+    from pipekit_experiment import HashMismatchError
+
+    reg, write_raw = registry_and_writer
+    h = reg.store(_sequential(), name="e1", weights=b"weights")
+    if target == "operator.json":
+        # A valid state for a different pipeline: it would load silently.
+        tampered = _sequential()
+        tampered.operators[1] = type(tampered.operators[1])((5, 3))
+        from pipekit.hashing import stable_json
+
+        write_raw(stable_json(tampered.state).encode(), h, target)
+    else:
+        write_raw(b"other weights", h, target)
+
+    for ref in (h, "e1"):
+        with pytest.raises(HashMismatchError, match="corrupted"):
+            reg.load(ref)
+        with pytest.raises(HashMismatchError, match="corrupted"):
+            reg.load_weights(ref)
+
+
+class _Drifting(Operator):
+    """An operator whose state does not round-trip (``n`` grows on rebuild)."""
+
+    def __init__(self, n: int = 0) -> None:
+        self.n = n + 1
+
+    def _apply(self, x):
+        return x
+
+
+def test_registry_load_rejects_operator_that_rebuilds_to_another_hash(
+    registry_and_writer,
+):
+    from pipekit_experiment import HashMismatchError
+
+    reg, _ = registry_and_writer
+    h = reg.store(_Drifting())
+    # The stored bytes are intact, so the weights still load ...
+    assert reg.load_weights(h) is None
+    # ... but the rebuilt operator is not the one that was stored.
+    with pytest.raises(HashMismatchError, match="round-trip"):
+        reg.load(h)
+
+
+def test_hash_mismatch_error_is_a_value_error():
+    from pipekit_experiment import HashMismatchError
+
+    assert issubclass(HashMismatchError, ValueError)

@@ -28,6 +28,12 @@ fsspec). References (hashes) and tag names are restricted to single
 path segments so a caller-supplied string can never escape the
 registry root.
 
+Loading verifies content against its address: `load` and
+`load_weights` recompute the hash of what is on disk and raise
+`HashMismatchError` if it differs from the requested hash, and `load`
+also checks that the rebuilt operator hashes back to it
+(``pipeline_hash(load(h), load_weights(h)) == h``).
+
 See master plan Report 12, section 2.4 and section 5.
 """
 
@@ -40,7 +46,16 @@ from pathlib import Path
 from typing import Any
 
 from pipekit import Operator
-from pipekit.hashing import pipeline_hash, stable_json
+from pipekit.hashing import pipeline_hash, sha256_hex, stable_json
+
+
+class HashMismatchError(ValueError):
+    """Stored content does not match the hash it is stored under.
+
+    Raised on load when the bytes on disk (``operator.json``,
+    ``weights.bin``) were modified after `store`, or when the operator
+    rebuilt from them hashes to something else. Subclass of `ValueError`.
+    """
 
 
 def _check_component(value: str, kind: str) -> str:
@@ -158,19 +173,64 @@ class _ModelRegistryBase:
         return h
 
     def load(self, ref: str) -> Operator:
-        """Reconstruct the operator stored under ``ref`` (hash or tag)."""
+        """Reconstruct the operator stored under ``ref`` (hash or tag).
+
+        The stored content is checked against its hash, and so is the
+        rebuilt operator: ``pipeline_hash(op, load_weights(ref))`` equals
+        the resolved hash.
+
+        Raises:
+            KeyError: If nothing is stored under ``ref``.
+            HashMismatchError: If the stored content, or the operator
+                rebuilt from it, does not hash to the resolved hash.
+        """
         h = self._resolve(ref)
-        if not self._exists(h, "operator.json"):
-            raise KeyError(f"No model with hash {h!r} in {self._where()}.")
-        state = json.loads(self._read_text(h, "operator.json"))
-        return Operator.from_state(state)
+        text, weights = self._read_verified(h)
+        op = Operator.from_state(json.loads(text))
+        rebuilt = pipeline_hash(op, weights)
+        if rebuilt != h:
+            raise HashMismatchError(
+                f"Model {h!r} in {self._where()} rebuilds to an operator with "
+                f"hash {rebuilt!r}: its state does not "
+                "round-trip through Operator.from_state."
+            )
+        return op
 
     def load_weights(self, ref: str) -> bytes | None:
-        """Return the raw weight bytes for ``ref``, or ``None`` if absent."""
-        h = self._resolve(ref)
-        if not self._exists(h, "weights.bin"):
-            return None
-        return self._read_bytes(h, "weights.bin")
+        """Return the raw weight bytes for ``ref``, or ``None`` if absent.
+
+        Raises:
+            KeyError: If nothing is stored under ``ref``.
+            HashMismatchError: If the stored content does not hash to the
+                resolved hash.
+        """
+        return self._read_verified(self._resolve(ref))[1]
+
+    def _read_verified(self, h: str) -> tuple[str, bytes | None]:
+        """Read ``operator.json`` and ``weights.bin`` of ``h`` and check them.
+
+        `store` writes ``stable_json(op.state)``, so hashing the stored
+        text with `pipeline_hash`'s framing reproduces ``h`` unless a
+        file changed after it was written. Checking the text (rather than
+        a rebuilt operator) also covers operators that cannot be rebuilt
+        (``forbid_in_yaml``), whose weights are still loadable.
+        """
+        if not self._exists(h, "operator.json"):
+            raise KeyError(f"No model with hash {h!r} in {self._where()}.")
+        text = self._read_text(h, "operator.json")
+        weights = (
+            self._read_bytes(h, "weights.bin")
+            if self._exists(h, "weights.bin")
+            else None
+        )
+        # The framing of `pipeline_hash`, applied to the stored text.
+        actual = sha256_hex(text, b"\x00", weights or b"")
+        if actual != h:
+            raise HashMismatchError(
+                f"Model {h!r} in {self._where()} is corrupted: its stored "
+                f"operator.json and weights.bin hash to {actual!r}."
+            )
+        return text, weights
 
     def list(
         self,
@@ -315,7 +375,7 @@ class S3ModelRegistry(_ModelRegistryBase):
         storage_options: dict[str, Any] | None = None,
     ) -> None:
         try:
-            import fsspec  # noqa: F401  # ty: ignore[unresolved-import]
+            import fsspec  # noqa: F401
         except ImportError as e:
             raise ImportError(
                 "S3ModelRegistry requires fsspec. Install with "
@@ -325,7 +385,7 @@ class S3ModelRegistry(_ModelRegistryBase):
         self.storage_options = dict(storage_options) if storage_options else {}
 
     def _fs(self):
-        import fsspec  # ty: ignore[unresolved-import]
+        import fsspec
 
         fs, _ = fsspec.core.url_to_fs(self.uri, **self.storage_options)
         return fs
