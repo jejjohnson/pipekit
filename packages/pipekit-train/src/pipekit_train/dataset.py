@@ -566,7 +566,7 @@ class CachedDataset(TrainingDataset):
         """
         path = self._cache_path()
         if self._is_fsspec_uri(self.cache_dir):
-            import fsspec  # ty: ignore[unresolved-import]
+            import fsspec
 
             fs, fs_path = fsspec.core.url_to_fs(path)
             if fs.exists(fs_path):

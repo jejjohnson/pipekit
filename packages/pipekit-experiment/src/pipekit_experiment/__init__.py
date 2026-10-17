@@ -7,7 +7,8 @@ tools (DVC, Hydra, Metaflow, …). Two pieces:
   — runtime-checkable seams that adapters satisfy structurally.
 - **Run records** (`run`): `Run`, `RunMetrics`, `RunArtifacts`.
 - **Model registry** (`registry`): `LocalModelRegistry` (always
-  available); `S3ModelRegistry` (behind ``[s3]`` extra, fsspec-backed).
+  available); `S3ModelRegistry` (behind ``[s3]`` extra, fsspec-backed);
+  `HashMismatchError` when stored content no longer matches its hash.
 - **Artifacts** (`artifacts`): `TrainingArtifact`, `InferenceArtifact`.
 
 Adapters live under `pipekit_experiment.adapters.<tool>` and are
@@ -22,12 +23,17 @@ See master plan Report 12.
 
 from pipekit_experiment.artifacts import InferenceArtifact, TrainingArtifact
 from pipekit_experiment.protocols import ExperimentTracker, ModelRegistry
-from pipekit_experiment.registry import LocalModelRegistry, S3ModelRegistry
+from pipekit_experiment.registry import (
+    HashMismatchError,
+    LocalModelRegistry,
+    S3ModelRegistry,
+)
 from pipekit_experiment.run import Run, RunArtifacts, RunMetrics
 
 
 __all__ = [
     "ExperimentTracker",
+    "HashMismatchError",
     "InferenceArtifact",
     "LocalModelRegistry",
     "ModelRegistry",

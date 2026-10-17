@@ -226,3 +226,26 @@ def test_with_weights_structure_mismatch_raises():
     )
     with pytest.raises((ValueError, RuntimeError), match=r"shape|structure"):
         wrong_shape.with_weights(blob)
+
+
+def test_registry_round_trip_keeps_hash_and_outputs(tmp_path):
+    """Gate E1: a model restored from the registry has the hash it was
+    stored under, and bitwise-equal outputs."""
+    from pipekit.hashing import pipeline_hash
+    from pipekit_experiment import LocalModelRegistry
+
+    registry = LocalModelRegistry(tmp_path / "models")
+    trained = JaxModelOp(_toy_mlp(key=0))
+    x = jnp.array([0.3, -0.7], dtype=jnp.float32)
+
+    h = registry.store(trained, weights=trained.serialize_weights())
+    restored = JaxModelOp(_toy_mlp(key=999)).from_registry(registry, h)
+
+    # Serialisation is deterministic, so the restored model's own blob
+    # reproduces the stored hash.
+    assert restored.serialize_weights() == registry.load_weights(h)
+    assert pipeline_hash(restored, restored.serialize_weights()) == h
+    expected, actual = np.asarray(trained(x)), np.asarray(restored(x))
+    assert actual.dtype == expected.dtype and actual.shape == expected.shape
+    assert np.array_equal(actual, expected)
+    assert actual.tobytes() == expected.tobytes()

@@ -39,6 +39,9 @@ dev = [
     # diffrax backs the pipekit-jax [diffrax] extra; dev-installed so the
     # adapter tests run in the workspace.
     "diffrax>=0.7",
+    # fsspec backs the pipekit-experiment [s3] extra; dev-installed so the
+    # S3ModelRegistry tests run (on the in-memory filesystem) in CI.
+    "fsspec>=2024.0",
     # Workspace members are dev-installed so tests can import them.
     "pipekit",
     "pipekit-array",
