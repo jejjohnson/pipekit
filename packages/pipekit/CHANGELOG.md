@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.0...pipekit-v0.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **build:** ship a LICENSE in each package so it builds ([#90](https://github.com/jejjohnson/pipekit/issues/90)) ([5671c46](https://github.com/jejjohnson/pipekit/commit/5671c46e933d7770bd930b93591c621b135cc8ff))
+
 ## [0.1.0](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.0.2...pipekit-v0.1.0) (2026-10-17)
 
 
