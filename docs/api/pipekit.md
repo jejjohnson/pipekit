@@ -62,3 +62,7 @@ third-party dependencies. Master plan reference: Report 2.
 ## Hashing primitives
 
 ::: pipekit.hashing
+
+## Testing
+
+::: pipekit.testing

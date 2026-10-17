@@ -34,6 +34,10 @@ the one the pipekit-experiment registries store under. `pipekit.hashing`
 also holds the stable-hash primitives (`stable_json`, `stable_repr`,
 `sha256_hex`) reused by `Cache` and the pipekit-train datasets.
 
+Testing: `pipekit.testing.assert_round_trip(op, *inputs)` checks the
+config round-trip contract (same `pipeline_hash`, same output after
+``loads(dumps(op))``) from a library's own test suite.
+
 See the master plan (Report 2) for the full v0.1 inventory.
 """
 
