@@ -5,7 +5,8 @@ description = "Time-stepping, data assimilation, and observation operators on to
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
-license = { file = "../../LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 1 - Planning"]
@@ -15,7 +16,7 @@ dependencies = ["pipekit"]
 array = ["pipekit-array"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
