@@ -68,6 +68,7 @@ FORBIDDEN: dict[str, str] = {
     "geocatalog": "geotoolz-catalog",
     "geocloud": "geotoolz-cloud",
     "geonnax": "geonnax",
+    "geoops": "geotoolz-ops",
     "geopatcher": "geotoolz-patcher",
     "geoproducts": "geotoolz-products",
     "georeader": "georeader-spaceml",

@@ -89,7 +89,7 @@ array-carrier setting:
 - **No backend-specific tricks.** No `jax.jit` integration, no
   `torch.compile` hooks, no CUDA-specific paths. Those belong in
   `pipekit-jax`, `pipekit-torch`, etc., or in the user's outer code.
-- **Sister libraries re-export.** `geotoolz.qc.AssertValueRange`
+- **Sister libraries re-export.** `geoops.qc.AssertValueRange`
   subclasses `pipekit_array.qc.AssertValueRange` and adds
   GeoTensor-aware defaults (e.g. reading `fill_value` as the implicit
   min/max). Same for `xr_toolz`. One implementation; three places
