@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.1...pipekit-train-v0.1.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* **experiment:** verify the content hash when loading from a registry ([#93](https://github.com/jejjohnson/pipekit/issues/93)) ([3374a57](https://github.com/jejjohnson/pipekit/commit/3374a570cfb7b3a72a21bb71f73647ac09ea9d0e))
+
 ## [0.1.1](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.0...pipekit-train-v0.1.1) (2026-10-17)
 
 
