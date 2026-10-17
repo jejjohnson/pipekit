@@ -5,7 +5,8 @@ description = "JAX / Equinox carrier integration for pipekit — JaxModelOp with
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
-license = { file = "../../LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 3 - Alpha"]
@@ -21,7 +22,7 @@ dependencies = [
 diffrax = ["diffrax>=0.7"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

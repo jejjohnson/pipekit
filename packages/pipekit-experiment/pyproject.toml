@@ -5,7 +5,8 @@ description = "Experiment tracking adapters and content-addressed model registry
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
-license = { file = "../../LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 1 - Planning"]
@@ -20,7 +21,7 @@ metaflow = ["metaflow>=2.10"]
 s3 = ["fsspec>=2024.0", "s3fs>=2024.0"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

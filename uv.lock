@@ -4078,7 +4078,7 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.0.2"
+version = "0.1.0"
 source = { editable = "packages/pipekit" }
 
 [[package]]
@@ -4143,7 +4143,7 @@ provides-extras = ["array"]
 
 [[package]]
 name = "pipekit-evaluate"
-version = "0.0.2"
+version = "0.1.0"
 source = { editable = "packages/pipekit-evaluate" }
 dependencies = [
     { name = "numpy" },
@@ -4175,7 +4175,7 @@ provides-extras = ["cycle", "xskill", "proper"]
 
 [[package]]
 name = "pipekit-experiment"
-version = "0.0.2"
+version = "0.0.3"
 source = { editable = "packages/pipekit-experiment" }
 dependencies = [
     { name = "pipekit" },
@@ -4219,7 +4219,7 @@ provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.0.2"
+version = "0.0.3"
 source = { editable = "packages/pipekit-jax" }
 dependencies = [
     { name = "equinox" },
@@ -4306,7 +4306,7 @@ docs = [
     { name = "mkdocs-jupyter", specifier = ">=0.26.3" },
     { name = "mkdocs-material", specifier = ">=9.7.6" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.4" },
-    { name = "pygments", specifier = ">=2.19,<2.20" },
+    { name = "pygments", specifier = ">=2.19,<2.22" },
     { name = "watermark", specifier = ">=2.4" },
 ]
 lint = [{ name = "ruff", specifier = ">=0.15.11" }]
@@ -4314,7 +4314,7 @@ typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
 name = "pipekit-train"
-version = "0.0.2"
+version = "0.1.0"
 source = { editable = "packages/pipekit-train" }
 dependencies = [
     { name = "pipekit" },
