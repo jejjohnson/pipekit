@@ -38,4 +38,4 @@ __all__ = [
     "TrainingArtifact",
 ]
 
-__version__ = "0.0.3"  # x-release-please-version
+__version__ = "0.0.4"  # x-release-please-version
