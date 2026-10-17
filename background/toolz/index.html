@@ -1,0 +1,3077 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A carrier-agnostic operator-graph framework for composable scientific pipelines.">
+      
+      
+        <meta name="author" content="J. Emmanuel Johnson">
+      
+      
+      
+        <link rel="prev" href="../../patterns/">
+      
+      
+        <link rel="next" href="../../tutorials/train-emulator/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Background - pipekit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#background-from-toolz-to-pipekit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="pipekit" class="md-header__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pipekit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Background
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../protocols/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Protocols
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../core-tour/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tour of the core
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../patterns/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Patterns
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Background
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/train-emulator/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/pipekit/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../notebooks/pipekit_train_quickstart/" class="md-tabs__link">
+          
+  
+  
+  Notebooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design-train/" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="pipekit" class="md-nav__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pipekit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core-tour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tour of the core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-page-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this page exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toolz-as-the-ancestor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        toolz as the ancestor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="toolz as the ancestor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-toolzfunctoolz-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The toolz.functoolz surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mental model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-to-one-mappings-to-pipekit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-to-one mappings to pipekit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-toolz-stops-being-enough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where toolz stops being enough
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where toolz stops being enough">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#introspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialisation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dual-mode-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dual-mode dispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shape-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closure-discipline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closure discipline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-trajectory-functions-protocols-typed-entities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trajectory: functions, Protocols, typed entities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The trajectory: functions, Protocols, typed entities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#carriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Carriers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-pipekit-lands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where pipekit lands
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-typed-operators-are-not-over-engineering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why typed operators are not over-engineering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/train-emulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train an emulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/da-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a DA cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/anomaly-graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build a bigger graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/train-register-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train, register, forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/ensemble-da/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble data assimilation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/etl-regions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ETL over many regions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/pipekit-under-jit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run pipelines under jit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-array
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-evaluate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/pipekit-jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-jax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart (MLP regression)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_cycle_handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cycle handoff (emulator → forecast)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_svi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro SVI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_numpyro_mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pipekit_train_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — BlackJAX NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_12_1" id="__nav_12_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_12_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundaries & future work
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend adapters
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/numpyro_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-train/blackjax_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlackJAX adapter (NUTS / SG-MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-page-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this page exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toolz-as-the-ancestor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        toolz as the ancestor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="toolz as the ancestor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-toolzfunctoolz-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The toolz.functoolz surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mental model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-to-one-mappings-to-pipekit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-to-one mappings to pipekit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-toolz-stops-being-enough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where toolz stops being enough
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where toolz stops being enough">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#introspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialisation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dual-mode-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dual-mode dispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shape-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closure-discipline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closure discipline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-trajectory-functions-protocols-typed-entities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trajectory: functions, Protocols, typed entities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The trajectory: functions, Protocols, typed entities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#carriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Carriers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-pipekit-lands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where pipekit lands
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-typed-operators-are-not-over-engineering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why typed operators are not over-engineering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="background-from-toolz-to-pipekit">Background — from toolz to pipekit<a class="headerlink" href="#background-from-toolz-to-pipekit" title="Permanent link">&para;</a></h1>
+<p><em>Where pipekit comes from, and why its operators are classes.</em></p>
+<p>pipekit is <code>toolz</code> with each function replaced by a typed class. This page
+shows what that inheritance gives, the six things plain functions cannot
+carry, and why operators settled on a concrete base class while the data
+flowing through them did not. It is background: for what ships and when to
+reach for it, read the <a href="../../core-tour/">tour of the core</a>.</p>
+<details class="note">
+<summary>About this page</summary>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Reading time</strong></td>
+<td>about 15 minutes</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>anyone who wants to know why pipekit is shaped the way it is</td>
+</tr>
+<tr>
+<td><strong>Companions</strong></td>
+<td><a href="../../core-tour/">Tour of the core</a> (what ships), <a href="../../patterns/">Patterns</a> (where it is used), <a href="../../concepts/">Concepts</a> (the mental model in ten minutes)</td>
+</tr>
+<tr>
+<td><strong>Checked against</strong></td>
+<td>toolz 1.1 and pipekit 0.0.2; every output below is from a real run</td>
+</tr>
+<tr>
+<td><strong>History</strong></td>
+<td>First written as Report 1 of the <a href="https://github.com/jejjohnson/geostack/tree/main/docs/reports">GeoStack design reports</a>, which now point here</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="why-this-page-exists">Why this page exists<a class="headerlink" href="#why-this-page-exists" title="Permanent link">&para;</a></h2>
+<p>The pipekit design makes more sense once you have seen three things: what it
+inherited from <code>toolz</code>, what that inheritance cannot do, and why moving from
+"any function" to a typed operator class is the right call rather than
+over-engineering. This is the motivation layer; the operators themselves are
+in the <a href="../../core-tour/">tour of the core</a>.</p>
+<h2 id="toolz-as-the-ancestor">toolz as the ancestor<a class="headerlink" href="#toolz-as-the-ancestor" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/pytoolz/toolz"><code>pytoolz/toolz</code></a> is pipekit's explicit
+intellectual ancestor. Looking at it directly is the fastest way to see which
+idea pipekit carries forward and what it adds. Its functional core is a dozen
+primitives.</p>
+<h3 id="the-toolzfunctoolz-surface">The <code>toolz.functoolz</code> surface<a class="headerlink" href="#the-toolzfunctoolz-surface" title="Permanent link">&para;</a></h3>
+<p><em>The <code>functoolz</code> primitives pipekit inherits from.</em></p>
+<table>
+<thead>
+<tr>
+<th><code>toolz</code> primitive</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>identity(x)</code></td>
+<td>pass the value through unchanged</td>
+</tr>
+<tr>
+<td><code>pipe(value, *funcs)</code></td>
+<td>apply functions left to right to a value</td>
+</tr>
+<tr>
+<td><code>compose(*funcs)</code></td>
+<td>right-to-left composition: <code>f(g(h(x)))</code></td>
+</tr>
+<tr>
+<td><code>compose_left(*funcs)</code></td>
+<td>left-to-right composition</td>
+</tr>
+<tr>
+<td><code>juxt(*funcs)</code></td>
+<td>several outputs: <code>juxt(f, g)(x)</code> is <code>(f(x), g(x))</code></td>
+</tr>
+<tr>
+<td><code>do(f, x)</code></td>
+<td>run <code>f(x)</code> for its side effect and return <code>x</code></td>
+</tr>
+<tr>
+<td><code>complement(pred)</code></td>
+<td>negate a predicate</td>
+</tr>
+<tr>
+<td><code>excepts(exceptions, func, handler)</code></td>
+<td>catch the listed exceptions while applying <code>func</code></td>
+</tr>
+<tr>
+<td><code>memoize(func)</code></td>
+<td>cache results by input</td>
+</tr>
+<tr>
+<td><code>curry</code></td>
+<td>partial application, as a class wrapper</td>
+</tr>
+<tr>
+<td><code>thread_first</code>, <code>thread_last</code></td>
+<td>Clojure-style threading macros</td>
+</tr>
+<tr>
+<td><code>flip(f, a, b)</code></td>
+<td>call <code>f(b, a)</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>toolz</code> also ships <code>itertoolz</code> (about 30 functions on iterables) and
+<code>dicttoolz</code> (about 15 on dicts). pipekit only really inherits from
+<code>functoolz</code>.</p>
+<h3 id="the-mental-model">The mental model<a class="headerlink" href="#the-mental-model" title="Permanent link">&para;</a></h3>
+<p><code>toolz</code> says a pipeline is a sequence of pure functions, composed with <code>pipe</code>
+or <code>compose</code>. Each function is responsible for its transform and nothing
+else; metadata, types and side effects are someone else's problem.</p>
+<div class="highlight"><span class="filename">A toolz pipeline. do must come from toolz.curried to be used without its value.</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">toolz</span><span class="w"> </span><span class="kn">import</span> <span class="n">pipe</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">toolz.curried</span><span class="w"> </span><span class="kn">import</span> <span class="n">do</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">pipe</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;  HELLO  &quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">str</span><span class="o">.</span><span class="n">lower</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">do</span><span class="p">(</span><span class="nb">print</span><span class="p">),</span>                  <span class="c1"># side effect: prints &quot;hello&quot;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;l&quot;</span><span class="p">),</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># → [&#39;he&#39;, &#39;&#39;, &#39;o&#39;]</span>
+</code></pre></div>
+<p>This is functional composition over plain Python. Functions are values,
+composition is an operation, and side effects are explicit (<code>do</code>). It is
+elegant and minimal, and it directly inspired pipekit's <code>|</code> syntax, the
+<code>Sequential</code> shape, the <code>Tap</code> / <code>Sink</code> split, and the <code>juxt</code> / <code>Fanout</code>
+pair.</p>
+<h3 id="one-to-one-mappings-to-pipekit">One-to-one mappings to pipekit<a class="headerlink" href="#one-to-one-mappings-to-pipekit" title="Permanent link">&para;</a></h3>
+<p>Almost every pipekit primitive has a <code>toolz</code> ancestor. The mapping is tight
+enough that the most accurate one-line description of pipekit is
+<strong><code>toolz</code>, with each function replaced by a typed class</strong>.</p>
+<p><em>toolz primitives and their pipekit counterparts.</em></p>
+<table>
+<thead>
+<tr>
+<th><code>toolz</code></th>
+<th>pipekit</th>
+<th>What pipekit's version adds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pipe(value, *funcs)</code></td>
+<td><code>pipe(value, *operators)</code>, <code>Sequential(operators)(value)</code></td>
+<td>operators carry config; a readable repr; reuse</td>
+</tr>
+<tr>
+<td><code>compose_left(*funcs)</code></td>
+<td><code>compose_left(...)</code>, <code>op1 \| op2 \| op3</code></td>
+<td><code>\|</code> flattens into one <code>Sequential</code>; class-typed steps</td>
+</tr>
+<tr>
+<td><code>compose(*funcs)</code></td>
+<td><code>compose(...)</code></td>
+<td>the same, in mathematical order</td>
+</tr>
+<tr>
+<td><code>do(f, x)</code></td>
+<td><code>Tap(fn)</code>, <code>Sink(write_fn)</code></td>
+<td>the closure is owned by an operator with a name; marked <code>forbid_in_yaml</code></td>
+</tr>
+<tr>
+<td><code>juxt(f, g, h)</code></td>
+<td><code>juxt(...)</code> (tuple) and <code>Fanout({...})</code> (dict)</td>
+<td>both shapes; named outputs for downstream steps</td>
+</tr>
+<tr>
+<td><code>memoize</code></td>
+<td><code>Cache</code>, with <code>Memoize</code> as an alias</td>
+<td>config-aware hashing</td>
+</tr>
+<tr>
+<td><code>excepts</code></td>
+<td><code>Try</code>, <code>Coalesce</code></td>
+<td>operator-shaped arms; an explicit exception list</td>
+</tr>
+<tr>
+<td><code>complement</code></td>
+<td><code>complement</code></td>
+<td>ships as a plain function</td>
+</tr>
+<tr>
+<td><code>identity</code></td>
+<td><code>Identity</code></td>
+<td>an operator, so it composes everywhere</td>
+</tr>
+<tr>
+<td><code>curry</code></td>
+<td>implicit in <code>__init__</code></td>
+<td>an operator's constructor is its partial application</td>
+</tr>
+</tbody>
+</table>
+<p>The same pipeline in both libraries shows the difference. Both outputs below
+are from real runs.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">toolz</label><label for="__tabbed_1_2">pipekit</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">A toolz composition prints its steps as raw function objects, in reverse order.</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">toolz</span><span class="w"> </span><span class="kn">import</span> <span class="n">compose_left</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">steps</span> <span class="o">=</span> <span class="n">compose_left</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="nb">str</span><span class="o">.</span><span class="n">lower</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;l&quot;</span><span class="p">))</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Compose(&lt;function &lt;lambda&gt; at 0x7f…&gt;, &lt;method &#39;lower&#39; of &#39;str&#39; objects&gt;,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1">#         &lt;method &#39;strip&#39; of &#39;str&#39; objects&gt;)</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">The same steps as pipekit operators: named, indexable, in order.</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Lambda</span><span class="p">,</span> <span class="n">Tap</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">steps</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">Lambda</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">)</span> <span class="o">|</span> <span class="n">Lambda</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">lower</span><span class="p">)</span> <span class="o">|</span> <span class="n">Tap</span><span class="p">(</span><span class="nb">print</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">|</span> <span class="n">Lambda</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;l&quot;</span><span class="p">))</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Sequential([Lambda(name=&#39;strip&#39;), Lambda(name=&#39;lower&#39;),</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1">#             Tap(name=&#39;print&#39;), Lambda(name=&#39;&lt;lambda&gt;&#39;)])</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">steps</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>                   <span class="c1"># → Tap(name=&#39;print&#39;)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">steps</span><span class="p">(</span><span class="s2">&quot;  HELLO  &quot;</span><span class="p">)</span>         <span class="c1"># prints &quot;hello&quot;; → [&#39;he&#39;, &#39;&#39;, &#39;o&#39;]</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p><code>toolz</code> is the design template. pipekit is the typed, introspectable,
+serialisable variant of the same idea.</p>
+<h2 id="where-toolz-stops-being-enough">Where toolz stops being enough<a class="headerlink" href="#where-toolz-stops-being-enough" title="Permanent link">&para;</a></h2>
+<p><code>toolz</code> handles the mechanics of function composition cleanly. Six things are
+beyond it, and each is why the domain libraries needed more.</p>
+<p><em>The six gaps, and where pipekit puts each one.</em></p>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>What <code>toolz</code> gives</th>
+<th>Where it lives in pipekit</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Introspection</td>
+<td>a repr of raw function objects</td>
+<td>named operators, <code>Sequential.__getitem__</code>, <code>summary()</code></td>
+<td>ships</td>
+</tr>
+<tr>
+<td>Serialisation</td>
+<td>nothing</td>
+<td><code>get_config</code>, <code>dumps</code> / <code>loads</code>, <code>from_state</code></td>
+<td>flat operators only</td>
+</tr>
+<tr>
+<td>Dual-mode dispatch</td>
+<td>eager calls only</td>
+<td><code>Operator.__call__</code> switches on <code>Node</code> inputs</td>
+<td>ships</td>
+</tr>
+<tr>
+<td>Control flow</td>
+<td>Python <code>if</code> / <code>match</code> outside the pipeline</td>
+<td><code>Branch</code>, <code>Switch</code>, <code>Try</code>, <code>Coalesce</code></td>
+<td>ships</td>
+</tr>
+<tr>
+<td>Shape tracking</td>
+<td><code>Any → Any</code></td>
+<td><code>Signature</code>, <code>Sequential.summary()</code></td>
+<td>ships; needs signatures</td>
+</tr>
+<tr>
+<td>Closure discipline</td>
+<td>any closure, silently</td>
+<td>the <code>forbid_in_yaml</code> class flag</td>
+<td>ships</td>
+</tr>
+</tbody>
+</table>
+<h3 id="introspection">Introspection<a class="headerlink" href="#introspection" title="Permanent link">&para;</a></h3>
+<p>A <code>toolz</code> composition is not opaque: <code>Compose</code> prints its steps (the <code>toolz</code>
+tab above). But it prints them as raw function objects, in reverse order,
+with lambdas anonymous and no configuration or per-step state to inspect.
+That is fine at an interactive prompt. For a 14-step preprocessing pipeline
+that has to be audited, you want named steps, in order, that you can index
+(<code>steps[2]</code>) and summarise.</p>
+<h3 id="serialisation">Serialisation<a class="headerlink" href="#serialisation" title="Permanent link">&para;</a></h3>
+<p><code>toolz</code> pipelines are tuples of function references and closures. They do
+not round-trip to YAML, JSON or a Hydra config, and they cannot be shipped to
+a worker process and rebuilt. Every deployment shape in the
+<a href="../../patterns/">patterns</a> (an ETL job, a web service, a tile server, a
+regulatory artifact, an orchestrator) needs serialisation in some form.</p>
+<p>pipekit gives every operator a <code>get_config()</code>, and a pipeline's <code>state</code> is
+its whole configuration: each nested operator as its own record, and for a
+<code>Graph</code> every node and its wiring. That record round-trips through JSON, and
+through <code>_target_</code> YAML with <code>pipekit-experiment</code>'s <code>HydraConfigLoader</code>:</p>
+<div class="highlight"><span class="filename">A nested pipeline round-trips, from a real run.</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pk</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cache</span><span class="p">,</span> <span class="n">Const</span><span class="p">,</span> <span class="n">Identity</span><span class="p">,</span> <span class="n">Sequential</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">Cache</span><span class="p">(</span><span class="n">Sequential</span><span class="p">([</span><span class="n">Const</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">Identity</span><span class="p">()]))</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">back</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipe</span><span class="p">))</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">back</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">pipe</span><span class="o">.</span><span class="n">state</span>                         <span class="c1"># → True</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">pk</span><span class="o">.</span><span class="n">pipeline_hash</span><span class="p">(</span><span class="n">back</span><span class="p">)</span> <span class="o">==</span> <span class="n">pk</span><span class="o">.</span><span class="n">pipeline_hash</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>  <span class="c1"># → True</span>
+</code></pre></div>
+<p>Only operators that hold a closure (<code>Lambda</code>, <code>Tap</code>, a <code>Branch</code> predicate)
+stay out: they are flagged <code>forbid_in_yaml</code>, and <code>loads</code> refuses them
+wherever they sit in the tree.</p>
+<h3 id="dual-mode-dispatch">Dual-mode dispatch<a class="headerlink" href="#dual-mode-dispatch" title="Permanent link">&para;</a></h3>
+<p><code>toolz</code> functions only run eagerly. You cannot pass a symbolic placeholder
+through them to build a graph that runs later. Graph building (the <code>Input</code> /
+<code>Node</code> API) needs the same callable to behave differently depending on
+whether its argument is data or a placeholder. In pipekit that switch lives
+once, in <code>Operator.__call__</code>: any <code>Node</code> argument builds a graph node, and
+anything else calls <code>_apply</code>.</p>
+<h3 id="control-flow">Control flow<a class="headerlink" href="#control-flow" title="Permanent link">&para;</a></h3>
+<p>In a <code>toolz</code>-style pipeline, a conditional is a Python <code>if</code> or <code>match</code>
+outside the pipeline, which splits the pipeline apart wherever one is needed.
+pipekit makes conditionals first-class operators (<code>Branch</code>, <code>Switch</code>, <code>Try</code>,
+<code>Coalesce</code>), composable inside a <code>Sequential</code> like any other step.</p>
+<h3 id="shape-tracking">Shape tracking<a class="headerlink" href="#shape-tracking" title="Permanent link">&para;</a></h3>
+<p>Every <code>toolz</code> step is <code>Any → Any</code>. For scientific data that hides structure
+worth surfacing: named dimensions, units, a coordinate system. pipekit's
+<code>Signature</code> lets an operator declare what it accepts and returns, and
+<code>Sequential.summary()</code> prints a Keras-style table that catches a shape
+mismatch when the pipeline is built, not deep in a hot loop. Operators that
+declare no signature show <code>?</code> in that table, so the payoff grows as more
+operators declare one.</p>
+<h3 id="closure-discipline">Closure discipline<a class="headerlink" href="#closure-discipline" title="Permanent link">&para;</a></h3>
+<p><code>toolz</code> accepts any closure. That is right for interactive work and wrong for
+pipelines that must be audited: a closure cannot be inspected for what it
+captures, serialised, or rebuilt on a worker. pipekit's answer is a class
+flag. Operators whose constructor takes a closure declare
+<code>forbid_in_yaml = True</code> (<code>Tap</code>, <code>Lambda</code>, <code>Sink</code>, <code>Branch</code>, <code>Switch</code>,
+<code>Coalesce</code>, <code>ShapeTrace</code>, <code>Quarantine</code>, <code>AssertCallable</code>), and a loader can
+refuse them. Operators that only nest other operators, such as <code>Try</code>,
+<code>Retry</code> or <code>Cache</code>, are not flagged: a walker finds the flagged children
+inside them.</p>
+<div class="admonition important">
+<p class="admonition-title">The gaps in one line</p>
+<p>pipekit is what <code>toolz</code> becomes when the pipeline is a first-class object:
+printable, configurable, summarisable, dispatchable, and bound by rules
+about what it may contain.</p>
+</div>
+<h2 id="the-trajectory-functions-protocols-typed-entities">The trajectory: functions, Protocols, typed entities<a class="headerlink" href="#the-trajectory-functions-protocols-typed-entities" title="Permanent link">&para;</a></h2>
+<p>The question is how pipekit moved from raw functions, through Protocols, to
+typed entities. The answer differs for the steps of a pipeline (operators)
+and for the data flowing through it (carriers), so the two are told
+separately.</p>
+<p><img alt="Two lanes. Operators move from toolz functions through an OperatorLike Protocol to pipekit's Operator class, which is highlighted as settled. Carriers show Any in pipekit core, Array API Protocols in pipekit-array, and GeoTensor or xarray in geotoolz and xrtoolz, all in use at once." src="../../assets/background/r1_trajectories.svg" /></p>
+<p><em>Operators settled on a typed class; carriers use all three stages at once.</em></p>
+<h3 id="operators">Operators<a class="headerlink" href="#operators" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">1 · Functions</label><label for="__tabbed_2_2">2 · Protocols</label><label for="__tabbed_2_3">3 · Typed base class</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The <code>toolz</code> shape: an operator is a Python function. Maximum flexibility,
+zero boilerplate.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">my_op</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="k">return</span> <span class="o">...</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">pipe</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">my_op</span><span class="p">,</span> <span class="n">other_op</span><span class="p">,</span> <span class="n">third_op</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Buys you:</strong> any existing function adapts trivially, with no subclassing
+and no dependency beyond <code>toolz</code>.</p>
+<p><strong>Costs you:</strong> no config, no readable repr, no serialisation, no dispatch,
+no flags, no state, and no reuse beyond reusing the function.</p>
+</div>
+<div class="tabbed-block">
+<p>The natural next thought is to write a <code>Protocol</code> for what an operator
+looks like. Anything structurally compatible counts; nothing has to
+inherit.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Protocol</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">OperatorLike</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Buys you:</strong> structural typing. Tools can recognise operator-shaped
+objects without forcing inheritance, which suits third-party code that
+does not import your library.</p>
+<p><strong>Costs you:</strong> a Protocol is a check, not a base class.</p>
+<ul>
+<li><strong>No default implementations.</strong> Every implementer rebuilds
+  <code>get_config</code>, <code>__repr__</code> and <code>__or__</code>; there is no <code>super()</code> to reuse.</li>
+<li><strong>No class-level flags.</strong> <code>forbid_in_yaml</code> and <code>_terminal</code> describe an
+  operator's contract, not its instances, and a Protocol cannot carry
+  them cleanly.</li>
+<li><strong>No shared mechanism.</strong> Dual-mode dispatch is infrastructure every
+  operator needs; with a Protocol each one reimplements it.</li>
+<li><strong>No class registry.</strong> <code>Operator.from_state</code> rebuilds an operator by
+  walking <code>cls.__subclasses__()</code>; a Protocol has no subclasses to walk.</li>
+</ul>
+<p><strong>Verdict:</strong> a Protocol is the right tool to check that something is
+operator-shaped, and the wrong tool to be the operator base. (pipekit
+still uses Protocols where they fit: for the seams algorithm libraries
+plug into without importing it; see <a href="../../protocols/">Protocols</a>.)</p>
+</div>
+<div class="tabbed-block">
+<p>Where pipekit landed. A simplified view of <code>pipekit/_base/operator.py</code>:</p>
+<div class="highlight"><span class="filename">The Operator base class, simplified.</span><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Operator</span><span class="p">(</span><span class="n">ConfigMixin</span><span class="p">):</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">forbid_in_yaml</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>   <span class="c1"># closure-holding operators set True</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">_terminal</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>        <span class="c1"># may only end a Sequential</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>     <span class="c1"># dual-mode dispatch</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">Node</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            <span class="o">...</span>                              <span class="c1"># build a graph node</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># run eagerly</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>       <span class="c1"># the one method subclasses write</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__or__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequential</span><span class="p">:</span>   <span class="c1"># pipe syntax, defined once</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>        <span class="o">...</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_state</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Operator</span><span class="p">:</span>  <span class="c1"># walks cls.__subclasses__()</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>        <span class="o">...</span>
+</code></pre></div>
+<p><strong>Buys you:</strong></p>
+<ul>
+<li><code>__init__</code> carries config, <code>get_config()</code> (derived by <code>ConfigMixin</code>)
+  exposes it, and <code>from_state</code> rebuilds from it.</li>
+<li><code>__or__</code> is defined once, so every subclass gets pipe syntax for free.</li>
+<li>Dual-mode <code>__call__</code> is defined once; subclasses only write <code>_apply</code>.</li>
+<li>Class flags (<code>forbid_in_yaml</code>, <code>_terminal</code>) are visible to
+  <code>Sequential</code>'s validation and to any loader.</li>
+<li>IDEs and type checkers see the whole surface.</li>
+</ul>
+<p><strong>Costs you:</strong></p>
+<ul>
+<li>Subclassing is more ceremony than a function (<code>class NDVI(Operator)</code>).</li>
+<li>A third-party function does not adapt for free; <code>Lambda</code> is the escape
+  hatch, and <code>ConfigMixin</code> keeps the boilerplate small.</li>
+<li>More framework code to maintain.</li>
+</ul>
+<p><strong>Verdict:</strong> the right design for operators. Every responsibility has a
+natural home, and the cost is a one-time decision to subclass. geotoolz
+and xrtoolz each arrived here independently before the base class moved
+into pipekit, which is the strongest sign it is right.</p>
+</div>
+</div>
+</div>
+<h3 id="carriers">Carriers<a class="headerlink" href="#carriers" title="Permanent link">&para;</a></h3>
+<p>The carrier trajectory is different, and not settled.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">1 · Any</label><label for="__tabbed_3_2">2 · Protocols</label><label for="__tabbed_3_3">3 · Concrete types</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>pipekit's core uses <code>Carrier = Any</code>. The framework does not care what
+flows through; operators that need structure check it in their own
+signatures.</p>
+<p><strong>Buys you:</strong> maximum flexibility. Composition works the same whether the
+carrier is a NumPy array, an <code>xr.DataArray</code>, a DataFrame, an AnnData, a
+scalar or a user type, and test pipelines can run on scalars.</p>
+<p><strong>Costs you:</strong> operators that do want structure (named axes, coordinate
+systems, units) duck-check it every time, and there is no shared metadata
+surface.</p>
+</div>
+<div class="tabbed-block">
+<p>The ecosystem has converged on Protocol-shaped array descriptions through
+the <a href="https://data-apis.org/array-api/">Array API standard</a>:
+<code>numpy.ndarray</code>, <code>jax.Array</code>, <code>cupy.ndarray</code>, <code>torch.Tensor</code> and
+<code>dask.array.Array</code> all expose <code>__array_namespace__</code>. Operators written
+against it declare the Protocol and work across backends; pipekit-array
+is where they live.</p>
+<p><strong>Buys you:</strong> an operator written once runs on NumPy, JAX, CuPy and
+PyTorch arrays, which is real value for cross-framework pipelines.</p>
+<p><strong>Costs you:</strong> the Array API becomes a dependency; operators call the
+namespace (<code>xp.mean(x)</code>) rather than NumPy (<code>np.mean(x)</code>); and some
+operations do not generalise cleanly, NaN handling for one.</p>
+</div>
+<div class="tabbed-block">
+<p>Domain libraries type their operators to a specific carrier. In the
+GeoStack, geotoolz uses <code>GeoTensor</code> and xrtoolz uses <code>xr.DataArray</code> or
+<code>xr.Dataset</code>.</p>
+<p><strong>Buys you:</strong> rich metadata used natively. geotoolz operators read
+<code>.crs</code> and <code>.transform</code> without defensive checks; xrtoolz operators use
+<code>.dims</code> and <code>.coords</code> directly.</p>
+<p><strong>Costs you:</strong> each library is locked to its carrier, so
+<code>Sequential([geotoolz_op, xrtoolz_op])</code> does not compose across them, and
+a carrier-specific operator is written once per library.</p>
+</div>
+</div>
+</div>
+<h3 id="where-pipekit-lands">Where pipekit lands<a class="headerlink" href="#where-pipekit-lands" title="Permanent link">&para;</a></h3>
+<p><em>The two trajectories, resolved separately.</em></p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Where it lands</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Operators</td>
+<td>a typed concrete base class, <code>pipekit.Operator</code></td>
+<td>settled</td>
+</tr>
+<tr>
+<td>Carriers, pipekit core</td>
+<td><code>Carrier = Any</code></td>
+<td>settled: the core stays carrier-agnostic</td>
+</tr>
+<tr>
+<td>Carriers, multi-backend</td>
+<td>Array API Protocols, in pipekit-array</td>
+<td>in progress</td>
+</tr>
+<tr>
+<td>Carriers, domain libraries</td>
+<td>your own: <code>GeoTensor</code> in geotoolz, <code>xr.DataArray</code> / <code>xr.Dataset</code> in xrtoolz, …</td>
+<td>in use</td>
+</tr>
+</tbody>
+</table>
+<p>It was never one arc from functions to Protocols to typed entities. It was
+two trajectories that shared vocabulary. Operators started at <code>toolz</code>
+functions, considered Protocols, and landed on a typed base class. Carriers
+are still at all three stages at once, by design: each library uses the
+stage that serves it. Telling them as one story blurs the picture.</p>
+<h2 id="why-typed-operators-are-not-over-engineering">Why typed operators are not over-engineering<a class="headerlink" href="#why-typed-operators-are-not-over-engineering" title="Permanent link">&para;</a></h2>
+<p>"Just use functions" is tempting: less code, faster to write, familiar to
+anyone who has used <code>toolz</code>, no subclassing.</p>
+<p>The case for typed operators is that the six gaps above have no
+function-shaped solutions. Each needs somewhere to live: <code>get_config</code> on the
+operator, <code>forbid_in_yaml</code> on the class, dispatch in <code>__call__</code>, subclass
+walking in <code>from_state</code>. A function is the wrong host for all of them.</p>
+<p>So the argument is not that classes beat functions. It is that <strong>the
+responsibilities pipekit takes on are class-shaped</strong>. Remove them (no
+introspection, no serialisation, no dispatch, no flags) and you are left with
+<code>toolz</code>, which is a perfectly good answer for problems that fit it.
+pipekit's problems do not.</p>
+<h2 id="where-next">Where next<a class="headerlink" href="#where-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The <a href="../../core-tour/">tour of the core</a> turns this background into what
+  ships: the <code>toolz</code>-style functions, the <code>Operator</code> base with the machinery
+  for the six gaps, composition, control flow, observers, caching, QC, shape
+  inference, parallelism, serialisation and state.</li>
+<li><a href="../../patterns/">Patterns</a> maps it onto the shapes real deployments take,
+  each linked to a worked tutorial.</li>
+<li>The sister libraries that narrow the carrier (pipekit-array, geotoolz,
+  xrtoolz) and the wider stack are in the
+  <a href="https://github.com/jejjohnson/geostack/tree/main/docs/reports">GeoStack design reports</a>.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://github.com/pytoolz/toolz">toolz</a> and its
+  <a href="https://toolz.readthedocs.io/">documentation</a>.</li>
+<li>The <a href="https://data-apis.org/array-api/">Python Array API standard</a>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
