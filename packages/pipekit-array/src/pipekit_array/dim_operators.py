@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 from pipekit import Operator, Signature
 
 from pipekit_array import dims as _dims
+from pipekit_array.dimarray import is_mask
 
 
 __all__ = [
@@ -119,8 +120,20 @@ class ISel(Operator):
             return sig.replace_dims({self.dim: new})
         if getattr(self.index, "ndim", None) == 0 or isinstance(self.index, int):
             return sig.drop_dims((self.dim,))
-        # a list or 1-D array of positions keeps the dim, one entry each
-        return sig.replace_dims({self.dim: len(self.index)})
+        # a list or 1-D array of positions keeps the dim, one entry each; a
+        # boolean mask keeps one entry per True
+        return sig.replace_dims({self.dim: _selected_count(self.index)})
+
+
+def _selected_count(index: Any) -> int | None:
+    """Entries a 1-D position array or boolean mask selects; None if traced."""
+    if not is_mask(index):
+        return len(index)
+    if "Tracer" in type(index).__name__:
+        return None
+    import numpy as np
+
+    return int(np.count_nonzero(np.asarray(index)))
 
 
 _TUPLE = "__tuple__"

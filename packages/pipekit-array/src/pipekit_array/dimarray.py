@@ -136,6 +136,16 @@ def _is_scalar(index: Any) -> bool:
     return getattr(index, "ndim", None) == 0 and kind in ("i", "u")
 
 
+def is_mask(index: Any) -> bool:
+    """A boolean array, or a non-empty list / tuple of bools."""
+    dtype = getattr(index, "dtype", None)
+    return (dtype is not None and dtype == bool) or (
+        isinstance(index, (list, tuple))
+        and len(index) > 0
+        and all(isinstance(v, bool) for v in index)
+    )
+
+
 def _positions(index: Any, dim: str, size: int) -> Any:
     """An indexer with a boolean mask turned into the positions it selects.
 
@@ -147,13 +157,7 @@ def _positions(index: Any, dim: str, size: int) -> Any:
     """
     if isinstance(index, slice) or _is_scalar(index):
         return index
-    dtype = getattr(index, "dtype", None)
-    is_mask = (dtype is not None and dtype == bool) or (
-        isinstance(index, (list, tuple))
-        and len(index) > 0
-        and all(isinstance(v, bool) for v in index)
-    )
-    if not is_mask:
+    if not is_mask(index):
         ndim = getattr(index, "ndim", None)
         if ndim is None:
             import numpy as np
