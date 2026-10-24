@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.0.5...pipekit-jax-v0.0.6) (2026-10-24)
+
+
+### Features
+
+* **jax:** pipekit_jax.to_jax(op) builds a JaxOperator from a KernelOp ([#115](https://github.com/jejjohnson/pipekit/issues/115)) ([0b104c8](https://github.com/jejjohnson/pipekit/commit/0b104c8f1a6c6d810197752a67b2e6753c0f2a90))
+
 ## [0.0.5](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.0.4...pipekit-jax-v0.0.5) (2026-10-24)
 
 
