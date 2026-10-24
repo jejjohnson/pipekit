@@ -65,6 +65,7 @@ __all__ = [
     "BackendError",
     "KernelOp",
     "KernelSpec",
+    "derive_geometry",
     "kernel_output_dims",
     "run_kernel",
 ]
@@ -384,6 +385,30 @@ def _check_by_kind(carriers: list[Any], adapters: list[NamedArrayAdapter]) -> li
     return out
 
 
+def derive_geometry(
+    geometry: dict[str, Callable[[Any], Any]], first: Any
+) -> dict[str, Any]:
+    """The kernel's derived-geometry keywords, computed from the first carrier.
+
+    Raises:
+        ValueError: The carrier's adapter reports ``batch_dims`` (one geometry
+            per item), but keyword inputs are passed whole (F4); the message
+            names ``map_over``.
+    """
+    if not geometry:
+        return {}
+    adapter = get_adapter(first)
+    batch = getattr(adapter, "batch_dims", None)
+    batched = batch(first) if batch is not None else ()
+    if batched:
+        raise ValueError(
+            f"geometry= on a carrier batched over {batched} (one geometry per "
+            "item), but keyword inputs are passed whole: use "
+            f"map_over(x, op, {batched[0]!r}) so each item has its own."
+        )
+    return {name: fn(first) for name, fn in geometry.items()}
+
+
 class KernelOp(Operator):
     """An L1 kernel wrapped once, run on raw arrays and on every named carrier.
 
@@ -446,21 +471,9 @@ class KernelOp(Operator):
                 f"{self.spec.signature!r} takes {len(self.spec.inputs)} input(s), "
                 f"got {len(carriers)}."
             )
-        derived = self._derived(carriers[0]) if self.geometry else {}
+        derived = derive_geometry(self.geometry, carriers[0])
         kwargs = self.params | derived
         return run_kernel(self.kernel, self.spec, self.core, carriers, kwargs)
-
-    def _derived(self, first: Any) -> dict[str, Any]:
-        adapter = get_adapter(first)
-        batch = getattr(adapter, "batch_dims", None)
-        batched = batch(first) if batch is not None else ()
-        if batched:
-            raise ValueError(
-                f"geometry= on a carrier batched over {batched} (one geometry per "
-                "item), but keyword inputs are passed whole: use "
-                f"map_over(x, op, {batched[0]!r}) so each item has its own."
-            )
-        return {name: fn(first) for name, fn in self.geometry.items()}
 
     def get_config(self) -> dict[str, Any]:
         module = getattr(self.kernel, "__module__", "?")

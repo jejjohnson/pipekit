@@ -20,6 +20,9 @@ Public surface:
   lazily).
 - `to_diffrax_adjoint` / `truncated_scan` — JAX-side interpreters for
   the carrier-agnostic adjoint specs in ``pipekit_cycle.adjoints``.
+- `to_jax` / `JaxKernelOp` — a ``pipekit_array.KernelOp`` as a
+  `JaxOperator` whose array parameters are leaves (behind the
+  ``[array]`` extra; imported lazily).
 
 Importing this package also registers ``pipekit.Sequential``,
 ``pipekit.Graph`` and `JaxModelOp` as JAX pytrees (`pipekit_jax.pytree`),
@@ -47,17 +50,24 @@ def __getattr__(name: str) -> Any:
         from pipekit_jax.diffrax_model import DiffraxForwardModel
 
         return DiffraxForwardModel
+    # to_jax / JaxKernelOp need the [array] extra (pipekit-array)
+    if name in ("to_jax", "JaxKernelOp"):
+        from pipekit_jax import kernel
+
+        return getattr(kernel, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
     "DiffraxForwardModel",
     "EnsembleScanCycle",
+    "JaxKernelOp",
     "JaxModelOp",
     "JaxOperator",
     "Rollout",
     "ScanCycle",
     "to_diffrax_adjoint",
+    "to_jax",
     "truncated_scan",
 ]
 

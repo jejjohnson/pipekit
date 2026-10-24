@@ -61,6 +61,14 @@ Measured on a 2-vCPU CPU VM (5-point diffusion step on a 128² grid):
 
 ::: pipekit_jax.cycle
 
+## KernelOp on JAX
+
+`to_jax(op)` turns a `pipekit_array.KernelOp` into a `JaxKernelOp`: its
+array parameters are leaves, so `eqx.filter_jit` and `eqx.filter_grad` reach
+them (`pipekit-jax[array]`).
+
+::: pipekit_jax.kernel
+
 ## JaxModelOp
 
 ::: pipekit_jax.model_op
