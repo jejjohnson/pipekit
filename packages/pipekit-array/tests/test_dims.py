@@ -476,3 +476,14 @@ def test_take_along_refuses_a_jax_index_on_numpy_data() -> None:
     index = DimArray(jnp.zeros(2, dtype=jnp.int32), ("x",))
     with pytest.raises(pa.BackendError, match="take_along"):
         pa.take_along(x, index, "t")
+
+
+@pytest.mark.parametrize(
+    "index", [[True, False, True], np.array([True, False, True]), [0, 2]]
+)
+def test_isel_signature_counts_selected_entries(index: Any) -> None:
+    """Codex #110: a mask predicts one entry per True, as execution gives."""
+    op = ISel(dim="x", index=index)
+    sig = op.compute_output_signature(Signature(dims=(("x", 3),)))
+    assert sig.dims == (("x", 2),)
+    assert op(DimArray(np.arange(3.0), ("x",))).data.shape == (2,)
