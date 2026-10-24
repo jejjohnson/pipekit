@@ -19,7 +19,9 @@ def normalized_difference(a: Any, b: Any, eps: float) -> Any:
 
 
 ND = KernelOp(normalized_difference, "(),()->()", core={}, eps=1e-10)
-BAND_SUM = KernelOp(lambda x: x.sum(-1), "(c)->()", core={"c": "band"})
+BAND_SUM = KernelOp(
+    lambda x: x.sum(-1), KernelSpec("(c)->()", dtypes=("same",)), core={"c": "band"}
+)
 
 
 def _dimarray(xp: Any = np) -> Any:

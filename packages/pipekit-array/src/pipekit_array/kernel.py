@@ -109,10 +109,15 @@ class KernelSpec:
         sizes: Output-only core letters and the input letter whose size each
             has, e.g. ``(("d", "c"),)``. Pairs, not a dict, so the spec stays
             hashable.
+        dtypes: Each output's dtype, for output signatures and lazy
+            backends: a dtype name (``"bool"``) or ``"same"`` for the first
+            input's. Empty (the default) leaves it unknown in signatures;
+            dask then finds it by calling the kernel once.
 
     Raises:
-        ValueError: The signature does not parse, or ``sizes`` names a letter
-            that is not output-only or an input letter that does not exist.
+        ValueError: The signature does not parse, ``sizes`` names a letter
+            that is not output-only or an input letter that does not exist,
+            or ``dtypes`` is not one entry per output.
 
     Example:
         >>> spec = KernelSpec("(r,c)->(c),(c,d)", sizes=(("d", "c"),))
@@ -124,12 +129,18 @@ class KernelSpec:
     backends: tuple[str, ...] = ("numpy", "jax", "dask", "xarray")
     vectorize: bool = False
     sizes: tuple[tuple[str, str], ...] = ()
+    dtypes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not _SIGNATURE.match(self.signature):
             raise ValueError(f"Not a gufunc signature: {self.signature!r}.")
         object.__setattr__(self, "backends", tuple(self.backends))
         object.__setattr__(self, "sizes", tuple(tuple(p) for p in self.sizes))
+        object.__setattr__(self, "dtypes", tuple(map(str, self.dtypes)))
+        if self.dtypes and len(self.dtypes) != len(self.outputs):
+            raise ValueError(
+                f"dtypes: {len(self.dtypes)} entries for {len(self.outputs)} output(s)."
+            )
         in_letters = {c for group in self.inputs for c in group}
         out_only = {c for group in self.outputs for c in group} - in_letters
         declared = {out for out, _ in self.sizes}
@@ -515,8 +526,8 @@ class KernelOp(Operator):
 
         A two-output kernel gives a tuple of signatures. With several inputs
         the other inputs' dims are unknown here, so the answer is ``None``.
-        The dtype is the input's: kernels preserve their input dtype (the
-        caller decides precision).
+        The dtype is the one ``spec.dtypes`` declares (``"same"``: the
+        input's), else unknown: a kernel may return a mask or an index.
         """
         sig = signature_of(input_signature)
         if not isinstance(sig, Signature) or len(self.spec.inputs) != 1:
@@ -532,8 +543,13 @@ class KernelOp(Operator):
         dim_size = {self.core[k]: v for k, v in letter_size.items()} | {
             d: s for d, s in sizes.items()
         }
+        dtypes = [sig.dtype if d == "same" else d for d in self.spec.dtypes] or [
+            None
+        ] * len(self.spec.outputs)
         outs = tuple(
-            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=sig.dtype)
-            for dims in kernel_output_dims(self.spec, self.core, [names])
+            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
+            for dims, dtype in zip(
+                kernel_output_dims(self.spec, self.core, [names]), dtypes, strict=True
+            )
         )
         return outs if len(outs) > 1 else outs[0]

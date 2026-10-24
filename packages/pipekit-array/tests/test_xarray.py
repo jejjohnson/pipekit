@@ -336,3 +336,39 @@ def test_lazy_combine_declares_the_result_dtype() -> None:
     halved = pa.combine(lambda a: a / 2, x)
     assert halved.dtype == np.float64
     assert float(halved.sum().compute()) == pytest.approx(4.5)
+
+
+# -- review fixes (Codex, #114) -------------------------------------------------------
+
+
+def _labelled(lazy: bool) -> xr.DataArray:
+    rng = np.random.default_rng(1)
+    cube = xr.DataArray(
+        rng.random((4, 3, 2)),
+        dims=("time", "y", "x"),
+        coords={
+            "time": np.arange(4),
+            "quality": (("time", "x"), rng.random((4, 2))),
+            "x": [10.0, 20.0],
+        },
+        attrs={"units": "K"},
+    )
+    return cube.chunk({"y": 1}) if lazy else cube
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_take_along_keeps_attrs_and_gathers_aux_coords(lazy: bool) -> None:
+    cube = _labelled(lazy)
+    best = pa.argreduce(cube, "argmax", "time")
+    out = pa.take_along(cube, best, "time")
+    assert out.dims == ("y", "x")
+    assert out.attrs == {"units": "K"}
+    assert "time" not in out.coords
+    eager = _labelled(False)
+    idx = eager.argmax("time")
+    np.testing.assert_allclose(out.values, eager.isel(time=idx).values)
+    np.testing.assert_allclose(
+        out["quality"].transpose("y", "x").values,
+        eager["quality"].isel(time=idx).transpose("y", "x").values,
+    )
+    np.testing.assert_array_equal(out["x"].values, [10.0, 20.0])

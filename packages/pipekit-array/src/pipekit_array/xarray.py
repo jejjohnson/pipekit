@@ -122,22 +122,21 @@ class XarrayAdapter:
         """One entry of ``dim`` per position, lazily on dask, in ``x``'s dim order.
 
         An ``apply_ufunc`` over ``take_along_axis``, not a vectorized
-        ``isel``: dask cannot index with a lazy indexer.
+        ``isel``: dask cannot index with a lazy indexer. Attributes are kept,
+        auxiliary coordinates on ``dim`` (``quality(time, x)``) are gathered
+        with the same index, and ``dim``'s own coordinate is dropped.
         """
         rest = [str(d) for d in x.dims if d != dim]
         idx = _as_dataarray(index)
-        out = xr.apply_ufunc(
-            _take_along_last,
-            x,
-            idx,
-            input_core_dims=[[dim], []],
-            dask="parallelized",
-            join="exact",
-            output_dtypes=[x.dtype],
-            # the gathered dim must be whole in each block
-            dask_gufunc_kwargs={"allow_rechunk": True},
-        )
-        return out.transpose(*rest)
+        out = _gather(x, idx, dim)
+        aux = {
+            str(name): _gather(xr.DataArray(c.variable), idx, dim).variable
+            for name, c in x.coords.items()
+            if dim in c.dims and name != dim
+        }
+        if aux:
+            out = out.assign_coords(aux)
+        return out.transpose(*rest, ...)
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """A new leading dim; coordinates must be identical (never aligned)."""
@@ -222,12 +221,31 @@ class XarrayAdapter:
         return result.transpose(*targets[0])
 
 
+def _gather(values: xr.DataArray, idx: xr.DataArray, dim: str) -> xr.DataArray:
+    """``values`` at ``idx`` along ``dim``; coordinates on ``dim`` are dropped."""
+    return xr.apply_ufunc(
+        _take_along_last,
+        values,
+        idx,
+        input_core_dims=[[dim], []],
+        dask="parallelized",
+        join="exact",
+        keep_attrs=True,
+        output_dtypes=[values.dtype],
+        # the gathered dim must be whole in each block
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+
+
 def _take_along_last(values: Any, index: Any) -> Any:
     """values (..., n) at index (...) along the last axis."""
     import numpy as np
 
-    # apply_ufunc aligns missing loop dims to the right, as NumPy broadcasts
-    index = np.broadcast_to(index, values.shape[:-1])
+    # apply_ufunc gives each input its own loop dims in one order, size 1 or
+    # absent where it lacks one: broadcast both to the common loop shape
+    loop = np.broadcast_shapes(values.shape[:-1], np.shape(index))
+    values = np.broadcast_to(values, (*loop, values.shape[-1]))
+    index = np.broadcast_to(index, loop)
     picked = np.take_along_axis(values, index[..., None], axis=-1)
     return picked[..., 0]
 
@@ -241,14 +259,17 @@ def _output_dtypes(
 ) -> list[Any] | None:
     """Each output's dtype, which dask must know before it runs anything.
 
-    Found by calling the kernel once on ones with only the core dims (the
-    loop dims dropped), so a mask or an index kernel declares bool or int;
-    the first input's dtype when that call fails.
+    ``spec.dtypes`` when declared; else found by calling the kernel once on
+    ones with only the core dims (the loop dims dropped), so a mask or an
+    index kernel gives bool or int; the first input's dtype when that call
+    fails.
     """
     if not any(_is_dask(x) for x in xs):
         # eager: let the kernel (or np.vectorize) decide; a declared dtype
         # would cast the results
         return None
+    if spec.dtypes:
+        return [xs[0].dtype if d == "same" else np.dtype(d) for d in spec.dtypes]
     fallback = [xs[0].dtype] * len(spec.outputs)
     probes = [
         np.ones(tuple(letter_size[c] for c in group), dtype=x.dtype)
