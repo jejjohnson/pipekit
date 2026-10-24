@@ -35,6 +35,27 @@ def _multi_backend_msg(names: list[str]) -> str:
     )
 
 
+_UNSET: Any = object()
+_compat: Any = _UNSET
+
+
+def _compat_namespace() -> Callable[..., Any] | None:
+    """``array_api_compat.array_namespace``, or None; looked up once.
+
+    A failed import is not cached by Python, so trying it on every call
+    cost about 0.2 ms per operator call (KernelOp's PK-K5 budget is 25 µs).
+    """
+    global _compat
+    if _compat is _UNSET:
+        try:
+            import array_api_compat  # ty: ignore[unresolved-import]
+
+            _compat = array_api_compat.array_namespace
+        except ImportError:
+            _compat = None
+    return _compat
+
+
 def array_namespace(*xs: Any) -> Any:
     """Return the Array API namespace shared by all input arrays.
 
@@ -51,13 +72,7 @@ def array_namespace(*xs: Any) -> Any:
             inputs span more than one backend. The error message is
             consistent whether or not `array-api-compat` is installed.
     """
-    compat_ns: Callable[..., Any] | None = None
-    try:
-        import array_api_compat  # ty: ignore[unresolved-import]
-
-        compat_ns = array_api_compat.array_namespace
-    except ImportError:
-        pass
+    compat_ns = _compat_namespace()
 
     if compat_ns is not None:
         try:

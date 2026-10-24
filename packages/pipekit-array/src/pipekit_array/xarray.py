@@ -119,10 +119,25 @@ class XarrayAdapter:
         return x.reduce(fn, dim=dim)
 
     def take_along(self, x: xr.DataArray, index: Any, dim: str) -> xr.DataArray:
-        """Vectorized ``x.isel({dim: index})``, in ``x``'s dim order."""
-        rest = [d for d in x.dims if d != dim]
-        out = x.isel({dim: _as_dataarray(index)})
-        return out.transpose(*rest).drop_vars(dim, errors="ignore")
+        """One entry of ``dim`` per position, lazily on dask, in ``x``'s dim order.
+
+        An ``apply_ufunc`` over ``take_along_axis``, not a vectorized
+        ``isel``: dask cannot index with a lazy indexer.
+        """
+        rest = [str(d) for d in x.dims if d != dim]
+        idx = _as_dataarray(index)
+        out = xr.apply_ufunc(
+            _take_along_last,
+            x,
+            idx,
+            input_core_dims=[[dim], []],
+            dask="parallelized",
+            join="exact",
+            output_dtypes=[x.dtype],
+            # the gathered dim must be whole in each block
+            dask_gufunc_kwargs={"allow_rechunk": True},
+        )
+        return out.transpose(*rest)
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """A new leading dim; coordinates must be identical (never aligned)."""
@@ -199,6 +214,16 @@ class XarrayAdapter:
         if len(out_dims) > 1:
             return tuple(r.transpose(*t) for r, t in zip(result, targets, strict=True))
         return result.transpose(*targets[0])
+
+
+def _take_along_last(values: Any, index: Any) -> Any:
+    """values (..., n) at index (...) along the last axis."""
+    import numpy as np
+
+    # apply_ufunc aligns missing loop dims to the right, as NumPy broadcasts
+    index = np.broadcast_to(index, values.shape[:-1])
+    picked = np.take_along_axis(values, index[..., None], axis=-1)
+    return picked[..., 0]
 
 
 def _as_dataarray(index: Any) -> xr.DataArray:

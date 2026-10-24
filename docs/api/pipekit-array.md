@@ -38,3 +38,10 @@ and the trained-model wrapper `ModelOp`.
 ## xarray
 
 ::: pipekit_array.xarray
+
+## Test kit
+
+Shipped in the wheel, for carrier libraries' own test suites (gates PK-K1 and
+PK-K4; pipekit's own tests run PK-K2, PK-K3 and, under `-m slow`, PK-K5).
+
+::: pipekit_array.testing
