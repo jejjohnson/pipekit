@@ -362,3 +362,47 @@ def test_concat_rejects_different_dims_and_a_missing_dim() -> None:
         pa.concat([a, b], "time")
     with pytest.raises(ValueError, match="not a dim"):
         pa.concat([a, a], "run")
+
+
+# -- review fixes (Codex, #114) -------------------------------------------------------
+
+
+def _labelled(lazy: bool) -> xr.DataArray:
+    rng = np.random.default_rng(1)
+    cube = xr.DataArray(
+        rng.random((4, 3, 2)),
+        dims=("time", "y", "x"),
+        coords={
+            "time": np.arange(4),
+            "quality": (("time", "x"), rng.random((4, 2))),
+            "x": [10.0, 20.0],
+        },
+        attrs={"units": "K"},
+    )
+    return cube.chunk({"y": 1}) if lazy else cube
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_take_along_keeps_attrs_and_gathers_aux_coords(lazy: bool) -> None:
+    cube = _labelled(lazy)
+    best = pa.argreduce(cube, "argmax", "time")
+    out = pa.take_along(cube, best, "time")
+    assert out.dims == ("y", "x")
+    assert out.attrs == {"units": "K"}
+    assert "time" not in out.coords
+    eager = _labelled(False)
+    idx = eager.argmax("time")
+    np.testing.assert_allclose(out.values, eager.isel(time=idx).values)
+    np.testing.assert_allclose(
+        out["quality"].transpose("y", "x").values,
+        eager["quality"].isel(time=idx).transpose("y", "x").values,
+    )
+    np.testing.assert_array_equal(out["x"].values, [10.0, 20.0])
+
+
+def test_take_along_rejects_an_unrelated_index_dim() -> None:
+    """Codex #114: an index on `z` is an error, not a broadcast to (x, z)."""
+    x = xr.DataArray(np.zeros((3, 2)), dims=("time", "x"))
+    index = xr.DataArray([0, 1, 2, 0], dims=("z",))
+    with pytest.raises(ValueError, match="not among"):
+        pa.take_along(x, index, "time")

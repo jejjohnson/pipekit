@@ -109,10 +109,15 @@ class KernelSpec:
         sizes: Output-only core letters and the input letter whose size each
             has, e.g. ``(("d", "c"),)``. Pairs, not a dict, so the spec stays
             hashable.
+        dtypes: Each output's dtype, for output signatures and lazy
+            backends: a dtype name (``"bool"``) or ``"same"`` for the first
+            input's. Empty (the default) leaves it unknown in signatures;
+            dask then finds it by calling the kernel once.
 
     Raises:
-        ValueError: The signature does not parse, or ``sizes`` names a letter
-            that is not output-only or an input letter that does not exist.
+        ValueError: The signature does not parse, ``sizes`` names a letter
+            that is not output-only or an input letter that does not exist,
+            or ``dtypes`` is not one entry per output.
 
     Example:
         >>> spec = KernelSpec("(r,c)->(c),(c,d)", sizes=(("d", "c"),))
@@ -124,12 +129,18 @@ class KernelSpec:
     backends: tuple[str, ...] = ("numpy", "jax", "dask", "xarray")
     vectorize: bool = False
     sizes: tuple[tuple[str, str], ...] = ()
+    dtypes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not _SIGNATURE.match(self.signature):
             raise ValueError(f"Not a gufunc signature: {self.signature!r}.")
         object.__setattr__(self, "backends", tuple(self.backends))
         object.__setattr__(self, "sizes", tuple(tuple(p) for p in self.sizes))
+        object.__setattr__(self, "dtypes", tuple(map(str, self.dtypes)))
+        if self.dtypes and len(self.dtypes) != len(self.outputs):
+            raise ValueError(
+                f"dtypes: {len(self.dtypes)} entries for {len(self.outputs)} output(s)."
+            )
         in_letters = {c for group in self.inputs for c in group}
         out_only = {c for group in self.outputs for c in group} - in_letters
         declared = {out for out, _ in self.sizes}
@@ -145,17 +156,17 @@ class KernelSpec:
                 f"sizes=(({missing[0]!r}, '<input letter>'),)."
             )
 
-    @property
+    @functools.cached_property
     def inputs(self) -> tuple[tuple[str, ...], ...]:
         """Core letters of each input."""
         return _groups(self.signature.split("->")[0])
 
-    @property
+    @functools.cached_property
     def outputs(self) -> tuple[tuple[str, ...], ...]:
         """Core letters of each output."""
         return _groups(self.signature.split("->")[1])
 
-    @property
+    @functools.cached_property
     def letters(self) -> tuple[str, ...]:
         """Every core letter, in order of first appearance."""
         seen: dict[str, None] = {}
@@ -273,7 +284,8 @@ def run_kernel(
                 "pipekit_array.DimArray with its dims."
             )
     named: list[NamedArrayAdapter] = [a for a in adapters if a is not None]
-    own = [cast(_RunsKernels, a) for a in named if isinstance(a, _RunsKernels)]
+    # a class attribute check: isinstance against a runtime Protocol costs ~10 µs
+    own = [cast(_RunsKernels, a) for a in named if hasattr(type(a), "apply_kernel")]
     if own:
         if len({type(a) for a in named}) > 1:
             raise BackendError(
@@ -284,6 +296,58 @@ def run_kernel(
     return _run_named(kernel, spec, core, list(carriers), named, kwargs)
 
 
+@dataclasses.dataclass(frozen=True)
+class _Plan:
+    """Everything about one call that depends only on dims: computed once."""
+
+    # per input: axes to put (present loop dims, core dims) in order (None if
+    # already in order), and where to insert size-1 axes for loop dims it lacks
+    arrange: tuple[tuple[tuple[int, ...] | None, tuple[int, ...]], ...]
+    # per input: (axis, dim) pairs, to check each dim has one size
+    size_checks: tuple[tuple[tuple[int, str], ...], ...]
+    # per output: the permutation back to the target order (None if none is
+    # needed), and that order
+    restore: tuple[tuple[tuple[int, ...] | None, tuple[str, ...]], ...]
+
+
+@functools.lru_cache(maxsize=1024)
+def _plan(
+    spec: KernelSpec,
+    core_items: tuple[tuple[str, str], ...],
+    dims: tuple[tuple[str, ...], ...],
+) -> _Plan:
+    core = dict(core_items)
+    core_dims = [tuple(core[c] for c in group) for group in spec.inputs]
+    loop: list[str] = []
+    for i, (x_dims, cores) in enumerate(zip(dims, core_dims, strict=True)):
+        missing = [c for c in cores if c not in x_dims]
+        if missing:
+            raise ValueError(
+                f"input {i}: core dim(s) {missing} not in its dims {x_dims}."
+            )
+        for d in x_dims:
+            if d not in cores and d not in loop:
+                loop.append(d)
+    arrange = []
+    for x_dims, cores in zip(dims, core_dims, strict=True):
+        present = [d for d in loop if d in x_dims]
+        axes = tuple(x_dims.index(d) for d in (*present, *cores))
+        inserts = tuple(pos for pos, d in enumerate(loop) if d not in x_dims)
+        arrange.append((_unless_identity(axes), inserts))
+    size_checks = tuple(tuple(enumerate(x_dims)) for x_dims in dims)
+    targets = kernel_output_dims(spec, core, dims)
+    restore = []
+    for group, target in zip(spec.outputs, targets, strict=True):
+        produced = (*loop, *(core[c] for c in group))
+        axes = tuple(produced.index(d) for d in target)
+        restore.append((_unless_identity(axes), target))
+    return _Plan(tuple(arrange), size_checks, tuple(restore))
+
+
+def _unless_identity(axes: tuple[int, ...]) -> tuple[int, ...] | None:
+    return None if axes == tuple(range(len(axes))) else axes
+
+
 def _run_named(
     kernel: Callable[..., Any],
     spec: KernelSpec,
@@ -292,57 +356,45 @@ def _run_named(
     adapters: list[NamedArrayAdapter],
     kwargs: dict[str, Any],
 ) -> Any:
-    backends = {
-        backend_name(a.data(x)) for a, x in zip(adapters, carriers, strict=True)
-    }
-    backend = _require_backend(backends, spec)
-    carriers = _check_by_kind(carriers, adapters)
-    dims = [a.dims(x) for a, x in zip(adapters, carriers, strict=True)]
-    core_dims = [tuple(core[c] for c in group) for group in spec.inputs]
-    loop: list[str] = []
+    datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
+    backend = _require_backend({backend_name(d) for d in datas}, spec)
+    if len(carriers) > 1:
+        carriers = _check_by_kind(carriers, adapters)
+        datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
+    dims = tuple(tuple(a.dims(x)) for a, x in zip(adapters, carriers, strict=True))
+    plan = _plan(spec, tuple(sorted(core.items())), dims)
     sizes: dict[str, int] = {}
-    for i, (x_dims, cores, adapter, x) in enumerate(
-        zip(dims, core_dims, adapters, carriers, strict=True)
-    ):
-        missing = [c for c in cores if c not in x_dims]
-        if missing:
-            raise ValueError(
-                f"input {i}: core dim(s) {missing} not in its dims {x_dims}."
-            )
-        for d, n in zip(x_dims, adapter.data(x).shape, strict=True):
+    # one input cannot disagree with itself
+    checked_sizes = plan.size_checks if len(datas) > 1 else ()
+    for i, (data, checks) in enumerate(zip(datas, checked_sizes, strict=False)):
+        shape = data.shape
+        for axis, d in checks:
+            n = shape[axis]
             if sizes.setdefault(d, n) != n:
                 raise ValueError(f"input {i}: dim {d!r} has size {n}, not {sizes[d]}.")
-            if d not in cores and d not in loop:
-                loop.append(d)
-    _check_core_not_loop(loop, core_dims)
-    xp = namespace_of(adapters[0].data(carriers[0]))
-    arrays = [
-        _arrange(xp, a.data(x), x_dims, loop, cores)
-        for a, x, x_dims, cores in zip(adapters, carriers, dims, core_dims, strict=True)
-    ]
+    xp = namespace_of(datas[0])
+    arrays = []
+    for data, (axes, inserts) in zip(datas, plan.arrange, strict=True):
+        moved = _permute(xp, data, axes)
+        for position in inserts:
+            moved = xp.expand_dims(moved, axis=position)
+        arrays.append(moved)
     result = _call(kernel, spec, kwargs, backend)(*arrays)
-    many = len(spec.outputs) > 1
+    many = len(plan.restore) > 1
     results = tuple(result) if many else (result,)
-    targets = kernel_output_dims(spec, core, dims)
     template, template_adapter = carriers[0], adapters[0]
     wrapped = []
-    for out, group, target in zip(results, spec.outputs, targets, strict=True):
-        produced = (*loop, *(core[c] for c in group))
-        moved = xp.permute_dims(out, tuple(produced.index(d) for d in target))
-        wrapped.append(template_adapter.rewrap(template, moved, target))
+    for out, (axes, target) in zip(results, plan.restore, strict=True):
+        moved_out = _permute(xp, out, axes)
+        wrapped.append(template_adapter.rewrap(template, moved_out, target))
     return tuple(wrapped) if many else wrapped[0]
 
 
-def _arrange(
-    xp: Any, data: Any, dims: tuple[str, ...], loop: list[str], cores: tuple[str, ...]
-) -> Any:
-    """Loop dims in loop order (size 1 where absent), then the core dims."""
-    present = [d for d in loop if d in dims]
-    moved = xp.permute_dims(data, tuple(dims.index(d) for d in (*present, *cores)))
-    for position, d in enumerate(loop):
-        if d not in dims:
-            moved = xp.expand_dims(moved, axis=position)
-    return moved
+def _permute(xp: Any, data: Any, axes: tuple[int, ...] | None) -> Any:
+    """``permute_dims``, skipped when the plan says the order is already right."""
+    if axes is None:
+        return data
+    return xp.permute_dims(data, axes)
 
 
 def _check_by_kind(carriers: list[Any], adapters: list[NamedArrayAdapter]) -> list[Any]:
@@ -474,6 +526,8 @@ class KernelOp(Operator):
 
         A two-output kernel gives a tuple of signatures. With several inputs
         the other inputs' dims are unknown here, so the answer is ``None``.
+        The dtype is the one ``spec.dtypes`` declares (``"same"``: the
+        input's), else unknown: a kernel may return a mask or an index.
         """
         sig = signature_of(input_signature)
         if not isinstance(sig, Signature) or len(self.spec.inputs) != 1:
@@ -489,8 +543,13 @@ class KernelOp(Operator):
         dim_size = {self.core[k]: v for k, v in letter_size.items()} | {
             d: s for d, s in sizes.items()
         }
+        dtypes = [sig.dtype if d == "same" else d for d in self.spec.dtypes] or [
+            None
+        ] * len(self.spec.outputs)
         outs = tuple(
-            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=None)
-            for dims in kernel_output_dims(self.spec, self.core, [names])
+            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
+            for dims, dtype in zip(
+                kernel_output_dims(self.spec, self.core, [names]), dtypes, strict=True
+            )
         )
         return outs if len(outs) > 1 else outs[0]

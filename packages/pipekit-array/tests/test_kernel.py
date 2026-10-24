@@ -389,3 +389,19 @@ def test_vectorize_refuses_dask_instead_of_computing_it() -> None:
     )
     with pytest.raises(BackendError, match="eagerly"):
         op(DimArray(da.ones((3, 4), chunks=1), ("y", "x")))
+
+
+def test_kernel_signature_dtype_is_declared_or_unknown() -> None:
+    sig = Signature(dims=(("band", 3), ("y", 2)), dtype="float32")
+    mask = KernelOp(lambda z: z > 0.5, "(c)->(c)", core={"c": "band"})
+    assert mask.compute_output_signature(sig).dtype is None
+    same = KernelOp(
+        lambda z: z.sum(-1), KernelSpec("(c)->()", dtypes=("same",)), core={"c": "band"}
+    )
+    assert same.compute_output_signature(sig).dtype == "float32"
+    declared = KernelOp(
+        lambda z: z > 0, KernelSpec("(c)->(c)", dtypes=("bool",)), core={"c": "band"}
+    )
+    assert declared.compute_output_signature(sig).dtype == "bool"
+    with pytest.raises(ValueError, match="dtypes"):
+        KernelSpec("(c)->()", dtypes=("bool", "bool"))
