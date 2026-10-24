@@ -8,7 +8,10 @@ named carrier for tests and for libraries with none of their own
 - **It holds** a raw array (NumPy, JAX or dask), one name per axis, and
   the static labels of any dim (band names, level values).
 - **It is** a JAX pytree whose only leaf is the data: dims and labels are
-  static, so a new set of values never recompiles.
+  static, so a new set of values never recompiles. Under a bare
+  ``jax.vmap`` (``in_axes=0``) the mapped dim is the first one: it is
+  dropped inside and comes back as ``"batch"`` (`vmapped_dims`); to map a
+  named dim, use `pipekit_array.map_over`.
 - **It does not hold** a georeference, coordinates beyond labels, or
   attrs, and **does not do** alignment, arithmetic or selection by value;
   `DimArray.to_xarray` crosses to xarray when an analysis needs those.
@@ -209,6 +212,30 @@ class DimArrayAdapter:
         return Signature(dims=dims, dtype=str(x.dtype))
 
 
+def vmapped_dims(dims: tuple[str, ...], shape: Any) -> tuple[str, ...]:
+    """Static dims matched to leaves ``jax.vmap`` added or removed an axis from.
+
+    ``vmap`` maps leaves but not static dims: inside, the data has lost
+    its leading axis; outside, the results gained one. With the default
+    ``in_axes=0`` / ``out_axes=0`` that axis is the first, so drop the
+    first dims, or prepend ``"batch"`` (``"batch_1"``, … if taken). A
+    shape that already matches, or no shape (a tracing placeholder),
+    leaves ``dims`` alone. Map over any other axis with `map_over`.
+    """
+    if shape is None or not hasattr(shape, "__len__") or len(shape) == len(dims):
+        return dims
+    if len(shape) < len(dims):
+        return dims[len(dims) - len(shape) :]
+    added: list[str] = []
+    k = 0
+    while len(added) < len(shape) - len(dims):
+        name = "batch" if k == 0 else f"batch_{k}"
+        k += 1
+        if name not in dims:
+            added.append(name)
+    return (*added, *dims)
+
+
 def _register_pytree() -> bool:
     """Register `DimArray` with JAX when JAX is installed; never fail without it."""
     try:
@@ -227,7 +254,9 @@ def _register_pytree() -> bool:
     def unflatten(aux: Any, leaves: Any) -> DimArray:
         # never validate: JAX unflattens with placeholder leaves while tracing
         dims, labels = aux
-        return _build(leaves[0], dims, dict(labels))
+        data = leaves[0]
+        dims = vmapped_dims(dims, getattr(data, "shape", None))
+        return _build(data, dims, {d: v for d, v in labels if d in dims})
 
     jax.tree_util.register_pytree_with_keys(
         DimArray, flatten_with_keys, unflatten, flatten_func=flatten
