@@ -339,6 +339,8 @@ def take_along(x: Any, index: Any, dim: str) -> Any:
     data = adapter.data(x)
     xp = namespace_of(data)
     idx = index_adapter.data(index)
+    # a JAX index next to NumPy data would be converted (or fail under jit)
+    require_one_backend([data, idx], "take_along")
     # index → x's dim order with dim as a size-1 axis; missing dims broadcast
     for d in index_dims:
         mine, theirs = adapter.labels(x, d), index_adapter.labels(index, d)

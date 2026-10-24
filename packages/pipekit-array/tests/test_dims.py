@@ -455,3 +455,24 @@ def test_numpy_conversion_honours_copy() -> None:
     assert d.data[0] == 0.0
     with pytest.raises(ValueError):
         np.array(d, dtype=np.float32, copy=False)
+
+
+def test_sel_with_a_label_array_keeps_the_dim_in_its_signature() -> None:
+    """Codex #110: a 1-D label array is several labels, in the signature too."""
+    from pipekit import dumps, loads
+
+    cube = DimArray(np.zeros((3, 2)), ("band", "x"), {"band": ("a", "b", "c")})
+    op = Sel(dim="band", label=np.array(["a", "c"]))
+    sig = op.compute_output_signature(Signature(dims=(("band", 3), ("x", 2))))
+    assert sig.dims == (("band", 2), ("x", 2))
+    assert op(cube).dims == ("band", "x")
+    assert loads(dumps(op)).label == ["a", "c"]
+
+
+def test_take_along_refuses_a_jax_index_on_numpy_data() -> None:
+    """Codex #110: mixed backends raise instead of converting the index."""
+    jnp = pytest.importorskip("jax.numpy")
+    x = DimArray(np.zeros((3, 2)), ("t", "x"))
+    index = DimArray(jnp.zeros(2, dtype=jnp.int32), ("x",))
+    with pytest.raises(pa.BackendError, match="take_along"):
+        pa.take_along(x, index, "t")
