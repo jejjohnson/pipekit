@@ -37,6 +37,7 @@ from pipekit_array.dim_operators import (
 )
 from pipekit_array.dimarray import DimArray, DimArrayAdapter
 from pipekit_array.dims import (
+    BackendError,
     argreduce,
     combine,
     concat,

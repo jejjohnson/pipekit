@@ -154,10 +154,15 @@ def get_adapter(x: Any) -> NamedArrayAdapter | None:
         adapter = _REGISTRY.get(base)
         if adapter is not None:
             return adapter
-    name = f"{cls.__module__}.{cls.__qualname__}"
-    hint = _EXTRA_HINTS.get(name)
-    if hint is not None:
-        raise MissingAdapterError(f"{name} needs its named-array adapter: {hint}.")
+    # a subclass of a known carrier gets its base's hint
+    for base in cls.__mro__:
+        name = f"{base.__module__}.{base.__qualname__}"
+        hint = _EXTRA_HINTS.get(name)
+        if hint is not None:
+            raise MissingAdapterError(
+                f"{cls.__module__}.{cls.__qualname__} needs its named-array "
+                f"adapter: {hint}."
+            )
     return None
 
 
