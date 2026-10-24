@@ -4175,7 +4175,7 @@ provides-extras = ["cycle", "xskill", "proper"]
 
 [[package]]
 name = "pipekit-experiment"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "packages/pipekit-experiment" }
 dependencies = [
     { name = "pipekit" },
@@ -4219,7 +4219,7 @@ provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "packages/pipekit-jax" }
 dependencies = [
     { name = "equinox" },
@@ -4316,7 +4316,7 @@ typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
 name = "pipekit-train"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "packages/pipekit-train" }
 dependencies = [
     { name = "pipekit" },
