@@ -140,6 +140,9 @@ def test_known_family_without_adapter_names_the_extra(
     with pytest.raises(MissingAdapterError, match=r"pipekit-array\[xarray\]"):
         get_adapter(data_array())
     assert issubclass(MissingAdapterError, TypeError)
+    subclass = type("MyArray", (data_array,), {"__module__": "myapp.arrays"})
+    with pytest.raises(MissingAdapterError, match=r"myapp\.arrays\.MyArray"):
+        get_adapter(subclass())
 
 
 def test_other_types_of_a_known_library_pass_through(
