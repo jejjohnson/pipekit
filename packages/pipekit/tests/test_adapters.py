@@ -142,6 +142,19 @@ def test_known_family_without_adapter_names_the_extra(
     assert issubclass(MissingAdapterError, TypeError)
 
 
+def test_other_types_of_a_known_library_pass_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An xr.Dataset is not a carrier: no adapter, no error, signature passes it on."""
+    fake = types.ModuleType("xarray.core.dataset")
+    dataset = type("Dataset", (), {"__module__": "xarray.core.dataset"})
+    fake.Dataset = dataset  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "xarray.core.dataset", fake)
+    value = dataset()
+    assert get_adapter(value) is None
+    assert signature_of(value) is value
+
+
 def test_check_compatible_returns_the_carriers() -> None:
     adapter = ToyAdapter()
     a, b = Toy([1.0], ("x",)), Toy([2.0], ("x",))
