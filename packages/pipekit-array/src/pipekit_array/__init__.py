@@ -13,6 +13,10 @@ Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 `concat`, `combine`; as operators (`dim_operators`): `ISel`, `Sel`,
 `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
+
+Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
+`KernelOp`, which runs one L1 kernel on raw arrays and on every named
+carrier; `BackendError` for mixed or unsupported backends.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from pipekit_array.dims import (
     take_along,
     transpose,
 )
+from pipekit_array.kernel import KernelOp, KernelSpec
 from pipekit_array.reductions import MeanScalar
 
 
@@ -60,6 +65,8 @@ __all__ = [
     "DimArray",
     "DimArrayAdapter",
     "ISel",
+    "KernelOp",
+    "KernelSpec",
     "MapOver",
     "MeanScalar",
     "Reduce",

@@ -30,3 +30,7 @@ and the trained-model wrapper `ModelOp`.
 ::: pipekit_array.dims
 
 ::: pipekit_array.dim_operators
+
+## Kernels
+
+::: pipekit_array.kernel
