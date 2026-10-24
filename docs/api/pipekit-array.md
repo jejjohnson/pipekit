@@ -34,3 +34,7 @@ and the trained-model wrapper `ModelOp`.
 ## Kernels
 
 ::: pipekit_array.kernel
+
+## xarray
+
+::: pipekit_array.xarray

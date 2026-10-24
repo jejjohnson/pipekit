@@ -29,7 +29,8 @@ The v0.1 public surface, grouped by module:
 - **Group N — structural protocols** (`protocols`): `Predictor`,
   `FittableTransformer`.
 - **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
-  `register_adapter`, `unregister_adapter`, `get_adapter`,
+  `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
+  `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
   reaches a carrier with named dims.
 
@@ -53,6 +54,7 @@ from pipekit.adapters import (
     NamedArrayAdapter,
     get_adapter,
     register_adapter,
+    register_lazy_adapter,
     signature_of,
     unregister_adapter,
 )
@@ -150,6 +152,7 @@ __all__ = [
     "pipeline_hash",
     "register",
     "register_adapter",
+    "register_lazy_adapter",
     "signature_of",
     "unregister",
     "unregister_adapter",

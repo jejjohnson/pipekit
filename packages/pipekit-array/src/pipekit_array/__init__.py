@@ -17,11 +17,15 @@ Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
 `KernelOp`, which runs one L1 kernel on raw arrays and on every named
 carrier; `BackendError` for mixed or unsupported backends.
+
+xarray (``[xarray]``): the ``xr.DataArray`` adapter, `pipekit_array.xarray`,
+loads lazily the first time a DataArray reaches `pipekit.get_adapter`, so
+importing pipekit-array never imports xarray.
 """
 
 from __future__ import annotations
 
-from pipekit import register_adapter
+from pipekit import register_adapter, register_lazy_adapter
 
 from pipekit_array._namespace import array_namespace
 from pipekit_array.combinators import ConcatenateAlong, StackAlong
@@ -56,6 +60,15 @@ from pipekit_array.reductions import MeanScalar
 __version__ = "0.0.3"  # x-release-please-version
 
 register_adapter(DimArray, DimArrayAdapter())
+
+
+def _load_xarray_adapter() -> None:
+    from pipekit_array.xarray import register
+
+    register()
+
+
+register_lazy_adapter("xarray.", _load_xarray_adapter)
 
 __all__ = [
     "ArgReduce",
