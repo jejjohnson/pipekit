@@ -487,3 +487,23 @@ def test_isel_signature_counts_selected_entries(index: Any) -> None:
     sig = op.compute_output_signature(Signature(dims=(("x", 3),)))
     assert sig.dims == (("x", 2),)
     assert op(DimArray(np.arange(3.0), ("x",))).data.shape == (2,)
+
+
+@pytest.mark.parametrize(
+    ("index", "native"),
+    [
+        (np.array([1, 2]), [1, 2]),
+        (np.int64(1), 1),
+        (np.array(1), 1),
+        (np.array([True, False, True]), [True, False, True]),
+    ],
+)
+def test_isel_numpy_indices_survive_dumps_loads(index: Any, native: Any) -> None:
+    """Codex #110: NumPy indices become JSON-native, and select the same."""
+    from pipekit import dumps, loads
+
+    cube = DimArray(np.arange(3.0), ("t",))
+    op = ISel(dim="t", index=index)
+    again = loads(dumps(op))
+    assert again.index == native
+    np.testing.assert_array_equal(again(cube).data, op(cube).data)
