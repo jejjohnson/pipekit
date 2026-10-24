@@ -5,7 +5,11 @@ on `Operator`) that together let `Sequential.summary` print a
 Keras-style structural table without executing any data.
 
 - `Signature(dims, dtype)` — immutable record of named dimensions and
-  dtype. Helpers: `format`, `drop_dims`, `replace_dims`.
+  dtype. Helpers: `format`, `drop_dims`, `replace_dims`; `matches` tests
+  it against a dims pattern (``"band y x"``, ``"... y x"``) and
+  `from_pattern` builds a sizeless one from a pattern. Patterns are the
+  one dims vocabulary of the stack: readable types, ``check_dims`` and
+  kernel output signatures are written in them.
 - `Operator.compute_output_signature(input_sig) -> Signature | None`
   — per-operator method, default passthrough. Operators that reshape /
   reduce / retype override; carriers without named dimensions return
@@ -86,8 +90,77 @@ class Signature:
         new = tuple((n, sizes.get(n, s)) for n, s in self.dims)
         return Signature(dims=new, dtype=self.dtype)
 
+    def matches(self, pattern: str) -> bool:
+        """Whether these dims fit a dims pattern; sizes are ignored.
+
+        A pattern is whitespace-separated dim names with at most one
+        ``...``, which matches zero or more dims at its position. Names
+        compare exactly and in order.
+
+        Args:
+            pattern: E.g. ``"band y x"`` (exactly these dims) or
+                ``"... y x"`` (any leading dims, then ``y`` and ``x``).
+
+        Raises:
+            ValueError: if the pattern has more than one ``...``.
+
+        Examples:
+            >>> sig = Signature(dims=(("time", 12), ("band", 2), ("y", 4), ("x", 4)))
+            >>> sig.matches("time band y x"), sig.matches("... y x")
+            (True, True)
+            >>> sig.matches("band y x"), sig.matches("time ... x")
+            (False, True)
+        """
+        names, ellipsis = _parse_pattern(pattern)
+        dims = tuple(name for name, _ in self.dims)
+        if ellipsis is None:
+            return dims == tuple(names)
+        head = tuple(names[:ellipsis])
+        tail = tuple(names[ellipsis:])
+        if len(dims) < len(head) + len(tail):
+            return False
+        return dims[: len(head)] == head and dims[len(dims) - len(tail) :] == tail
+
+    @classmethod
+    def from_pattern(cls, pattern: str, dtype: str | None = None) -> Signature:
+        """A sizeless `Signature` from a dims pattern, for annotations.
+
+        Args:
+            pattern: Whitespace-separated dim names, e.g. ``"band y x"``.
+            dtype: An optional dtype label.
+
+        Raises:
+            ValueError: if the pattern has a ``...`` (a signature needs
+                concrete names) or repeats a name.
+
+        Example:
+            >>> Signature.from_pattern("band y x").dims
+            (('band', None), ('y', None), ('x', None))
+        """
+        names, ellipsis = _parse_pattern(pattern)
+        if ellipsis is not None:
+            raise ValueError(
+                f"from_pattern needs concrete dim names, got {pattern!r} with '...'."
+            )
+        return cls(dims=tuple((name, None) for name in names), dtype=dtype)
+
     def __repr__(self) -> str:
         return f"Signature({self.format()})"
+
+
+def _parse_pattern(pattern: str) -> tuple[list[str], int | None]:
+    """Names in a dims pattern, and the position of its ``...`` (or None)."""
+    tokens = pattern.split()
+    names: list[str] = []
+    ellipsis: int | None = None
+    for token in tokens:
+        if token == "...":
+            if ellipsis is not None:
+                raise ValueError(f"A dims pattern has at most one '...': {pattern!r}.")
+            ellipsis = len(names)
+        else:
+            names.append(token)
+    return names, ellipsis
 
 
 def compute_output_signature(
