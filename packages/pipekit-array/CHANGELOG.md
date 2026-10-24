@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.4](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.3...pipekit-array-v0.0.4) (2026-10-24)
+
+
+### Features
+
+* **array:** add DimArray and its reference adapter ([#109](https://github.com/jejjohnson/pipekit/issues/109)) ([df7ed83](https://github.com/jejjohnson/pipekit/commit/df7ed8387e720e319d984802e64caa9c7c2d472f))
+* **array:** add KernelSpec and KernelOp ([#111](https://github.com/jejjohnson/pipekit/issues/111)) ([c659ca8](https://github.com/jejjohnson/pipekit/commit/c659ca8b882bef6d35d8be7847ec1c288329047a))
+* **array:** dim-level functions over the adapter ([#110](https://github.com/jejjohnson/pipekit/issues/110)) ([18a2dff](https://github.com/jejjohnson/pipekit/commit/18a2dfffd754db211b3f9c481698fa13ff739c72))
+* **array:** the [xarray] adapter and the apply_ufunc path ([#112](https://github.com/jejjohnson/pipekit/issues/112)) ([fa0e924](https://github.com/jejjohnson/pipekit/commit/fa0e924dbe55dd05513f1b0bd14ff3e696cab78f))
+* **jax:** pipekit_jax.to_jax(op) builds a JaxOperator from a KernelOp ([#115](https://github.com/jejjohnson/pipekit/issues/115)) ([0b104c8](https://github.com/jejjohnson/pipekit/commit/0b104c8f1a6c6d810197752a67b2e6753c0f2a90))
+
 ## [0.0.3](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.2...pipekit-array-v0.0.3) (2026-10-17)
 
 

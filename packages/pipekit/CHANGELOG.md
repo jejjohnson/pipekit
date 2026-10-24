@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.1...pipekit-v0.1.2) (2026-10-24)
+
+
+### Features
+
+* **array:** dim-level functions over the adapter ([#110](https://github.com/jejjohnson/pipekit/issues/110)) ([18a2dff](https://github.com/jejjohnson/pipekit/commit/18a2dfffd754db211b3f9c481698fa13ff739c72))
+* **array:** the [xarray] adapter and the apply_ufunc path ([#112](https://github.com/jejjohnson/pipekit/issues/112)) ([fa0e924](https://github.com/jejjohnson/pipekit/commit/fa0e924dbe55dd05513f1b0bd14ff3e696cab78f))
+* **core:** add the NamedArrayAdapter protocol and register_adapter registry ([#108](https://github.com/jejjohnson/pipekit/issues/108)) ([242ba52](https://github.com/jejjohnson/pipekit/commit/242ba52f3170e8f6346aa86325ad06e865812e65))
+* **core:** Signature.matches and Signature.from_pattern ([#107](https://github.com/jejjohnson/pipekit/issues/107)) ([ea6e4e3](https://github.com/jejjohnson/pipekit/commit/ea6e4e3cd0f4cff78a1021977288655fa54ec633)), closes [#99](https://github.com/jejjohnson/pipekit/issues/99)
+
 ## [0.1.1](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.0...pipekit-v0.1.1) (2026-10-17)
 
 
