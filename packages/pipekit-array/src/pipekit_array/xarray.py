@@ -27,9 +27,10 @@ from typing import Any
 
 import numpy as np
 import xarray as xr
-from pipekit import Signature, register_adapter
+from pipekit import Signature, get_adapter, register_adapter
 
 from pipekit_array.dimarray import DimArray
+from pipekit_array.dims import check_index_labels
 from pipekit_array.kernel import BackendError, KernelSpec, kernel_output_dims
 
 
@@ -127,7 +128,11 @@ class XarrayAdapter:
         with the same index, and ``dim``'s own coordinate is dropped.
         """
         rest = [str(d) for d in x.dims if d != dim]
-        idx = _as_dataarray(index)
+        idx = _as_dataarray(index)  # raises for an unnamed index
+        # the labels are checked on the index itself: idx drops its coordinates
+        index_adapter = get_adapter(index)
+        if index_adapter is not None:
+            check_index_labels(self, x, index_adapter, index, index_adapter.dims(index))
         out = _gather(x, idx, dim)
         aux = {
             str(name): _gather(xr.DataArray(c.variable), idx, dim).variable
@@ -144,6 +149,13 @@ class XarrayAdapter:
             raise ValueError(
                 f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
             )
+        first = tuple(xs[0].dims)
+        for i, x in enumerate(xs[1:], start=1):
+            # xr.concat would broadcast over the union of dims
+            if tuple(x.dims) != first:
+                raise ValueError(
+                    f"stack: input {i} has dims {tuple(x.dims)}, not {first}."
+                )
         checked = self.check_compatible(*xs)
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"
