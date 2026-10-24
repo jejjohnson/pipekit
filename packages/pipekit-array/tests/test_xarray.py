@@ -336,3 +336,20 @@ def test_lazy_combine_declares_the_result_dtype() -> None:
     halved = pa.combine(lambda a: a / 2, x)
     assert halved.dtype == np.float64
     assert float(halved.sum().compute()) == pytest.approx(4.5)
+
+
+# -- review fixes (Codex, #112, second round) -----------------------------------------
+
+
+def test_take_along_rejects_reordered_index_labels() -> None:
+    x = xr.DataArray(
+        np.arange(6.0).reshape(3, 2), dims=("t", "x"), coords={"x": ["A", "B"]}
+    )
+    index = xr.DataArray([0, 1], dims=("x",), coords={"x": ["B", "A"]})
+    with pytest.raises(ValueError, match="labels"):
+        pa.take_along(x, index, "t")
+
+
+def test_stack_rejects_different_dims() -> None:
+    with pytest.raises(ValueError, match="dims"):
+        pa.stack([xr.DataArray([1.0], dims="x"), xr.DataArray([1.0], dims="y")], "run")

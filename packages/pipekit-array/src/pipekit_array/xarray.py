@@ -27,9 +27,10 @@ from typing import Any
 
 import numpy as np
 import xarray as xr
-from pipekit import Signature, register_adapter
+from pipekit import Signature, get_adapter, register_adapter
 
 from pipekit_array.dimarray import DimArray
+from pipekit_array.dims import check_index_labels
 from pipekit_array.kernel import BackendError, KernelSpec, kernel_output_dims
 
 
@@ -121,7 +122,12 @@ class XarrayAdapter:
     def take_along(self, x: xr.DataArray, index: Any, dim: str) -> xr.DataArray:
         """Vectorized ``x.isel({dim: index})``, in ``x``'s dim order."""
         rest = [d for d in x.dims if d != dim]
-        out = x.isel({dim: _as_dataarray(index)})
+        # the labels are checked on the index itself: bare drops its coordinates
+        bare = _as_dataarray(index)  # raises for an unnamed index
+        index_adapter = get_adapter(index)
+        if index_adapter is not None:
+            check_index_labels(self, x, index_adapter, index, index_adapter.dims(index))
+        out = x.isel({dim: bare})
         return out.transpose(*rest).drop_vars(dim, errors="ignore")
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
@@ -130,6 +136,13 @@ class XarrayAdapter:
             raise ValueError(
                 f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
             )
+        first = tuple(xs[0].dims)
+        for i, x in enumerate(xs[1:], start=1):
+            # xr.concat would broadcast over the union of dims
+            if tuple(x.dims) != first:
+                raise ValueError(
+                    f"stack: input {i} has dims {tuple(x.dims)}, not {first}."
+                )
         checked = self.check_compatible(*xs)
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"

@@ -340,13 +340,7 @@ def take_along(x: Any, index: Any, dim: str) -> Any:
     xp = namespace_of(data)
     idx = index_adapter.data(index)
     # index → x's dim order with dim as a size-1 axis; missing dims broadcast
-    for d in index_dims:
-        mine, theirs = adapter.labels(x, d), index_adapter.labels(index, d)
-        if mine is not None and theirs is not None and tuple(mine) != tuple(theirs):
-            raise ValueError(
-                f"take_along: the index's {d!r} labels {tuple(theirs)} are not x's "
-                f"{tuple(mine)}; the index is applied by position, so they must match."
-            )
+    check_index_labels(adapter, x, index_adapter, index, index_dims)
     sizes = dict(zip(dims, data.shape, strict=True))
     for d, n in zip(index_dims, idx.shape, strict=True):
         if n != sizes[d]:
@@ -473,6 +467,27 @@ def combine(fn: Callable[..., Any], *xs: Any) -> Any:
             data = namespace_of(data).permute_dims(data, _axes(other, dims, "combine"))
         datas.append(data)
     return adapter.rewrap(checked[0], fn(*datas), dims)
+
+
+def check_index_labels(
+    adapter: NamedArrayAdapter,
+    x: Any,
+    index_adapter: NamedArrayAdapter,
+    index: Any,
+    dims: Sequence[str],
+) -> None:
+    """`take_along`'s check: on each shared dim the index's labels are x's.
+
+    Raises:
+        ValueError: Labels differ in value or order (the index is positional).
+    """
+    for d in dims:
+        mine, theirs = adapter.labels(x, d), index_adapter.labels(index, d)
+        if mine is not None and theirs is not None and tuple(mine) != tuple(theirs):
+            raise ValueError(
+                f"take_along: the index's {d!r} labels {tuple(theirs)} are not x's "
+                f"{tuple(mine)}; the index is applied by position, so they must match."
+            )
 
 
 def _same_dims(
