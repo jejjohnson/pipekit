@@ -58,11 +58,10 @@ from pipekit import (
     signature_of,
 )
 
-from pipekit_array.dims import namespace_of
+from pipekit_array.dims import BackendError, backend_name, namespace_of
 
 
 __all__ = [
-    "BackendError",
     "KernelOp",
     "KernelSpec",
     "kernel_output_dims",
@@ -87,10 +86,6 @@ class _RunsKernels(Protocol):
         kwargs: dict[str, Any],
         *carriers: Any,
     ) -> Any: ...
-
-
-class BackendError(TypeError):
-    """Inputs on different backends, or a backend the kernel does not support."""
 
 
 def _groups(part: str) -> tuple[tuple[str, ...], ...]:
@@ -209,13 +204,30 @@ def _check_core_not_loop(
         )
 
 
-def _backend(data: Any) -> str:
-    module = type(data).__module__
-    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
-        return "jax"
-    if module.startswith("dask."):
-        return "dask"
-    return "numpy"
+def _require_backend(backends: set[str], spec: KernelSpec) -> str:
+    """The one backend of the inputs, checked against the spec.
+
+    Raises:
+        BackendError: Inputs on several backends, a backend the spec does
+            not list, or ``vectorize=True`` on dask arrays (``np.vectorize``
+            would compute the whole graph; the xarray path stays lazy).
+    """
+    if len(backends) > 1:
+        raise BackendError(
+            f"inputs on {sorted(backends)}: call to_jax() on the NumPy carriers "
+            "first (inputs never move between backends silently)."
+        )
+    backend = backends.pop() if backends else "numpy"
+    if backend not in spec.backends:
+        raise BackendError(
+            f"the kernel declares backends {spec.backends}, not {backend!r}."
+        )
+    if backend == "dask" and spec.vectorize:
+        raise BackendError(
+            "vectorize=True on dask arrays would compute them eagerly; pass an "
+            "xr.DataArray (apply_ufunc keeps it lazy) or a vectorized kernel."
+        )
+    return backend
 
 
 def _call(
@@ -252,7 +264,7 @@ def run_kernel(
     """
     adapters = [get_adapter(x) for x in carriers]
     if all(a is None for a in adapters):
-        backend = _backend(carriers[0]) if carriers else "numpy"
+        backend = _require_backend({backend_name(x) for x in carriers}, spec)
         return _call(kernel, spec, kwargs, backend)(*carriers)
     for i, adapter in enumerate(adapters):
         if adapter is None:
@@ -280,17 +292,10 @@ def _run_named(
     adapters: list[NamedArrayAdapter],
     kwargs: dict[str, Any],
 ) -> Any:
-    backends = {_backend(a.data(x)) for a, x in zip(adapters, carriers, strict=True)}
-    if len(backends) > 1:
-        raise BackendError(
-            f"inputs on {sorted(backends)}: call to_jax() on the NumPy carriers "
-            "first (inputs never move between backends silently)."
-        )
-    backend = backends.pop()
-    if backend not in spec.backends:
-        raise BackendError(
-            f"the kernel declares backends {spec.backends}, not {backend!r}."
-        )
+    backends = {
+        backend_name(a.data(x)) for a, x in zip(adapters, carriers, strict=True)
+    }
+    backend = _require_backend(backends, spec)
     carriers = _check_by_kind(carriers, adapters)
     dims = [a.dims(x) for a, x in zip(adapters, carriers, strict=True)]
     core_dims = [tuple(core[c] for c in group) for group in spec.inputs]

@@ -49,7 +49,7 @@ from pipekit_array.dims import (
     take_along,
     transpose,
 )
-from pipekit_array.kernel import BackendError, KernelOp, KernelSpec
+from pipekit_array.kernel import KernelOp, KernelSpec
 from pipekit_array.reductions import MeanScalar
 
 
