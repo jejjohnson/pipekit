@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 from pipekit import NamedArrayAdapter, Signature, get_adapter
@@ -205,3 +207,29 @@ def test_isel_rejects_a_mask_of_the_wrong_length() -> None:
         DimArrayAdapter().isel(d, {"x": [True, False]})
     with pytest.raises(IndexError):
         DimArrayAdapter().isel(d, {"x": np.ones((3, 1), dtype=bool)})
+
+
+@pytest.mark.parametrize("labelled", [False, True])
+def test_isel_with_a_0d_integer_array_drops_the_dim(labelled: bool) -> None:
+    """Codex #109: ``np.array(1)`` selects like ``1``."""
+    labels = {"x": ("a", "b", "c")} if labelled else {}
+    d = DimArray(np.arange(6.0).reshape(2, 3), ("y", "x"), labels)
+    out = DimArrayAdapter().isel(d, {"x": np.array(1)})
+    assert out.dims == ("y",)
+    np.testing.assert_array_equal(out.data, [1.0, 4.0])
+    assert out.labels == {}
+
+
+def test_isel_with_a_traced_scalar_index_drops_the_dim() -> None:
+    jax = pytest.importorskip("jax")
+    d = DimArray(np.arange(6.0).reshape(2, 3), ("y", "x"))
+
+    @jax.jit
+    def pick(i: Any) -> Any:
+        out = DimArrayAdapter().isel(
+            DimArray(jax.numpy.asarray(d.data), d.dims), {"x": i}
+        )
+        assert out.dims == ("y",)
+        return out.data
+
+    np.testing.assert_array_equal(pick(jax.numpy.asarray(2)), [2.0, 5.0])
