@@ -102,7 +102,12 @@ class ISel(Operator):
 
     def __init__(self, dim: str, index: int | slice) -> None:
         self.dim = dim
-        self.index = _slice_from_config(index)
+        index = _slice_from_config(index)
+        if type(index).__module__ == "numpy":
+            # NumPy positions or a mask (array or scalar) as int / list, so
+            # the config is JSON; numpy is optional, so no isinstance
+            index = index.tolist()
+        self.index = index
 
     def _apply(self, x: Any) -> Any:
         return _dims.isel(x, **{self.dim: self.index})
