@@ -189,6 +189,29 @@ returns `EquinoxModelOp` (in-package, no round-trip) or
 contract is "the returned op is a `pipekit.Operator`"; the specific
 class differs by backend.
 
+## A9. Named carriers: `DimArray`, through pipekit's adapter registry
+
+**Decision (PK-P7, 23 Oct 2026):** pipekit-array's plain named carrier is
+`DimArray(data, dims, labels)`, a JAX pytree whose only leaf is the data.
+It is what a geo carrier becomes when a kernel consumes one of its
+spatial dims (per-column statistics consume `row` and keep `col`), and
+the carrier for tests and for libraries with none of their own. Its
+adapter, `DimArrayAdapter`, is registered with `pipekit.register_adapter`
+on import and is the reference adapter every other one is tested
+against.
+
+`DimArray` holds no georeference, no coordinates beyond static labels and
+no attrs, and does no alignment, arithmetic or selection by value; it
+crosses to xarray with `to_xarray()` when an analysis needs those.
+
+The design pages' separate two-field `Named` record (`data`, `dims`) is
+folded into `DimArray`: a `DimArray` with no labels is that record.
+
+**Rationale:** one plain carrier, not two, and one registry (pipekit
+core's, PK-P1) through which the dim-level functions and `KernelOp` reach
+it, `xr.DataArray` and geoarray's carriers alike. See geostack's
+`docs/design/pipekit_kernels.md`.
+
 ## Optional extras matrix
 
 For reference, the extras shape that drops out of these decisions:
@@ -200,6 +223,7 @@ For reference, the extras shape that drops out of these decisions:
 | `[torch]`    | `torch>=2.0`            | Array API namespace in torch 2.0+                     |
 | `[cupy]`     | `cupy>=13`              | Array API conformance from cupy 13                    |
 | `[dask]`     | `dask[array]>=2024`     | Partial conformance; lazy                             |
+| `[xarray]`   | `xarray>=2024.6`        | `DimArray.to_xarray`; the `DataArray` adapter (A9)    |
 | `[compat]` *(proposed, v0.2)* | `array-api-compat>=1.4` | Optional shim for older / partial backends — not yet wired in `pyproject.toml`; lands with the v0.1 impl PRs |
 
 The first five extras already exist in `packages/pipekit-array/pyproject.toml`.

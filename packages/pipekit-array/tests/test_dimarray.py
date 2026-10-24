@@ -1,0 +1,159 @@
+"""Tests for `pipekit_array.DimArray` and its reference adapter (#101)."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+from pipekit import NamedArrayAdapter, Signature, get_adapter
+from pipekit_array import DimArray, DimArrayAdapter
+
+
+BANDS = ("B11", "B12")
+
+
+def _stats() -> DimArray:
+    """μ(col, band): three columns, two bands, labelled bands."""
+    data = np.arange(6, dtype=np.float32).reshape(3, 2)
+    return DimArray(data, ("col", "band"), {"band": BANDS})
+
+
+def test_construction() -> None:
+    mu = _stats()
+    assert mu.dims == ("col", "band")
+    assert mu.shape == (3, 2)
+    assert mu.labels == {"band": BANDS}
+    # label values are stored as tuples
+    listed = DimArray(np.zeros(2), ("band",), {"band": ["B11", "B12"]})
+    assert listed.labels["band"] == BANDS
+    assert "DimArray[col band](3, 2)" in repr(mu)
+
+
+@pytest.mark.parametrize(
+    ("dims", "labels", "match"),
+    [
+        (("col",), {}, "shape"),
+        (("col", "col"), {}, "unique"),
+        (("col", "band"), {"band": ("B11",)}, "1 labels"),
+        (("col", "band"), {"level": (1, 2)}, "not in dims"),
+    ],
+)
+def test_construction_errors(
+    dims: tuple[str, ...], labels: dict[str, tuple], match: str
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        DimArray(np.zeros((3, 2)), dims, labels)
+
+
+def test_registered_on_import() -> None:
+    adapter = get_adapter(_stats())
+    assert isinstance(adapter, DimArrayAdapter)
+    assert isinstance(adapter, NamedArrayAdapter)
+
+
+def test_isel_keeps_and_slices_labels() -> None:
+    adapter = DimArrayAdapter()
+    mu = _stats()
+    # a slice keeps the dim and slices its labels
+    last_band = adapter.isel(mu, {"band": slice(1, None)})
+    assert last_band.dims == ("col", "band")
+    assert last_band.labels == {"band": ("B12",)}
+    np.testing.assert_array_equal(last_band.data, mu.data[:, 1:])
+    # an integer drops the dim and its labels
+    one_col = adapter.isel(mu, {"col": 0})
+    assert one_col.dims == ("band",)
+    assert one_col.labels == {"band": BANDS}
+    one_band = adapter.isel(mu, {"band": np.int64(0)})
+    assert one_band.dims == ("col",)
+    assert one_band.labels == {}
+    # an index array keeps the dim, with one label per position
+    swapped = adapter.isel(mu, {"band": np.array([1, 0])})
+    assert swapped.labels == {"band": ("B12", "B11")}
+    np.testing.assert_array_equal(swapped.data, mu.data[:, [1, 0]])
+
+
+def test_isel_unknown_dim() -> None:
+    with pytest.raises(KeyError, match="unknown dim"):
+        DimArrayAdapter().isel(_stats(), {"row": 0})
+
+
+def test_rewrap_drops_labels_of_dropped_or_resized_dims() -> None:
+    adapter = DimArrayAdapter()
+    mu = _stats()
+    # band kept at its size: labels kept
+    scaled = adapter.rewrap(mu, mu.data * 2, mu.dims)
+    assert scaled.labels == {"band": BANDS}
+    # band consumed: no labels
+    total = adapter.rewrap(mu, mu.data.sum(axis=1), ("col",))
+    assert total.dims == ("col",)
+    assert total.labels == {}
+    # band resized: its labels no longer fit
+    padded = adapter.rewrap(mu, np.zeros((3, 3)), ("col", "band"))
+    assert padded.labels == {}
+    # a new dim gets none
+    covariance = adapter.rewrap(mu, np.zeros((3, 2, 2)), ("col", "band", "band2"))
+    assert covariance.labels == {"band": BANDS}
+
+
+def test_check_compatible() -> None:
+    adapter = DimArrayAdapter()
+    mu = _stats()
+    other = DimArray(np.ones((3, 2)), ("col", "band"), {"band": BANDS})
+    assert adapter.check_compatible(mu, other) == (mu, other)
+    # different dims combine if the shared ones agree
+    per_col = DimArray(np.ones(3), ("col",))
+    assert adapter.check_compatible(mu, per_col) == (mu, per_col)
+    with pytest.raises(ValueError, match="size"):
+        adapter.check_compatible(mu, DimArray(np.ones(4), ("col",)))
+    relabelled = DimArray(np.ones((3, 2)), ("col", "band"), {"band": ("B8", "B4")})
+    with pytest.raises(ValueError, match="labels"):
+        adapter.check_compatible(mu, relabelled)
+
+
+def test_signature() -> None:
+    sig = DimArrayAdapter().signature(_stats())
+    assert sig == Signature(dims=(("col", 3), ("band", 2)), dtype="float32")
+    assert sig.matches("col band")
+
+
+def test_jax_pytree() -> None:
+    jax = pytest.importorskip("jax")
+    jnp = pytest.importorskip("jax.numpy")
+    mu = DimArray(jnp.arange(6.0).reshape(3, 2), ("col", "band"), {"band": BANDS})
+    leaves = jax.tree_util.tree_leaves(mu)
+    assert len(leaves) == 1
+    assert leaves[0] is mu.data
+    traces = 0
+
+    def double(d: DimArray) -> DimArray:
+        nonlocal traces
+        traces += 1
+        return DimArrayAdapter().rewrap(d, d.data * 2, d.dims)
+
+    f = jax.jit(double)
+    out = f(mu)
+    assert out.dims == mu.dims
+    assert out.labels == mu.labels
+    np.testing.assert_array_equal(np.asarray(out.data), np.asarray(mu.data) * 2)
+    # new values, same dims and labels: no retrace
+    f(DimArray(jnp.ones((3, 2)), ("col", "band"), {"band": BANDS}))
+    assert traces == 1
+    # new labels are static: one more trace
+    f(DimArray(jnp.ones((3, 2)), ("col", "band"), {"band": ("B8", "B4")}))
+    assert traces == 2
+
+
+def test_to_xarray() -> None:
+    xr = pytest.importorskip("xarray")
+    da = _stats().to_xarray()
+    assert isinstance(da, xr.DataArray)
+    assert da.dims == ("col", "band")
+    assert tuple(da.coords["band"].values.tolist()) == BANDS
+    assert "col" not in da.coords
+
+
+def test_to_xarray_without_xarray(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+
+    monkeypatch.setitem(sys.modules, "xarray", None)
+    with pytest.raises(ImportError, match=r"pipekit-array\[xarray\]"):
+        _stats().to_xarray()
