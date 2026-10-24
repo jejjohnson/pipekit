@@ -29,14 +29,16 @@ The `Operator` forms live in `pipekit_array.dim_operators`.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 from pipekit import NamedArrayAdapter, get_adapter
 
 from pipekit_array._namespace import array_namespace
+from pipekit_array.dimarray import DimArray
 
 
 __all__ = [
+    "BackendError",
     "argreduce",
     "combine",
     "concat",
@@ -64,13 +66,85 @@ def adapter_of(x: Any, what: str) -> NamedArrayAdapter:
     return adapter
 
 
+class BackendError(TypeError):
+    """Carriers on more than one backend, or a backend a kernel does not list."""
+
+
+class _DaskNamespace:
+    """``dask.array`` under the Array API names the generic paths call.
+
+    dask has ``transpose`` and ``concatenate`` where the Array API has
+    ``permute_dims`` and ``concat``; everything else passes through.
+    """
+
+    _NAMES: ClassVar[dict[str, str]] = {
+        "permute_dims": "transpose",
+        "concat": "concatenate",
+    }
+
+    def __init__(self, module: Any) -> None:
+        self._module = module
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._module, self._NAMES.get(name, name))
+
+    def take_along_axis(self, data: Any, index: Any, axis: int) -> Any:
+        """``np.take_along_axis`` per block, with ``axis`` in one chunk."""
+        import numpy as np
+
+        da = self._module
+        data = da.asarray(data).rechunk({axis: -1})
+        index = da.asarray(index)
+        chunks = tuple(
+            index.shape[k] if k == axis else data.chunks[k] for k in range(data.ndim)
+        )
+        index = index.rechunk(chunks)
+        return da.map_blocks(
+            np.take_along_axis,
+            data,
+            index,
+            axis=axis,
+            dtype=data.dtype,
+            chunks=index.chunks,
+        )
+
+
+_DASK: list[_DaskNamespace] = []
+
+
 def namespace_of(data: Any) -> Any:
     """The array namespace of raw data, dask included (which has none of its own)."""
     if type(data).__module__.startswith("dask."):
-        import dask.array as da
+        if not _DASK:
+            import dask.array as da
 
-        return da
+            _DASK.append(_DaskNamespace(da))
+        return _DASK[0]
     return array_namespace(data)
+
+
+def backend_name(data: Any) -> str:
+    """``"jax"``, ``"dask"`` or ``"numpy"`` for raw data (tracers count as JAX)."""
+    module = type(data).__module__
+    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
+        return "jax"
+    if module.startswith("dask."):
+        return "dask"
+    return "numpy"
+
+
+def require_one_backend(datas: Sequence[Any], what: str) -> None:
+    """Raise `BackendError` when raw arrays sit on more than one backend.
+
+    Inputs never move between backends silently: a NumPy array next to a
+    JAX one would otherwise be converted depending on input order.
+    """
+    backends = {backend_name(d) for d in datas}
+    if len(backends) > 1:
+        raise BackendError(
+            f"{what}: inputs on {sorted(backends)}; call to_jax() on the NumPy "
+            "carriers first (inputs never move between backends silently)."
+        )
 
 
 def _fast_path(adapter: NamedArrayAdapter, name: str) -> Callable[..., Any] | None:
@@ -266,6 +340,13 @@ def take_along(x: Any, index: Any, dim: str) -> Any:
     xp = namespace_of(data)
     idx = index_adapter.data(index)
     # index → x's dim order with dim as a size-1 axis; missing dims broadcast
+    for d in index_dims:
+        mine, theirs = adapter.labels(x, d), index_adapter.labels(index, d)
+        if mine is not None and theirs is not None and tuple(mine) != tuple(theirs):
+            raise ValueError(
+                f"take_along: the index's {d!r} labels {tuple(theirs)} are not x's "
+                f"{tuple(mine)}; the index is applied by position, so they must match."
+            )
     sizes = dict(zip(dims, data.shape, strict=True))
     for d, n in zip(index_dims, idx.shape, strict=True):
         if n != sizes[d]:
@@ -307,7 +388,12 @@ def map_over(x: Any, fn: Callable[[Any], Any], dim: str) -> Any:
     (axis,) = _axes(dims, (dim,), "map_over")
     size = adapter.data(x).shape[axis]
     items = [fn(adapter.isel(x, {dim: i})) for i in range(size)]
-    return stack(items, dim)
+    out = stack(items, dim)
+    # each output position is the input's: keep the mapped dim's labels
+    labels = adapter.labels(x, dim)
+    if labels is not None and isinstance(out, DimArray):
+        return DimArray(out.data, out.dims, {**out.labels, dim: labels})
+    return out
 
 
 def stack(xs: Sequence[Any], dim: str) -> Any:
@@ -323,6 +409,7 @@ def stack(xs: Sequence[Any], dim: str) -> Any:
     if dim in dims:
         raise ValueError(f"stack: {dim!r} is already a dim of {dims}; use concat.")
     datas = [adapter.data(x) for x in checked]
+    require_one_backend(datas, "stack")
     xp = namespace_of(datas[0])
     return adapter.rewrap(checked[0], xp.stack(datas), (dim, *dims))
 
@@ -342,9 +429,12 @@ def concat(xs: Sequence[Any], dim: str) -> Any:
     dims = _same_dims(adapter, xs, "concat")
     (axis,) = _axes(dims, (dim,), "concat")
     # the other dims must combine; dim itself may differ in size
-    others = [adapter.isel(x, {dim: 0}) for x in xs]
+    # the other dims must combine; an empty slice of dim checks them even
+    # when an input has no entries along dim
+    others = [adapter.isel(x, {dim: slice(0, 0)}) for x in xs]
     adapter.check_compatible(*others)
     datas = [adapter.data(x) for x in xs]
+    require_one_backend(datas, "concat")
     xp = namespace_of(datas[0])
     return adapter.rewrap(xs[0], xp.concat(datas, axis=axis), dims)
 
@@ -371,6 +461,7 @@ def combine(fn: Callable[..., Any], *xs: Any) -> Any:
     if fast is not None:
         return fast(fn, *xs)
     checked = adapter.check_compatible(*xs)
+    require_one_backend([adapter.data(x) for x in checked], "combine")
     dims = adapter.dims(checked[0])
     datas = []
     for x in checked:

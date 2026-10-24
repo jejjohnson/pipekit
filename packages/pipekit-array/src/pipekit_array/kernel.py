@@ -58,11 +58,10 @@ from pipekit import (
     signature_of,
 )
 
-from pipekit_array.dims import namespace_of
+from pipekit_array.dims import BackendError, backend_name, namespace_of
 
 
 __all__ = [
-    "BackendError",
     "KernelOp",
     "KernelSpec",
     "derive_geometry",
@@ -90,10 +89,6 @@ class _RunsKernels(Protocol):
     ) -> Any: ...
 
 
-class BackendError(TypeError):
-    """Inputs on different backends, or a backend the kernel does not support."""
-
-
 def _groups(part: str) -> tuple[tuple[str, ...], ...]:
     return tuple(
         tuple(name.strip() for name in group.split(",") if name.strip())
@@ -115,10 +110,15 @@ class KernelSpec:
         sizes: Output-only core letters and the input letter whose size each
             has, e.g. ``(("d", "c"),)``. Pairs, not a dict, so the spec stays
             hashable.
+        dtypes: Each output's dtype, for output signatures and lazy
+            backends: a dtype name (``"bool"``) or ``"same"`` for the first
+            input's. Empty (the default) leaves it unknown in signatures;
+            dask then finds it by calling the kernel once.
 
     Raises:
-        ValueError: The signature does not parse, or ``sizes`` names a letter
-            that is not output-only or an input letter that does not exist.
+        ValueError: The signature does not parse, ``sizes`` names a letter
+            that is not output-only or an input letter that does not exist,
+            or ``dtypes`` is not one entry per output.
 
     Example:
         >>> spec = KernelSpec("(r,c)->(c),(c,d)", sizes=(("d", "c"),))
@@ -130,12 +130,18 @@ class KernelSpec:
     backends: tuple[str, ...] = ("numpy", "jax", "dask", "xarray")
     vectorize: bool = False
     sizes: tuple[tuple[str, str], ...] = ()
+    dtypes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not _SIGNATURE.match(self.signature):
             raise ValueError(f"Not a gufunc signature: {self.signature!r}.")
         object.__setattr__(self, "backends", tuple(self.backends))
         object.__setattr__(self, "sizes", tuple(tuple(p) for p in self.sizes))
+        object.__setattr__(self, "dtypes", tuple(map(str, self.dtypes)))
+        if self.dtypes and len(self.dtypes) != len(self.outputs):
+            raise ValueError(
+                f"dtypes: {len(self.dtypes)} entries for {len(self.outputs)} output(s)."
+            )
         in_letters = {c for group in self.inputs for c in group}
         out_only = {c for group in self.outputs for c in group} - in_letters
         declared = {out for out, _ in self.sizes}
@@ -210,13 +216,30 @@ def _check_core_not_loop(
         )
 
 
-def _backend(data: Any) -> str:
-    module = type(data).__module__
-    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
-        return "jax"
-    if module.startswith("dask."):
-        return "dask"
-    return "numpy"
+def _require_backend(backends: set[str], spec: KernelSpec) -> str:
+    """The one backend of the inputs, checked against the spec.
+
+    Raises:
+        BackendError: Inputs on several backends, a backend the spec does
+            not list, or ``vectorize=True`` on dask arrays (``np.vectorize``
+            would compute the whole graph; the xarray path stays lazy).
+    """
+    if len(backends) > 1:
+        raise BackendError(
+            f"inputs on {sorted(backends)}: call to_jax() on the NumPy carriers "
+            "first (inputs never move between backends silently)."
+        )
+    backend = backends.pop() if backends else "numpy"
+    if backend not in spec.backends:
+        raise BackendError(
+            f"the kernel declares backends {spec.backends}, not {backend!r}."
+        )
+    if backend == "dask" and spec.vectorize:
+        raise BackendError(
+            "vectorize=True on dask arrays would compute them eagerly; pass an "
+            "xr.DataArray (apply_ufunc keeps it lazy) or a vectorized kernel."
+        )
+    return backend
 
 
 def _call(
@@ -253,7 +276,7 @@ def run_kernel(
     """
     adapters = [get_adapter(x) for x in carriers]
     if all(a is None for a in adapters):
-        backend = _backend(carriers[0]) if carriers else "numpy"
+        backend = _require_backend({backend_name(x) for x in carriers}, spec)
         return _call(kernel, spec, kwargs, backend)(*carriers)
     for i, adapter in enumerate(adapters):
         if adapter is None:
@@ -335,17 +358,7 @@ def _run_named(
     kwargs: dict[str, Any],
 ) -> Any:
     datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
-    backends = {_backend(d) for d in datas}
-    if len(backends) > 1:
-        raise BackendError(
-            f"inputs on {sorted(backends)}: call to_jax() on the NumPy carriers "
-            "first (inputs never move between backends silently)."
-        )
-    backend = backends.pop()
-    if backend not in spec.backends:
-        raise BackendError(
-            f"the kernel declares backends {spec.backends}, not {backend!r}."
-        )
+    backend = _require_backend({backend_name(d) for d in datas}, spec)
     if len(carriers) > 1:
         carriers = _check_by_kind(carriers, adapters)
         datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
@@ -526,8 +539,8 @@ class KernelOp(Operator):
 
         A two-output kernel gives a tuple of signatures. With several inputs
         the other inputs' dims are unknown here, so the answer is ``None``.
-        The dtype is the input's: kernels preserve their input dtype (the
-        caller decides precision).
+        The dtype is the one ``spec.dtypes`` declares (``"same"``: the
+        input's), else unknown: a kernel may return a mask or an index.
         """
         sig = signature_of(input_signature)
         if not isinstance(sig, Signature) or len(self.spec.inputs) != 1:
@@ -543,8 +556,13 @@ class KernelOp(Operator):
         dim_size = {self.core[k]: v for k, v in letter_size.items()} | {
             d: s for d, s in sizes.items()
         }
+        dtypes = [sig.dtype if d == "same" else d for d in self.spec.dtypes] or [
+            None
+        ] * len(self.spec.outputs)
         outs = tuple(
-            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=sig.dtype)
-            for dims in kernel_output_dims(self.spec, self.core, [names])
+            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
+            for dims, dtype in zip(
+                kernel_output_dims(self.spec, self.core, [names]), dtypes, strict=True
+            )
         )
         return outs if len(outs) > 1 else outs[0]

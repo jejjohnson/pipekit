@@ -297,3 +297,78 @@ def test_lazy_mask_kernel_declares_its_dtype() -> None:
     assert isinstance(out.data, da.Array)
     assert out.dtype == bool
     assert out.compute().dtype == bool
+
+
+# -- review fixes (Codex, #112) -------------------------------------------------------
+
+
+def test_vectorized_kernel_keeps_its_output_dtype() -> None:
+    ints = xr.DataArray(np.array([[1, 2], [3, 4]]), dims=("y", "c"))
+    op = KernelOp(
+        lambda v: v.mean(), KernelSpec("(c)->()", vectorize=True), core={"c": "c"}
+    )
+    np.testing.assert_allclose(op(ints).values, [1.5, 3.5])
+
+
+def test_reduce_names_follow_numpy_semantics() -> None:
+    x = xr.DataArray(np.array([[1.0, np.nan], [3.0, 4.0]]), dims=("t", "x"))
+    assert np.isnan(pa.reduce(x, "mean", "t").values[1])
+    np.testing.assert_allclose(pa.reduce(x, "nanmean", "t").values, [2.0, 4.0])
+    lazy = pa.reduce(_cube(lazy=True), "nanmean", "time")
+    assert isinstance(lazy.data, da.Array)
+
+
+def test_datetime_labels_stay_datetimes() -> None:
+    times = np.array(["2026-06-01", "2026-06-02"], dtype="datetime64[ns]")
+    x = xr.DataArray(np.arange(2.0), dims=("time",), coords={"time": times})
+    assert pa.sel(x, time=times[1]).values == 1.0
+    assert from_xarray(x).to_xarray()["time"].dtype == times.dtype
+
+
+def test_stack_fast_path_refuses_an_existing_dim() -> None:
+    a = _cube().isel(time=0)
+    with pytest.raises(ValueError, match="already a dim"):
+        pa.stack([a, a], "band")
+
+
+def test_lazy_combine_declares_the_result_dtype() -> None:
+    x = xr.DataArray(da.from_array(np.array([1, 3, 5]), chunks=1), dims=("x",))
+    halved = pa.combine(lambda a: a / 2, x)
+    assert halved.dtype == np.float64
+    assert float(halved.sum().compute()) == pytest.approx(4.5)
+
+
+# -- review fixes (Codex, #114) -------------------------------------------------------
+
+
+def _labelled(lazy: bool) -> xr.DataArray:
+    rng = np.random.default_rng(1)
+    cube = xr.DataArray(
+        rng.random((4, 3, 2)),
+        dims=("time", "y", "x"),
+        coords={
+            "time": np.arange(4),
+            "quality": (("time", "x"), rng.random((4, 2))),
+            "x": [10.0, 20.0],
+        },
+        attrs={"units": "K"},
+    )
+    return cube.chunk({"y": 1}) if lazy else cube
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_take_along_keeps_attrs_and_gathers_aux_coords(lazy: bool) -> None:
+    cube = _labelled(lazy)
+    best = pa.argreduce(cube, "argmax", "time")
+    out = pa.take_along(cube, best, "time")
+    assert out.dims == ("y", "x")
+    assert out.attrs == {"units": "K"}
+    assert "time" not in out.coords
+    eager = _labelled(False)
+    idx = eager.argmax("time")
+    np.testing.assert_allclose(out.values, eager.isel(time=idx).values)
+    np.testing.assert_allclose(
+        out["quality"].transpose("y", "x").values,
+        eager["quality"].isel(time=idx).transpose("y", "x").values,
+    )
+    np.testing.assert_array_equal(out["x"].values, [10.0, 20.0])

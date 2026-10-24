@@ -52,7 +52,11 @@ class XarrayAdapter:
     def labels(self, x: xr.DataArray, dim: str) -> tuple[Any, ...] | None:
         """The values of ``dim``'s 1-D index coordinate, or None."""
         if dim in x.indexes and x.coords[dim].ndim == 1:
-            return tuple(x.coords[dim].values.tolist())
+            values = x.coords[dim].values
+            # tolist() turns datetime64[ns] into integers; keep the scalars
+            if values.dtype.kind in "mM":
+                return tuple(values)
+            return tuple(values.tolist())
         return None
 
     def isel(self, x: xr.DataArray, indexers: dict[str, Any]) -> xr.DataArray:
@@ -100,48 +104,46 @@ class XarrayAdapter:
     def reduce(
         self, x: xr.DataArray, fn: str | Callable[..., Any], dims: tuple[str, ...]
     ) -> xr.DataArray:
-        """A named reduction method (``x.mean(dim=…)``) or ``x.reduce(fn, dim=…)``."""
-        if isinstance(fn, str):
-            method = getattr(x, fn, None)
-            if method is None:
-                raise ValueError(f"reduce: DataArray has no reduction {fn!r}.")
-            return method(dim=list(dims))
-        return x.reduce(fn, dim=list(dims))
+        """``x.reduce`` with the array-namespace function, lazy on dask.
+
+        A name resolves to NumPy's function (``"nanmean"`` included), so NaN
+        handling matches the generic path: DataArray's own ``mean`` would
+        skip NaN by default.
+        """
+        return x.reduce(_numpy_function(fn, "reduce"), dim=list(dims))
 
     def argreduce(
         self, x: xr.DataArray, fn: str | Callable[..., Any], dim: str
     ) -> xr.DataArray:
-        """``x.argmax(dim=…)`` / ``x.argmin(dim=…)``, or ``x.reduce(fn, dim=…)``."""
-        if isinstance(fn, str):
-            method = getattr(x, fn, None)
-            if method is None:
-                raise ValueError(f"argreduce: DataArray has no {fn!r}.")
-            return method(dim=dim)
-        return x.reduce(fn, dim=dim)
+        """``x.reduce`` with NumPy's ``argmax`` / ``argmin`` (or ``fn``)."""
+        return x.reduce(_numpy_function(fn, "argreduce"), dim=dim)
 
     def take_along(self, x: xr.DataArray, index: Any, dim: str) -> xr.DataArray:
         """One entry of ``dim`` per position, lazily on dask, in ``x``'s dim order.
 
         An ``apply_ufunc`` over ``take_along_axis``, not a vectorized
-        ``isel``: dask cannot index with a lazy indexer.
+        ``isel``: dask cannot index with a lazy indexer. Attributes are kept,
+        auxiliary coordinates on ``dim`` (``quality(time, x)``) are gathered
+        with the same index, and ``dim``'s own coordinate is dropped.
         """
         rest = [str(d) for d in x.dims if d != dim]
         idx = _as_dataarray(index)
-        out = xr.apply_ufunc(
-            _take_along_last,
-            x,
-            idx,
-            input_core_dims=[[dim], []],
-            dask="parallelized",
-            join="exact",
-            output_dtypes=[x.dtype],
-            # the gathered dim must be whole in each block
-            dask_gufunc_kwargs={"allow_rechunk": True},
-        )
-        return out.transpose(*rest)
+        out = _gather(x, idx, dim)
+        aux = {
+            str(name): _gather(xr.DataArray(c.variable), idx, dim).variable
+            for name, c in x.coords.items()
+            if dim in c.dims and name != dim
+        }
+        if aux:
+            out = out.assign_coords(aux)
+        return out.transpose(*rest, ...)
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """A new leading dim; coordinates must be identical (never aligned)."""
+        if dim in xs[0].dims:
+            raise ValueError(
+                f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
+            )
         checked = self.check_compatible(*xs)
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"
@@ -158,12 +160,14 @@ class XarrayAdapter:
         checked = self.check_compatible(*xs)
         dims = tuple(checked[0].dims)
         ordered = [x.transpose(*dims) for x in checked]
+        lazy = any(_is_dask(x) for x in ordered)
         return xr.apply_ufunc(
             fn,
             *ordered,
             dask="parallelized",
             join="exact",
-            output_dtypes=[ordered[0].dtype],
+            # dask needs the result dtype up front: read it from a one-element call
+            output_dtypes=[_probe_dtype(fn, ordered)] if lazy else None,
         )
 
     # -- KernelOp ---------------------------------------------------------
@@ -217,12 +221,31 @@ class XarrayAdapter:
         return result.transpose(*targets[0])
 
 
+def _gather(values: xr.DataArray, idx: xr.DataArray, dim: str) -> xr.DataArray:
+    """``values`` at ``idx`` along ``dim``; coordinates on ``dim`` are dropped."""
+    return xr.apply_ufunc(
+        _take_along_last,
+        values,
+        idx,
+        input_core_dims=[[dim], []],
+        dask="parallelized",
+        join="exact",
+        keep_attrs=True,
+        output_dtypes=[values.dtype],
+        # the gathered dim must be whole in each block
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+
+
 def _take_along_last(values: Any, index: Any) -> Any:
     """values (..., n) at index (...) along the last axis."""
     import numpy as np
 
-    # apply_ufunc aligns missing loop dims to the right, as NumPy broadcasts
-    index = np.broadcast_to(index, values.shape[:-1])
+    # apply_ufunc gives each input its own loop dims in one order, size 1 or
+    # absent where it lacks one: broadcast both to the common loop shape
+    loop = np.broadcast_shapes(values.shape[:-1], np.shape(index))
+    values = np.broadcast_to(values, (*loop, values.shape[-1]))
+    index = np.broadcast_to(index, loop)
     picked = np.take_along_axis(values, index[..., None], axis=-1)
     return picked[..., 0]
 
@@ -233,16 +256,21 @@ def _output_dtypes(
     kwargs: dict[str, Any],
     xs: Sequence[xr.DataArray],
     letter_size: dict[str, int],
-) -> list[Any]:
+) -> list[Any] | None:
     """Each output's dtype, which dask must know before it runs anything.
 
-    Found by calling the kernel once on ones with only the core dims (the
-    loop dims dropped), so a mask or an index kernel declares bool or int;
-    the first input's dtype when that call fails.
+    ``spec.dtypes`` when declared; else found by calling the kernel once on
+    ones with only the core dims (the loop dims dropped), so a mask or an
+    index kernel gives bool or int; the first input's dtype when that call
+    fails.
     """
+    if not any(_is_dask(x) for x in xs):
+        # eager: let the kernel (or np.vectorize) decide; a declared dtype
+        # would cast the results
+        return None
+    if spec.dtypes:
+        return [xs[0].dtype if d == "same" else np.dtype(d) for d in spec.dtypes]
     fallback = [xs[0].dtype] * len(spec.outputs)
-    if not any(type(x.data).__module__.startswith("dask.") for x in xs):
-        return fallback
     probes = [
         np.ones(tuple(letter_size[c] for c in group), dtype=x.dtype)
         for x, group in zip(xs, spec.inputs, strict=True)
@@ -253,6 +281,28 @@ def _output_dtypes(
         return fallback
     outs = out if len(spec.outputs) > 1 else (out,)
     return [np.asarray(o).dtype for o in outs]
+
+
+def _is_dask(x: xr.DataArray) -> bool:
+    return type(x.data).__module__.startswith("dask.")
+
+
+def _probe_dtype(fn: Callable[..., Any], xs: Sequence[xr.DataArray]) -> Any:
+    """``fn``'s result dtype on one-element arrays of the inputs' dtypes."""
+    probes = [np.ones((1,) * x.ndim, dtype=x.dtype) for x in xs]
+    try:
+        return np.asarray(fn(*probes)).dtype
+    except Exception:
+        return xs[0].dtype
+
+
+def _numpy_function(fn: Any, what: str) -> Callable[..., Any]:
+    if callable(fn):
+        return fn
+    resolved = getattr(np, fn, None)
+    if resolved is None:
+        raise ValueError(f"{what}: the array namespace has no {fn!r}.")
+    return resolved
 
 
 def _as_dataarray(index: Any) -> xr.DataArray:

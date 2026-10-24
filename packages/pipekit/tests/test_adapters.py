@@ -142,6 +142,9 @@ def test_known_family_without_adapter_names_the_extra(
     with pytest.raises(MissingAdapterError, match=r"pipekit-array\[xarray\]"):
         get_adapter(data_array())
     assert issubclass(MissingAdapterError, TypeError)
+    subclass = type("MyArray", (data_array,), {"__module__": "myapp.arrays"})
+    with pytest.raises(MissingAdapterError, match=r"myapp\.arrays\.MyArray"):
+        get_adapter(subclass())
 
 
 def test_lazy_loader_runs_once_on_first_use(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -226,3 +229,15 @@ def test_summary_and_signatures_start_from_a_carrier() -> None:
     assert "(y=1, x=3)" in pipe.summary(toy)
     # the base Operator default reads the carrier too
     assert Operator().compute_output_signature(toy) == signature_of(toy)
+
+
+def test_lazy_loader_runs_for_a_subclass_defined_elsewhere(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = type("Cube", (), {"__module__": "lazylib2.core"})
+    sub = type("MyCube", (base,), {"__module__": "myapp.cubes"})
+    adapter = ToyAdapter()
+    monkeypatch.setitem(
+        adapters_module._LAZY, "lazylib2.", lambda: register_adapter(base, adapter)
+    )
+    assert get_adapter(sub()) is adapter
