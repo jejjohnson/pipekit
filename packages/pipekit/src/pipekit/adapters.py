@@ -10,8 +10,12 @@ imports pipekit in its core and ``xr.DataArray`` needs no accessor.
 - `NamedArrayAdapter` — the protocol every adapter satisfies.
 - `register_adapter` / `unregister_adapter` / `get_adapter` — the one
   registry, looked up along the carrier type's MRO. Carrier libraries
-  register on import: pipekit-array registers `DimArray` (and, with its
-  ``[xarray]`` extra, ``xr.DataArray``); geoarray registers its carriers.
+  register on import: pipekit-array registers `DimArray`; geoarray
+  registers its carriers.
+- `register_lazy_adapter` — a loader for a carrier family whose library
+  may not be imported yet: pipekit-array registers one for
+  ``xr.DataArray``, so importing it never imports xarray, and the adapter
+  loads the first time a DataArray arrives.
 - `signature_of` — a carrier's `Signature`, through its adapter.
 - `MissingAdapterError` — a known carrier family with nothing registered.
 
@@ -22,6 +26,7 @@ cycle (PK-P1). pipekit core ships no adapter itself.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
 from pipekit.signature import Signature
@@ -32,6 +37,7 @@ __all__ = [
     "NamedArrayAdapter",
     "get_adapter",
     "register_adapter",
+    "register_lazy_adapter",
     "signature_of",
     "unregister_adapter",
 ]
@@ -92,6 +98,9 @@ class NamedArrayAdapter(Protocol):
 
 _REGISTRY: dict[type, NamedArrayAdapter] = {}
 
+#: module prefix of a carrier type -> a loader that registers its adapter
+_LAZY: dict[str, Callable[[], None]] = {}
+
 #: carrier families whose adapter ships behind an extra:
 #: module prefix of the carrier type -> what to install
 _EXTRA_HINTS: dict[str, str] = {"xarray.": "pipekit-array[xarray]"}
@@ -122,6 +131,17 @@ def register_adapter(carrier_type: type, adapter: NamedArrayAdapter) -> None:
     _REGISTRY[carrier_type] = adapter
 
 
+def register_lazy_adapter(module_prefix: str, loader: Callable[[], None]) -> None:
+    """Register ``loader`` for carrier types defined under ``module_prefix``.
+
+    The first time `get_adapter` meets an unregistered type whose module
+    starts with ``module_prefix`` (``"xarray."``), it calls ``loader``
+    once, which registers the real adapter, and looks again. The carrier's
+    library is already imported by then, so nothing is imported early.
+    """
+    _LAZY[module_prefix] = loader
+
+
 def unregister_adapter(carrier_type: type) -> None:
     """Remove the adapter registered for exactly ``carrier_type``, if any."""
     _REGISTRY.pop(carrier_type, None)
@@ -144,16 +164,30 @@ def get_adapter(x: Any) -> NamedArrayAdapter | None:
         True
     """
     cls = type(x)
-    for base in cls.__mro__:
-        adapter = _REGISTRY.get(base)
-        if adapter is not None:
-            return adapter
+    adapter = _lookup(cls)
+    if adapter is not None:
+        return adapter
+    for prefix in list(_LAZY):
+        if cls.__module__.startswith(prefix):
+            # load once: a loader that registers nothing is not retried
+            _LAZY.pop(prefix)()
+            adapter = _lookup(cls)
+            if adapter is not None:
+                return adapter
     for prefix, extra in _EXTRA_HINTS.items():
         if cls.__module__.startswith(prefix):
             raise MissingAdapterError(
                 f"{cls.__module__}.{cls.__qualname__} needs its named-array "
                 f"adapter: pip install '{extra}'."
             )
+    return None
+
+
+def _lookup(cls: type) -> NamedArrayAdapter | None:
+    for base in cls.__mro__:
+        adapter = _REGISTRY.get(base)
+        if adapter is not None:
+            return adapter
     return None
 
 

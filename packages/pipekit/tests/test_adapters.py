@@ -18,6 +18,7 @@ from pipekit import (
     adapters as adapters_module,
     get_adapter,
     register_adapter,
+    register_lazy_adapter,
     signature_of,
     unregister_adapter,
 )
@@ -79,6 +80,7 @@ class OtherAdapter(ToyAdapter):
 def isolated_registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Each test sees an empty registry; the real one is restored after."""
     monkeypatch.setattr(adapters_module, "_REGISTRY", {})
+    monkeypatch.setattr(adapters_module, "_LAZY", {})
     yield
 
 
@@ -140,6 +142,34 @@ def test_known_family_without_adapter_names_the_extra(
     with pytest.raises(MissingAdapterError, match=r"pipekit-array\[xarray\]"):
         get_adapter(data_array())
     assert issubclass(MissingAdapterError, TypeError)
+
+
+def test_lazy_loader_runs_once_on_first_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A loader registers the adapter the first time a carrier of its family arrives."""
+    fake = types.ModuleType("lazylib.core")
+    carrier = type("Cube", (), {"__module__": "lazylib.core"})
+    fake.Cube = carrier  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "lazylib.core", fake)
+    calls: list[int] = []
+    adapter = ToyAdapter()
+
+    def load() -> None:
+        calls.append(1)
+        register_adapter(carrier, adapter)
+
+    register_lazy_adapter("lazylib.", load)
+    assert calls == []
+    assert get_adapter(carrier()) is adapter
+    assert get_adapter(carrier()) is adapter
+    assert calls == [1]
+
+
+def test_lazy_loader_that_registers_nothing_is_not_retried() -> None:
+    calls: list[int] = []
+    register_lazy_adapter("tests.", lambda: calls.append(1))
+    assert get_adapter(Toy([1.0], ("x",))) is None
+    assert get_adapter(Toy([1.0], ("x",))) is None
+    assert calls == [1]
 
 
 def test_check_compatible_returns_the_carriers() -> None:
