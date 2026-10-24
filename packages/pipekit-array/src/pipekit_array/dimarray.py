@@ -119,6 +119,32 @@ def _build(data: Any, dims: tuple[str, ...], labels: dict[str, Any]) -> DimArray
     return d
 
 
+def _positions(index: Any) -> Any:
+    """An indexer with a boolean mask turned into the positions it selects.
+
+    Raises:
+        TypeError: A traced boolean mask (its positions are not static).
+    """
+    if isinstance(index, numbers.Integral | slice):
+        return index
+    dtype = getattr(index, "dtype", None)
+    is_mask = (dtype is not None and dtype == bool) or (
+        isinstance(index, (list, tuple))
+        and len(index) > 0
+        and all(isinstance(v, bool) for v in index)
+    )
+    if not is_mask:
+        return index
+    if "Tracer" in type(index).__name__:
+        raise TypeError(
+            "isel: a boolean mask under jit has no static size; select with "
+            "positions, or mask the data instead."
+        )
+    import numpy as np
+
+    return np.flatnonzero(np.asarray(index))
+
+
 def _index_labels(values: tuple[Any, ...], index: Any) -> tuple[Any, ...] | None:
     """Labels after one positional index on their dim; None if the dim drops."""
     if isinstance(index, numbers.Integral):
@@ -153,8 +179,25 @@ class DimArrayAdapter:
         unknown = sorted(set(indexers) - set(x.dims))
         if unknown:
             raise KeyError(f"isel: unknown dim(s) {unknown}; dims are {x.dims}.")
-        key = tuple(indexers.get(dim, slice(None)) for dim in x.dims)
-        data = x.data[key]
+        normalized = {dim: _positions(index) for dim, index in indexers.items()}
+        # ints and slices at once; each position array on its own axis, so
+        # two arrays select independently instead of pairing up (outer indexing)
+        basic = tuple(
+            index if isinstance(index, numbers.Integral | slice) else slice(None)
+            for index in (normalized.get(dim, slice(None)) for dim in x.dims)
+        )
+        data = x.data[basic]
+        kept_dims = [
+            dim
+            for dim, index in zip(x.dims, basic, strict=True)
+            if not isinstance(index, numbers.Integral)
+        ]
+        for dim, index in normalized.items():
+            if isinstance(index, numbers.Integral | slice):
+                continue
+            axis = kept_dims.index(dim)
+            data = data[(slice(None),) * axis + (index,)]
+        key = tuple(normalized.get(dim, slice(None)) for dim in x.dims)
         dims: list[str] = []
         labels: dict[str, tuple[Any, ...]] = {}
         for dim, index in zip(x.dims, key, strict=True):
