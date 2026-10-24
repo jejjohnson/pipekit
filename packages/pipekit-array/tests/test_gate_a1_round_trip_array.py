@@ -16,23 +16,44 @@ import pipekit_array
 import pytest
 from pipekit import Operator
 from pipekit.testing import assert_round_trip, public_operators
-from pipekit_array import ConcatenateAlong, MeanScalar, StackAlong
+from pipekit_array import (
+    ArgReduce,
+    ConcatenateAlong,
+    DimArray,
+    ISel,
+    MeanScalar,
+    Reduce,
+    Sel,
+    StackAlong,
+    TakeAlong,
+    Transpose,
+)
 
 
 np = pytest.importorskip("numpy")
 
 X = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
 PAIR = [X[0], X[1]]
+#: a named cube (time, band, x) with labelled bands, and an index into its time
+CUBE = DimArray(X, ("time", "band", "x"), {"band": ("B4", "B8", "B11")})
+BEST = DimArray(np.array([[0, 1, 0, 1]] * 3), ("band", "x"))
 
 #: Abstract bases: none ship in pipekit-array yet.
 SKIP: dict[str, str] = {}
 
 #: name -> (build the operator, positional inputs)
 CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...]]] = {
+    "ArgReduce": (lambda: ArgReduce("argmax", dim="time"), (CUBE,)),
     "ConcatenateAlong": (lambda: ConcatenateAlong(axis=1), (PAIR,)),
+    # a slice index is stored as start/stop/step
+    "ISel": (lambda: ISel(dim="x", index=slice(1, None, 2)), (CUBE,)),
     # a tuple of axes comes back from JSON as a list
     "MeanScalar": (lambda: MeanScalar(axis=(0, 2), keepdims=True), (X,)),
+    "Reduce": (lambda: Reduce("mean", dim=("time", "x")), (CUBE,)),
+    "Sel": (lambda: Sel(dim="band", label=["B8", "B4"]), (CUBE,)),
     "StackAlong": (lambda: StackAlong(axis=-1), (PAIR,)),
+    "TakeAlong": (lambda: TakeAlong(dim="time"), (CUBE, BEST)),
+    "Transpose": (lambda: Transpose(order=("x", "time", "band")), (CUBE,)),
 }
 
 OPERATORS = public_operators(pipekit_array)

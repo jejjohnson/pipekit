@@ -15,7 +15,7 @@ and the trained-model wrapper `ModelOp`.
 
 ## Reductions
 
-::: pipekit_array.reduce
+::: pipekit_array.reductions
 
 ## Combinators
 
@@ -24,3 +24,9 @@ and the trained-model wrapper `ModelOp`.
 ## Named arrays
 
 ::: pipekit_array.dimarray
+
+## Dim-level functions
+
+::: pipekit_array.dims
+
+::: pipekit_array.dim_operators
