@@ -139,7 +139,9 @@ def sel(x: Any, /, **labels: Any) -> Any:
         if values is None:
             raise KeyError(f"sel: dim {dim!r} has no labels; use isel.")
         position = {value: i for i, value in enumerate(values)}
-        many = isinstance(wanted, (list, tuple))
+        many = _many_labels(wanted, position)
+        if many and not isinstance(wanted, (list, tuple)):
+            wanted = list(wanted.tolist())
         for label in wanted if many else (wanted,):
             if label not in position:
                 raise KeyError(f"sel: {label!r} is not a label of {dim!r}: {values}.")
@@ -148,6 +150,21 @@ def sel(x: Any, /, **labels: Any) -> Any:
         else:
             indexers[dim] = position[wanted]
     return adapter.isel(x, indexers)
+
+
+def _many_labels(wanted: Any, position: dict[Any, int]) -> bool:
+    """Whether ``wanted`` lists several labels (a list, a tuple or a 1-D array).
+
+    A tuple that is itself a label (tuple-valued labels) is one label.
+    """
+    if isinstance(wanted, list):
+        return True
+    if isinstance(wanted, tuple):
+        try:
+            return wanted not in position
+        except TypeError:
+            return True
+    return getattr(wanted, "ndim", 0) == 1
 
 
 def transpose(x: Any, order: Sequence[str]) -> Any:
@@ -249,6 +266,13 @@ def take_along(x: Any, index: Any, dim: str) -> Any:
     xp = namespace_of(data)
     idx = index_adapter.data(index)
     # index → x's dim order with dim as a size-1 axis; missing dims broadcast
+    sizes = dict(zip(dims, data.shape, strict=True))
+    for d, n in zip(index_dims, idx.shape, strict=True):
+        if n != sizes[d]:
+            raise ValueError(
+                f"take_along: index dim {d!r} has size {n}, but {d!r} has size "
+                f"{sizes[d]}; the index is never broadcast."
+            )
     present = [d for d in rest if d in index_dims]
     idx = xp.permute_dims(idx, tuple(index_dims.index(d) for d in present))
     full = tuple(1 if d == dim or d not in index_dims else None for d in dims)
