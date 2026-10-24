@@ -89,6 +89,12 @@ class DimArray:
         """The data's dtype."""
         return self.data.dtype
 
+    def __array__(self, dtype: Any = None, copy: bool | None = None) -> Any:
+        """The data as a NumPy array, so ``np.asarray(d)`` works (dims are dropped)."""
+        import numpy as np
+
+        return np.asarray(self.data, dtype=dtype)
+
     def to_xarray(self) -> Any:
         """An ``xr.DataArray`` with the same data and dims; labels become coordinates.
 

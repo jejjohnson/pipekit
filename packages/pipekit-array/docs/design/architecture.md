@@ -144,7 +144,7 @@ from pipekit_array.qc import (
     AssertValueRange,
     Diff,
 )
-from pipekit_array.reduce import MeanScalar
+from pipekit_array.reductions import MeanScalar
 
 __all__ = [
     "ApplyToBands",

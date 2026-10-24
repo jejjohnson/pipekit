@@ -1,4 +1,4 @@
-"""Tests for `pipekit_array.reduce` — `MeanScalar`."""
+"""Tests for `pipekit_array.reductions` — `MeanScalar`."""
 
 from __future__ import annotations
 
