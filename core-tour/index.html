@@ -1,0 +1,3162 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A carrier-agnostic operator-graph framework for composable scientific pipelines.">
+      
+      
+        <meta name="author" content="J. Emmanuel Johnson">
+      
+      
+      
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../patterns/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Tour of the core - pipekit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#a-tour-of-the-core" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="pipekit" class="md-header__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pipekit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tour of the core
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../protocols/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Protocols
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tour of the core
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../patterns/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Patterns
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../background/toolz/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Background
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/train-emulator/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/pipekit/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../notebooks/pipekit_train_quickstart/" class="md-tabs__link">
+          
+  
+  
+  Notebooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../design-train/" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="pipekit" class="md-nav__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pipekit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tour of the core
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tour of the core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#foundations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foundations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Foundations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sequential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graph-input-and-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph, Input and Node
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combination
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shape-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape inference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallelism
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits today
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../background/toolz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/train-emulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train an emulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/da-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a DA cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/anomaly-graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build a bigger graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/train-register-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train, register, forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/ensemble-da/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble data assimilation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/etl-regions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ETL over many regions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/pipekit-under-jit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run pipelines under jit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-array
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-evaluate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pipekit-jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-jax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pipekit_train_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart (MLP regression)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pipekit_train_cycle_handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cycle handoff (emulator → forecast)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pipekit_train_numpyro_svi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro SVI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pipekit_train_numpyro_mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pipekit_train_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — BlackJAX NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_12_1" id="__nav_12_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_12_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundaries & future work
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend adapters
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/numpyro_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-train/blackjax_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlackJAX adapter (NUTS / SG-MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#foundations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foundations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Foundations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sequential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graph-input-and-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph, Input and Node
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combination
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quality-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shape-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape inference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallelism
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits today
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="a-tour-of-the-core">A tour of the core<a class="headerlink" href="#a-tour-of-the-core" title="Permanent link">&para;</a></h1>
+<p><em>Everything in <code>pipekit</code>, group by group: what it is, when to reach for it,
+and what it does today.</em></p>
+<p>The core is pure Python with no dependencies. Its public surface is about
+fifty names in thirteen modules, one module per job, so you can learn it a
+group at a time. For why it is shaped this way (operators as classes, the
+carrier left open), read the <a href="../background/toolz/">background</a>; for the
+shapes real pipelines take, read <a href="../patterns/">Patterns</a>.</p>
+<p>Every output on this page is from a real run of pipekit 0.0.2.</p>
+<h2 id="the-map">The map<a class="headerlink" href="#the-map" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Module</th>
+<th>Names</th>
+<th>Reach for it when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foundations</td>
+<td><code>_base/</code></td>
+<td><code>Operator</code>, <code>ConfigMixin</code>, <code>Sequential</code>, <code>Graph</code>, <code>Input</code>, <code>Node</code></td>
+<td>always: writing a step, chaining steps, wiring a graph</td>
+</tr>
+<tr>
+<td>Composition</td>
+<td><code>compose</code></td>
+<td><code>pipe</code>, <code>compose</code>, <code>compose_left</code>, <code>juxt</code>, <code>complement</code></td>
+<td>you think in <code>toolz</code></td>
+</tr>
+<tr>
+<td>Building blocks</td>
+<td><code>blocks</code></td>
+<td><code>Identity</code>, <code>Const</code>, <code>Lambda</code>, <code>Sink</code></td>
+<td>a no-op, a constant, a quick function, a write</td>
+</tr>
+<tr>
+<td>Control flow</td>
+<td><code>control</code></td>
+<td><code>Branch</code>, <code>Switch</code>, <code>Try</code>, <code>Coalesce</code>, <code>Retry</code></td>
+<td>a decision or a failure inside the pipeline</td>
+</tr>
+<tr>
+<td>Observers</td>
+<td><code>observe</code></td>
+<td><code>Tap</code>, <code>Snapshot</code>, <code>ShapeTrace</code>, <code>Profile</code>, <code>Histogram</code></td>
+<td>looking without changing the flow</td>
+</tr>
+<tr>
+<td>Combination</td>
+<td><code>combine</code></td>
+<td><code>Fanout</code></td>
+<td>one input, several named outputs</td>
+</tr>
+<tr>
+<td>Caching</td>
+<td><code>cache</code></td>
+<td><code>Cache</code>, <code>Memoize</code></td>
+<td>the same expensive call twice</td>
+</tr>
+<tr>
+<td>Quality control</td>
+<td><code>qc</code></td>
+<td><code>Quarantine</code>, <code>AssertShape</code>, <code>AssertDType</code>, <code>AssertHasAttribute</code>, <code>AssertCallable</code>, <code>QCError</code></td>
+<td>a guard that fails loudly, or sets bad inputs aside</td>
+</tr>
+<tr>
+<td>Shape inference</td>
+<td><code>signature</code></td>
+<td><code>Signature</code>, <code>compute_output_signature</code></td>
+<td>catching a shape mismatch before running</td>
+</tr>
+<tr>
+<td>Parallelism</td>
+<td><code>parallel</code></td>
+<td><code>ThreadMap</code>, <code>ProcessMap</code>, <code>AsyncMap</code>, <code>BatchedMap</code>, <code>check_pickleable</code></td>
+<td>many items, one operator</td>
+</tr>
+<tr>
+<td>Serialisation</td>
+<td><code>serial</code></td>
+<td><code>dumps</code>, <code>loads</code>, <code>loads_sandboxed</code>, <code>from_state_sandboxed</code>, <code>register</code>, <code>unregister</code>, <code>allowed</code></td>
+<td>configuration as data; untrusted pipelines</td>
+</tr>
+<tr>
+<td>Hashing</td>
+<td><code>hashing</code></td>
+<td><code>pipeline_hash</code></td>
+<td>one key for "the same pipeline again": a registry, a cache, an orchestrator task</td>
+</tr>
+<tr>
+<td>State</td>
+<td><code>state</code></td>
+<td><code>StatefulOperator</code>, <code>CarryState</code></td>
+<td>state carried across calls: time steps, training, streams</td>
+</tr>
+<tr>
+<td>Protocols</td>
+<td><code>protocols</code></td>
+<td><code>Predictor</code>, <code>FittableTransformer</code></td>
+<td>accepting a model without importing its library</td>
+</tr>
+</tbody>
+</table>
+<p>The sister packages build on this core: time stepping and data assimilation
+in <code>pipekit-cycle</code>, training in <code>pipekit-train</code>, the model registry in
+<code>pipekit-experiment</code>, benchmarks in <code>pipekit-evaluate</code>, Array API dispatch in
+<code>pipekit-array</code>, JAX models in <code>pipekit-jax</code>.</p>
+<p>The examples share one small operator:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Operator</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Scale</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;x ↦ a · x.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">factor</span> <span class="o">=</span> <span class="n">factor</span>  <span class="c1"># stored under its argument&#39;s name → its config</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor</span>
+</code></pre></div>
+<h2 id="foundations">Foundations<a class="headerlink" href="#foundations" title="Permanent link">&para;</a></h2>
+<h3 id="operator"><code>Operator</code><a class="headerlink" href="#operator" title="Permanent link">&para;</a></h3>
+<p>The class every step subclasses. You write two things: a constructor that
+stores its arguments under the same names, and <code>_apply</code>. The base class
+supplies the rest:</p>
+<ul>
+<li><strong>configuration</strong>: <code>get_config()</code> is derived from the constructor's
+  signature (<code>ConfigMixin</code>), and <code>state</code> is a JSON-safe record of the class
+  and its config;</li>
+<li><strong>rebuilding</strong>: <code>Operator.from_state(state)</code> finds the class among every
+  imported subclass and calls it with the config;</li>
+<li><strong>the pipe</strong>: <code>a | b</code> is a <code>Sequential</code>, flattened;</li>
+<li><strong>two modes in one <code>__call__</code></strong>: on data it runs <code>_apply</code>; on a graph
+  placeholder (<code>Input</code> or <code>Node</code>) it records a node instead;</li>
+<li><strong>class flags</strong>: <code>forbid_in_yaml</code> (holds a closure, so its config cannot be
+  rebuilt) and <code>_terminal</code> (may only end a <code>Sequential</code>).</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pk</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">state</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># → {&#39;module&#39;: &#39;__main__&#39;, &#39;class&#39;: &#39;Scale&#39;, &#39;config&#39;: {&#39;factor&#39;: 2.0}}</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)))</span>   <span class="c1"># → Scale(factor=2.0)</span>
+</code></pre></div>
+<h3 id="sequential"><code>Sequential</code><a class="headerlink" href="#sequential" title="Permanent link">&para;</a></h3>
+<p>Apply operators left to right. It checks at construction that every item is
+an operator and that a <code>_terminal</code> one comes last; <code>|</code> flattens, so
+<code>(a | b) | c</code> and <code>a | (b | c)</code> are the same three steps. It has <code>len</code>,
+indexing and slicing, a Keras-style <code>summary(signature)</code> and a <code>describe()</code>
+tree, and the empty <code>Sequential</code> is the identity.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequential</span><span class="p">,</span> <span class="n">Signature</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">Scale</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span> <span class="o">|</span> <span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span> <span class="o">|</span> <span class="n">Scale</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">pipe</span><span class="p">(</span><span class="mf">10.0</span><span class="p">)</span>         <span class="c1"># → 30.0</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nb">len</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>          <span class="c1"># → 3</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">pipe</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>           <span class="c1"># → Sequential([Scale(factor=2.0), Scale(factor=3.0)])</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">Sequential</span><span class="p">([])(</span><span class="mi">7</span><span class="p">)</span>  <span class="c1"># → 7</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">pipe</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">Signature</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">((</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float32&quot;</span><span class="p">)))</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Operator   Input sig                      Output sig</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># -----------------------------------------------------------------------</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># [0] Scale  Signature((y=4, x=4) float32)  Signature((y=4, x=4) float32)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># [1] Scale  Signature((y=4, x=4) float32)  Signature((y=4, x=4) float32)</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># [2] Scale  Signature((y=4, x=4) float32)  Signature((y=4, x=4) float32)</span>
+</code></pre></div>
+<h3 id="graph-input-and-node"><code>Graph</code>, <code>Input</code> and <code>Node</code><a class="headerlink" href="#graph-input-and-node" title="Permanent link">&para;</a></h3>
+<p>For flows that branch and merge, with several inputs and named outputs.
+Calling operators on <code>Input</code>s (and on what those calls return) records the
+graph; <code>Graph(inputs=…, outputs=…)</code> wraps it, rejects cycles, and evaluates
+in topological order. Inputs bind by keyword or by position; outputs come
+back as a dict.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span><span class="p">,</span> <span class="n">Input</span><span class="p">,</span> <span class="n">Lambda</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">),</span> <span class="n">Input</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">s</span> <span class="o">=</span> <span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)(</span><span class="n">a</span><span class="p">)</span>                                     <span class="c1"># s = 2a</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">total</span> <span class="o">=</span> <span class="n">Lambda</span><span class="p">(</span><span class="k">lambda</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="n">u</span> <span class="o">+</span> <span class="n">v</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">)(</span><span class="n">s</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>  <span class="c1"># s + b</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="n">a</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">},</span> <span class="n">outputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;s&quot;</span><span class="p">:</span> <span class="n">s</span><span class="p">,</span> <span class="s2">&quot;sum&quot;</span><span class="p">:</span> <span class="n">total</span><span class="p">})</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">g</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mf">10.0</span><span class="p">)</span>   <span class="c1"># → {&#39;s&#39;: 2.0, &#39;sum&#39;: 12.0}</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">g</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">)</span>       <span class="c1"># → the same; positional arguments bind in declaration order</span>
+</code></pre></div>
+<p>A single-input graph composes into a <code>Sequential</code>
+(<code>(Scale(2.0) | g1)(1.0)</code> → <code>{'y': 6.0}</code> for a graph <code>g1</code> with output
+<code>y = 3x</code>). The <a href="../tutorials/anomaly-graph/">bigger-graph tutorial</a> builds a
+full one.</p>
+<h2 id="composition">Composition<a class="headerlink" href="#composition" title="Permanent link">&para;</a></h2>
+<p>Free functions that carry the <code>toolz</code> surface. They are not operators
+themselves (except what they return). Below, <code>inc = Lambda(lambda v: v + 1)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th><code>toolz</code> ancestor</th>
+<th>What it does</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pipe(value, *ops)</code></td>
+<td><code>toolz.pipe</code></td>
+<td><code>Sequential(ops)(value)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>compose(*ops)</code></td>
+<td><code>toolz.compose</code></td>
+<td>right to left: <code>compose(f, g, h)</code> is <code>Sequential([h, g, f])</code></td>
+<td><code>compose(Scale(2.0), inc)(3.0)</code> → <code>8.0</code></td>
+</tr>
+<tr>
+<td><code>compose_left(*ops)</code></td>
+<td><code>toolz.compose_left</code></td>
+<td>left to right, like <code>Sequential</code></td>
+<td><code>compose_left(Scale(2.0), inc)(3.0)</code> → <code>7.0</code></td>
+</tr>
+<tr>
+<td><code>juxt(*ops)</code></td>
+<td><code>toolz.juxt</code></td>
+<td>each operator on the same input; a tuple</td>
+<td><code>juxt(Identity(), Scale(2.0))(5.0)</code> → <code>(5.0, 10.0)</code></td>
+</tr>
+<tr>
+<td><code>complement(pred)</code></td>
+<td><code>toolz.complement</code></td>
+<td>negates a predicate</td>
+<td><code>complement(str.isdigit)("a")</code> → <code>True</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>juxt</code> returns a plain function, so it cannot sit inside a <code>Sequential</code>;
+<code>Fanout</code> is the operator-shaped version.</p>
+<h2 id="building-blocks">Building blocks<a class="headerlink" href="#building-blocks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Purpose</th>
+<th>Holds a closure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Identity()</code></td>
+<td>an explicit no-op; the default branch of <code>Branch</code> and <code>Switch</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>Const(value)</code></td>
+<td>return a fixed value, whatever the input</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>Lambda(fn, name=…)</code></td>
+<td>wrap any callable; the escape hatch</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Sink(write_fn, name=…)</code></td>
+<td>write as a side effect, return the input unchanged</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p><code>Sink</code> returns its input, so a pipeline can continue past it. An operator that
+really ends a pipeline (writes and returns nothing) sets <code>_terminal = True</code>.</p>
+<h2 id="control-flow">Control flow<a class="headerlink" href="#control-flow" title="Permanent link">&para;</a></h2>
+<p>Decisions and failures as steps inside the pipeline, rather than <code>if</code> and
+<code>try</code> around it.</p>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Branch(predicate, if_true, if_false=Identity())</code></td>
+<td>a binary choice</td>
+</tr>
+<tr>
+<td><code>Switch(key, cases, default=Identity())</code></td>
+<td>dispatch on <code>key(carrier)</code></td>
+</tr>
+<tr>
+<td><code>Try(primary, fallback, on)</code></td>
+<td>run <code>fallback</code> when <code>primary</code> raises one of <code>on</code></td>
+</tr>
+<tr>
+<td><code>Coalesce(sources, is_ok, on=())</code></td>
+<td>the first source whose output passes <code>is_ok</code></td>
+</tr>
+<tr>
+<td><code>Retry(op, attempts, base_delay, on)</code></td>
+<td>retry on <code>on</code>; attempt <em>i</em> waits <code>base_delay · 2^(i−1)</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Coalesce</span><span class="p">,</span> <span class="n">Const</span><span class="p">,</span> <span class="n">Lambda</span><span class="p">,</span> <span class="n">Retry</span><span class="p">,</span> <span class="n">Try</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">down</span><span class="p">(</span><span class="n">_</span><span class="p">):</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;down&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">Try</span><span class="p">(</span><span class="n">Lambda</span><span class="p">(</span><span class="n">down</span><span class="p">),</span> <span class="n">Const</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span> <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">IOError</span><span class="p">,))(</span><span class="mf">1.0</span><span class="p">)</span>    <span class="c1"># → 0.0</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">Coalesce</span><span class="p">(</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="p">[</span><span class="n">Lambda</span><span class="p">(</span><span class="n">down</span><span class="p">),</span> <span class="n">Const</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">Const</span><span class="p">(</span><span class="mi">5</span><span class="p">)],</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">is_ok</span><span class="o">=</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span>                            <span class="c1"># -1 fails the check</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">IOError</span><span class="p">,),</span>                                    <span class="c1"># down() falls through</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)(</span><span class="mi">0</span><span class="p">)</span>                                                  <span class="c1"># → 5</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="n">Retry</span><span class="p">(</span><span class="n">flaky</span><span class="p">,</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">,))(</span><span class="mi">42</span><span class="p">)</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># → 42, where flaky is an operator that raises ConnectionError twice, then succeeds</span>
+</code></pre></div>
+<p><code>Try</code> and <code>Retry</code> require their exception list, so neither is ever a silent
+catch-all; when every source fails, <code>Coalesce</code> raises <code>RuntimeError</code>. The
+<a href="../tutorials/etl-regions/">ETL tutorial</a> nests all three around a reader.</p>
+<h2 id="observers">Observers<a class="headerlink" href="#observers" title="Permanent link">&para;</a></h2>
+<p>The carrier flows through unchanged; something useful happens on the side.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tap(fn, name=…)</code></td>
+<td>call <code>fn</code> on the carrier; return the carrier</td>
+</tr>
+<tr>
+<td><code>Snapshot()</code> + <code>.at(key)</code></td>
+<td>capture intermediates by name in <code>snapshot.captures</code></td>
+</tr>
+<tr>
+<td><code>ShapeTrace(printer=print, mode="every" \| "diff_only", label=None, extra=None)</code></td>
+<td>log <code>shape</code> and <code>dtype</code> at each step; <code>extra(carrier)</code> adds a line (a coordinate system, units)</td>
+</tr>
+<tr>
+<td><code>Profile()</code> + <code>.wrap(op)</code></td>
+<td>time each call; <code>profile.report()</code> gives calls, total and mean per operator</td>
+</tr>
+<tr>
+<td><code>Histogram(bins=10, to_array=list)</code> + <code>.at(key)</code></td>
+<td>capture distributions; <code>to_array</code> turns the carrier into numbers</td>
+</tr>
+</tbody>
+</table>
+<p><code>Snapshot</code>, <code>Profile</code> and <code>Histogram</code> are <em>controllers</em>, not operators: the
+operators you place in the pipeline come from <code>.at()</code> and <code>.wrap()</code>, and the
+data they collect lives on the controller.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Histogram</span><span class="p">,</span> <span class="n">Lambda</span><span class="p">,</span> <span class="n">Profile</span><span class="p">,</span> <span class="n">Snapshot</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">snap</span><span class="p">,</span> <span class="n">prof</span><span class="p">,</span> <span class="n">hist</span> <span class="o">=</span> <span class="n">Snapshot</span><span class="p">(),</span> <span class="n">Profile</span><span class="p">(),</span> <span class="n">Histogram</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">Lambda</span><span class="p">(</span><span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">v</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">v</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;pair&quot;</span><span class="p">)</span> <span class="o">|</span> <span class="n">snap</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="s2">&quot;mid&quot;</span><span class="p">)</span> <span class="o">|</span> <span class="n">hist</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="s2">&quot;out&quot;</span><span class="p">)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">pipe</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>                   <span class="c1"># → [1.0, 2.0]</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">snap</span><span class="o">.</span><span class="n">captures</span>               <span class="c1"># → {&#39;mid&#39;: [1.0, 2.0]}</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">prof</span><span class="o">.</span><span class="n">wrap</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">3.0</span><span class="p">))(</span><span class="mf">2.0</span><span class="p">)</span>  <span class="c1"># → 6.0;  prof.report() → {&#39;Scale&#39;: {&#39;calls&#39;: 1.0, ...}}</span>
+</code></pre></div>
+<h2 id="combination">Combination<a class="headerlink" href="#combination" title="Permanent link">&para;</a></h2>
+<p><code>Fanout</code> runs several operators on the same input and returns a dict of
+their outputs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Fanout</span><span class="p">,</span> <span class="n">Lambda</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">Fanout</span><span class="p">({</span><span class="s2">&quot;n&quot;</span><span class="p">:</span> <span class="n">Lambda</span><span class="p">(</span><span class="nb">len</span><span class="p">),</span> <span class="s2">&quot;u&quot;</span><span class="p">:</span> <span class="n">Lambda</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">upper</span><span class="p">)})(</span><span class="s2">&quot;ab&quot;</span><span class="p">)</span>   <span class="c1"># → {&#39;n&#39;: 2, &#39;u&#39;: &#39;AB&#39;}</span>
+</code></pre></div>
+<h2 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h2>
+<p><code>Cache(inner)</code> (alias <code>Memoize</code>) memoises an operator in memory, keyed by a
+SHA-256 of the input and the inner operator's configuration. Arrays are keyed
+by their bytes, dtype and shape, so two large arrays never collide, and the
+bookkeeping is thread-safe, so one <code>Cache</code> can be shared by <code>ThreadMap</code>
+workers.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cache</span><span class="p">,</span> <span class="n">Memoize</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">c</span> <span class="o">=</span> <span class="n">Cache</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">))</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">c</span><span class="p">(</span><span class="mf">1.0</span><span class="p">);</span> <span class="n">c</span><span class="p">(</span><span class="mf">1.0</span><span class="p">);</span> <span class="n">c</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">c</span><span class="o">.</span><span class="n">hits</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">misses</span>    <span class="c1"># → (1, 2)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">Memoize</span> <span class="ow">is</span> <span class="n">Cache</span>    <span class="c1"># → True</span>
+</code></pre></div>
+<h2 id="quality-control">Quality control<a class="headerlink" href="#quality-control" title="Permanent link">&para;</a></h2>
+<p>Assertions as pass-through operators: a research-time "this won't break"
+becomes a permanent guard.</p>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Purpose</th>
+<th>Holds a closure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Quarantine(check, sentinel, on_quarantine=None)</code></td>
+<td>on failure call <code>on_quarantine</code> and return <code>sentinel</code>; never raises</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>AssertShape(expected_shape)</code></td>
+<td>raise <code>QCError</code> on a shape mismatch; <code>None</code> matches any size</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>AssertDType(expected_dtype)</code></td>
+<td>raise <code>QCError</code> on a dtype mismatch</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>AssertHasAttribute(name, value=…)</code></td>
+<td>raise <code>QCError</code> if an attribute is missing or wrong</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>AssertCallable(predicate, message=…)</code></td>
+<td>raise <code>QCError</code> if a predicate fails</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">AssertShape</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">))(</span><span class="n">x</span><span class="p">)</span>   <span class="c1"># x.shape == (2, 3)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># QCError: AssertShape: axis 1 expected 4, got 3 (expected=(2, 4), actual=(2, 3)).</span>
+</code></pre></div>
+<p>The checks read <code>shape</code>, <code>dtype</code> and attributes and never look inside the
+data, so they work on any carrier. <code>QCError</code> subclasses <code>AssertionError</code>.
+<code>Quarantine</code> is the batch-friendly one: the
+<a href="../tutorials/inference/">inference</a> and <a href="../tutorials/etl-regions/">ETL</a>
+tutorials use it to set bad records aside and keep going.</p>
+<h2 id="shape-inference">Shape inference<a class="headerlink" href="#shape-inference" title="Permanent link">&para;</a></h2>
+<p><code>Signature</code> is an immutable record of named dimensions and a dtype; a size of
+<code>None</code> marks a dimension dynamic. An operator declares how it changes a
+signature by overriding <code>compute_output_signature</code>; returning <code>None</code> means
+"this operator does not track shape", and <code>Sequential.summary</code> shows <code>?</code> for
+it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Signature</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">sig</span> <span class="o">=</span> <span class="n">Signature</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">((</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="mi">256</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="mi">256</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float32&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">sig</span><span class="o">.</span><span class="n">format</span><span class="p">()</span>                  <span class="c1"># → &#39;(time=12, y=256, x=256) float32&#39;</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">sig</span><span class="o">.</span><span class="n">drop_dims</span><span class="p">((</span><span class="s2">&quot;time&quot;</span><span class="p">,))</span>      <span class="c1"># → Signature((y=256, x=256) float32)</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">sig</span><span class="o">.</span><span class="n">replace_dims</span><span class="p">({</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mi">128</span><span class="p">})</span>  <span class="c1"># → Signature((time=12, y=256, x=128) float32)</span>
+</code></pre></div>
+<p>Containers report what they return:
+- <code>Cache</code>, <code>Retry</code> and <code>Profile.wrap</code> report their inner operator's signature.
+- <code>Try</code>, <code>Branch</code>, <code>Switch</code> and <code>Coalesce</code> report the signature their
+  branches agree on, else <code>None</code>.
+- <code>Fanout</code> and the parallel maps report <code>None</code>, because they return a dict
+  or a list.</p>
+<p>A <code>Graph</code> propagates signatures node by node: <code>output_signatures</code> gives
+each output's, and <code>summary</code> prints the table. A node with several inputs
+gets its operator's signature only when the inputs agree; otherwise it shows
+<code>?</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span><span class="p">,</span> <span class="n">Input</span><span class="p">,</span> <span class="n">Operator</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MeanOver</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Mean over one named dimension: drops it from the signature.&quot;&quot;&quot;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">=</span> <span class="n">dim</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>        <span class="k">return</span> <span class="n">x</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">compute_output_signature</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signature</span><span class="p">):</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>        <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">signature</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">signature</span><span class="o">.</span><span class="n">drop_dims</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,))</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="n">x</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span> <span class="n">outputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;climatology&quot;</span><span class="p">:</span> <span class="n">MeanOver</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)(</span><span class="n">x</span><span class="p">)})</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">sig</span><span class="p">))</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="c1"># Node                 Input sig                        Output sig</span>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="c1"># ----------------------------------------------------------------</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="c1"># [0] MeanOver(x)      (time=12, y=256, x=256) float32  (y=256, x=256) float32</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a><span class="c1"># → climatology = [0]                                   (y=256, x=256) float32</span>
+</code></pre></div>
+<p>The payoff grows as the operators you write (and domain libraries) declare
+theirs.</p>
+<h2 id="parallelism">Parallelism<a class="headerlink" href="#parallelism" title="Permanent link">&para;</a></h2>
+<p>Four shapes, one wrapper each. Every wrapper takes an iterable and returns a
+list in input order.</p>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>When</th>
+<th>Constraint</th>
+<th>Operator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Threads</td>
+<td>I/O-bound: object-store reads, downloads</td>
+<td>the I/O must release the GIL</td>
+<td><code>ThreadMap(op, n_workers=8)</code></td>
+</tr>
+<tr>
+<td>Processes</td>
+<td>CPU-bound work</td>
+<td>every step must pickle</td>
+<td><code>ProcessMap(op, n_workers=8, on_error="raise" \| "log_and_continue")</code></td>
+</tr>
+<tr>
+<td>Async</td>
+<td>I/O on one thread: web services</td>
+<td><code>async def _apply</code>, or a sync operator run in a thread</td>
+<td><code>AsyncMap(op, semaphore=8)</code></td>
+</tr>
+<tr>
+<td>Batches</td>
+<td>GPU inference, vectorised code</td>
+<td>the inner operator takes a <em>list</em> of items</td>
+<td><code>BatchedMap(op, batch_size=8, flatten=True)</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncMap</span><span class="p">,</span> <span class="n">BatchedMap</span><span class="p">,</span> <span class="n">Lambda</span><span class="p">,</span> <span class="n">ThreadMap</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">ThreadMap</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">n_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>             <span class="c1"># → [2.0, 4.0, 6.0]</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">add_up</span> <span class="o">=</span> <span class="n">Lambda</span><span class="p">(</span><span class="k">lambda</span> <span class="n">b</span><span class="p">:</span> <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span><span class="p">)</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">BatchedMap</span><span class="p">(</span><span class="n">add_up</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">2</span><span class="p">)([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">])</span>         <span class="c1"># → [3, 7, 5]</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">AsyncMap</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">semaphore</span><span class="o">=</span><span class="mi">2</span><span class="p">)([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>                 <span class="c1"># → [2.0, 4.0]</span>
+</code></pre></div>
+<p><strong>Pickling.</strong> Process pools need every operator to pickle, and closures
+(<code>Lambda</code>, <code>Tap</code>, <code>Sink</code>, a <code>Branch</code> predicate), open handles and captured
+random generators do not. Operators that hold a closure carry
+<code>forbid_in_yaml = True</code>, and <code>check_pickleable(op)</code> walks a whole pipeline,
+however deeply nested, and returns the flagged operators before you fan out:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Branch</span><span class="p">,</span> <span class="n">Cache</span><span class="p">,</span> <span class="n">Identity</span><span class="p">,</span> <span class="n">Tap</span><span class="p">,</span> <span class="n">ThreadMap</span><span class="p">,</span> <span class="n">check_pickleable</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">ThreadMap</span><span class="p">(</span><span class="n">Cache</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span> <span class="o">|</span> <span class="n">Tap</span><span class="p">(</span><span class="nb">print</span><span class="p">)</span> <span class="o">|</span> <span class="n">Branch</span><span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">Identity</span><span class="p">())))</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">check_pickleable</span><span class="p">(</span><span class="n">pipe</span><span class="p">)]</span>   <span class="c1"># → [&#39;Tap&#39;, &#39;Branch&#39;]</span>
+</code></pre></div>
+<p><strong>Async.</strong> <code>AsyncMap(...)(items)</code> drives its own event loop, so it works in
+scripts. Inside a running loop (a FastAPI or LitServe handler) it raises a
+<code>RuntimeError</code> that says to await its <code>run</code> method instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handler</span><span class="p">(</span><span class="n">items</span><span class="p">):</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="k">return</span> <span class="k">await</span> <span class="n">AsyncMap</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>   <span class="c1"># → [2.0, 4.0] for [1, 2]</span>
+</code></pre></div>
+<p><strong>Deliberately left out.</strong> No automatic parallelism (<code>Sequential</code> is
+sequential; <code>Graph</code> evaluates in one process), no backend abstraction (the
+wrappers are <code>concurrent.futures</code> and <code>asyncio</code>), no fault tolerance beyond
+<code>on_error="log_and_continue"</code>, and no distributed execution: Dask, Ray, Beam
+and orchestrators schedule pipekit operators; pipekit keeps them pickleable so
+they can.</p>
+<h2 id="serialisation">Serialisation<a class="headerlink" href="#serialisation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dumps(op)</code></td>
+<td>JSON-encode <code>op.state</code>, keys sorted, nested operators included</td>
+</tr>
+<tr>
+<td><code>loads(s)</code></td>
+<td>rebuild the whole tree through <code>Operator.from_state</code>; the defining modules must be imported</td>
+</tr>
+<tr>
+<td><code>register(cls)</code></td>
+<td>add a class to the sandbox allowlist (also a class decorator)</td>
+</tr>
+<tr>
+<td><code>unregister(cls)</code>, <code>allowed()</code></td>
+<td>remove from, and list, the allowlist</td>
+</tr>
+<tr>
+<td><code>loads_sandboxed(s)</code></td>
+<td><code>loads</code>, but <code>PermissionError</code> for any class in the tree that is not registered</td>
+</tr>
+<tr>
+<td><code>from_state_sandboxed(state)</code></td>
+<td>the same check on a record already in memory</td>
+</tr>
+</tbody>
+</table>
+<p>The sandboxed loader is for pipelines you did not write (uploaded by users,
+read from a queue): only classes you registered can be built, at any depth,
+and every class is checked before anything is constructed. Nothing is
+allowed by default, pipekit's own containers included.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pk</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">Const</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># → &#39;{&quot;class&quot;: &quot;Const&quot;, &quot;config&quot;: {&quot;value&quot;: 3}, &quot;module&quot;: &quot;pipekit.blocks&quot;}&#39;</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)))</span>             <span class="c1"># → Scale(factor=2.0)</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads_sandboxed</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)))</span>   <span class="c1"># PermissionError: not registered</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="n">pk</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Scale</span><span class="p">)</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads_sandboxed</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)))</span>   <span class="c1"># → Scale(factor=2.0)</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">Lambda</span><span class="p">(</span><span class="nb">abs</span><span class="p">)))</span>         <span class="c1"># RuntimeError: marked forbid_in_yaml</span>
+</code></pre></div>
+<p>Nested pipelines round-trip too. A child operator appears in its parent's
+config as its own <code>state</code> record, a <code>Graph</code> records every node and its
+wiring, and an exception class (<code>Try.on</code>, <code>Retry.on</code>) is written as
+<code>{"exception": "builtins.KeyError"}</code>. <code>pipeline_hash</code> hashes that whole
+record, so two pipelines share a hash exactly when they are configured the
+same:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cache</span><span class="p">,</span> <span class="n">Retry</span><span class="p">,</span> <span class="n">Sequential</span><span class="p">,</span> <span class="n">ThreadMap</span><span class="p">,</span> <span class="n">pipeline_hash</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">ThreadMap</span><span class="p">(</span><span class="n">Cache</span><span class="p">(</span><span class="n">Retry</span><span class="p">(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">OSError</span><span class="p">,))))</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">back</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipe</span><span class="p">))</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="n">back</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">pipe</span><span class="o">.</span><span class="n">state</span>                      <span class="c1"># → True</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="n">pipeline_hash</span><span class="p">(</span><span class="n">back</span><span class="p">)</span> <span class="o">==</span> <span class="n">pipeline_hash</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>    <span class="c1"># → True</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">pk</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Sequential</span><span class="p">)</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="n">pk</span><span class="o">.</span><span class="n">loads_sandboxed</span><span class="p">(</span><span class="n">pk</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">Sequential</span><span class="p">([</span><span class="n">Scale</span><span class="p">(</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">pk</span><span class="o">.</span><span class="n">Identity</span><span class="p">()])))</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="c1"># PermissionError: &#39;__main__.Scale&#39; is not in the allowlist (checked first)</span>
+</code></pre></div>
+<p><code>pipekit-experiment</code>'s <code>HydraConfigLoader</code> does the same with <code>_target_</code>
+YAML: <code>to_yaml(op)</code> writes any pipeline, <code>from_yaml</code> loads it through
+Hydra, and <code>from_yaml_sandboxed</code> loads untrusted YAML through the allowlist
+without ever calling Hydra's <code>instantiate</code>.</p>
+<h2 id="state">State<a class="headerlink" href="#state" title="Permanent link">&para;</a></h2>
+<p>Most operators are stateless: <code>_apply(carrier) → carrier</code>. Some work carries
+state from call to call: a data-assimilation cycle (forecast, analysis,
+forecast…), a training loop (optimiser state, step, metrics), a streaming
+statistic, a recurrent model. A <code>StatefulOperator</code> implements
+<code>_apply(carrier, state) → (carrier, state)</code>, and a <code>CarryState</code> is the base
+for that state, with <code>to_dict</code> / <code>from_dict</code> for checkpointing. A
+<code>Sequential</code> that contains a stateful step threads the state through and
+returns <code>(carrier, state)</code>; stateless steps pass it along untouched.</p>
+<p>A streaming mean: after values x₁, …, xₙ the state is the running sum
+Sₙ = ∑ᵢ xᵢ = Sₙ₋₁ + xₙ and the count n, and the step emits x̄ₙ = Sₙ / n.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">CarryState</span><span class="p">,</span> <span class="n">StatefulOperator</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MeanState</span><span class="p">(</span><span class="n">CarryState</span><span class="p">):</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">total</span> <span class="o">=</span> <span class="n">total</span>  <span class="c1"># Sₙ = ∑ᵢ xᵢ</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>          <span class="c1"># n</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">StreamMean</span><span class="p">(</span><span class="n">StatefulOperator</span><span class="p">):</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>        <span class="n">st</span> <span class="o">=</span> <span class="n">MeanState</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">total</span> <span class="o">+</span> <span class="n">x</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Sₙ = Sₙ₋₁ + xₙ;  n ← n + 1</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>        <span class="k">return</span> <span class="n">st</span><span class="o">.</span><span class="n">total</span> <span class="o">/</span> <span class="n">st</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="n">st</span>                    <span class="c1"># x̄ₙ = Sₙ / n</span>
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">Scale</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span> <span class="o">|</span> <span class="n">StreamMean</span><span class="p">()</span>                    <span class="c1"># a stateless step, then a stateful one</span>
+<a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="n">x_bar</span><span class="p">,</span> <span class="n">st</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">MeanState</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>      <span class="c1"># x̄₁ = 4.0</span>
+<a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a><span class="n">x_bar</span><span class="p">,</span> <span class="n">st</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="mf">8.0</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">st</span><span class="p">)</span>                     <span class="c1"># x̄₂ = 6.0</span>
+<a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a><span class="n">st</span>                                                  <span class="c1"># → MeanState(total=12.0, n=2)</span>
+<a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a><span class="n">MeanState</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">st</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span> <span class="o">==</span> <span class="n">st</span>             <span class="c1"># → True</span>
+<a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a><span class="n">pipe</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)</span>   <span class="c1"># TypeError: ... called without a `state` argument</span>
+</code></pre></div>
+<p>A <code>Graph</code> threads state the same way. Call it with <code>state=</code> and it returns
+<code>(outputs, state)</code>; the state passes through its stateful nodes in
+topological order (the order <code>describe()</code> lists):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pipekit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span><span class="p">,</span> <span class="n">Input</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">x</span> <span class="o">=</span> <span class="n">Input</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span> <span class="n">outputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="n">StreamMean</span><span class="p">()(</span><span class="n">Scale</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)(</span><span class="n">x</span><span class="p">))})</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">out</span><span class="p">,</span> <span class="n">st</span> <span class="o">=</span> <span class="n">g</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">MeanState</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>   <span class="c1"># out == {&quot;mean&quot;: 4.0}</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">out</span><span class="p">,</span> <span class="n">st</span> <span class="o">=</span> <span class="n">g</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">st</span><span class="p">)</span>                  <span class="c1"># out == {&quot;mean&quot;: 6.0}</span>
+</code></pre></div>
+<p><code>pipekit-cycle</code>'s <code>Cycle</code>, <code>DACycle</code> and <code>EnsembleDACycle</code> and
+<code>pipekit-train</code>'s <code>TrainingLoop</code> are built on these two classes; see the
+<a href="../tutorials/ensemble-da/">data-assimilation</a> and
+<a href="../tutorials/train-register-forecast/">training</a> tutorials.</p>
+<h2 id="protocols">Protocols<a class="headerlink" href="#protocols" title="Permanent link">&para;</a></h2>
+<p>Model wrappers in the sister libraries rely on two duck-typed seams, written
+down once as <code>runtime_checkable</code> Protocols: <code>Predictor</code> (anything with
+<code>predict(x)</code>) and <code>FittableTransformer</code> (anything with <code>fit(x)</code> and
+<code>transform(x)</code>). <code>isinstance(model, Predictor)</code> checks that the methods exist,
+not their signatures, so a scikit-learn estimator, a JAX model wrapper or your
+own class all qualify without importing pipekit. The cycle and experiment
+packages define more such seams (<code>ForwardModel</code>, <code>AnalysisStep</code>,
+<code>ModelRegistry</code>, …); see <a href="../protocols/">Protocols</a>.</p>
+<h2 id="limits-today">Limits today<a class="headerlink" href="#limits-today" title="Permanent link">&para;</a></h2>
+<p>The limits this page used to list have been fixed:
+- nested pipelines round-trip;
+- a <code>Graph</code>'s <code>state</code> records every node, threads carry state and has a
+  <code>summary</code>;
+- containers report the signature of what they return;
+- <code>CarryState</code> is consistently unhashable;
+- <code>ProcessMap</code> reports failures through <code>logging</code>;
+- <code>AsyncMap</code> explains itself inside a running loop;
+- <code>ShapeTrace</code> takes an extra line.</p>
+<p>The design questions still open are tracked in the
+<a href="https://github.com/jejjohnson/geostack/tree/main/docs/reports">GeoStack design reports</a>
+and pipekit's issues.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
