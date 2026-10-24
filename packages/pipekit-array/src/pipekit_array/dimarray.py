@@ -128,6 +128,14 @@ def _build(data: Any, dims: tuple[str, ...], labels: dict[str, Any]) -> DimArray
     return d
 
 
+def _is_scalar(index: Any) -> bool:
+    """An int, or a 0-d integer array (NumPy or JAX, traced too): it drops its dim."""
+    if isinstance(index, numbers.Integral):
+        return True
+    kind = getattr(getattr(index, "dtype", None), "kind", None)
+    return getattr(index, "ndim", None) == 0 and kind in ("i", "u")
+
+
 def _positions(index: Any, dim: str, size: int) -> Any:
     """An indexer with a boolean mask turned into the positions it selects.
 
@@ -135,7 +143,7 @@ def _positions(index: Any, dim: str, size: int) -> Any:
         TypeError: A traced boolean mask (its positions are not static).
         IndexError: A mask that is not 1-D or not the length of ``dim``.
     """
-    if isinstance(index, numbers.Integral | slice):
+    if isinstance(index, slice) or _is_scalar(index):
         return index
     dtype = getattr(index, "dtype", None)
     is_mask = (dtype is not None and dtype == bool) or (
@@ -201,17 +209,17 @@ class DimArrayAdapter:
         # ints and slices at once; each position array on its own axis, so
         # two arrays select independently instead of pairing up (outer indexing)
         basic = tuple(
-            index if isinstance(index, numbers.Integral | slice) else slice(None)
+            index if isinstance(index, slice) or _is_scalar(index) else slice(None)
             for index in (normalized.get(dim, slice(None)) for dim in x.dims)
         )
         data = x.data[basic]
         kept_dims = [
             dim
             for dim, index in zip(x.dims, basic, strict=True)
-            if not isinstance(index, numbers.Integral)
+            if not _is_scalar(index)
         ]
         for dim, index in normalized.items():
-            if isinstance(index, numbers.Integral | slice):
+            if isinstance(index, slice) or _is_scalar(index):
                 continue
             axis = kept_dims.index(dim)
             data = data[(slice(None),) * axis + (index,)]
@@ -219,7 +227,7 @@ class DimArrayAdapter:
         dims: list[str] = []
         labels: dict[str, tuple[Any, ...]] = {}
         for dim, index in zip(x.dims, key, strict=True):
-            if isinstance(index, numbers.Integral):
+            if _is_scalar(index):
                 continue
             dims.append(dim)
             if dim in x.labels:
