@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import Any, Self
 
 from pipekit._base.operator import _MISSING, Carrier, Operator
+from pipekit.adapters import signature_of
 
 
 class Node:
@@ -443,7 +444,7 @@ class Graph(Operator):
 
         signatures: dict[int, Any] = {}
         for name, node in self.inputs.items():
-            signatures[id(node)] = input_signatures.get(name)
+            signatures[id(node)] = signature_of(input_signatures.get(name))
         for node in self._order:
             assert node.operator is not None  # guaranteed by _topological_sort
             parents = [signatures[id(parent)] for parent in node.parents]

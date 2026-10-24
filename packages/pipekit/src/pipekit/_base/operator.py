@@ -36,6 +36,8 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
+from pipekit.adapters import signature_of
+
 
 if TYPE_CHECKING:
     from pipekit._base.sequential import Sequential
@@ -199,10 +201,15 @@ class Operator(ConfigMixin):
         `Graph.summary` show ``?`` for it, and every later step in a
         `Sequential` is unknown too.
 
+        Handed a carrier instead of a signature, the default reads the
+        carrier's `Signature` through its registered adapter
+        (`pipekit.adapters.signature_of`), so ``Sequential.summary`` can
+        start from data.
+
         The annotation is `Any` rather than `Signature | None` so domain
         libraries can thread their own signature types.
         """
-        return input_signature
+        return signature_of(input_signature)
 
     @property
     def state(self) -> dict[str, Any]:

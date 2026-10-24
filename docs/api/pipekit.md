@@ -43,6 +43,10 @@ third-party dependencies. Master plan reference: Report 2.
 
 ::: pipekit.signature
 
+## Named-array adapters
+
+::: pipekit.adapters
+
 ## Parallelism
 
 ::: pipekit.parallel
