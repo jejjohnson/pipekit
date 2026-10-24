@@ -342,3 +342,31 @@ def test_config_is_a_debug_repr() -> None:
     assert config["kernel"].endswith(":matched_filter_score")
     assert config["spec"] == "(r,c),(c),(c,d)->(r)"
     assert config["params"] == ["t"]
+
+
+# -- review fixes ---------------------------------------------------------------------
+
+
+def test_param_named_like_a_constructor_argument() -> None:
+    def scale(x: Any, geometry: float) -> Any:
+        return x * geometry
+
+    op = KernelOp(scale, "()->()", core={}, params={"geometry": 3.0})
+    out = op(DimArray(np.ones((2,)), ("x",)))
+    np.testing.assert_array_equal(out.data, [3.0, 3.0])
+    with pytest.raises(TypeError, match="params="):
+        KernelOp(scale, "()->()", core={}, geometry=3)
+
+
+def test_param_and_derived_geometry_names_clash() -> None:
+    with pytest.raises(ValueError, match="derived-geometry"):
+        KernelOp(
+            lambda x, dx: x, "()->()", core={}, geometry={"dx": lambda c: 1.0}, dx=2.0
+        )
+
+
+def test_dim_core_for_one_input_loop_for_another() -> None:
+    op = KernelOp(lambda a, b: a.sum(-1) * b, "(c),()->()", core={"c": "band"})
+    a = DimArray(np.ones((2, 3)), ("y", "band"))
+    with pytest.raises(ValueError, match="core dims of one input but loop dims"):
+        op(a, a)

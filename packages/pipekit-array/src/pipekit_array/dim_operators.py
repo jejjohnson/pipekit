@@ -33,9 +33,40 @@ __all__ = [
 ]
 
 #: reductions that keep the input's dtype whatever it is
-_DTYPE_PRESERVING = frozenset(
-    {"max", "min", "sum", "prod", "nanmax", "nanmin", "nansum", "nanprod"}
+#: reductions whose output dtype is always the input's
+_DTYPE_PRESERVING = frozenset({"max", "min", "nanmax", "nanmin"})
+#: reductions that keep a float input's dtype (integers and bools promote)
+_FLOAT_PRESERVING = frozenset(
+    {
+        "sum",
+        "prod",
+        "nansum",
+        "nanprod",
+        "mean",
+        "nanmean",
+        "median",
+        "nanmedian",
+        "std",
+        "nanstd",
+        "var",
+        "nanvar",
+    }
 )
+#: reductions that return booleans
+_BOOLEAN = frozenset({"all", "any"})
+
+
+def _reduced_dtype(fn: str, dtype: str | None) -> str | None:
+    """The dtype a reduction returns, when it is known without running it."""
+    if dtype is None:
+        return None
+    if fn in _DTYPE_PRESERVING:
+        return dtype
+    if fn in _BOOLEAN:
+        return "bool"
+    if fn in _FLOAT_PRESERVING and "float" in dtype:
+        return dtype
+    return None
 
 
 def _slice_config(index: Any) -> Any:
@@ -86,7 +117,10 @@ class ISel(Operator):
             size = dict(sig.dims)[self.dim]
             new = None if size is None else len(range(*self.index.indices(size)))
             return sig.replace_dims({self.dim: new})
-        return sig.drop_dims((self.dim,))
+        if getattr(self.index, "ndim", None) == 0 or isinstance(self.index, int):
+            return sig.drop_dims((self.dim,))
+        # a list or 1-D array of positions keeps the dim, one entry each
+        return sig.replace_dims({self.dim: len(self.index)})
 
 
 class Sel(Operator):
@@ -178,8 +212,7 @@ class Reduce(Operator):
             return None
         names = (self.dim,) if isinstance(self.dim, str) else self.dim
         dropped = sig.drop_dims(tuple(names))
-        keeps_dtype = self.fn in _DTYPE_PRESERVING or "float" in (sig.dtype or "")
-        return Signature(dims=dropped.dims, dtype=sig.dtype if keeps_dtype else None)
+        return Signature(dims=dropped.dims, dtype=_reduced_dtype(self.fn, sig.dtype))
 
 
 class ArgReduce(Operator):

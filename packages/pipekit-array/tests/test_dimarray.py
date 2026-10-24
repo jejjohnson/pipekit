@@ -157,3 +157,26 @@ def test_to_xarray_without_xarray(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "xarray", None)
     with pytest.raises(ImportError, match=r"pipekit-array\[xarray\]"):
         _stats().to_xarray()
+
+
+def test_bare_vmap_drops_and_restores_the_leading_dim() -> None:
+    jax = pytest.importorskip("jax")
+    cube = DimArray(np.ones((3, 2, 4)), ("time", "band", "x"), {"band": ("a", "b")})
+    seen: list[tuple[str, ...]] = []
+
+    def per_time(c: DimArray) -> DimArray:
+        seen.append(c.dims)
+        assert c.labels == {"band": ("a", "b")}
+        return DimArray(c.data.sum(axis=0), ("x",))
+
+    out = jax.vmap(per_time)(cube)
+    assert seen == [("band", "x")]
+    assert out.dims == ("batch", "x")
+    assert out.shape == (3, 4)
+
+
+def test_vmapped_dims_skips_taken_names() -> None:
+    from pipekit_array.dimarray import vmapped_dims
+
+    assert vmapped_dims(("batch", "x"), (2, 3, 4)) == ("batch_1", "batch", "x")
+    assert vmapped_dims(("y", "x"), None) == ("y", "x")

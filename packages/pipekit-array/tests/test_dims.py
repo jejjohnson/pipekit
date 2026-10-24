@@ -13,6 +13,7 @@ from pipekit_array import (
     Combine,
     ConcatenateAlong,
     DimArray,
+    DimArrayAdapter,
     ISel,
     MapOver,
     Reduce,
@@ -288,3 +289,69 @@ def test_combinators_take_dim() -> None:
     assert StackAlong().get_config() == {"axis": 0}
     with pytest.raises(ValueError, match="not both"):
         StackAlong(axis=0, dim="time")
+
+
+# -- review fixes ---------------------------------------------------------------------
+
+
+def test_take_along_never_broadcasts_a_size_one_index_dim() -> None:
+    cube = DimArray(np.arange(12.0).reshape(3, 4), ("time", "x"))
+    index = DimArray(np.array([2]), ("x",))
+    with pytest.raises(ValueError, match="never broadcast"):
+        pa.take_along(cube, index, "time")
+
+
+def test_sel_takes_an_array_of_labels_and_tuple_labels() -> None:
+    scene = DimArray(
+        np.arange(6.0).reshape(3, 2), ("band", "x"), {"band": ("a", "b", "c")}
+    )
+    picked = pa.sel(scene, band=np.array(["a", "c"]))
+    assert picked.labels["band"] == ("a", "c")
+    pairs = DimArray(
+        np.arange(4.0), ("cell",), {"cell": ((0, 0), (0, 1), (1, 0), (1, 1))}
+    )
+    assert pa.sel(pairs, cell=(0, 1)).dims == ()
+    assert pa.sel(pairs, cell=[(0, 1), (1, 1)]).shape == (2,)
+
+
+@pytest.mark.parametrize(
+    ("index", "expected"),
+    [
+        (0, ("x",)),
+        ([0, 2], ("t", "x")),
+        (np.array([1, 2]), ("t", "x")),
+        (slice(1, 3), ("t", "x")),
+    ],
+)
+def test_isel_operator_predicts_the_run(
+    index: object, expected: tuple[str, ...]
+) -> None:
+    cube = DimArray(np.ones((4, 3)), ("t", "x"))
+    op = pa.ISel(dim="t", index=index)
+    sig = op.compute_output_signature(DimArrayAdapter().signature(cube))
+    out = op(cube)
+    assert out.dims == expected
+    assert tuple(n for _, n in sig.dims) == out.shape
+
+
+@pytest.mark.parametrize(
+    ("fn", "dtype"),
+    [
+        ("all", np.float32),
+        ("any", np.int8),
+        ("sum", np.int8),
+        ("sum", np.float32),
+        ("max", np.int8),
+        ("mean", np.float32),
+        ("mean", np.int16),
+        ("prod", np.bool_),
+    ],
+)
+def test_reduce_operator_predicts_the_dtype(fn: str, dtype: type) -> None:
+    cube = DimArray(np.ones((4, 3), dtype=dtype), ("t", "x"))
+    op = pa.Reduce(fn, dim="t")
+    predicted = op.compute_output_signature(DimArrayAdapter().signature(cube)).dtype
+    actual = str(op(cube).data.dtype)
+    assert predicted in (None, actual), (fn, dtype, predicted, actual)
+    if fn in ("all", "any", "max") or "float" in str(np.dtype(dtype)):
+        assert predicted == actual

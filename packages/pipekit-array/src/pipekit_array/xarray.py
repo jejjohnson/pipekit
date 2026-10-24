@@ -25,6 +25,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any
 
+import numpy as np
 import xarray as xr
 from pipekit import Signature, register_adapter
 
@@ -205,7 +206,7 @@ class XarrayAdapter:
             vectorize=spec.vectorize,
             dask="parallelized",
             join="exact",
-            output_dtypes=[checked[0].dtype] * len(out_dims),
+            output_dtypes=_output_dtypes(kernel, spec, kwargs, checked, letter_size),
             dask_gufunc_kwargs={"allow_rechunk": True, "output_sizes": output_sizes},
         )
         targets = kernel_output_dims(
@@ -224,6 +225,34 @@ def _take_along_last(values: Any, index: Any) -> Any:
     index = np.broadcast_to(index, values.shape[:-1])
     picked = np.take_along_axis(values, index[..., None], axis=-1)
     return picked[..., 0]
+
+
+def _output_dtypes(
+    kernel: Callable[..., Any],
+    spec: KernelSpec,
+    kwargs: dict[str, Any],
+    xs: Sequence[xr.DataArray],
+    letter_size: dict[str, int],
+) -> list[Any]:
+    """Each output's dtype, which dask must know before it runs anything.
+
+    Found by calling the kernel once on ones with only the core dims (the
+    loop dims dropped), so a mask or an index kernel declares bool or int;
+    the first input's dtype when that call fails.
+    """
+    fallback = [xs[0].dtype] * len(spec.outputs)
+    if not any(type(x.data).__module__.startswith("dask.") for x in xs):
+        return fallback
+    probes = [
+        np.ones(tuple(letter_size[c] for c in group), dtype=x.dtype)
+        for x, group in zip(xs, spec.inputs, strict=True)
+    ]
+    try:
+        out = kernel(*probes, **kwargs)
+    except Exception:
+        return fallback
+    outs = out if len(spec.outputs) > 1 else (out,)
+    return [np.asarray(o).dtype for o in outs]
 
 
 def _as_dataarray(index: Any) -> xr.DataArray:

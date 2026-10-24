@@ -101,9 +101,14 @@ _REGISTRY: dict[type, NamedArrayAdapter] = {}
 #: module prefix of a carrier type -> a loader that registers its adapter
 _LAZY: dict[str, Callable[[], None]] = {}
 
-#: carrier families whose adapter ships behind an extra:
-#: module prefix of the carrier type -> what to install
-_EXTRA_HINTS: dict[str, str] = {"xarray.": "pipekit-array[xarray]"}
+#: carriers whose adapter ships behind an extra, by exact type
+#: (``module.qualname``) -> how to get it. Only carriers: an ``xr.Dataset``
+#: or ``xr.Variable`` is not one, so it passes through as a plain value.
+_EXTRA_HINTS: dict[str, str] = {
+    "xarray.core.dataarray.DataArray": (
+        "pip install 'pipekit-array[xarray]', then import pipekit_array"
+    ),
+}
 
 
 class MissingAdapterError(TypeError):
@@ -154,10 +159,11 @@ def get_adapter(x: Any) -> NamedArrayAdapter | None:
     adapter unless it has its own (the closest registration wins).
 
     Raises:
-        MissingAdapterError: if ``x`` belongs to a carrier family whose
-            adapter ships behind an extra (an ``xr.DataArray`` without
-            ``pipekit-array[xarray]``), so it is never silently treated
-            as a raw array.
+        MissingAdapterError: if ``x`` is a carrier whose adapter ships
+            behind an extra and is not registered (an ``xr.DataArray``
+            without ``pipekit-array[xarray]``, or before ``pipekit_array``
+            is imported), so it is never silently treated as a raw array.
+            Other values of that library (an ``xr.Dataset``) return ``None``.
 
     Example:
         >>> get_adapter([1.0, 2.0]) is None
@@ -174,12 +180,10 @@ def get_adapter(x: Any) -> NamedArrayAdapter | None:
             adapter = _lookup(cls)
             if adapter is not None:
                 return adapter
-    for prefix, extra in _EXTRA_HINTS.items():
-        if cls.__module__.startswith(prefix):
-            raise MissingAdapterError(
-                f"{cls.__module__}.{cls.__qualname__} needs its named-array "
-                f"adapter: pip install '{extra}'."
-            )
+    name = f"{cls.__module__}.{cls.__qualname__}"
+    hint = _EXTRA_HINTS.get(name)
+    if hint is not None:
+        raise MissingAdapterError(f"{name} needs its named-array adapter: {hint}.")
     return None
 
 
