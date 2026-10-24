@@ -157,7 +157,12 @@ class Sel(Operator):
         self.dim = dim
         # a tuple that is itself a label (tuple-valued labels) stays one label;
         # a config from JSON spells it {"__tuple__": [...]}
-        self.label = _decode_tuples(label)
+        label = _decode_tuples(label)
+        if getattr(label, "ndim", 0) == 1:
+            # a 1-D array of labels is a list of labels: the dim is kept, and
+            # the config stays JSON
+            label = list(label.tolist())
+        self.label = label
 
     def _apply(self, x: Any) -> Any:
         return _dims.sel(x, **{self.dim: self.label})

@@ -233,3 +233,12 @@ def test_isel_with_a_traced_scalar_index_drops_the_dim() -> None:
         return out.data
 
     np.testing.assert_array_equal(pick(jax.numpy.asarray(2)), [2.0, 5.0])
+
+
+def test_isel_rejects_multidimensional_positions() -> None:
+    """Codex #109: a 2-D position array would add an axis ``x`` cannot name."""
+    d = DimArray(np.arange(3.0), ("x",))
+    with pytest.raises(IndexError, match="1-D"):
+        DimArrayAdapter().isel(d, {"x": np.array([[0, 1]])})
+    with pytest.raises(IndexError, match="1-D"):
+        DimArrayAdapter().isel(d, {"x": [[0, 1]]})
