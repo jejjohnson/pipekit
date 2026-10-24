@@ -128,12 +128,14 @@ class Sel(Operator):
 
     Args:
         dim: The dim to select on; it must have labels.
-        label: One label, or a list of labels (the dim is kept).
+        label: One label, or a list of labels (the dim is kept). A tuple is
+            one label when the dim has tuple-valued labels, else several.
     """
 
     def __init__(self, dim: str, label: Any) -> None:
         self.dim = dim
-        self.label = list(label) if isinstance(label, tuple) else label
+        # a tuple that is itself a label (tuple-valued labels) stays one label
+        self.label = label
 
     def _apply(self, x: Any) -> Any:
         return _dims.sel(x, **{self.dim: self.label})
@@ -145,6 +147,8 @@ class Sel(Operator):
         sig = _signature(input_signature)
         if sig is None:
             return None
+        if isinstance(self.label, tuple):
+            return None  # one tuple-valued label or several: unknown without labels
         if isinstance(self.label, list):
             return sig.replace_dims({self.dim: len(self.label)})
         return sig.drop_dims((self.dim,))

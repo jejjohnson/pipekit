@@ -400,11 +400,18 @@ def _resolve_exception(path: Any) -> type[BaseException]:
 def resolve_loaded(module_name: str, class_name: str) -> type[Operator]:
     """The loaded `Operator` subclass named ``module.class``; nothing is imported.
 
+    A class that moved lists its old modules in ``__former_modules__``, so
+    states saved before the move still load.
+
     Raises:
         TypeError: if no loaded `Operator` subclass has that name.
     """
     for op_type in (Operator, *_operator_subclasses(Operator)):
-        if op_type.__module__ == module_name and op_type.__name__ == class_name:
+        if op_type.__name__ != class_name:
+            continue
+        # a class that moved keeps loading states saved under its old module
+        former = getattr(op_type, "__former_modules__", ())
+        if op_type.__module__ == module_name or module_name in former:
             return op_type
     raise TypeError(f"{module_name}.{class_name} is not a loaded Operator")
 

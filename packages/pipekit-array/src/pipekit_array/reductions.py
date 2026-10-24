@@ -6,7 +6,7 @@ Wraps `xp.mean` as a pipekit `Operator`. See
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from pipekit import Operator
 from pipekit.signature import Signature
@@ -37,6 +37,9 @@ class MeanScalar(Operator):
         out = MeanScalar(axis=(-2, -1))(image)  # per-band mean
         out = MeanScalar(axis=0, keepdims=True)(image)  # shape (1, H, W)
     """
+
+    #: saved states name the module it had before the rename (pipekit-array 0.0.3)
+    __former_modules__: ClassVar[tuple[str, ...]] = ("pipekit_array.reduce",)
 
     def __init__(
         self,

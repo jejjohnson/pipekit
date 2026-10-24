@@ -355,3 +355,93 @@ def test_reduce_operator_predicts_the_dtype(fn: str, dtype: type) -> None:
     assert predicted in (None, actual), (fn, dtype, predicted, actual)
     if fn in ("all", "any", "max") or "float" in str(np.dtype(dtype)):
         assert predicted == actual
+
+
+# -- review fixes (Codex, #110) -------------------------------------------------------
+
+
+def test_meanscalar_states_saved_before_the_rename_load() -> None:
+    from pipekit import Operator
+
+    state = pa.MeanScalar(axis=0).state
+    state = {**state, "module": "pipekit_array.reduce"}
+    assert isinstance(Operator.from_state(state), pa.MeanScalar)
+
+
+def test_dask_generic_paths_stay_lazy() -> None:
+    da = pytest.importorskip("dask.array")
+    cube = DimArray(
+        da.ones((3, 2, 4), chunks=1), ("time", "band", "x"), {"band": BANDS}
+    )
+    moved = pa.transpose(cube, ("x", "band", "time"))
+    joined = pa.concat(
+        [pa.isel(cube, time=slice(0, 1)), pa.isel(cube, time=slice(1, None))], "time"
+    )
+    best = DimArray(
+        da.zeros((2, 4), dtype=int, chunks=1), ("band", "x"), {"band": BANDS}
+    )
+    picked = pa.take_along(cube, best, "time")
+    for out in (moved, joined, picked):
+        assert isinstance(out.data, da.Array)
+    assert moved.shape == (4, 2, 3) and joined.shape == (3, 2, 4)
+    values = np.random.default_rng(0).random((3, 2, 4))
+    idx = np.random.default_rng(1).integers(0, 3, (2, 4))
+    lazy = pa.take_along(
+        DimArray(da.from_array(values, chunks=1), ("time", "band", "x")),
+        DimArray(da.from_array(idx, chunks=1), ("band", "x")),
+        "time",
+    )
+    eager = pa.take_along(
+        DimArray(values, ("time", "band", "x")), DimArray(idx, ("band", "x")), "time"
+    )
+    np.testing.assert_array_equal(lazy.data.compute(), eager.data)
+
+
+def test_concat_accepts_an_empty_part() -> None:
+    cube = _cube()
+    joined = pa.concat([pa.isel(cube, time=slice(0, 0)), cube], "time")
+    np.testing.assert_array_equal(joined.data, cube.data)
+
+
+def test_map_over_keeps_the_mapped_labels() -> None:
+    cube = _cube()
+    out = pa.map_over(cube, lambda item: item, "band")
+    assert out.labels["band"] == BANDS
+    assert pa.sel(out, band="B8").dims == ("time", "x")
+
+
+def test_take_along_rejects_reordered_labels() -> None:
+    data = DimArray(np.ones((3, 2)), ("time", "x"), {"x": ("left", "right")})
+    index = DimArray(np.zeros(2, dtype=int), ("x",), {"x": ("right", "left")})
+    with pytest.raises(ValueError, match="by position"):
+        pa.take_along(data, index, "time")
+
+
+def test_mixed_backends_never_stack_silently() -> None:
+    jnp = pytest.importorskip("jax.numpy")
+    a = DimArray(np.ones((2, 3)), ("y", "x"))
+    b = DimArray(jnp.ones((2, 3)), ("y", "x"))
+    for join in (
+        lambda: pa.stack([a, b], "run"),
+        lambda: pa.concat([a, b], "y"),
+        lambda: pa.combine(np.add, a, b),
+    ):
+        with pytest.raises(pa.BackendError, match="to_jax"):
+            join()
+
+
+def test_sel_operator_keeps_a_tuple_label() -> None:
+    pairs = DimArray(
+        np.arange(4.0), ("cell",), {"cell": ((0, 0), (0, 1), (1, 0), (1, 1))}
+    )
+    assert Sel(dim="cell", label=(0, 1))(pairs).dims == ()
+    assert Sel(dim="cell", label=[(0, 1), (1, 1)])(pairs).shape == (2,)
+
+
+def test_numpy_conversion_honours_copy() -> None:
+    d = DimArray(np.zeros(3), ("x",))
+    copied = np.array(d, copy=True)
+    copied[0] = 1.0
+    assert d.data[0] == 0.0
+    with pytest.raises(ValueError):
+        np.array(d, dtype=np.float32, copy=False)

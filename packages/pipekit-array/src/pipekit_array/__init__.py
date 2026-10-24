@@ -33,6 +33,7 @@ from pipekit_array.dim_operators import (
 )
 from pipekit_array.dimarray import DimArray, DimArrayAdapter
 from pipekit_array.dims import (
+    BackendError,
     argreduce,
     combine,
     concat,
@@ -53,6 +54,7 @@ register_adapter(DimArray, DimArrayAdapter())
 
 __all__ = [
     "ArgReduce",
+    "BackendError",
     "Combine",
     "ConcatenateAlong",
     "DimArray",

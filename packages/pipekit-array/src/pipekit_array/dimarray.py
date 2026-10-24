@@ -96,7 +96,10 @@ class DimArray:
         """The data as a NumPy array, so ``np.asarray(d)`` works (dims are dropped)."""
         import numpy as np
 
-        return np.asarray(self.data, dtype=dtype)
+        if copy is None:
+            return np.asarray(self.data, dtype=dtype)
+        # copy=True always copies; copy=False raises if a copy is needed
+        return np.array(self.data, dtype=dtype, copy=copy)
 
     def to_xarray(self) -> Any:
         """An ``xr.DataArray`` with the same data and dims; labels become coordinates.
