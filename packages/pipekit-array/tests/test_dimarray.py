@@ -180,3 +180,19 @@ def test_vmapped_dims_skips_taken_names() -> None:
 
     assert vmapped_dims(("batch", "x"), (2, 3, 4)) == ("batch_1", "batch", "x")
     assert vmapped_dims(("y", "x"), None) == ("y", "x")
+
+
+def test_isel_index_arrays_select_independently() -> None:
+    d = DimArray(np.arange(12).reshape(3, 4), ("row", "col"), {"row": ("a", "b", "c")})
+    out = DimArrayAdapter().isel(d, {"row": [0, 2], "col": [1, 3]})
+    assert out.dims == ("row", "col") and out.shape == (2, 2)
+    np.testing.assert_array_equal(out.data, [[1, 3], [9, 11]])
+    assert out.labels == {"row": ("a", "c")}
+
+
+def test_isel_boolean_mask_filters_labels() -> None:
+    d = DimArray(np.arange(3.0), ("x",), {"x": ("a", "b", "c")})
+    for mask in ([True, False, True], np.array([True, False, True])):
+        out = DimArrayAdapter().isel(d, {"x": mask})
+        np.testing.assert_array_equal(out.data, [0.0, 2.0])
+        assert out.labels == {"x": ("a", "c")}

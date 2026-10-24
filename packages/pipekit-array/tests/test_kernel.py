@@ -370,3 +370,22 @@ def test_dim_core_for_one_input_loop_for_another() -> None:
     a = DimArray(np.ones((2, 3)), ("y", "band"))
     with pytest.raises(ValueError, match="core dims of one input but loop dims"):
         op(a, a)
+
+
+def test_raw_inputs_are_checked_like_carriers() -> None:
+    jnp = pytest.importorskip("jax.numpy")
+    nd = KernelOp(lambda a, b: a - b, "(),()->()", core={})
+    with pytest.raises(BackendError, match="to_jax"):
+        nd(np.ones(3), jnp.ones(3))
+    jax_only = KernelOp(lambda a: a, KernelSpec("()->()", backends=("jax",)), core={})
+    with pytest.raises(BackendError, match="not 'numpy'"):
+        jax_only(np.ones(3))
+
+
+def test_vectorize_refuses_dask_instead_of_computing_it() -> None:
+    da = pytest.importorskip("dask.array")
+    op = KernelOp(
+        lambda x: x.sum(), KernelSpec("(c)->()", vectorize=True), core={"c": "x"}
+    )
+    with pytest.raises(BackendError, match="eagerly"):
+        op(DimArray(da.ones((3, 4), chunks=1), ("y", "x")))

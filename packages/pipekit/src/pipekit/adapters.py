@@ -173,17 +173,24 @@ def get_adapter(x: Any) -> NamedArrayAdapter | None:
     adapter = _lookup(cls)
     if adapter is not None:
         return adapter
+    # a carrier's library (or a subclass's base library) may load its adapter
+    modules = [base.__module__ for base in cls.__mro__]
     for prefix in list(_LAZY):
-        if cls.__module__.startswith(prefix):
+        if any(module.startswith(prefix) for module in modules):
             # load once: a loader that registers nothing is not retried
             _LAZY.pop(prefix)()
             adapter = _lookup(cls)
             if adapter is not None:
                 return adapter
-    name = f"{cls.__module__}.{cls.__qualname__}"
-    hint = _EXTRA_HINTS.get(name)
-    if hint is not None:
-        raise MissingAdapterError(f"{name} needs its named-array adapter: {hint}.")
+    # a subclass of a known carrier gets its base's hint
+    for base in cls.__mro__:
+        name = f"{base.__module__}.{base.__qualname__}"
+        hint = _EXTRA_HINTS.get(name)
+        if hint is not None:
+            raise MissingAdapterError(
+                f"{cls.__module__}.{cls.__qualname__} needs its named-array "
+                f"adapter: {hint}."
+            )
     return None
 
 
