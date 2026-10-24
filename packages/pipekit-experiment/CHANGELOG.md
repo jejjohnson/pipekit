@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.0.4...pipekit-experiment-v0.0.5) (2026-10-24)
+
+
+### Bug Fixes
+
+* **experiment:** verify the content hash when loading from a registry ([#93](https://github.com/jejjohnson/pipekit/issues/93)) ([3374a57](https://github.com/jejjohnson/pipekit/commit/3374a570cfb7b3a72a21bb71f73647ac09ea9d0e))
+
 ## [0.0.4](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.0.3...pipekit-experiment-v0.0.4) (2026-10-17)
 
 
