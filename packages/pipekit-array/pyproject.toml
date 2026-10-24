@@ -18,6 +18,9 @@ jax = ["jax>=0.4.20"]
 torch = ["torch>=2.0"]
 cupy = ["cupy>=13"]
 dask = ["dask[array]>=2024"]
+# `DimArray.to_xarray`, and the `xr.DataArray` adapter (KernelOp and the
+# dim-level functions on DataArrays, lazily through dask).
+xarray = ["xarray>=2024.6"]
 compat = [
     "array-api-compat>=1.4",
 ]

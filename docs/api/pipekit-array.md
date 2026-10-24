@@ -20,3 +20,7 @@ and the trained-model wrapper `ModelOp`.
 ## Combinators
 
 ::: pipekit_array.combinators
+
+## Named arrays
+
+::: pipekit_array.dimarray

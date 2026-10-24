@@ -4108,6 +4108,9 @@ numpy = [
 torch = [
     { name = "torch" },
 ]
+xarray = [
+    { name = "xarray" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -4118,8 +4121,9 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'numpy'", specifier = ">=2.0" },
     { name = "pipekit", editable = "packages/pipekit" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0" },
+    { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2024.6" },
 ]
-provides-extras = ["numpy", "jax", "torch", "cupy", "dask", "compat"]
+provides-extras = ["numpy", "jax", "torch", "cupy", "dask", "xarray", "compat"]
 
 [[package]]
 name = "pipekit-cycle"
@@ -4252,6 +4256,7 @@ source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "dask", extra = ["array"] },
     { name = "diffrax" },
     { name = "fsspec" },
     { name = "pipekit" },
@@ -4264,6 +4269,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "xarray" },
 ]
 docs = [
     { name = "ipykernel" },
@@ -4287,6 +4293,7 @@ typecheck = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "dask", extras = ["array"], specifier = ">=2024" },
     { name = "diffrax", specifier = ">=0.7" },
     { name = "fsspec", specifier = ">=2024.0" },
     { name = "pipekit", editable = "packages/pipekit" },
@@ -4299,6 +4306,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "xarray", specifier = ">=2024.6" },
 ]
 docs = [
     { name = "ipykernel", specifier = ">=7.2.0" },
