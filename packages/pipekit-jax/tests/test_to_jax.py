@@ -165,3 +165,12 @@ def test_rejects_non_kernel_ops_and_unhashable_params() -> None:
     op = KernelOp(lambda x, opts: x, "()->()", core={}, opts={"a": 1})
     with pytest.raises(TypeError, match="hashable"):
         to_jax(op)
+
+
+def test_dimarray_parameter_is_a_leaf() -> None:
+    w = DimArray(np.ones(2), ("q",))
+    op = KernelOp(lambda x, w: x * w.data.sum(), "()->()", core={}, w=w)
+    jop = to_jax(op)
+    assert sorted(jop.params) == ["w"]
+    assert jop.static_params == ()
+    assert isinstance(jop.params["w"].data, jax.Array)

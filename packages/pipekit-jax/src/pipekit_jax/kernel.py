@@ -5,7 +5,8 @@ A `KernelOp` that holds arrays (a fitted background mean μ and covariance
 ``eqx.filter_jit`` and ``eqx.filter_grad``. `to_jax` generates that shell
 from the `KernelOp` instead of a hand-written operator per kernel:
 
-- **leaves** — every array-valued parameter, converted with ``jnp.asarray``;
+- **leaves** — every parameter that is an array or holds arrays (a
+  `DimArray` of statistics), its arrays converted with ``jnp.asarray``;
 - **static** — the kernel, its spec, the core-dim map, the geometry
   functions and every non-array parameter (``eps``, a dim name).
 
@@ -23,6 +24,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -44,6 +46,17 @@ def _kernel_module() -> Any:
 
 def _is_array(value: Any) -> bool:
     return isinstance(value, np.ndarray) or eqx.is_array(value)
+
+
+def _holds_arrays(value: Any) -> bool:
+    """An array, or a pytree with array leaves (a `DimArray`): a parameter leaf."""
+    return any(_is_array(leaf) for leaf in jax.tree_util.tree_leaves(value))
+
+
+def _to_jnp(value: Any) -> Any:
+    return jax.tree_util.tree_map(
+        lambda leaf: jnp.asarray(leaf) if _is_array(leaf) else leaf, value
+    )
 
 
 class JaxKernelOp(JaxOperator):
@@ -85,8 +98,9 @@ class JaxKernelOp(JaxOperator):
 def to_jax(op: Any) -> JaxKernelOp:
     """A `JaxKernelOp` with ``op``'s kernel, spec, core and geometry.
 
-    Array parameters become leaves (``jnp.asarray``); the rest are static
-    and must be hashable (numbers, strings, tuples).
+    Parameters that are or hold arrays (a `DimArray`) become leaves, their
+    arrays converted with ``jnp.asarray``; the rest are static and must be
+    hashable (numbers, strings, tuples).
 
     Args:
         op: A `pipekit_array.KernelOp`.
@@ -112,8 +126,8 @@ def to_jax(op: Any) -> JaxKernelOp:
     arrays: dict[str, Any] = {}
     static: list[tuple[str, Any]] = []
     for name, value in op.params.items():
-        if _is_array(value):
-            arrays[name] = jnp.asarray(value)
+        if _holds_arrays(value):
+            arrays[name] = _to_jnp(value)
             continue
         try:
             hash(value)
