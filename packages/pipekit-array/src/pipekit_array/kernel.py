@@ -64,7 +64,9 @@ from pipekit_array.dims import BackendError, backend_name, namespace_of
 __all__ = [
     "KernelOp",
     "KernelSpec",
+    "derive_geometry",
     "kernel_output_dims",
+    "kernel_output_signature",
     "run_kernel",
 ]
 
@@ -199,6 +201,40 @@ def kernel_output_dims(
         ordered = [d for d in first if d in dims] + [d for d in dims if d not in first]
         outputs.append(tuple(ordered))
     return tuple(outputs)
+
+
+def kernel_output_signature(
+    spec: KernelSpec, core: dict[str, str], input_signature: Any
+) -> Any:
+    """`KernelOp.compute_output_signature` for any operator running ``spec``.
+
+    Shared with ``pipekit_jax.JaxKernelOp``, so a converted operator reports
+    the same dims, sizes, dtypes and output count.
+    """
+    sig = signature_of(input_signature)
+    if not isinstance(sig, Signature) or len(spec.inputs) != 1:
+        return None
+    sizes = dict(sig.dims)
+    names = tuple(sizes)
+    letter_size = {}
+    for letter, dim in core.items():
+        if dim in sizes:
+            letter_size[letter] = sizes[dim]
+    for out, source in spec.sizes:
+        letter_size[out] = letter_size.get(source)
+    dim_size = {core[k]: v for k, v in letter_size.items()} | {
+        d: s for d, s in sizes.items()
+    }
+    dtypes = [sig.dtype if d == "same" else d for d in spec.dtypes] or [None] * len(
+        spec.outputs
+    )
+    outs = tuple(
+        Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
+        for dims, dtype in zip(
+            kernel_output_dims(spec, core, [names]), dtypes, strict=True
+        )
+    )
+    return outs if len(outs) > 1 else outs[0]
 
 
 def _check_core_not_loop(
@@ -412,6 +448,30 @@ def _check_by_kind(carriers: list[Any], adapters: list[NamedArrayAdapter]) -> li
     return out
 
 
+def derive_geometry(
+    geometry: dict[str, Callable[[Any], Any]], first: Any
+) -> dict[str, Any]:
+    """The kernel's derived-geometry keywords, computed from the first carrier.
+
+    Raises:
+        ValueError: The carrier's adapter reports ``batch_dims`` (one geometry
+            per item), but keyword inputs are passed whole (F4); the message
+            names ``map_over``.
+    """
+    if not geometry:
+        return {}
+    adapter = get_adapter(first)
+    batch = getattr(adapter, "batch_dims", None)
+    batched = batch(first) if batch is not None else ()
+    if batched:
+        raise ValueError(
+            f"geometry= on a carrier batched over {batched} (one geometry per "
+            "item), but keyword inputs are passed whole: use "
+            f"map_over(x, op, {batched[0]!r}) so each item has its own."
+        )
+    return {name: fn(first) for name, fn in geometry.items()}
+
+
 class KernelOp(Operator):
     """An L1 kernel wrapped once, run on raw arrays and on every named carrier.
 
@@ -494,21 +554,9 @@ class KernelOp(Operator):
                 f"{self.spec.signature!r} takes {len(self.spec.inputs)} input(s), "
                 f"got {len(carriers)}."
             )
-        derived = self._derived(carriers[0]) if self.geometry else {}
+        derived = derive_geometry(self.geometry, carriers[0])
         kwargs = self.params | derived
         return run_kernel(self.kernel, self.spec, self.core, carriers, kwargs)
-
-    def _derived(self, first: Any) -> dict[str, Any]:
-        adapter = get_adapter(first)
-        batch = getattr(adapter, "batch_dims", None)
-        batched = batch(first) if batch is not None else ()
-        if batched:
-            raise ValueError(
-                f"geometry= on a carrier batched over {batched} (one geometry per "
-                "item), but keyword inputs are passed whole: use "
-                f"map_over(x, op, {batched[0]!r}) so each item has its own."
-            )
-        return {name: fn(first) for name, fn in self.geometry.items()}
 
     def get_config(self) -> dict[str, Any]:
         module = getattr(self.kernel, "__module__", "?")
@@ -529,27 +577,4 @@ class KernelOp(Operator):
         The dtype is the one ``spec.dtypes`` declares (``"same"``: the
         input's), else unknown: a kernel may return a mask or an index.
         """
-        sig = signature_of(input_signature)
-        if not isinstance(sig, Signature) or len(self.spec.inputs) != 1:
-            return None
-        sizes = dict(sig.dims)
-        names = tuple(sizes)
-        letter_size = {}
-        for letter, dim in self.core.items():
-            if dim in sizes:
-                letter_size[letter] = sizes[dim]
-        for out, source in self.spec.sizes:
-            letter_size[out] = letter_size.get(source)
-        dim_size = {self.core[k]: v for k, v in letter_size.items()} | {
-            d: s for d, s in sizes.items()
-        }
-        dtypes = [sig.dtype if d == "same" else d for d in self.spec.dtypes] or [
-            None
-        ] * len(self.spec.outputs)
-        outs = tuple(
-            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
-            for dims, dtype in zip(
-                kernel_output_dims(self.spec, self.core, [names]), dtypes, strict=True
-            )
-        )
-        return outs if len(outs) > 1 else outs[0]
+        return kernel_output_signature(self.spec, self.core, input_signature)

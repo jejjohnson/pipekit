@@ -20,6 +20,9 @@ dependencies = [
 
 [project.optional-dependencies]
 diffrax = ["diffrax>=0.7"]
+# `to_jax(op)`: a pipekit-array KernelOp as a JaxOperator (the edge pipekit-jax
+# already has through pipekit-cycle's [array] extra, declared here).
+array = ["pipekit-array"]
 
 [build-system]
 requires = ["hatchling>=1.27"]

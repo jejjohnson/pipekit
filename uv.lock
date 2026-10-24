@@ -4234,6 +4234,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+array = [
+    { name = "pipekit-array" },
+]
 diffrax = [
     { name = "diffrax" },
 ]
@@ -4245,9 +4248,10 @@ requires-dist = [
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxtyping", specifier = ">=0.2" },
     { name = "pipekit", editable = "packages/pipekit" },
+    { name = "pipekit-array", marker = "extra == 'array'", editable = "packages/pipekit-array" },
     { name = "pipekit-cycle", editable = "packages/pipekit-cycle" },
 ]
-provides-extras = ["diffrax"]
+provides-extras = ["diffrax", "array"]
 
 [[package]]
 name = "pipekit-monorepo"
