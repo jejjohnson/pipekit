@@ -355,6 +355,15 @@ def test_stack_rejects_different_dims() -> None:
         pa.stack([xr.DataArray([1.0], dims="x"), xr.DataArray([1.0], dims="y")], "run")
 
 
+def test_concat_rejects_different_dims_and_a_missing_dim() -> None:
+    a = xr.DataArray(np.zeros((1, 2)), dims=("time", "x"))
+    b = xr.DataArray(np.zeros((1, 2)), dims=("time", "y"))
+    with pytest.raises(ValueError, match="dims"):
+        pa.concat([a, b], "time")
+    with pytest.raises(ValueError, match="not a dim"):
+        pa.concat([a, a], "run")
+
+
 # -- review fixes (Codex, #114) -------------------------------------------------------
 
 

@@ -149,13 +149,7 @@ class XarrayAdapter:
             raise ValueError(
                 f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
             )
-        first = tuple(xs[0].dims)
-        for i, x in enumerate(xs[1:], start=1):
-            # xr.concat would broadcast over the union of dims
-            if tuple(x.dims) != first:
-                raise ValueError(
-                    f"stack: input {i} has dims {tuple(x.dims)}, not {first}."
-                )
+        _require_same_dims(xs, "stack")
         checked = self.check_compatible(*xs)
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"
@@ -163,6 +157,9 @@ class XarrayAdapter:
 
     def concat(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """Along an existing dim, joining its coordinate; others must be identical."""
+        dims = _require_same_dims(xs, "concat")
+        if dim not in dims:
+            raise ValueError(f"concat: {dim!r} is not a dim of {dims}; use stack.")
         return xr.concat(
             list(xs), dim=dim, join="exact", coords="minimal", compat="identical"
         )
@@ -293,6 +290,15 @@ def _output_dtypes(
         return fallback
     outs = out if len(spec.outputs) > 1 else (out,)
     return [np.asarray(o).dtype for o in outs]
+
+
+def _require_same_dims(xs: Sequence[xr.DataArray], what: str) -> tuple[str, ...]:
+    """The inputs' common dims; ``xr.concat`` would broadcast over their union."""
+    dims = tuple(map(str, xs[0].dims))
+    for i, x in enumerate(xs[1:], start=1):
+        if tuple(map(str, x.dims)) != dims:
+            raise ValueError(f"{what}: input {i} has dims {tuple(x.dims)}, not {dims}.")
+    return dims
 
 
 def _is_dask(x: xr.DataArray) -> bool:
