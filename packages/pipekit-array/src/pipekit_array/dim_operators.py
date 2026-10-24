@@ -123,6 +123,27 @@ class ISel(Operator):
         return sig.replace_dims({self.dim: len(self.index)})
 
 
+_TUPLE = "__tuple__"
+
+
+def _encode_tuples(value: Any) -> Any:
+    """Tuples (at any depth in lists) as ``{"__tuple__": [...]}`` for JSON."""
+    if isinstance(value, tuple):
+        return {_TUPLE: [_encode_tuples(v) for v in value]}
+    if isinstance(value, list):
+        return [_encode_tuples(v) for v in value]
+    return value
+
+
+def _decode_tuples(value: Any) -> Any:
+    """The inverse of `_encode_tuples`; other values pass through."""
+    if isinstance(value, dict) and set(value) == {_TUPLE}:
+        return tuple(_decode_tuples(v) for v in value[_TUPLE])
+    if isinstance(value, list):
+        return [_decode_tuples(v) for v in value]
+    return value
+
+
 class Sel(Operator):
     """Select by exact label along one dim; one label drops the dim.
 
@@ -134,14 +155,16 @@ class Sel(Operator):
 
     def __init__(self, dim: str, label: Any) -> None:
         self.dim = dim
-        # a tuple that is itself a label (tuple-valued labels) stays one label
-        self.label = label
+        # a tuple that is itself a label (tuple-valued labels) stays one label;
+        # a config from JSON spells it {"__tuple__": [...]}
+        self.label = _decode_tuples(label)
 
     def _apply(self, x: Any) -> Any:
         return _dims.sel(x, **{self.dim: self.label})
 
     def get_config(self) -> dict[str, Any]:
-        return {"dim": self.dim, "label": self.label}
+        # JSON has no tuples: keep "one tuple label" apart from "a list of labels"
+        return {"dim": self.dim, "label": _encode_tuples(self.label)}
 
     def compute_output_signature(self, input_signature: Any) -> Any:
         sig = _signature(input_signature)

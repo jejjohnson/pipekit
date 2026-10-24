@@ -438,6 +438,16 @@ def test_sel_operator_keeps_a_tuple_label() -> None:
     assert Sel(dim="cell", label=[(0, 1), (1, 1)])(pairs).shape == (2,)
 
 
+@pytest.mark.parametrize("label", [(0, 1), [(0, 1), (1, 1)], ["a", "b"], "a"])
+def test_sel_tuple_labels_survive_dumps_loads(label: Any) -> None:
+    """Codex #110: JSON turns tuples into lists; the config keeps them apart."""
+    from pipekit import dumps, loads
+
+    again = loads(dumps(Sel(dim="cell", label=label)))
+    assert again.label == label
+    assert type(again.label) is type(label)
+
+
 def test_numpy_conversion_honours_copy() -> None:
     d = DimArray(np.zeros(3), ("x",))
     copied = np.array(d, copy=True)
