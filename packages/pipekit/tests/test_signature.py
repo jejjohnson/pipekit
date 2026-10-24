@@ -89,3 +89,85 @@ def test_operator_overrides_compute_output_signature():
 def test_free_function_dispatch(Scale_cls):
     sig = Signature(dims=(("x", 3),))
     assert compute_output_signature(Scale_cls(2.0), sig) is sig
+
+
+# -- dims patterns (#99) -------------------------------------------------------
+
+
+def _sig(*names: str) -> Signature:
+    return Signature(dims=tuple((name, 3) for name in names), dtype="float32")
+
+
+@pytest.mark.parametrize(
+    ("names", "pattern", "expected"),
+    [
+        (("band", "y", "x"), "band y x", True),
+        (("band", "y", "x"), "... y x", True),
+        (("time", "band", "y", "x"), "... y x", True),
+        (("y", "x"), "... y x", True),
+        (("time", "band", "y", "x"), "time ... x", True),
+        (("time", "x"), "time ... x", True),
+        (("time", "band", "y", "x"), "time band y x ...", True),
+        (("band", "y", "x"), "y x", False),
+        (("band", "x", "y"), "band y x", False),
+        (("band", "y", "x"), "band row col", False),
+        (("x",), "... y x", False),
+        (("y", "x"), "y ... y x", False),
+    ],
+)
+def test_signature_matches(
+    names: tuple[str, ...], pattern: str, expected: bool
+) -> None:
+    assert _sig(*names).matches(pattern) is expected
+
+
+def test_signature_matches_ignores_sizes() -> None:
+    sig = Signature(dims=(("y", None), ("x", 600)))
+    assert sig.matches("y x")
+
+
+def test_scalar_signature_and_the_empty_pattern() -> None:
+    scalar = Signature(dims=())
+    assert scalar.matches("")
+    assert scalar.matches("...")
+    assert not scalar.matches("x")
+    assert not _sig("x").matches("")
+
+
+def test_two_ellipses_raise() -> None:
+    with pytest.raises(ValueError, match="at most one"):
+        _sig("y", "x").matches("... y ... x")
+
+
+def test_from_pattern() -> None:
+    sig = Signature.from_pattern("band y x", dtype="float32")
+    assert sig.dims == (("band", None), ("y", None), ("x", None))
+    assert sig.dtype == "float32"
+    assert sig.matches("band y x")
+    assert Signature.from_pattern("") == Signature(dims=())
+
+
+def test_from_pattern_rejects_ellipsis_and_repeats() -> None:
+    with pytest.raises(ValueError, match="concrete"):
+        Signature.from_pattern("... y x")
+    with pytest.raises(ValueError, match="unique"):
+        Signature.from_pattern("y y")
+
+
+def test_matches_property_on_random_dims() -> None:
+    """from_pattern(names) matches its own names, and '... last' matches too."""
+    import random
+
+    rng = random.Random(0)
+    vocabulary = ["time", "member", "level", "band", "variable", "patch", "y", "x"]
+    for _ in range(500):
+        k = rng.randint(1, len(vocabulary))
+        names = rng.sample(vocabulary, k)
+        sig = Signature(dims=tuple((n, rng.randint(1, 9)) for n in names))
+        pattern = " ".join(names)
+        assert Signature.from_pattern(pattern).matches(pattern)
+        assert sig.matches(pattern)
+        assert sig.matches("... " + names[-1])
+        assert sig.matches(names[0] + " ...")
+        if k > 1:
+            assert not sig.matches(" ".join(reversed(names)))
