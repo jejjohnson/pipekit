@@ -288,3 +288,12 @@ def test_dimarray_round_trip() -> None:
     cube = _cube()
     back = from_xarray(cube).to_xarray()
     xr.testing.assert_identical(back, cube.drop_vars([]))
+
+
+def test_lazy_mask_kernel_declares_its_dtype() -> None:
+    """dask's metadata matches the computed dtype for a bool-valued kernel."""
+    op = KernelOp(lambda z: z > 0.5, "(c)->(c)", core={"c": "band"})
+    out = op(_cube(lazy=True))
+    assert isinstance(out.data, da.Array)
+    assert out.dtype == bool
+    assert out.compute().dtype == bool

@@ -47,7 +47,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, Protocol, cast, runtime_checkable
 
 from pipekit import (
@@ -186,6 +186,7 @@ def kernel_output_dims(
         for d in dims:
             if d not in cores and d not in loop:
                 loop.append(d)
+    _check_core_not_loop(loop, [tuple(core[c] for c in g) for g in spec.inputs])
     first = tuple(input_dims[0]) if input_dims else ()
     outputs = []
     for group in spec.outputs:
@@ -193,6 +194,20 @@ def kernel_output_dims(
         ordered = [d for d in first if d in dims] + [d for d in dims if d not in first]
         outputs.append(tuple(ordered))
     return tuple(outputs)
+
+
+def _check_core_not_loop(
+    loop: Sequence[str], core_dims: Sequence[tuple[str, ...]]
+) -> None:
+    """Raise when a dim is a core dim of one input and a loop dim of another."""
+    cores = {d for group in core_dims for d in group}
+    both = [d for d in loop if d in cores]
+    if both:
+        raise ValueError(
+            f"dim(s) {both} are core dims of one input but loop dims of another: "
+            "every input carrying a core dim must take it as a core dim (give the "
+            "other input its own letter in the spec)."
+        )
 
 
 def _backend(data: Any) -> str:
@@ -422,10 +437,15 @@ class KernelOp(Operator):
         geometry: Kernel keyword → a function of the first carrier returning
             arrays (``{"spacing": spacing_of}``), computed per call and passed
             whole.
-        **params: Keyword parameters passed to every call.
+        params: Keyword parameters passed to every call, as a mapping: the
+            way to pass one named ``core``, ``geometry`` or ``params``.
+        **kwargs: More keyword parameters passed to every call.
 
     Raises:
-        ValueError: ``core`` misses or invents a letter of the spec.
+        ValueError: ``core`` misses or invents a letter of the spec, or a
+            parameter has the name of a derived-geometry keyword.
+        TypeError: ``geometry`` is not a mapping of callables (pass a kernel
+            parameter named ``geometry`` through ``params=``).
 
     ``KernelOp`` holds a user function, so its config is a debug repr only
     (``forbid_in_yaml``, like `pipekit.Lambda`); a named operator built on
@@ -449,9 +469,11 @@ class KernelOp(Operator):
         self,
         kernel: Callable[..., Any],
         spec: KernelSpec | str,
+        /,
         core: dict[str, str],
         geometry: dict[str, Callable[[Any], Any]] | None = None,
-        **params: Any,
+        params: Mapping[str, Any] | None = None,
+        **kwargs: Any,
     ) -> None:
         self.kernel = kernel
         self.spec = spec if isinstance(spec, KernelSpec) else KernelSpec(spec)
@@ -462,8 +484,21 @@ class KernelOp(Operator):
                 f"got {sorted(core)}."
             )
         self.core = dict(core)
+        if geometry is not None and not (
+            isinstance(geometry, Mapping) and all(map(callable, geometry.values()))
+        ):
+            raise TypeError(
+                "geometry= maps kernel keywords to functions of the first carrier; "
+                "pass a kernel parameter named 'geometry' as params={'geometry': ...}."
+            )
         self.geometry = dict(geometry or {})
-        self.params = params
+        self.params = {**dict(params or {}), **kwargs}
+        clash = sorted(set(self.params) & set(self.geometry))
+        if clash:
+            raise ValueError(
+                f"{clash} are both parameters and derived-geometry keywords; "
+                "the kernel can take each name once."
+            )
 
     def _apply(self, *carriers: Any) -> Any:
         if len(carriers) != len(self.spec.inputs):
