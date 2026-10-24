@@ -36,6 +36,7 @@ from pipekit._base.operator import (
     nested_config,
     require_operator,
 )
+from pipekit.adapters import signature_of
 
 
 class Sequential(Operator):
@@ -149,8 +150,11 @@ class Sequential(Operator):
         return out, state
 
     def compute_output_signature(self, input_signature: Any) -> Any:
-        """Thread the signature through every operator in order."""
-        sig = input_signature
+        """Thread the signature through every operator in order.
+
+        A registered carrier is read as its `Signature` first.
+        """
+        sig = signature_of(input_signature)
         for op in self.operators:
             sig = op.compute_output_signature(sig)
             if sig is None:
@@ -208,9 +212,10 @@ class Sequential(Operator):
     def summary(self, input_signature: Any = None) -> str:
         """Render a Keras-style summary table.
 
-        Threads ``input_signature`` through `compute_output_signature`.
-        If any operator returns ``None`` (does not track shape), the
-        summary still lists the operator but shows ``?`` for its output
+        Threads ``input_signature`` through `compute_output_signature`;
+        a registered carrier is read as its `Signature` first. If any
+        operator returns ``None`` (does not track shape), the summary
+        still lists the operator but shows ``?`` for its output
         signature. With ``input_signature=None``, only operator names
         and types are shown.
 
@@ -218,7 +223,7 @@ class Sequential(Operator):
         caller decides where it goes (notebook, log, file).
         """
         rows: list[tuple[str, str, str]] = []
-        sig = input_signature
+        sig = signature_of(input_signature)
         for i, op in enumerate(self.operators):
             sig_in = "?" if sig is None else repr(sig)
             sig = op.compute_output_signature(sig)

@@ -28,6 +28,10 @@ The v0.1 public surface, grouped by module:
   `CarryState`.
 - **Group N — structural protocols** (`protocols`): `Predictor`,
   `FittableTransformer`.
+- **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
+  `register_adapter`, `unregister_adapter`, `get_adapter`,
+  `signature_of`, `MissingAdapterError` — how carrier-agnostic code
+  reaches a carrier with named dims.
 
 Hashing: `pipeline_hash(op)` is the content hash of a whole pipeline,
 the one the pipekit-experiment registries store under. `pipekit.hashing`
@@ -44,6 +48,14 @@ See the master plan (Report 2) for the full v0.1 inventory.
 from pipekit._base.graph import Graph, Input, Node
 from pipekit._base.operator import Carrier, ConfigMixin, Operator
 from pipekit._base.sequential import Sequential
+from pipekit.adapters import (
+    MissingAdapterError,
+    NamedArrayAdapter,
+    get_adapter,
+    register_adapter,
+    signature_of,
+    unregister_adapter,
+)
 from pipekit.blocks import Const, Identity, Lambda, Sink
 from pipekit.cache import Cache, Memoize
 from pipekit.combine import Fanout
@@ -102,6 +114,8 @@ __all__ = [
     "Input",
     "Lambda",
     "Memoize",
+    "MissingAdapterError",
+    "NamedArrayAdapter",
     "Node",
     "Operator",
     "Predictor",
@@ -128,13 +142,17 @@ __all__ = [
     "compute_output_signature",
     "dumps",
     "from_state_sandboxed",
+    "get_adapter",
     "juxt",
     "loads",
     "loads_sandboxed",
     "pipe",
     "pipeline_hash",
     "register",
+    "register_adapter",
+    "signature_of",
     "unregister",
+    "unregister_adapter",
 ]
 
 __version__ = "0.1.1"  # x-release-please-version
