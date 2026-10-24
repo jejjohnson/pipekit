@@ -52,7 +52,11 @@ class XarrayAdapter:
     def labels(self, x: xr.DataArray, dim: str) -> tuple[Any, ...] | None:
         """The values of ``dim``'s 1-D index coordinate, or None."""
         if dim in x.indexes and x.coords[dim].ndim == 1:
-            return tuple(x.coords[dim].values.tolist())
+            values = x.coords[dim].values
+            # tolist() turns datetime64[ns] into integers; keep the scalars
+            if values.dtype.kind in "mM":
+                return tuple(values)
+            return tuple(values.tolist())
         return None
 
     def isel(self, x: xr.DataArray, indexers: dict[str, Any]) -> xr.DataArray:
@@ -100,24 +104,19 @@ class XarrayAdapter:
     def reduce(
         self, x: xr.DataArray, fn: str | Callable[..., Any], dims: tuple[str, ...]
     ) -> xr.DataArray:
-        """A named reduction method (``x.mean(dim=…)``) or ``x.reduce(fn, dim=…)``."""
-        if isinstance(fn, str):
-            method = getattr(x, fn, None)
-            if method is None:
-                raise ValueError(f"reduce: DataArray has no reduction {fn!r}.")
-            return method(dim=list(dims))
-        return x.reduce(fn, dim=list(dims))
+        """``x.reduce`` with the array-namespace function, lazy on dask.
+
+        A name resolves to NumPy's function (``"nanmean"`` included), so NaN
+        handling matches the generic path: DataArray's own ``mean`` would
+        skip NaN by default.
+        """
+        return x.reduce(_numpy_function(fn, "reduce"), dim=list(dims))
 
     def argreduce(
         self, x: xr.DataArray, fn: str | Callable[..., Any], dim: str
     ) -> xr.DataArray:
-        """``x.argmax(dim=…)`` / ``x.argmin(dim=…)``, or ``x.reduce(fn, dim=…)``."""
-        if isinstance(fn, str):
-            method = getattr(x, fn, None)
-            if method is None:
-                raise ValueError(f"argreduce: DataArray has no {fn!r}.")
-            return method(dim=dim)
-        return x.reduce(fn, dim=dim)
+        """``x.reduce`` with NumPy's ``argmax`` / ``argmin`` (or ``fn``)."""
+        return x.reduce(_numpy_function(fn, "argreduce"), dim=dim)
 
     def take_along(self, x: xr.DataArray, index: Any, dim: str) -> xr.DataArray:
         """One entry of ``dim`` per position, lazily on dask, in ``x``'s dim order.
@@ -142,6 +141,10 @@ class XarrayAdapter:
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """A new leading dim; coordinates must be identical (never aligned)."""
+        if dim in xs[0].dims:
+            raise ValueError(
+                f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
+            )
         checked = self.check_compatible(*xs)
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"
@@ -158,12 +161,14 @@ class XarrayAdapter:
         checked = self.check_compatible(*xs)
         dims = tuple(checked[0].dims)
         ordered = [x.transpose(*dims) for x in checked]
+        lazy = any(_is_dask(x) for x in ordered)
         return xr.apply_ufunc(
             fn,
             *ordered,
             dask="parallelized",
             join="exact",
-            output_dtypes=[ordered[0].dtype],
+            # dask needs the result dtype up front: read it from a one-element call
+            output_dtypes=[_probe_dtype(fn, ordered)] if lazy else None,
         )
 
     # -- KernelOp ---------------------------------------------------------
@@ -233,16 +238,18 @@ def _output_dtypes(
     kwargs: dict[str, Any],
     xs: Sequence[xr.DataArray],
     letter_size: dict[str, int],
-) -> list[Any]:
+) -> list[Any] | None:
     """Each output's dtype, which dask must know before it runs anything.
 
     Found by calling the kernel once on ones with only the core dims (the
     loop dims dropped), so a mask or an index kernel declares bool or int;
     the first input's dtype when that call fails.
     """
+    if not any(_is_dask(x) for x in xs):
+        # eager: let the kernel (or np.vectorize) decide; a declared dtype
+        # would cast the results
+        return None
     fallback = [xs[0].dtype] * len(spec.outputs)
-    if not any(type(x.data).__module__.startswith("dask.") for x in xs):
-        return fallback
     probes = [
         np.ones(tuple(letter_size[c] for c in group), dtype=x.dtype)
         for x, group in zip(xs, spec.inputs, strict=True)
@@ -253,6 +260,28 @@ def _output_dtypes(
         return fallback
     outs = out if len(spec.outputs) > 1 else (out,)
     return [np.asarray(o).dtype for o in outs]
+
+
+def _is_dask(x: xr.DataArray) -> bool:
+    return type(x.data).__module__.startswith("dask.")
+
+
+def _probe_dtype(fn: Callable[..., Any], xs: Sequence[xr.DataArray]) -> Any:
+    """``fn``'s result dtype on one-element arrays of the inputs' dtypes."""
+    probes = [np.ones((1,) * x.ndim, dtype=x.dtype) for x in xs]
+    try:
+        return np.asarray(fn(*probes)).dtype
+    except Exception:
+        return xs[0].dtype
+
+
+def _numpy_function(fn: Any, what: str) -> Callable[..., Any]:
+    if callable(fn):
+        return fn
+    resolved = getattr(np, fn, None)
+    if resolved is None:
+        raise ValueError(f"{what}: the array namespace has no {fn!r}.")
+    return resolved
 
 
 def _as_dataarray(index: Any) -> xr.DataArray:
