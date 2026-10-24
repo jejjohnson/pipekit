@@ -66,6 +66,7 @@ __all__ = [
     "KernelSpec",
     "derive_geometry",
     "kernel_output_dims",
+    "kernel_output_signature",
     "run_kernel",
 ]
 
@@ -200,6 +201,40 @@ def kernel_output_dims(
         ordered = [d for d in first if d in dims] + [d for d in dims if d not in first]
         outputs.append(tuple(ordered))
     return tuple(outputs)
+
+
+def kernel_output_signature(
+    spec: KernelSpec, core: dict[str, str], input_signature: Any
+) -> Any:
+    """`KernelOp.compute_output_signature` for any operator running ``spec``.
+
+    Shared with ``pipekit_jax.JaxKernelOp``, so a converted operator reports
+    the same dims, sizes, dtypes and output count.
+    """
+    sig = signature_of(input_signature)
+    if not isinstance(sig, Signature) or len(spec.inputs) != 1:
+        return None
+    sizes = dict(sig.dims)
+    names = tuple(sizes)
+    letter_size = {}
+    for letter, dim in core.items():
+        if dim in sizes:
+            letter_size[letter] = sizes[dim]
+    for out, source in spec.sizes:
+        letter_size[out] = letter_size.get(source)
+    dim_size = {core[k]: v for k, v in letter_size.items()} | {
+        d: s for d, s in sizes.items()
+    }
+    dtypes = [sig.dtype if d == "same" else d for d in spec.dtypes] or [None] * len(
+        spec.outputs
+    )
+    outs = tuple(
+        Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
+        for dims, dtype in zip(
+            kernel_output_dims(spec, core, [names]), dtypes, strict=True
+        )
+    )
+    return outs if len(outs) > 1 else outs[0]
 
 
 def _check_core_not_loop(
@@ -542,27 +577,4 @@ class KernelOp(Operator):
         The dtype is the one ``spec.dtypes`` declares (``"same"``: the
         input's), else unknown: a kernel may return a mask or an index.
         """
-        sig = signature_of(input_signature)
-        if not isinstance(sig, Signature) or len(self.spec.inputs) != 1:
-            return None
-        sizes = dict(sig.dims)
-        names = tuple(sizes)
-        letter_size = {}
-        for letter, dim in self.core.items():
-            if dim in sizes:
-                letter_size[letter] = sizes[dim]
-        for out, source in self.spec.sizes:
-            letter_size[out] = letter_size.get(source)
-        dim_size = {self.core[k]: v for k, v in letter_size.items()} | {
-            d: s for d, s in sizes.items()
-        }
-        dtypes = [sig.dtype if d == "same" else d for d in self.spec.dtypes] or [
-            None
-        ] * len(self.spec.outputs)
-        outs = tuple(
-            Signature(dims=tuple((d, dim_size.get(d)) for d in dims), dtype=dtype)
-            for dims, dtype in zip(
-                kernel_output_dims(self.spec, self.core, [names]), dtypes, strict=True
-            )
-        )
-        return outs if len(outs) > 1 else outs[0]
+        return kernel_output_signature(self.spec, self.core, input_signature)

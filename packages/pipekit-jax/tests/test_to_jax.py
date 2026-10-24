@@ -174,3 +174,18 @@ def test_dimarray_parameter_is_a_leaf() -> None:
     assert sorted(jop.params) == ["w"]
     assert jop.static_params == ()
     assert isinstance(jop.params["w"].data, jax.Array)
+
+
+def test_converted_op_keeps_the_kernel_signature() -> None:
+    """Codex #115: a `(c)->()` kernel drops `band` after conversion too."""
+    from pipekit import Signature
+
+    scene, params = _problem()
+    op = _score(params)
+    sig = Signature(dims=(("band", 4), ("y", 6), ("x", 5)), dtype="float64")
+    jop = to_jax(op)
+    assert jop.compute_output_signature(sig) == op.compute_output_signature(sig)
+    assert jop.compute_output_signature(sig).dims == (("y", 6), ("x", 5))
+    assert jop(scene).dims == ("y", "x")
+    two = KernelOp(lambda x: (x.mean(-1), x.std(-1)), "(c)->(),()", core={"c": "band"})
+    assert len(to_jax(two).compute_output_signature(sig)) == 2

@@ -94,6 +94,12 @@ class JaxKernelOp(JaxOperator):
             self.kernel, self.spec, dict(self.core), carriers, kwargs
         )
 
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The source `KernelOp`'s: the same dims, sizes, dtypes and outputs."""
+        return _kernel_module().kernel_output_signature(
+            self.spec, dict(self.core), input_signature
+        )
+
 
 def to_jax(op: Any) -> JaxKernelOp:
     """A `JaxKernelOp` with ``op``'s kernel, spec, core and geometry.
