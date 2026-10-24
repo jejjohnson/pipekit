@@ -140,6 +140,25 @@ def test_kernel_op_agrees_across_families() -> None:
     )
 
 
+def test_kernel_op_check_catches_a_wrong_size_or_dtype() -> None:
+    """Codex #114: a kernel that breaks its declared size or dtype fails the check."""
+    scene = DimArray(np.random.default_rng(0).random((3, 4)), ("band", "x"))
+    short = KernelOp(
+        lambda z: z[..., :1],
+        KernelSpec("(c)->(d)", sizes=(("d", "c"),)),
+        core={"c": "band", "d": "out"},
+    )
+    with pytest.raises(AssertionError, match="out=3"):
+        check_kernel_op(short, [scene])
+    liar = KernelOp(
+        lambda z: z.sum(-1) > 0,
+        KernelSpec("(c)->()", dtypes=("same",)),
+        core={"c": "band"},
+    )
+    with pytest.raises(AssertionError, match="dtype"):
+        check_kernel_op(liar, [scene])
+
+
 def test_kernel_op_mismatch_names_the_carrier() -> None:
     xr = pytest.importorskip("xarray")
     scene = np.random.default_rng(0).random((3, 4, 5))

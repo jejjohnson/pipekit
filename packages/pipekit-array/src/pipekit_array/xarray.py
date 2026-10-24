@@ -129,6 +129,12 @@ class XarrayAdapter:
         """
         rest = [str(d) for d in x.dims if d != dim]
         idx = _as_dataarray(index)  # raises for an unnamed index
+        index_dims = tuple(map(str, idx.dims))
+        if not set(index_dims) <= set(rest):
+            # the gather would broadcast over an unrelated index dim
+            raise ValueError(
+                f"take_along: index dims {index_dims} are not among {tuple(rest)}."
+            )
         # the labels are checked on the index itself: idx drops its coordinates
         index_adapter = get_adapter(index)
         if index_adapter is not None:
@@ -141,7 +147,7 @@ class XarrayAdapter:
         }
         if aux:
             out = out.assign_coords(aux)
-        return out.transpose(*rest, ...)
+        return out.transpose(*rest)
 
     def stack(self, xs: Sequence[xr.DataArray], dim: str) -> xr.DataArray:
         """A new leading dim; coordinates must be identical (never aligned)."""

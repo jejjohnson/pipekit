@@ -398,3 +398,11 @@ def test_take_along_keeps_attrs_and_gathers_aux_coords(lazy: bool) -> None:
         eager["quality"].isel(time=idx).transpose("y", "x").values,
     )
     np.testing.assert_array_equal(out["x"].values, [10.0, 20.0])
+
+
+def test_take_along_rejects_an_unrelated_index_dim() -> None:
+    """Codex #114: an index on `z` is an error, not a broadcast to (x, z)."""
+    x = xr.DataArray(np.zeros((3, 2)), dims=("time", "x"))
+    index = xr.DataArray([0, 1, 2, 0], dims=("z",))
+    with pytest.raises(ValueError, match="not among"):
+        pa.take_along(x, index, "time")

@@ -242,3 +242,17 @@ def _check_signature(op: KernelOp, x: Any, outs: tuple[Any, ...], name: str) -> 
             f"output {k} on {name}: compute_output_signature gives {got}, "
             f"the output has {_dims_of(o)}"
         )
+        out_adapter = get_adapter(o)
+        if out_adapter is None:
+            continue
+        actual = out_adapter.signature(o)
+        # every size and the dtype the prediction states must be the output's
+        for (d, want), (_, have) in zip(p.dims, actual.dims, strict=True):
+            assert want is None or want == have, (
+                f"output {k} on {name}: compute_output_signature gives {d}={want}, "
+                f"the output has {d}={have}"
+            )
+        assert p.dtype is None or p.dtype == actual.dtype, (
+            f"output {k} on {name}: compute_output_signature gives dtype "
+            f"{p.dtype}, the output has {actual.dtype}"
+        )
