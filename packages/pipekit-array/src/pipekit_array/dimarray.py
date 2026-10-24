@@ -141,7 +141,9 @@ def _positions(index: Any, dim: str, size: int) -> Any:
 
     Raises:
         TypeError: A traced boolean mask (its positions are not static).
-        IndexError: A mask that is not 1-D or not the length of ``dim``.
+        IndexError: A mask that is not 1-D or not the length of ``dim``, or
+            a position array that is not 1-D (it would add axes ``dim``
+            cannot name).
     """
     if isinstance(index, slice) or _is_scalar(index):
         return index
@@ -152,6 +154,15 @@ def _positions(index: Any, dim: str, size: int) -> Any:
         and all(isinstance(v, bool) for v in index)
     )
     if not is_mask:
+        ndim = getattr(index, "ndim", None)
+        if ndim is None:
+            import numpy as np
+
+            ndim = np.ndim(index)
+        if ndim != 1:
+            raise IndexError(
+                f"isel: positions on {dim!r} must be an int or 1-D, got {ndim}-D."
+            )
         return index
     if "Tracer" in type(index).__name__:
         raise TypeError(
