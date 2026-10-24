@@ -128,11 +128,12 @@ def _build(data: Any, dims: tuple[str, ...], labels: dict[str, Any]) -> DimArray
     return d
 
 
-def _positions(index: Any) -> Any:
+def _positions(index: Any, dim: str, size: int) -> Any:
     """An indexer with a boolean mask turned into the positions it selects.
 
     Raises:
         TypeError: A traced boolean mask (its positions are not static).
+        IndexError: A mask that is not 1-D or not the length of ``dim``.
     """
     if isinstance(index, numbers.Integral | slice):
         return index
@@ -151,7 +152,12 @@ def _positions(index: Any) -> Any:
         )
     import numpy as np
 
-    return np.flatnonzero(np.asarray(index))
+    mask = np.asarray(index)
+    if mask.shape != (size,):
+        raise IndexError(
+            f"isel: a boolean mask on {dim!r} has shape {mask.shape}, not ({size},)."
+        )
+    return np.flatnonzero(mask)
 
 
 def _index_labels(values: tuple[Any, ...], index: Any) -> tuple[Any, ...] | None:
@@ -188,7 +194,10 @@ class DimArrayAdapter:
         unknown = sorted(set(indexers) - set(x.dims))
         if unknown:
             raise KeyError(f"isel: unknown dim(s) {unknown}; dims are {x.dims}.")
-        normalized = {dim: _positions(index) for dim, index in indexers.items()}
+        sizes = dict(zip(x.dims, x.data.shape, strict=True))
+        normalized = {
+            dim: _positions(index, dim, sizes[dim]) for dim, index in indexers.items()
+        }
         # ints and slices at once; each position array on its own axis, so
         # two arrays select independently instead of pairing up (outer indexing)
         basic = tuple(

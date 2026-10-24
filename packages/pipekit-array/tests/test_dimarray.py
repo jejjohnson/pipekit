@@ -196,3 +196,12 @@ def test_isel_boolean_mask_filters_labels() -> None:
         out = DimArrayAdapter().isel(d, {"x": mask})
         np.testing.assert_array_equal(out.data, [0.0, 2.0])
         assert out.labels == {"x": ("a", "c")}
+
+
+def test_isel_rejects_a_mask_of_the_wrong_length() -> None:
+    """Codex #109: a short mask is an error, not a partial selection."""
+    d = DimArray(np.arange(3.0), ("x",))
+    with pytest.raises(IndexError, match=r"\(3,\)"):
+        DimArrayAdapter().isel(d, {"x": [True, False]})
+    with pytest.raises(IndexError):
+        DimArrayAdapter().isel(d, {"x": np.ones((3, 1), dtype=bool)})
