@@ -242,3 +242,22 @@ def test_isel_rejects_multidimensional_positions() -> None:
         DimArrayAdapter().isel(d, {"x": np.array([[0, 1]])})
     with pytest.raises(IndexError, match="1-D"):
         DimArrayAdapter().isel(d, {"x": [[0, 1]]})
+
+
+def test_importing_pipekit_array_does_not_import_jax() -> None:
+    """The pytree is registered when JAX is imported, never by pipekit-array."""
+    import subprocess
+    import sys
+
+    pytest.importorskip("jax")
+    code = (
+        "import sys, numpy as np, pipekit_array as pa\n"
+        "assert 'jax' not in sys.modules, 'pipekit_array imported jax'\n"
+        "import jax\n"
+        "d = pa.DimArray(np.zeros((2, 3)), ('y', 'x'))\n"
+        "assert len(jax.tree_util.tree_leaves(d)) == 1, 'not a pytree'\n"
+        "print(jax.jit(lambda c: c)(d).dims)\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "('y', 'x')"

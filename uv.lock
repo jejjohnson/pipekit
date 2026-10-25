@@ -4078,12 +4078,12 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "packages/pipekit" }
 
 [[package]]
 name = "pipekit-array"
-version = "0.0.3"
+version = "0.0.4"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit" },
@@ -4223,7 +4223,7 @@ provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.0.5"
+version = "0.0.6"
 source = { editable = "packages/pipekit-jax" }
 dependencies = [
     { name = "equinox" },
