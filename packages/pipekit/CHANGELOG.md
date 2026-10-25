@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.2...pipekit-v0.1.3) (2026-10-25)
+
+
+### Features
+
+* **core:** on_import runs code when a module is imported; pipekit-array registers DimArray lazily ([#117](https://github.com/jejjohnson/pipekit/issues/117)) ([3446f13](https://github.com/jejjohnson/pipekit/commit/3446f13ef2a5feb70109aaf9df1954052b04f8f2))
+
 ## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.1...pipekit-v0.1.2) (2026-10-24)
 
 
