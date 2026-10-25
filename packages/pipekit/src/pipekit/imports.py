@@ -10,6 +10,7 @@ from the moment JAX is loaded.
 
 from __future__ import annotations
 
+import importlib
 import importlib.abc
 import importlib.machinery
 import sys
@@ -29,11 +30,13 @@ _LOCK = threading.RLock()
 def on_import(name: str, callback: Callable[[ModuleType], object]) -> None:
     """Call ``callback(module)`` once ``name`` is imported, without importing it.
 
-    If ``name`` is already in ``sys.modules`` the callback runs now;
-    otherwise it runs right after the module's first import finishes,
-    whoever imports it. Each callback runs once. An exception from the
-    callback is reported as a `RuntimeWarning` and never breaks the import
-    of ``name``.
+    If ``name`` is already imported the callback runs now (after waiting
+    for another thread's import of it to finish); otherwise it runs right
+    after the module's first import finishes, whoever imports it, packages
+    and namespace packages alike. Each callback runs once. An exception
+    from the callback is reported as a `RuntimeWarning` (on stderr if
+    warnings are errors) and never breaks the import of ``name`` or the
+    other callbacks.
 
     Args:
         name: A top-level module name, e.g. ``"jax"``.
@@ -54,7 +57,15 @@ def on_import(name: str, callback: Callable[[ModuleType], object]) -> None:
             if not any(isinstance(f, _HookFinder) for f in sys.meta_path):
                 sys.meta_path.insert(0, _HookFinder())
             return
+    if _initializing(module):
+        # another thread is still importing it: importing it here waits on
+        # that import's module lock, so the callback sees the whole module
+        module = importlib.import_module(name)
     _run(name, module, [callback])
+
+
+def _initializing(module: ModuleType) -> bool:
+    return bool(getattr(getattr(module, "__spec__", None), "_initializing", False))
 
 
 def _run(
@@ -64,11 +75,13 @@ def _run(
         try:
             callback(module)
         except Exception as exc:  # never break the import of `name`
-            warnings.warn(
-                f"on_import({name!r}) callback {callback!r} failed: {exc!r}",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+            message = f"on_import({name!r}) callback {callback!r} failed: {exc!r}"
+            try:
+                warnings.warn(message, RuntimeWarning, stacklevel=2)
+            except Exception:
+                # -W error turns the warning into an exception: report it
+                # without aborting the import or the remaining callbacks
+                print(f"RuntimeWarning: {message}", file=sys.stderr)
 
 
 class _HookFinder(importlib.abc.MetaPathFinder):
@@ -90,8 +103,15 @@ class _HookFinder(importlib.abc.MetaPathFinder):
                 break
         else:
             return None
-        if spec.loader is not None and hasattr(spec.loader, "exec_module"):
-            spec.loader = _HookLoader(spec.loader, fullname)
+        loader = spec.loader
+        if loader is None and spec.submodule_search_locations is not None:
+            # a namespace package: the loader importlib would give it
+            loader = importlib.machinery.NamespaceLoader.__new__(
+                importlib.machinery.NamespaceLoader
+            )
+            loader._path = spec.submodule_search_locations  # type: ignore[attr-defined]
+        if loader is not None and hasattr(loader, "exec_module"):
+            spec.loader = _HookLoader(loader, fullname)
         return spec
 
 
