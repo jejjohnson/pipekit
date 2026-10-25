@@ -33,6 +33,8 @@ The v0.1 public surface, grouped by module:
   `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
   reaches a carrier with named dims.
+- **Import hooks** (`imports`): `on_import(name, callback)` runs code once
+  a module is imported without importing it (JAX pytree registration).
 
 Hashing: `pipeline_hash(op)` is the content hash of a whole pipeline,
 the one the pipekit-experiment registries store under. `pipekit.hashing`
@@ -64,6 +66,7 @@ from pipekit.combine import Fanout
 from pipekit.compose import complement, compose, compose_left, juxt, pipe
 from pipekit.control import Branch, Coalesce, Retry, Switch, Try
 from pipekit.hashing import pipeline_hash
+from pipekit.imports import on_import
 from pipekit.observe import Histogram, Profile, ShapeTrace, Snapshot, Tap
 from pipekit.parallel import (
     AsyncMap,
@@ -148,6 +151,7 @@ __all__ = [
     "juxt",
     "loads",
     "loads_sandboxed",
+    "on_import",
     "pipe",
     "pipeline_hash",
     "register",

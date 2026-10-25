@@ -27,7 +27,7 @@ import numbers
 from collections.abc import Mapping
 from typing import Any
 
-from pipekit import Signature
+from pipekit import Signature, on_import
 
 
 __all__ = ["DimArray", "DimArrayAdapter"]
@@ -320,12 +320,8 @@ def vmapped_dims(dims: tuple[str, ...], shape: Any) -> tuple[str, ...]:
     return (*added, *dims)
 
 
-def _register_pytree() -> bool:
-    """Register `DimArray` with JAX when JAX is installed; never fail without it."""
-    try:
-        import jax
-    except ImportError:
-        return False
+def _register_pytree(jax: Any) -> None:
+    """Register `DimArray` with JAX (run by `on_import` once JAX is imported)."""
 
     def flatten(d: DimArray) -> tuple[tuple[Any], Any]:
         aux = (d.dims, tuple((dim, d.labels[dim]) for dim in d.dims if dim in d.labels))
@@ -345,7 +341,8 @@ def _register_pytree() -> bool:
     jax.tree_util.register_pytree_with_keys(
         DimArray, flatten_with_keys, unflatten, flatten_func=flatten
     )
-    return True
 
 
-PYTREE_REGISTERED: bool = _register_pytree()
+# never import JAX here (0.6 s, and pre/post-processing never needs it): the
+# pytree is registered when JAX is imported, now or later, by anyone
+on_import("jax", _register_pytree)
