@@ -671,14 +671,19 @@ def _evaluate(
     task: TrainTask,
     key: jax.Array,
 ) -> dict[str, float]:
-    """Run model on val_dataset, return averaged metric dict.
+    """Run model on val_dataset, return the per-sample mean of each metric.
+
+    Each batch's metrics are weighted by the batch's size, so a short last
+    batch counts for its samples, not as much as a full batch (#122): the
+    result is the mean over the validation set for any metric that is a
+    per-batch mean.
 
     ``key`` seeds stochastic tasks (dropout, reparameterised sampling)
     and is split per batch so every batch — and every eval round —
     sees distinct randomness. Deterministic tasks ignore it.
     """
     sums: dict[str, float] = {}
-    n = 0
+    n = 0  # samples seen
     # We always do a single-pass (one epoch) over the val dataset.
     # Use direct iteration; the loss_fn we already have can score
     # mini-batches as if they were training batches.
@@ -686,9 +691,10 @@ def _evaluate(
     for batch in iterator:
         key, batch_key = jax.random.split(key)
         _, aux = task.loss_fn(model, batch, batch_key)
+        size = len(batch[0])
         for k, v in aux.items():
-            sums[k] = sums.get(k, 0.0) + float(np.asarray(v))
-        n += 1
+            sums[k] = sums.get(k, 0.0) + float(np.asarray(v)) * size
+        n += size
     if n == 0:
         return {}
     return {k: v / n for k, v in sums.items()}
