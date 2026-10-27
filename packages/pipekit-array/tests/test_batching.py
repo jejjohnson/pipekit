@@ -152,6 +152,33 @@ def test_reduce_where_on_xarray_matches_the_generic_path() -> None:
     np.testing.assert_array_equal(np.asarray(on_xr), generic.data)
 
 
+def test_a_named_where_with_other_lengths_is_rejected() -> None:
+    """Review on #121: (3, 2) has (2, 3)'s element count, but not its lengths."""
+    cube = DimArray(np.arange(6.0).reshape(2, 3), ("t", "x"))
+    mask = DimArray(np.ones((3, 2), dtype=bool), ("t", "x"))
+    with pytest.raises(ValueError, match="t: 3 vs 2, x: 2 vs 3"):
+        reduce(cube, "sum", "x", where=mask)
+
+
+def test_a_named_where_of_length_one_broadcasts() -> None:
+    cube = DimArray(np.arange(6.0).reshape(2, 3), ("t", "x"))
+    keep_all_t = DimArray(np.array([[True, False, True]]), ("t", "x"))  # (1, 3)
+    out = reduce(cube, "sum", "x", where=keep_all_t)
+    np.testing.assert_array_equal(out.data, cube.data[:, ::2].sum(axis=1))
+
+
+def test_reduce_where_on_another_backend_says_so() -> None:
+    """Review on #121: torch's reductions take no where= (nor dask's)."""
+    from pipekit_array.dims import _require_where_backend
+
+    class Tensor:  # stands in for torch.Tensor: only the module matters
+        __module__ = "torch"
+
+    with pytest.raises(TypeError, match=r"needs NumPy, JAX or CuPy.*torch"):
+        _require_where_backend(Tensor())
+    _require_where_backend(np.ones(2))  # NumPy passes
+
+
 def test_reduce_where_on_dask_says_so() -> None:
     da = pytest.importorskip("dask.array")
     cube = DimArray(da.ones((4, 3), chunks=2), ("sample", "x"))

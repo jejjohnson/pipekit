@@ -285,7 +285,8 @@ def reduce(
     Raises:
         ValueError: A plain ``where`` does not match ``x``'s leading dims,
             or a named one has a dim ``x`` lacks.
-        TypeError: ``where`` on dask data (dask's reductions take none).
+        TypeError: ``where`` on data other than NumPy, JAX or CuPy (dask's
+            and PyTorch's reductions take no ``where=``).
 
     Example:
         >>> import numpy as np
@@ -302,12 +303,9 @@ def reduce(
     fast = _fast_path(adapter, "reduce")
     dims = adapter.dims(x)
     data = adapter.data(x)
+    if where is not None:
+        _require_where_backend(data)
     mask = None if where is None else _aligned_mask(where, dims, data, "reduce")
-    if mask is not None and backend_name(data) == "dask":
-        raise TypeError(
-            "reduce: dask's reductions take no where=; compute the carrier first, "
-            "or mask with NaN and a nan-reduction (xr.DataArray.where, 'nanmean')."
-        )
     if fast is not None:
         return fast(x, fn, names) if mask is None else fast(x, fn, names, where=mask)
     axes = _axes(dims, names, "reduce")
@@ -315,6 +313,28 @@ def reduce(
     out = func(data, axis=axes) if mask is None else func(data, axis=axes, where=mask)
     kept = tuple(d for d in dims if d not in names)
     return adapter.rewrap(x, out, kept)
+
+
+#: array modules whose reductions take NumPy's ``where=`` (jax: tracers too)
+_WHERE_MODULES = ("numpy", "jax", "jaxlib", "cupy")
+
+
+def _require_where_backend(data: Any) -> None:
+    """Raise unless ``data``'s reductions honour ``where=`` (NumPy, JAX, CuPy).
+
+    dask's and PyTorch's reductions take no ``where=`` (array-api-compat
+    forwards it to ``torch.mean``, which rejects it), so a mask there would
+    fail deep in the backend, or be ignored by a reduction that swallows
+    keywords.
+    """
+    module = type(data).__module__.split(".")[0]
+    if module in _WHERE_MODULES or backend_name(data) == "jax":
+        return
+    raise TypeError(
+        f"reduce: where= needs NumPy, JAX or CuPy data, got {type(data).__name__} "
+        f"({module}), whose reductions take no where=. Compute or convert the "
+        "carrier first, or mask with NaN and a nan-reduction ('nanmean')."
+    )
 
 
 def _aligned_mask(where: Any, dims: tuple[str, ...], data: Any, what: str) -> Any:
@@ -332,9 +352,19 @@ def _aligned_mask(where: Any, dims: tuple[str, ...], data: Any, what: str) -> An
             raise ValueError(f"{what}: where= has dim(s) {extra} not in {dims}.")
         mask = mask_adapter.data(where)
         xp = namespace_of(mask)
+        sizes = dict(zip(mask_dims, mask.shape, strict=True))
+        wrong = {
+            d: (sizes[d], shape[i])
+            for i, d in enumerate(dims)
+            if d in sizes and sizes[d] not in (1, shape[i])
+        }
+        if wrong:
+            detail = ", ".join(f"{d}: {m} vs {n}" for d, (m, n) in wrong.items())
+            raise ValueError(f"{what}: where= sizes differ from the data's ({detail}).")
         order = [d for d in dims if d in mask_dims]
         mask = xp.permute_dims(mask, tuple(mask_dims.index(d) for d in order))
-        expanded = tuple(shape[i] if d in mask_dims else 1 for i, d in enumerate(dims))
+        # the mask's own lengths (1 broadcasts), never the data's
+        expanded = tuple(sizes.get(d, 1) for d in dims)
     else:
         mask = where
         xp = namespace_of(mask)

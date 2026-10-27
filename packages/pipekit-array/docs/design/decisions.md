@@ -234,8 +234,9 @@ pad="last" | "none" | "drop")`.
   reduction, with the kept-count denominator, passed through to the
   namespace's `where=`. A named mask aligns by dim name; a plain array
   must match the carrier's leading dims (a `(sample,)` mask on
-  `(sample, y, x)`), never NumPy's right-broadcast. Dask's reductions
-  take no `where=`, so a dask carrier raises `TypeError`.
+  `(sample, y, x)`), never NumPy's right-broadcast; a named mask's
+  lengths must match the data's (or be 1). Only NumPy, JAX and CuPy
+  reductions take `where=`; dask and PyTorch carriers raise `TypeError`.
 - **The name is `Padded`, with `valid`.** "Masked" invites polarity bugs:
   geotoolz masks and `np.ma` masks are True = drop, `valid` is
   True = keep. `Batch` is taken by pipekit-train's `(x, y)` tuples.
