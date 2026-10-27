@@ -29,6 +29,7 @@ cycle (PK-P1). pipekit core ships no adapter itself.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
@@ -242,7 +243,24 @@ def backend_name(data: Any) -> str:
     return "numpy"
 
 
-_ARRAY_MODULES = ("numpy", "jax", "jaxlib", "dask.")
+def _array_types() -> tuple[type, ...]:
+    """The array types of the backends already imported (nothing is imported).
+
+    NumPy's ``ndarray``, ``jax.Array`` (tracers included) and dask's
+    ``Array``; a NumPy scalar, a dtype or any other object of those
+    libraries is not an array.
+    """
+    found: list[type] = []
+    for module, name in (
+        ("numpy", "ndarray"),
+        ("jax", "Array"),
+        ("dask.array", "Array"),
+    ):
+        mod = sys.modules.get(module)
+        cls = getattr(mod, name, None) if mod is not None else None
+        if isinstance(cls, type):
+            found.append(cls)
+    return tuple(found)
 
 
 def backend_of(x: Any) -> str | None:
@@ -250,17 +268,16 @@ def backend_of(x: Any) -> str | None:
 
     A registered carrier answers through its adapter's raw data; a NumPy,
     JAX (tracers included) or dask array answers for itself. Anything else
-    (a number, a string, a table) has no backend.
+    (a number, a NumPy scalar or dtype, a string, a table) has no backend.
 
     Example:
         >>> import numpy as np
-        >>> backend_of(np.zeros(3)), backend_of("scene.tif")
-        ('numpy', None)
+        >>> backend_of(np.zeros(3)), backend_of(np.int64(0)), backend_of("a.tif")
+        ('numpy', None, None)
     """
     adapter = get_adapter(x)
     if adapter is not None:
         return backend_name(adapter.data(x))
-    cls = type(x)
-    if cls.__module__.startswith(_ARRAY_MODULES) or "Tracer" in cls.__name__:
+    if isinstance(x, _array_types()):
         return backend_name(x)
     return None

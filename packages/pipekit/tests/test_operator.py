@@ -276,3 +276,32 @@ def test_graph_mode_is_not_checked() -> None:
     from pipekit import Input, Node
 
     assert isinstance(_NumpyOnly()(Input("x")), Node)
+
+
+def test_numpy_scalars_and_dtypes_have_no_backend() -> None:
+    jnp = pytest.importorskip("jax.numpy")
+    from pipekit import backend_of
+
+    class Both(_NumpyOnly):
+        backends = ("jax",)
+
+    x = jnp.zeros(3)
+    assert backend_of(np.int64(0)) is None
+    assert backend_of(np.dtype("float32")) is None
+    assert Both()(x, axis=np.int64(0), dtype=np.dtype("float32")) is x
+
+
+def test_async_map_checks_a_coroutine_apply() -> None:
+    from pipekit import AsyncMap, BackendError
+
+    jnp = pytest.importorskip("jax.numpy")
+
+    class AsyncNumpy(Operator):
+        backends = ("numpy",)
+
+        async def _apply(self, x):
+            return x
+
+    assert AsyncMap(AsyncNumpy())([np.zeros(2)])[0].shape == (2,)
+    with pytest.raises(BackendError, match="AsyncNumpy runs on numpy only"):
+        AsyncMap(AsyncNumpy())([jnp.zeros(2)])

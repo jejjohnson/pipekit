@@ -187,13 +187,22 @@ class Operator(ConfigMixin):
                     "or supply them as a separate `Input`."
                 )
             return Node(operator=self, parents=tuple(args))
-        if self.backends is not None:
-            _require_backends(type(self).__name__, self.backends, args, kwargs)
+        self._check_backends(args, kwargs)
         out = self._apply(*args, **kwargs)
         # Reserved hook dispatch — no-op in v0.1; Spy/Hook family lands later
         # without requiring every Operator subclass to be edited.
         self._dispatch_post_apply_hooks(args, out)
         return out
+
+    def _check_backends(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        """Raise `BackendError` when the inputs break ``backends`` (if set).
+
+        `__call__` runs it before ``_apply``; anything else that calls
+        ``_apply`` directly (`AsyncMap` awaiting a coroutine ``_apply``)
+        runs it too.
+        """
+        if self.backends is not None:
+            _require_backends(type(self).__name__, self.backends, args, kwargs)
 
     def _apply(self, *args: Any, **kwargs: Any) -> Any:
         """Implement the operator's behaviour. Override in subclasses."""
