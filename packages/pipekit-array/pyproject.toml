@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-array"
-version = "0.0.6"
+version = "0.0.7"
 description = "Array API operators on top of pipekit — multi-backend (numpy, JAX, CuPy, PyTorch)."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},

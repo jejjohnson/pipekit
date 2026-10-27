@@ -170,4 +170,4 @@ __all__ = [
     "unregister_adapter",
 ]
 
-__version__ = "0.1.3"  # x-release-please-version
+__version__ = "0.1.4"  # x-release-please-version
