@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.2...pipekit-train-v0.1.3) (2026-10-27)
+
+
+### Bug Fixes
+
+* **train:** weight eval metrics by batch size, not per batch ([#123](https://github.com/jejjohnson/pipekit/issues/123)) ([3d95a09](https://github.com/jejjohnson/pipekit/commit/3d95a09b19f17c2620a77d9a6c0b9ff40a469543))
+
 ## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.1...pipekit-train-v0.1.2) (2026-10-24)
 
 

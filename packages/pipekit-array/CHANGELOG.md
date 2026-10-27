@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.5...pipekit-array-v0.0.6) (2026-10-27)
+
+
+### Features
+
+* **array:** padded batches with batch, Padded, stack_items and reduce(where=) ([#121](https://github.com/jejjohnson/pipekit/issues/121)) ([9bc9e1d](https://github.com/jejjohnson/pipekit/commit/9bc9e1dbbdc2d8cce5db9bbcbcd81b7076bcbb5f))
+
 ## [0.0.5](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.4...pipekit-array-v0.0.5) (2026-10-25)
 
 
