@@ -800,3 +800,21 @@ def test_batch_source_grain_get_state_is_dict():
     b = src2.next_batch()
     np.testing.assert_array_equal(np.asarray(a[0]), np.asarray(b[0]))
     np.testing.assert_array_equal(np.asarray(a[1]), np.asarray(b[1]))
+
+
+def test_evaluate_weights_a_short_last_batch_by_its_size():
+    """#122: 5 samples in batches of 2 → the metric is the mean of all 5."""
+    from pipekit_train.adapters.equinox import _evaluate
+
+    ys = [0.0, 0.0, 0.0, 0.0, 10.0]
+    val = [(np.zeros(1, dtype=np.float32), np.float32(y)) for y in ys]
+
+    class MeanTarget:
+        def loss_fn(self, model, batch, key):
+            _, y = batch
+            return jnp.mean(y), {"mean_y": jnp.mean(y)}
+
+    metrics = _evaluate(None, val, 2, MeanTarget(), jax.random.PRNGKey(0))
+
+    # equal batch weights would give mean(0, 0, 10) = 3.33…
+    assert metrics["mean_y"] == pytest.approx(2.0)
