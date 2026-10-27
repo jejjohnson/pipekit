@@ -76,6 +76,12 @@ def _cases() -> list[tuple[str, Callable[[Any], Any]]]:
             lambda c: _dims.reduce(c, "max", ("time", "band")),
         ),
         (
+            "reduce(mean, time, where)",
+            lambda c: _dims.reduce(
+                c, "mean", "time", where=np.array([True, False, True])
+            ),
+        ),
+        (
             "argreduce(argmax, time)",
             lambda c: _dims.argreduce(_dims.sel(c, band="B8"), "argmax", "time"),
         ),
@@ -94,6 +100,12 @@ def _cases() -> list[tuple[str, Callable[[Any], Any]]]:
         (
             "stack(run)",
             lambda c: _dims.stack(
+                [_dims.isel(c, time=0), _dims.isel(c, time=1)], "run"
+            ),
+        ),
+        (
+            "stack_items(run)",
+            lambda c: _dims.stack_items(
                 [_dims.isel(c, time=0), _dims.isel(c, time=1)], "run"
             ),
         ),
@@ -148,7 +160,10 @@ def check_adapter(
         f"not the adapter under test {type(adapter).__name__}"
     )
     _check_protocol(adapter, carrier, data, name)
+    lazy = _dims.backend_name(adapter.data(carrier)) == "dask"
     for label, fn in _cases():
+        if lazy and label.endswith("where)"):
+            continue  # dask's reductions take no where= (reduce raises TypeError)
         expected = fn(reference)
         actual = fn(carrier)
         got = _dims_of(actual)

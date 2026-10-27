@@ -9,10 +9,15 @@ adapter `DimArrayAdapter`, registered with `pipekit.register_adapter`
 on import.
 
 Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
-`transpose`, `reduce`, `argreduce`, `take_along`, `map_over`, `stack`,
-`concat`, `combine`; as operators (`dim_operators`): `ISel`, `Sel`,
+`transpose`, `reduce` (``where=`` masks), `argreduce`, `take_along`,
+`map_over`, `stack`, `stack_items`, `concat`, `combine`; as operators
+(`dim_operators`): `ISel`, `Sel`,
 `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
+
+Batches (`batching`): `batch` groups carriers into fixed-size `Padded`
+batches (``value``, ``valid``) along a new dim; ``pad="last" | "none" |
+"drop"`` decides the short last batch.
 
 Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
 `KernelOp`, which runs one L1 kernel on raw arrays and on every named
@@ -28,6 +33,7 @@ from __future__ import annotations
 from pipekit import register_adapter, register_lazy_adapter
 
 from pipekit_array._namespace import array_namespace
+from pipekit_array.batching import Padded, batch
 from pipekit_array.combinators import ConcatenateAlong, StackAlong
 from pipekit_array.dim_operators import (
     ArgReduce,
@@ -50,6 +56,7 @@ from pipekit_array.dims import (
     reduce,
     sel,
     stack,
+    stack_items,
     take_along,
     transpose,
 )
@@ -82,6 +89,7 @@ __all__ = [
     "KernelSpec",
     "MapOver",
     "MeanScalar",
+    "Padded",
     "Reduce",
     "Sel",
     "StackAlong",
@@ -89,6 +97,7 @@ __all__ = [
     "Transpose",
     "argreduce",
     "array_namespace",
+    "batch",
     "combine",
     "concat",
     "isel",
@@ -96,6 +105,7 @@ __all__ = [
     "reduce",
     "sel",
     "stack",
+    "stack_items",
     "take_along",
     "transpose",
 ]

@@ -31,6 +31,16 @@ and the trained-model wrapper `ModelOp`.
 
 ::: pipekit_array.dim_operators
 
+## Batches
+
+`batch` groups carriers into fixed-size `Padded` batches (`value`,
+`valid`) along a new dim, padding a short last batch with copies of its
+last item (`pad="last"`), yielding it short (`"none"`) or dropping it
+(`"drop"`). `stack_items` is the stacking it uses; leave the padding out
+of a statistic with `reduce(..., where=padded.valid)`. ADR A10.
+
+::: pipekit_array.batching
+
 ## Kernels
 
 ::: pipekit_array.kernel

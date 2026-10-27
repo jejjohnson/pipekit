@@ -4078,12 +4078,12 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "packages/pipekit" }
 
 [[package]]
 name = "pipekit-array"
-version = "0.0.4"
+version = "0.0.5"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit" },

@@ -10,11 +10,15 @@ stay xarray's; reprojection and sampling at points stay in geoarray.
 - `isel`, `sel` — by position, by exact label; an integer or a single
   label drops its dim.
 - `transpose` — reorder dims by name.
-- `reduce`, `argreduce` — over named dims.
+- `reduce`, `argreduce` — over named dims; ``reduce(..., where=valid)``
+  leaves masked entries out (a padded batch, nodata).
 - `take_along` — gather along a dim with an index carrier
   (``argreduce`` then ``take_along`` is a max-NDVI composite).
 - `map_over` — a function on each item along a dim.
 - `stack`, `concat` — a new dim, or along an existing one.
+- `stack_items` — items that may each carry their own geometry (patches,
+  per-frame grids) along a new leading dim; `stack` where that is the
+  same thing.
 - `combine` — an element-wise function of carriers with the same dims.
 
 **Fast paths.** An adapter may provide a method of the same name (the
@@ -47,6 +51,7 @@ __all__ = [
     "reduce",
     "sel",
     "stack",
+    "stack_items",
     "take_along",
     "transpose",
 ]
@@ -258,14 +263,30 @@ def transpose(x: Any, order: Sequence[str]) -> Any:
     return adapter.rewrap(x, moved, tuple(order))
 
 
-def reduce(x: Any, fn: Reduction, dim: str | Sequence[str]) -> Any:
+def reduce(
+    x: Any, fn: Reduction, dim: str | Sequence[str], *, where: Any | None = None
+) -> Any:
     """Reduce over one or more named dims.
 
     Args:
         x: A named carrier.
         fn: An array-namespace name (``"mean"``, ``"max"``, ``"nanmean"``) or a
-            function taking ``axis=``.
+            function taking ``axis=`` (and ``where=``, when given).
         dim: A dim name, or several.
+        where: Optional bool mask of the entries to keep, passed to ``fn``
+            as ``where=`` (``"mean"`` then divides by the kept count). Either
+            a named carrier, aligned to ``x`` by dim name (its dims must be
+            among ``x``'s), or a plain array covering ``x``'s *leading* dims
+            (``where.shape == shape[:where.ndim]``): a ``(sample,)`` mask on
+            ``(sample, y, x)`` data, as `Padded.valid` is. Never
+            right-broadcast. ``"max"`` / ``"min"`` need an ``initial`` for
+            a mask: pass a function that supplies one.
+
+    Raises:
+        ValueError: A plain ``where`` does not match ``x``'s leading dims,
+            or a named one has a dim ``x`` lacks.
+        TypeError: ``where`` on data other than NumPy or JAX (the
+            reductions of dask, PyTorch and CuPy take no ``where=``).
 
     Example:
         >>> import numpy as np
@@ -273,19 +294,90 @@ def reduce(x: Any, fn: Reduction, dim: str | Sequence[str]) -> Any:
         >>> cube = DimArray(np.ones((12, 2, 4)), ("time", "band", "x"))
         >>> reduce(cube, "mean", "time").dims
         ('band', 'x')
+        >>> batch = DimArray(np.array([[1.0], [3.0], [9.0]]), ("sample", "x"))
+        >>> reduce(batch, "mean", "sample", where=np.array([True, True, False])).data
+        array([2.])
     """
     adapter = adapter_of(x, "reduce")
     names = (dim,) if isinstance(dim, str) else tuple(dim)
     fast = _fast_path(adapter, "reduce")
-    if fast is not None:
-        return fast(x, fn, names)
     dims = adapter.dims(x)
-    axes = _axes(dims, names, "reduce")
     data = adapter.data(x)
+    if where is not None:
+        _require_where_backend(data)
+    mask = None if where is None else _aligned_mask(where, dims, data, "reduce")
+    if fast is not None:
+        return fast(x, fn, names) if mask is None else fast(x, fn, names, where=mask)
+    axes = _axes(dims, names, "reduce")
     func = _resolve(fn, namespace_of(data), "reduce")
-    out = func(data, axis=axes)
+    out = func(data, axis=axes) if mask is None else func(data, axis=axes, where=mask)
     kept = tuple(d for d in dims if d not in names)
     return adapter.rewrap(x, out, kept)
+
+
+#: array modules whose reductions take NumPy's ``where=`` (jax: tracers too)
+_WHERE_MODULES = ("numpy", "jax", "jaxlib")
+
+
+def _require_where_backend(data: Any) -> None:
+    """Raise unless ``data``'s reductions honour ``where=`` (NumPy, JAX).
+
+    The reductions of dask, CuPy and PyTorch take no ``where=``
+    (array-api-compat forwards it to ``torch.mean``, which rejects it;
+    ``cupy.mean`` / ``cupy.sum`` have no such parameter), so a mask there would
+    fail deep in the backend, or be ignored by a reduction that swallows
+    keywords.
+    """
+    module = type(data).__module__.split(".")[0]
+    if module in _WHERE_MODULES or backend_name(data) == "jax":
+        return
+    raise TypeError(
+        f"reduce: where= needs NumPy or JAX data, got {type(data).__name__} "
+        f"({module}), whose reductions take no where=. Compute or convert the "
+        "carrier first, or mask with NaN and a nan-reduction ('nanmean')."
+    )
+
+
+def _aligned_mask(where: Any, dims: tuple[str, ...], data: Any, what: str) -> Any:
+    """``where`` as a bool array with ``data``'s shape, aligned by dim name.
+
+    The mask stays in its own array namespace (a NumPy mask on dask data,
+    a traced one under ``jit``).
+    """
+    shape = tuple(data.shape)
+    mask_adapter = get_adapter(where)
+    if mask_adapter is not None:
+        mask_dims = tuple(mask_adapter.dims(where))
+        extra = [d for d in mask_dims if d not in dims]
+        if extra:
+            raise ValueError(f"{what}: where= has dim(s) {extra} not in {dims}.")
+        mask = mask_adapter.data(where)
+        xp = namespace_of(mask)
+        sizes = dict(zip(mask_dims, mask.shape, strict=True))
+        wrong = {
+            d: (sizes[d], shape[i])
+            for i, d in enumerate(dims)
+            if d in sizes and sizes[d] not in (1, shape[i])
+        }
+        if wrong:
+            detail = ", ".join(f"{d}: {m} vs {n}" for d, (m, n) in wrong.items())
+            raise ValueError(f"{what}: where= sizes differ from the data's ({detail}).")
+        order = [d for d in dims if d in mask_dims]
+        mask = xp.permute_dims(mask, tuple(mask_dims.index(d) for d in order))
+        # the mask's own lengths (1 broadcasts), never the data's
+        expanded = tuple(sizes.get(d, 1) for d in dims)
+    else:
+        mask = where
+        xp = namespace_of(mask)
+        if tuple(mask.shape) != shape[: mask.ndim]:
+            raise ValueError(
+                f"{what}: a plain where= of shape {tuple(mask.shape)} must match the "
+                f"leading dims {dims[: mask.ndim]} of shape {shape[: mask.ndim]}; pass "
+                "a named mask to align by dim name."
+            )
+        expanded = (*mask.shape, *(1,) * (len(shape) - mask.ndim))
+    mask = xp.reshape(xp.astype(mask, xp.bool), expanded)
+    return xp.broadcast_to(mask, shape)
 
 
 def argreduce(x: Any, fn: Reduction, dim: str) -> Any:
@@ -408,6 +500,36 @@ def stack(xs: Sequence[Any], dim: str) -> Any:
     require_one_backend(datas, "stack")
     xp = namespace_of(datas[0])
     return adapter.rewrap(checked[0], xp.stack(datas), (dim, *dims))
+
+
+def stack_items(xs: Sequence[Any], dim: str) -> Any:
+    """Items along a new leading dim ``dim``, each keeping its own geometry.
+
+    The inverse of the split `map_over` makes: where `stack` requires one
+    shared grid (geoarray's `stack` never aligns two), ``stack_items`` lets
+    each item carry its own per-item leaves (a patch's transform row, a
+    frame's grid) and makes ``dim`` a batch dim. A carrier family with no
+    per-item geometry (`DimArray`, ``xr.DataArray``) has nothing to keep
+    apart, so this is `stack`; geoarray's adapter provides the
+    ``stack_items`` fast path.
+
+    Raises:
+        ValueError: ``xs`` is empty, or the items' dims differ.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> items = [DimArray(np.ones((2, 3)), ("y", "x")) for _ in range(4)]
+        >>> stack_items(items, "sample").dims
+        ('sample', 'y', 'x')
+    """
+    if len(xs) == 0:
+        raise ValueError("stack_items needs at least one carrier.")
+    adapter = adapter_of(xs[0], "stack_items")
+    fast = _fast_path(adapter, "stack_items")
+    if fast is not None:
+        return fast(list(xs), dim)
+    return stack(xs, dim)
 
 
 def concat(xs: Sequence[Any], dim: str) -> Any:
