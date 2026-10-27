@@ -103,15 +103,24 @@ class XarrayAdapter:
         return x.transpose(*order)
 
     def reduce(
-        self, x: xr.DataArray, fn: str | Callable[..., Any], dims: tuple[str, ...]
+        self,
+        x: xr.DataArray,
+        fn: str | Callable[..., Any],
+        dims: tuple[str, ...],
+        *,
+        where: Any | None = None,
     ) -> xr.DataArray:
         """``x.reduce`` with the array-namespace function, lazy on dask.
 
         A name resolves to NumPy's function (``"nanmean"`` included), so NaN
         handling matches the generic path: DataArray's own ``mean`` would
-        skip NaN by default.
+        skip NaN by default. ``where`` arrives aligned to ``x``'s full shape
+        (`pipekit_array.reduce` aligns it) and is passed to the function.
         """
-        return x.reduce(_numpy_function(fn, "reduce"), dim=list(dims))
+        func = _numpy_function(fn, "reduce")
+        if where is None:
+            return x.reduce(func, dim=list(dims))
+        return x.reduce(func, dim=list(dims), where=where)
 
     def argreduce(
         self, x: xr.DataArray, fn: str | Callable[..., Any], dim: str

@@ -212,6 +212,38 @@ core's, PK-P1) through which the dim-level functions and `KernelOp` reach
 it, `xr.DataArray` and geoarray's carriers alike. See geostack's
 `docs/design/pipekit_kernels.md`.
 
+## A10. Padded batches: `batch`, `Padded`, `stack_items`, `reduce(where=)`
+
+**Decision (#119):** a fixed-size batch is `Padded(value, valid)`, a
+`NamedTuple` of the items stacked along a new leading dim and a `(n,)`
+bool mask of the real ones, made by `batch(items, *, size, dim,
+pad="last" | "none" | "drop")`.
+
+- **Padding copies the last real item.** Values stay finite and in
+  distribution, so a masked loss, its gradient and a normalisation over
+  the batch behave (the rule geoarray's `pad_points` and geopatcher's
+  `PatchBatch` already follow).
+- **Policy strings**, not `pad_last` / `drop_last` flags: one argument,
+  three outcomes, no invalid combination.
+- **`stack_items`, not `stack`.** `stack` joins carriers on one shared
+  grid (geoarray's never aligns two). A batch's items may each carry
+  their own geometry (patch transforms), the inverse of the split
+  `map_over` makes, so it is a separate adapter verb. Without a fast path
+  it is `stack`.
+- **Masks are `reduce(..., where=)`**, not a `masked_mean`: every
+  reduction, with the kept-count denominator, passed through to the
+  namespace's `where=`. A named mask aligns by dim name; a plain array
+  must match the carrier's leading dims (a `(sample,)` mask on
+  `(sample, y, x)`), never NumPy's right-broadcast. Dask's reductions
+  take no `where=`, so a dask carrier raises `TypeError`.
+- **The name is `Padded`, with `valid`.** "Masked" invites polarity bugs:
+  geotoolz masks and `np.ma` masks are True = drop, `valid` is
+  True = keep. `Batch` is taken by pipekit-train's `(x, y)` tuples.
+
+**Rationale:** three copies of "group, pad, mask" across the stack
+(geoarray `pad_points`, geopatcher `PatchBatch`, pipekit-train's eval
+batches with no mask), one home for the rule.
+
 ## Optional extras matrix
 
 For reference, the extras shape that drops out of these decisions:
