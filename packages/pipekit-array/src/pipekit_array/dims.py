@@ -36,6 +36,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
 from pipekit import NamedArrayAdapter, get_adapter
+from pipekit.adapters import BackendError, backend_name
 
 from pipekit_array._namespace import array_namespace
 from pipekit_array.dimarray import DimArray
@@ -69,10 +70,6 @@ def adapter_of(x: Any, what: str) -> NamedArrayAdapter:
             "array as pipekit_array.DimArray(data, dims)."
         )
     return adapter
-
-
-class BackendError(TypeError):
-    """Carriers on more than one backend, or a backend a kernel does not list."""
 
 
 class _DaskNamespace:
@@ -126,16 +123,6 @@ def namespace_of(data: Any) -> Any:
             _DASK.append(_DaskNamespace(da))
         return _DASK[0]
     return array_namespace(data)
-
-
-def backend_name(data: Any) -> str:
-    """``"jax"``, ``"dask"`` or ``"numpy"`` for raw data (tracers count as JAX)."""
-    module = type(data).__module__
-    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
-        return "jax"
-    if module.startswith("dask."):
-        return "dask"
-    return "numpy"
 
 
 def require_one_backend(datas: Sequence[Any], what: str) -> None:

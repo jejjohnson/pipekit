@@ -191,6 +191,7 @@ class AsyncMap(Operator):
         async def _one(item: Any) -> Any:
             async with sem:
                 if is_coro:
+                    self.op._check_backends((item,), {})
                     return await self.op._apply(item)
                 return await asyncio.to_thread(self.op, item)
 

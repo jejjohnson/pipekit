@@ -18,6 +18,9 @@ imports pipekit in its core and ``xr.DataArray`` needs no accessor.
   loads the first time a DataArray arrives.
 - `signature_of` — a carrier's `Signature`, through its adapter.
 - `MissingAdapterError` — a known carrier family with nothing registered.
+- `backend_name`, `backend_of`, `BackendError` — which array backend a
+  raw array or a carrier sits on (``"numpy"``, ``"jax"``, ``"dask"``),
+  for ``Operator.backends`` and pipekit-array's kernels.
 
 The registry lives here, in pipekit core, because pipekit-array already
 depends on pipekit: a lookup from core into pipekit-array would be a
@@ -26,6 +29,7 @@ cycle (PK-P1). pipekit core ships no adapter itself.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
@@ -33,8 +37,11 @@ from pipekit.signature import Signature
 
 
 __all__ = [
+    "BackendError",
     "MissingAdapterError",
     "NamedArrayAdapter",
+    "backend_name",
+    "backend_of",
     "get_adapter",
     "register_adapter",
     "register_lazy_adapter",
@@ -215,3 +222,62 @@ def signature_of(x: Any) -> Any:
     if adapter is None:
         return x
     return adapter.signature(x)
+
+
+class BackendError(TypeError):
+    """Inputs on more than one backend, or a backend the code does not run on."""
+
+
+def backend_name(data: Any) -> str:
+    """``"jax"``, ``"dask"`` or ``"numpy"`` for raw data (tracers count as JAX).
+
+    Example:
+        >>> backend_name([1.0, 2.0])
+        'numpy'
+    """
+    module = type(data).__module__
+    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
+        return "jax"
+    if module.startswith("dask."):
+        return "dask"
+    return "numpy"
+
+
+def _array_types() -> tuple[type, ...]:
+    """The array types of the backends already imported (nothing is imported).
+
+    NumPy's ``ndarray``, ``jax.Array`` (tracers included) and dask's
+    ``Array``; a NumPy scalar, a dtype or any other object of those
+    libraries is not an array.
+    """
+    found: list[type] = []
+    for module, name in (
+        ("numpy", "ndarray"),
+        ("jax", "Array"),
+        ("dask.array", "Array"),
+    ):
+        mod = sys.modules.get(module)
+        cls = getattr(mod, name, None) if mod is not None else None
+        if isinstance(cls, type):
+            found.append(cls)
+    return tuple(found)
+
+
+def backend_of(x: Any) -> str | None:
+    """The backend of a carrier or a raw array; ``None`` for any other value.
+
+    A registered carrier answers through its adapter's raw data; a NumPy,
+    JAX (tracers included) or dask array answers for itself. Anything else
+    (a number, a NumPy scalar or dtype, a string, a table) has no backend.
+
+    Example:
+        >>> import numpy as np
+        >>> backend_of(np.zeros(3)), backend_of(np.int64(0)), backend_of("a.tif")
+        ('numpy', None, None)
+    """
+    adapter = get_adapter(x)
+    if adapter is not None:
+        return backend_name(adapter.data(x))
+    if isinstance(x, _array_types()):
+        return backend_name(x)
+    return None

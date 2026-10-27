@@ -68,7 +68,12 @@ supplies the rest:
 - **two modes in one `__call__`**: on data it runs `_apply`; on a graph
   placeholder (`Input` or `Node`) it records a node instead;
 - **class flags**: `forbid_in_yaml` (holds a closure, so its config cannot be
-  rebuilt) and `_terminal` (may only end a `Sequential`).
+  rebuilt) and `_terminal` (may only end a `Sequential`);
+- **`backends`**: the array backends the operator runs on, such as
+  `("numpy",)` or `("numpy", "jax")`. Left at `None`, nothing is checked. When
+  set, an eager call whose carriers or arrays sit on another backend, or on
+  several, raises `BackendError` before `_apply` runs, so inputs never move
+  between backends silently.
 
 ```python
 import pipekit as pk

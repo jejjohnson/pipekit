@@ -32,7 +32,9 @@ The v0.1 public surface, grouped by module:
   `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
   `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
-  reaches a carrier with named dims.
+  reaches a carrier with named dims; `backend_of`, `backend_name` and
+  `BackendError` — the array backend an input sits on, which
+  ``Operator.backends`` checks.
 - **Import hooks** (`imports`): `on_import(name, callback)` runs code once
   a module is imported without importing it (JAX pytree registration).
 
@@ -52,8 +54,11 @@ from pipekit._base.graph import Graph, Input, Node
 from pipekit._base.operator import Carrier, ConfigMixin, Operator
 from pipekit._base.sequential import Sequential
 from pipekit.adapters import (
+    BackendError,
     MissingAdapterError,
     NamedArrayAdapter,
+    backend_name,
+    backend_of,
     get_adapter,
     register_adapter,
     register_lazy_adapter,
@@ -103,6 +108,7 @@ __all__ = [
     "AssertHasAttribute",
     "AssertShape",
     "AsyncMap",
+    "BackendError",
     "BatchedMap",
     "Branch",
     "Cache",
@@ -140,6 +146,8 @@ __all__ = [
     "ThreadMap",
     "Try",
     "allowed",
+    "backend_name",
+    "backend_of",
     "check_pickleable",
     "complement",
     "compose",

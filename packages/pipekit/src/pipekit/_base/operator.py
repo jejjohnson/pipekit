@@ -36,7 +36,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
-from pipekit.adapters import signature_of
+from pipekit.adapters import BackendError, backend_of, signature_of
 
 
 if TYPE_CHECKING:
@@ -122,6 +122,13 @@ class Operator(ConfigMixin):
             ``None`` (or otherwise break the carrier-in / carrier-out
             contract). `Sequential` rejects terminal operators except
             as the last step. Default ``False``.
+        backends: The array backends the operator runs on (``"numpy"``,
+            ``"jax"``, ``"dask"``), or ``None`` (the default) for an
+            operator that does not care. When set, an eager call whose
+            carriers or arrays sit on another backend, or on several,
+            raises `pipekit.adapters.BackendError` before ``_apply``
+            runs: inputs never move between backends silently. Values
+            with no backend (numbers, strings, tables) are not checked.
 
     Example:
         Define and compose::
@@ -139,6 +146,7 @@ class Operator(ConfigMixin):
 
     forbid_in_yaml: ClassVar[bool] = False
     _terminal: ClassVar[bool] = False
+    backends: ClassVar[tuple[str, ...] | None] = None
     # Stateful-pipeline marker — `StatefulOperator` overrides to True; the
     # `Sequential` plumbing reads this to decide whether to thread state.
     # See `pipekit.state` (Group M).
@@ -154,6 +162,8 @@ class Operator(ConfigMixin):
         `__call__`.
 
         Raises:
+            BackendError: ``backends`` is set and an input sits on another
+                backend, or the inputs sit on several.
             TypeError: if graph-construction mode is triggered (at
                 least one `Node` arg) but other positional args are not
                 `Node`s. Mixing nodes and literals would crash
@@ -177,11 +187,22 @@ class Operator(ConfigMixin):
                     "or supply them as a separate `Input`."
                 )
             return Node(operator=self, parents=tuple(args))
+        self._check_backends(args, kwargs)
         out = self._apply(*args, **kwargs)
         # Reserved hook dispatch — no-op in v0.1; Spy/Hook family lands later
         # without requiring every Operator subclass to be edited.
         self._dispatch_post_apply_hooks(args, out)
         return out
+
+    def _check_backends(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        """Raise `BackendError` when the inputs break ``backends`` (if set).
+
+        `__call__` runs it before ``_apply``; anything else that calls
+        ``_apply`` directly (`AsyncMap` awaiting a coroutine ``_apply``)
+        runs it too.
+        """
+        if self.backends is not None:
+            _require_backends(type(self).__name__, self.backends, args, kwargs)
 
     def _apply(self, *args: Any, **kwargs: Any) -> Any:
         """Implement the operator's behaviour. Override in subclasses."""
@@ -279,6 +300,38 @@ class Operator(ConfigMixin):
         if isinstance(other, Sequential):
             return Sequential([self, *other.operators])
         return Sequential([self, other])
+
+
+def _require_backends(
+    name: str,
+    backends: tuple[str, ...],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> None:
+    """Raise `BackendError` unless every input sits on one listed backend.
+
+    The inputs are the positional and keyword arguments, and the items of a
+    list or tuple among them (a mosaic's scenes).
+    """
+    found: set[str] = set()
+    for value in (*args, *kwargs.values()):
+        items = value if isinstance(value, list | tuple) else (value,)
+        for item in items:
+            backend = backend_of(item)
+            if backend is not None:
+                found.add(backend)
+    if len(found) > 1:
+        raise BackendError(
+            f"{name}: inputs on {sorted(found)}; put them on one backend first "
+            "(inputs never move between backends silently)."
+        )
+    if found and (got := found.pop()) not in backends:
+        runs = " and ".join(backends)
+        raise BackendError(
+            f"{name} runs on {runs} only, not {got}. Convert the input first "
+            "(a carrier's to_numpy() or to_jax()); inputs never move between "
+            "backends silently."
+        )
 
 
 def nested_config(op: Operator) -> dict[str, Any]:
