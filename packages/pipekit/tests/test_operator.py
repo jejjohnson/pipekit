@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 from pipekit import ConfigMixin, Operator, Sequential
 
@@ -172,3 +173,106 @@ def test_operator_rejects_mixed_node_and_literal_args(Scale_cls, TwoInput_cls):
     from pipekit._base.graph import Node
 
     assert isinstance(op(a, Input("b")), Node)
+
+
+# ---- backends: an operator refuses inputs on a backend it does not run on ----
+
+
+class _NumpyOnly(Operator):
+    backends = ("numpy",)
+
+    def _apply(self, *xs, **kw):
+        return xs[0] if xs else next(iter(kw.values()))
+
+
+class _Carrier:
+    """A named carrier whose raw data sits on whatever backend it holds."""
+
+    def __init__(self, data):
+        self.data = data
+
+
+class _CarrierAdapter:
+    def dims(self, x):
+        return ("x",)
+
+    def data(self, x):
+        return x.data
+
+    def labels(self, x, dim):
+        return None
+
+    def isel(self, x, indexers):
+        return x
+
+    def rewrap(self, x, data, dims):
+        return _Carrier(data)
+
+    def check_compatible(self, *xs):
+        return xs
+
+    def signature(self, x):
+        return None
+
+
+@pytest.fixture
+def carrier_adapter():
+    from pipekit import register_adapter, unregister_adapter
+
+    register_adapter(_Carrier, _CarrierAdapter())
+    yield
+    unregister_adapter(_Carrier)
+
+
+def test_an_operator_without_backends_checks_nothing() -> None:
+    jnp = pytest.importorskip("jax.numpy")
+
+    class Agnostic(Operator):
+        def _apply(self, x):
+            return x
+
+    x = jnp.zeros(3)
+    assert Agnostic()(x) is x
+
+
+def test_a_numpy_operator_refuses_a_jax_array() -> None:
+    from pipekit import BackendError
+
+    jnp = pytest.importorskip("jax.numpy")
+    with pytest.raises(BackendError, match=r"_NumpyOnly runs on numpy only, not jax"):
+        _NumpyOnly()(jnp.zeros(3))
+
+
+def test_a_carrier_is_checked_through_its_adapter(carrier_adapter) -> None:
+    from pipekit import BackendError
+
+    jnp = pytest.importorskip("jax.numpy")
+    ok = _Carrier(np.zeros(3))
+    assert _NumpyOnly()(ok) is ok
+    with pytest.raises(BackendError, match="not jax"):
+        _NumpyOnly()(_Carrier(jnp.zeros(3)))
+    with pytest.raises(BackendError, match="not jax"):
+        _NumpyOnly()(x=_Carrier(jnp.zeros(3)))
+
+
+def test_mixed_backends_are_refused_even_in_a_list() -> None:
+    from pipekit import BackendError
+
+    jnp = pytest.importorskip("jax.numpy")
+
+    class Both(_NumpyOnly):
+        backends = ("numpy", "jax")
+
+    with pytest.raises(BackendError, match=r"inputs on \['jax', 'numpy'\]"):
+        Both()([np.zeros(3), jnp.zeros(3)])
+
+
+def test_values_without_a_backend_pass() -> None:
+    assert _NumpyOnly()("scene.tif") == "scene.tif"
+    assert _NumpyOnly()(None, 3) is None
+
+
+def test_graph_mode_is_not_checked() -> None:
+    from pipekit import Input, Node
+
+    assert isinstance(_NumpyOnly()(Input("x")), Node)

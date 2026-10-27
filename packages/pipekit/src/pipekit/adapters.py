@@ -18,6 +18,9 @@ imports pipekit in its core and ``xr.DataArray`` needs no accessor.
   loads the first time a DataArray arrives.
 - `signature_of` — a carrier's `Signature`, through its adapter.
 - `MissingAdapterError` — a known carrier family with nothing registered.
+- `backend_name`, `backend_of`, `BackendError` — which array backend a
+  raw array or a carrier sits on (``"numpy"``, ``"jax"``, ``"dask"``),
+  for ``Operator.backends`` and pipekit-array's kernels.
 
 The registry lives here, in pipekit core, because pipekit-array already
 depends on pipekit: a lookup from core into pipekit-array would be a
@@ -33,8 +36,11 @@ from pipekit.signature import Signature
 
 
 __all__ = [
+    "BackendError",
     "MissingAdapterError",
     "NamedArrayAdapter",
+    "backend_name",
+    "backend_of",
     "get_adapter",
     "register_adapter",
     "register_lazy_adapter",
@@ -215,3 +221,46 @@ def signature_of(x: Any) -> Any:
     if adapter is None:
         return x
     return adapter.signature(x)
+
+
+class BackendError(TypeError):
+    """Inputs on more than one backend, or a backend the code does not run on."""
+
+
+def backend_name(data: Any) -> str:
+    """``"jax"``, ``"dask"`` or ``"numpy"`` for raw data (tracers count as JAX).
+
+    Example:
+        >>> backend_name([1.0, 2.0])
+        'numpy'
+    """
+    module = type(data).__module__
+    if module.startswith(("jax", "jaxlib")) or "Tracer" in type(data).__name__:
+        return "jax"
+    if module.startswith("dask."):
+        return "dask"
+    return "numpy"
+
+
+_ARRAY_MODULES = ("numpy", "jax", "jaxlib", "dask.")
+
+
+def backend_of(x: Any) -> str | None:
+    """The backend of a carrier or a raw array; ``None`` for any other value.
+
+    A registered carrier answers through its adapter's raw data; a NumPy,
+    JAX (tracers included) or dask array answers for itself. Anything else
+    (a number, a string, a table) has no backend.
+
+    Example:
+        >>> import numpy as np
+        >>> backend_of(np.zeros(3)), backend_of("scene.tif")
+        ('numpy', None)
+    """
+    adapter = get_adapter(x)
+    if adapter is not None:
+        return backend_name(adapter.data(x))
+    cls = type(x)
+    if cls.__module__.startswith(_ARRAY_MODULES) or "Tracer" in cls.__name__:
+        return backend_name(x)
+    return None
