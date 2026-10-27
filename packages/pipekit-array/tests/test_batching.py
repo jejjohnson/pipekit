@@ -174,8 +174,13 @@ def test_reduce_where_on_another_backend_says_so() -> None:
     class Tensor:  # stands in for torch.Tensor: only the module matters
         __module__ = "torch"
 
-    with pytest.raises(TypeError, match=r"needs NumPy, JAX or CuPy.*torch"):
+    class CupyArray:  # review on #121: cupy.mean / sum take no where= either
+        __module__ = "cupy"
+
+    with pytest.raises(TypeError, match=r"needs NumPy or JAX.*torch"):
         _require_where_backend(Tensor())
+    with pytest.raises(TypeError, match=r"needs NumPy or JAX.*cupy"):
+        _require_where_backend(CupyArray())
     _require_where_backend(np.ones(2))  # NumPy passes
 
 

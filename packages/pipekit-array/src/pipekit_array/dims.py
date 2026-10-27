@@ -285,8 +285,8 @@ def reduce(
     Raises:
         ValueError: A plain ``where`` does not match ``x``'s leading dims,
             or a named one has a dim ``x`` lacks.
-        TypeError: ``where`` on data other than NumPy, JAX or CuPy (dask's
-            and PyTorch's reductions take no ``where=``).
+        TypeError: ``where`` on data other than NumPy or JAX (the
+            reductions of dask, PyTorch and CuPy take no ``where=``).
 
     Example:
         >>> import numpy as np
@@ -316,14 +316,15 @@ def reduce(
 
 
 #: array modules whose reductions take NumPy's ``where=`` (jax: tracers too)
-_WHERE_MODULES = ("numpy", "jax", "jaxlib", "cupy")
+_WHERE_MODULES = ("numpy", "jax", "jaxlib")
 
 
 def _require_where_backend(data: Any) -> None:
-    """Raise unless ``data``'s reductions honour ``where=`` (NumPy, JAX, CuPy).
+    """Raise unless ``data``'s reductions honour ``where=`` (NumPy, JAX).
 
-    dask's and PyTorch's reductions take no ``where=`` (array-api-compat
-    forwards it to ``torch.mean``, which rejects it), so a mask there would
+    The reductions of dask, CuPy and PyTorch take no ``where=``
+    (array-api-compat forwards it to ``torch.mean``, which rejects it;
+    ``cupy.mean`` / ``cupy.sum`` have no such parameter), so a mask there would
     fail deep in the backend, or be ignored by a reduction that swallows
     keywords.
     """
@@ -331,7 +332,7 @@ def _require_where_backend(data: Any) -> None:
     if module in _WHERE_MODULES or backend_name(data) == "jax":
         return
     raise TypeError(
-        f"reduce: where= needs NumPy, JAX or CuPy data, got {type(data).__name__} "
+        f"reduce: where= needs NumPy or JAX data, got {type(data).__name__} "
         f"({module}), whose reductions take no where=. Compute or convert the "
         "carrier first, or mask with NaN and a nan-reduction ('nanmean')."
     )
