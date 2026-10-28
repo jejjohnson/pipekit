@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.3...pipekit-v0.1.4) (2026-10-27)
+
+
+### Features
+
+* **pipekit:** operators declare the array backends they run on ([#126](https://github.com/jejjohnson/pipekit/issues/126)) ([040e7a0](https://github.com/jejjohnson/pipekit/commit/040e7a01dcd6889b5a51dfd0b19250af1f539da8))
+
 ## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.2...pipekit-v0.1.3) (2026-10-25)
 
 
