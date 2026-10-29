@@ -11,7 +11,7 @@ An evaluation picks one value on each of three axes:
   differentiable it must be.
 
 The tags live on the scorer, not on the metric. The metrics stay in the
-carrier libraries (``xrtoolz.metrics``), which never import
+carrier libraries (``xrops.metrics``), which never import
 ``pipekit-evaluate``; a scorer declares its tags as optional attributes
 (``unit``, ``lens``, ``stages``, ``differentiable``) and :func:`tags_of`
 reads them, filling in the defaults. A scorer with only a ``name`` is
