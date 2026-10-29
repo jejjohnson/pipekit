@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.8](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.7...pipekit-array-v0.0.8) (2026-10-29)
+
+
+### Features
+
+* **array:** one scikit-learn Estimator on any named carrier ([#133](https://github.com/jejjohnson/pipekit/issues/133)) ([97ee31e](https://github.com/jejjohnson/pipekit/commit/97ee31e33f71e173052646d7c6013a77aefe9e50))
+* **array:** pipekit_array.einx, a named-dims einx bridge on any carrier ([#134](https://github.com/jejjohnson/pipekit/issues/134)) ([e6ee61d](https://github.com/jejjohnson/pipekit/commit/e6ee61d5b9d0a295e494d5a6e68782349999f2a8))
+* **array:** to_rows and from_rows, carriers to sample tables and back by dim name ([#132](https://github.com/jejjohnson/pipekit/issues/132)) ([3fca1dc](https://github.com/jejjohnson/pipekit/commit/3fca1dc4a389273cd4b96f9fb23ceb37ed6dc95b))
+
 ## [0.0.7](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.6...pipekit-array-v0.0.7) (2026-10-27)
 
 
