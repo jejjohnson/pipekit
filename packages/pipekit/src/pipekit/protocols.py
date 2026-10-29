@@ -1,7 +1,7 @@
 """Group N — carrier-agnostic structural protocols.
 
 The duck-typed seams that model-inference wrappers across the sister
-libraries (geotoolz ``ModelOp``, xrtoolz ``ModelOp`` / ``SklearnOp``,
+libraries (geotoolz ``ModelOp``, xrops ``ModelOp``, xrsklearn ``SklearnOp``,
 pipekit-jax ``JaxModelOp``) all rely on, promoted to runtime-checkable
 Protocols so the contract is written down once instead of re-implied in
 each wrapper's docstring. Domain-specific protocols stay in their

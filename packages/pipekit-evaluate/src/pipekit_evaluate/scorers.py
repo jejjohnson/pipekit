@@ -1,6 +1,6 @@
 """Turn any metric operator into a tagged :class:`Scorer`.
 
-The metrics live with their carriers (``xrtoolz.metrics`` for xarray,
+The metrics live with their carriers (``xrops.metrics`` for xarray,
 ``geotoolz`` for GeoTensors); :class:`MetricScorer` wraps one, records its
 place in the ``Unit x Lens x Stage`` taxonomy, and returns the named scalar
 values every scorer returns. Nothing here imports a carrier library: the
@@ -27,7 +27,7 @@ class MetricScorer:
     """A metric operator as a tagged :class:`Scorer`.
 
     The metric is any callable ``(prediction, reference) -> result``, such
-    as an ``xrtoolz.metrics`` operator. An :class:`Estimate` passed as the
+    as an ``xrops.metrics`` operator. An :class:`Estimate` passed as the
     prediction or the reference is handed to the metric as
     ``from_estimate(estimate)``, by default its point estimate, so the same
     scorer serves :func:`evaluate`-style calls on raw carriers and the
