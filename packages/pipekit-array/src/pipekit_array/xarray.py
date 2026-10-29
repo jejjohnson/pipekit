@@ -75,7 +75,9 @@ class XarrayAdapter:
             for name, coord in x.coords.items()
             if all(sizes.get(d) == x.sizes[d] for d in coord.dims)
         }
-        return xr.DataArray(data, dims=dims, coords=coords, attrs=x.attrs, name=x.name)
+        out = xr.DataArray(data, dims=dims, coords=coords, attrs=x.attrs, name=x.name)
+        # name=None lets xarray take a dask array's graph name; keep x's instead
+        return out if out.name == x.name else out.rename(x.name)
 
     def check_compatible(self, *xs: xr.DataArray) -> tuple[xr.DataArray, ...]:
         """The inputs back if their shared coordinates are exactly equal.
