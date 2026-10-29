@@ -21,6 +21,8 @@ dask = ["dask[array]>=2024"]
 # `DimArray.to_xarray`, and the `xr.DataArray` adapter (KernelOp and the
 # dim-level functions on DataArrays, lazily through dask).
 xarray = ["xarray>=2024.6"]
+# The scikit-learn wrapper, Estimator (geostack OP-O3).
+sklearn = ["scikit-learn>=1.4"]
 compat = [
     "array-api-compat>=1.4",
 ]

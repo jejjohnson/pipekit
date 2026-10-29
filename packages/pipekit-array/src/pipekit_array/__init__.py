@@ -17,7 +17,8 @@ Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 
 Sample tables (`rows`): `to_rows` flattens a carrier to a
 ``(n_samples, n_features)`` table by dim name and `from_rows` rebuilds
-one, for per-sample models (OP-O3).
+one; `Estimator` fits and applies a scikit-learn-style estimator on any
+carrier over them (``[sklearn]``, imported lazily; OP-O3).
 
 Batches (`batching`): `batch` groups carriers into fixed-size `Padded`
 batches (``value``, ``valid``) along a new dim; ``pad="last" | "none" |
@@ -64,6 +65,7 @@ from pipekit_array.dims import (
     take_along,
     transpose,
 )
+from pipekit_array.estimator import Estimator
 from pipekit_array.kernel import KernelOp, KernelSpec
 from pipekit_array.reductions import MeanScalar
 from pipekit_array.rows import RowLayout, from_rows, to_rows
@@ -89,6 +91,7 @@ __all__ = [
     "ConcatenateAlong",
     "DimArray",
     "DimArrayAdapter",
+    "Estimator",
     "ISel",
     "KernelOp",
     "KernelSpec",
