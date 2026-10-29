@@ -44,6 +44,8 @@ dev = [
     "dask[array]>=2024",
     # scikit-learn backs the pipekit-array [sklearn] extra (Estimator).
     "scikit-learn>=1.4",
+    # einx backs the pipekit-array [einx] extra (pipekit_array.einx).
+    "einx>=0.4",
     # fsspec backs the pipekit-experiment [s3] extra; dev-installed so the
     # S3ModelRegistry tests run (on the in-memory filesystem) in CI.
     "fsspec>=2024.0",
