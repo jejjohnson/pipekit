@@ -31,6 +31,12 @@ and the trained-model wrapper `ModelOp`.
 
 ::: pipekit_array.dim_operators
 
+## Sample tables
+
+`to_rows(x, sample_dims)` turns any named carrier into a `(n_samples, n_features)` table, rows over the sample dims and columns over the rest, and `from_rows(rows, layout)` turns a table back into a carrier like the input: with the original features, a new feature dim (`feature_dim="component"`) or, for one value per sample, the sample dims only. Both run on the data's own backend (geostack OP-O3).
+
+::: pipekit_array.rows
+
 ## Batches
 
 `batch` groups carriers into fixed-size `Padded` batches (`value`,

@@ -15,6 +15,10 @@ Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
 
+Sample tables (`rows`): `to_rows` flattens a carrier to a
+``(n_samples, n_features)`` table by dim name and `from_rows` rebuilds
+one, for per-sample models (OP-O3).
+
 Batches (`batching`): `batch` groups carriers into fixed-size `Padded`
 batches (``value``, ``valid``) along a new dim; ``pad="last" | "none" |
 "drop"`` decides the short last batch.
@@ -62,6 +66,7 @@ from pipekit_array.dims import (
 )
 from pipekit_array.kernel import KernelOp, KernelSpec
 from pipekit_array.reductions import MeanScalar
+from pipekit_array.rows import RowLayout, from_rows, to_rows
 
 
 __version__ = "0.0.7"  # x-release-please-version
@@ -91,6 +96,7 @@ __all__ = [
     "MeanScalar",
     "Padded",
     "Reduce",
+    "RowLayout",
     "Sel",
     "StackAlong",
     "TakeAlong",
@@ -100,6 +106,7 @@ __all__ = [
     "batch",
     "combine",
     "concat",
+    "from_rows",
     "isel",
     "map_over",
     "reduce",
@@ -107,5 +114,6 @@ __all__ = [
     "stack",
     "stack_items",
     "take_along",
+    "to_rows",
     "transpose",
 ]

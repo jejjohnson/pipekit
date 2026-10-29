@@ -406,3 +406,13 @@ def test_take_along_rejects_an_unrelated_index_dim() -> None:
     index = xr.DataArray([0, 1, 2, 0], dims=("z",))
     with pytest.raises(ValueError, match="not among"):
         pa.take_along(x, index, "time")
+
+
+def test_rewrap_keeps_an_unnamed_dataarray_unnamed_on_dask() -> None:
+    """xarray takes a dask array's graph name when ``name=None``; rewrap must not."""
+    pytest.importorskip("dask")
+    from pipekit_array.xarray import XarrayAdapter
+
+    da = xr.DataArray(np.zeros((2, 3)), dims=("y", "x")).chunk({"y": 1})
+    out = XarrayAdapter().rewrap(da, da.data * 2, ("y", "x"))
+    assert out.name is None
