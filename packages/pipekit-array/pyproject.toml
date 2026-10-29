@@ -23,6 +23,8 @@ dask = ["dask[array]>=2024"]
 xarray = ["xarray>=2024.6"]
 # The scikit-learn wrapper, Estimator (geostack OP-O3).
 sklearn = ["scikit-learn>=1.4"]
+# The named-dims einx bridge, pipekit_array.einx (geostack OP-O2).
+einx = ["einx>=0.4"]
 compat = [
     "array-api-compat>=1.4",
 ]

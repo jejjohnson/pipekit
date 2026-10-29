@@ -37,6 +37,12 @@ and the trained-model wrapper `ModelOp`.
 
 ::: pipekit_array.rows
 
+## einx
+
+`pipekit_array.einx` writes tensor algebra as einx patterns whose axis names are the carrier's dim names: `rearrange`, `reduce`, `einsum`, `repeat` and the `Einx` operator, on NumPy or JAX, rewrapped through the first input's adapter so surviving dims keep their labels, coordinates and grid. A dask input raises `BackendError` naming `.compute()`: einx has no dask backend. geostack OP-O2.
+
+::: pipekit_array.einx
+
 ## Batches
 
 `batch` groups carriers into fixed-size `Padded` batches (`value`,

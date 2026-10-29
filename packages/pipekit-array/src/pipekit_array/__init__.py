@@ -20,6 +20,10 @@ Sample tables (`rows`): `to_rows` flattens a carrier to a
 one; `Estimator` fits and applies a scikit-learn-style estimator on any
 carrier over them (``[sklearn]``, imported lazily; OP-O3).
 
+einx (``[einx]``): the submodule `pipekit_array.einx` holds `rearrange`,
+`reduce`, `einsum`, `repeat` and `Einx`, with dim names as pattern axes on
+any carrier (OP-O2); import it as ``from pipekit_array import einx``.
+
 Batches (`batching`): `batch` groups carriers into fixed-size `Padded`
 batches (``value``, ``valid``) along a new dim; ``pad="last" | "none" |
 "drop"`` decides the short last batch.
