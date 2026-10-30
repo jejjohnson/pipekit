@@ -173,3 +173,24 @@ def test_fit_inside_a_jax_trace_raises() -> None:
     # eagerly, a JAX carrier is converted on the host
     rows, _ = to_rows(DimArray(jnp.asarray(_scene().data), DIMS), ("y", "x"))
     assert rows.shape == (30, 4)
+
+
+def test_mask_drops_land_then_gappy_samples() -> None:
+    scene = _scene()
+    data = scene.data.copy()
+    data[1] = np.nan  # a whole band: dropped as a feature
+    data[0, 2, 3] = np.nan  # one gap: that pixel is dropped as a sample
+    holed = DimArray(data, DIMS)
+    op = Estimator(
+        PCA(2), sample_dims=("y", "x"), feature_dim="component", nan_policy="mask"
+    ).fit(holed)
+    assert op.kept_features_.tolist() == [True, False, True, True]
+    out = op.transform(holed)
+    assert np.isnan(out.data[:, 2, 3]).all()
+    assert int(np.isfinite(out.data[0]).sum()) == 29
+    table = _table(holed)[:, [0, 2, 3]]
+    valid = np.isfinite(table).all(axis=1)
+    want = PCA(2).fit(table[valid]).transform(table[valid])
+    np.testing.assert_allclose(_table(out)[valid], want, rtol=1e-10, atol=1e-12)
+    back = op.inverse_transform(out)
+    assert np.isnan(back.data[1]).all() and np.isnan(back.data[:, 2, 3]).all()
