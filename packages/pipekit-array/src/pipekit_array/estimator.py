@@ -24,7 +24,9 @@ input is computed and a JAX input converted, eagerly; inside a JAX trace
   and applying, and come back as ``NaN`` in the output;
 - ``"mask_features"``: columns non-finite in every fitted row are dropped
   at fit time and at transform time, and come back as ``NaN`` from
-  ``inverse_transform``.
+  ``inverse_transform``;
+- ``"mask"``: ``"mask_features"`` then ``"mask_samples"`` on the columns
+  kept, for a land-masked field that also has gaps.
 
 The scikit-learn import is lazy: install the ``[sklearn]`` extra.
 """
@@ -43,8 +45,14 @@ from pipekit_array.rows import RowLayout, from_rows, to_rows
 
 __all__ = ["Estimator", "NanPolicy"]
 
-NanPolicy = Literal["propagate", "raise", "mask_samples", "mask_features"]
-_POLICIES: tuple[str, ...] = ("propagate", "raise", "mask_samples", "mask_features")
+NanPolicy = Literal["propagate", "raise", "mask_samples", "mask_features", "mask"]
+_POLICIES: tuple[str, ...] = (
+    "propagate",
+    "raise",
+    "mask_samples",
+    "mask_features",
+    "mask",
+)
 _METHODS: tuple[str, ...] = ("transform", "predict", "predict_proba")
 
 
@@ -61,8 +69,8 @@ class Estimator(Operator):
             columns are not the input's features (PCA components, class
             probabilities). Left ``None``, outputs must have the input's
             feature count.
-        nan_policy: ``"propagate"``, ``"raise"``, ``"mask_samples"`` or
-            ``"mask_features"`` (module docstring).
+        nan_policy: ``"propagate"``, ``"raise"``, ``"mask_samples"``,
+            ``"mask_features"`` or ``"mask"`` (module docstring).
         method: What calling the operator runs once fitted:
             ``"transform"``, ``"predict"`` or ``"predict_proba"``.
 
@@ -137,10 +145,11 @@ class Estimator(Operator):
 
         rows, layout = to_rows(x, self.sample_dims)
         table = _host(rows, "fit")
-        keep = self._check_and_rows(table)
-        if self.nan_policy == "mask_features":
+        self._check(table)
+        if self.nan_policy in ("mask_features", "mask"):
             self.kept_features_ = np.asarray(np.isfinite(table).any(axis=0))
             table = table[:, self.kept_features_]
+        keep = self._rows(table)
         targets = None if y is None else _targets(y, self.sample_dims)
         estimator = clone(self.estimator)
         if targets is None:
@@ -203,7 +212,7 @@ class Estimator(Operator):
 
     @property
     def _masks_samples(self) -> bool:
-        return self.nan_policy == "mask_samples"
+        return self.nan_policy in ("mask_samples", "mask")
 
     def _fitted(self) -> RowLayout:
         if self.estimator_ is None or self.layout_ is None:
@@ -215,9 +224,10 @@ class Estimator(Operator):
         rows, x_layout = to_rows(x, self.sample_dims)
         _require_same_features(x_layout, layout)
         table = _host(rows, name)
-        keep = self._check_and_rows(table)
+        self._check(table)
         if self.kept_features_ is not None:
             table = table[:, self.kept_features_]
+        keep = self._rows(table)
         out = np.asarray(getattr(self.estimator_, name)(table[keep]))
         if out.ndim == 1:
             return from_rows(_fill_rows(out, keep, None), x_layout)
@@ -232,17 +242,17 @@ class Estimator(Operator):
             )
         return from_rows(full, x_layout, feature_dim=dim)
 
-    def _check_and_rows(self, table: np.ndarray) -> np.ndarray:
-        """The rows to use, after the NaN policy's check."""
-        finite = np.isfinite(table)
-        if self.nan_policy == "raise" and not finite.all():
+    def _check(self, table: np.ndarray) -> None:
+        """Raise on a non-finite entry under ``nan_policy="raise"``."""
+        if self.nan_policy == "raise" and not np.isfinite(table).all():
             raise ValueError(
                 "Estimator: the input has non-finite entries (nan_policy='raise'); "
-                "use 'mask_samples' or 'mask_features' to leave them out."
+                "use 'mask_samples', 'mask_features' or 'mask' to leave them out."
             )
-        if self._masks_samples:
-            return _finite_rows(table)
-        return _all(table)
+
+    def _rows(self, table: np.ndarray) -> np.ndarray:
+        """The rows to use: the finite ones when the policy masks samples."""
+        return _finite_rows(table) if self._masks_samples else _all(table)
 
     def _restore_features(self, cols: np.ndarray) -> np.ndarray:
         """Re-insert features dropped at fit time as ``NaN`` columns."""
