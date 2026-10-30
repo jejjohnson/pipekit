@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.8...pipekit-array-v0.0.9) (2026-10-30)
+
+
+### Features
+
+* **array:** nan_policy="mask" on Estimator, mask_features then mask_samples ([#136](https://github.com/jejjohnson/pipekit/issues/136)) ([9554709](https://github.com/jejjohnson/pipekit/commit/9554709f0c121e4464d901472087342c82bc642a))
+
 ## [0.0.8](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.7...pipekit-array-v0.0.8) (2026-10-29)
 
 
