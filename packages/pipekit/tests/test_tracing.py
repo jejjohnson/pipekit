@@ -118,7 +118,7 @@ def test_observers_stay_silent_on_concrete_values() -> None:
 def test_operators_accept_a_dict_jax_cannot_flatten() -> None:
     # JAX sorts dict keys when flattening, and 0 and "a" can't be compared.
     carrier = {0: "zero", "a": "letter"}
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="sorting"):
         jax.tree_util.tree_leaves(carrier)
 
     assert not is_traced(carrier)
