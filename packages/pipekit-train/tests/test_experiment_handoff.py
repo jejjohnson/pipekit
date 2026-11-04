@@ -261,3 +261,43 @@ def test_wrapper_keeps_its_other_attributes_through_training():
     trained, _ = _loop_on(op).run()
     assert trained.note == "kept"
     assert op.module is not trained.module
+
+
+def test_equinox_weights_with_a_scalar_field_reload_into_a_jax_model_op():
+    pipekit_jax = pytest.importorskip("pipekit_jax")
+
+    class Scaled(eqx.Module):
+        weight: jax.Array
+        gain: float
+
+        def __call__(self, x):
+            return self.gain * self.weight * x
+
+    blob = EquinoxModelOp(Scaled(jax.numpy.ones(1), 3.0)).serialize_weights()
+    skeleton = pipekit_jax.JaxModelOp(Scaled(jax.numpy.zeros(1), 0.0))
+    reloaded = skeleton.with_weights(blob)
+
+    assert reloaded.module.gain == 3.0
+    np.testing.assert_array_equal(reloaded.module.weight, np.ones(1))
+
+
+def test_module_operator_with_a_module_child_comes_back_trained():
+    pipekit_jax = pytest.importorskip("pipekit_jax")
+
+    class Wrapping(pipekit_jax.JaxOperator):
+        module: eqx.nn.MLP
+
+        def _apply(self, x):
+            return self.module(x)
+
+    start = Wrapping(eqx.nn.MLP(1, 1, width_size=8, depth=1, key=jax.random.key(0)))
+    # This operator's config can't hold an MLP, so it has no hash; training survives.
+    with pytest.warns(UserWarning, match="Can't hash"):
+        trained, artifact = _loop_on(start).run()
+
+    assert artifact.trained_model_hash == ""
+    assert isinstance(trained, Wrapping)
+    assert not np.array_equal(
+        np.asarray(trained.module.layers[0].weight),
+        np.asarray(start.module.layers[0].weight),
+    )

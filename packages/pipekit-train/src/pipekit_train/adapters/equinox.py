@@ -102,13 +102,14 @@ class EquinoxModelOp(Operator):
         return cast(Any, self.module)(x)
 
     def serialize_weights(self) -> bytes:
-        """Return the module's array leaves as ``tree_serialise_leaves`` bytes.
+        """Return the module's leaves as ``tree_serialise_leaves`` bytes.
 
-        ``pipekit_jax.JaxModelOp.with_weights`` can read these back into a
-        skeleton of the same structure.
+        Unfiltered, so that Python scalar fields are written too.
+        ``pipekit_jax.JaxModelOp.with_weights`` reads these bytes against an
+        unfiltered skeleton of the same structure.
         """
         buffer = io.BytesIO()
-        eqx.tree_serialise_leaves(buffer, eqx.filter(self.module, eqx.is_array))
+        eqx.tree_serialise_leaves(buffer, self.module)
         return buffer.getvalue()
 
     def get_config(self) -> dict[str, Any]:
@@ -772,17 +773,18 @@ def _wrap_trained_model(model_op: Any, trained: eqx.Module) -> Operator:
         trained: The module after training.
 
     Returns:
-        A copy of ``model_op`` holding ``trained`` when it wraps a ``.module``,
-        so a `JaxModelOp` keeps its weight round trip; ``trained`` itself when
-        it is an operator and a module, such as a `JaxOperator`; otherwise a
-        new `EquinoxModelOp`.
+        ``trained`` itself when ``model_op`` was already a module, such as a
+        `JaxOperator`; a copy of ``model_op`` holding ``trained`` when it wraps
+        a ``.module``, so a `JaxModelOp` keeps its weight round trip; otherwise
+        a new `EquinoxModelOp`. The order matches how ``run`` unwraps its input:
+        a module may also have a child named ``module``, and it is frozen.
     """
+    if isinstance(model_op, eqx.Module):
+        return trained if isinstance(trained, Operator) else EquinoxModelOp(trained)
     if isinstance(getattr(model_op, "module", None), eqx.Module):
         wrapped = copy.copy(model_op)
         wrapped.module = trained
         return wrapped
-    if isinstance(trained, Operator):
-        return trained
     return EquinoxModelOp(trained)
 
 
