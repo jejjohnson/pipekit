@@ -24,6 +24,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from pipekit._base.operator import Operator
+from pipekit._base.tracing import is_traced
 
 
 class Identity(Operator):
@@ -120,6 +121,11 @@ class Sink(Operator):
         name: Optional name for ``__repr__``. Defaults to the
             callable's ``__name__`` if available, otherwise ``"Sink"``.
 
+    Raises:
+        TypeError: If the carrier is a JAX tracer, for example inside
+            ``jax.jit``. A written tracer is never a value; use `Tap` with
+            ``jax.debug.callback`` to observe values at run time.
+
     Example::
 
         log = Sink(lambda gt: print(gt.shape), name="log_shape")
@@ -135,6 +141,12 @@ class Sink(Operator):
         self.name = name or getattr(write_fn, "__name__", "Sink")
 
     def _apply(self, x: Any, /, *args: Any, **kwargs: Any) -> Any:
+        if is_traced(x):
+            raise TypeError(
+                f"Sink {self.name!r} cannot write a traced value inside a JAX "
+                "transformation. Use Tap with jax.debug.callback to observe "
+                "values at run time."
+            )
         self.write_fn(x, *args, **kwargs)
         return x
 
