@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Operator
+from pipekit import Lambda, Operator
 from pipekit_cycle import (
     CallableForward,
     DACycle,
@@ -352,3 +352,167 @@ def test_state_clock_needs_a_cycle_count():
 def test_unknown_obs_clock_is_rejected():
     with pytest.raises(ValueError, match="obs_clock"):
         DACycle(_identity_forward(), IdentityObs(), _TakeObs(), obs_clock="wall")
+
+
+# --- obs_err_source: a per-step observation-error covariance ---------------
+
+
+class _ScalarKalmanFromState:
+    """The same filter, reading its observation error from ``obs_err_cov``."""
+
+    def __call__(self, forecast, obs, *, obs_op=None, obs_err_cov=None):
+        mean, variance = forecast
+        gain = variance / (variance + obs_err_cov)
+        return mean + gain * (obs - mean), (1.0 - gain) * variance
+
+
+def _r_source() -> Lambda:
+    # Σ_ε,t = 0.1 + 0.01 t
+    return Lambda(lambda t: 0.1 + 0.01 * t)
+
+
+def _time_varying_cycle(obs, n_steps: int, obs_clock: str = "call") -> DACycle:
+    forward = CallableForward(
+        lambda carrier, dt: (_A * carrier[0], _A**2 * carrier[1] + _Q), dt=1.0
+    )
+    return DACycle(
+        forward,
+        IdentityObs(),
+        _ScalarKalmanFromState(),
+        obs_source=_RecordingObs(obs),
+        n_steps=n_steps,
+        save_history=False,
+        obs_clock=obs_clock,
+        obs_err_source=_r_source(),
+    )
+
+
+def test_obs_err_source_equals_a_hand_written_kalman_filter():
+    obs = [1.0, 0.5, -0.2, 0.3, 1.1]
+    mean, variance = 0.0, 1.0
+    for t, y in enumerate(obs):
+        mean, variance = _A * mean, _A**2 * variance + _Q
+        gain = variance / (variance + (0.1 + 0.01 * t))
+        mean, variance = mean + gain * (y - mean), (1.0 - gain) * variance
+
+    carrier, state = _time_varying_cycle(obs, 5)((0.0, 1.0), DAState())
+
+    assert carrier == (mean, variance)
+    assert state.obs_err_cov == 0.1 + 0.01 * 4
+
+
+def test_obs_err_source_follows_the_state_clock():
+    obs = [1.0, 0.5, -0.2, 0.3, 1.1, 0.9]
+    continuous, _ = _time_varying_cycle(obs, 6, "state")((0.0, 1.0), DAState())
+
+    half = _time_varying_cycle(obs, 3, "state")
+    resumed, state = half((0.0, 1.0), DAState())
+    resumed, _ = half(resumed, state)
+
+    assert resumed == continuous
+
+
+def test_obs_err_source_leaves_the_callers_state_alone():
+    start = DAState(obs_err_cov="untouched")
+    _time_varying_cycle([1.0], 1)((0.0, 1.0), start)
+    assert start.obs_err_cov == "untouched"
+    assert start.cycle_count == 0
+
+
+def test_without_obs_err_source_the_state_covariance_is_used():
+    seen = []
+
+    class Record:
+        def __call__(self, forecast, obs, *, obs_op=None, obs_err_cov=None):
+            seen.append(obs_err_cov)
+            return obs
+
+    cycle = DACycle(
+        _identity_forward(),
+        IdentityObs(),
+        Record(),
+        obs_source=_RecordingObs(),
+        n_steps=2,
+        save_history=False,
+    )
+    cycle(0.0, DAState(obs_err_cov=0.5))
+
+    assert seen == [0.5, 0.5]
+    assert "obs_err_source" not in cycle.get_config()
+
+
+def test_ensemble_cycle_passes_each_steps_covariance():
+    seen = []
+
+    class Record:
+        def __call__(self, forecasts, obs, *, obs_op=None, obs_err_cov=None):
+            seen.append(obs_err_cov)
+            return forecasts
+
+    cycle = EnsembleDACycle(
+        _identity_forward(),
+        IdentityObs(),
+        Record(),
+        obs_source=_RecordingObs(),
+        n_steps=2,
+        n_members=1,
+        obs_err_source=Lambda(lambda t: float(t)),
+    )
+    cycle([0.0], DAState())
+
+    assert seen == [0.0, 1.0]
+    assert "obs_err_source" in cycle.get_config()
+
+
+def test_smoother_cycle_passes_the_windows_covariances_as_a_list():
+    seen = []
+
+    class Record:
+        def __call__(self, forecasts, obs, *, obs_op=None, obs_err_cov=None):
+            seen.append(obs_err_cov)
+            return forecasts[-1]
+
+    SmootherCycle(
+        _identity_forward(),
+        IdentityObs(),
+        Record(),
+        window=2,
+        stride=2,
+        obs_source=_RecordingObs(),
+        obs_err_source=Lambda(lambda t: float(t)),
+    )(0.0, DAState())
+
+    assert seen == [[0.0, 1.0], [2.0, 3.0]]
+
+
+def test_obs_err_source_needs_an_obs_source():
+    with pytest.raises(ValueError, match="needs an obs_source"):
+        DACycle(
+            _identity_forward(),
+            IdentityObs(),
+            _TakeObs(),
+            obs_err_source=_r_source(),
+        )
+
+
+def test_obs_err_source_must_be_an_operator():
+    with pytest.raises(TypeError, match="must be an Operator"):
+        DACycle(
+            _identity_forward(),
+            IdentityObs(),
+            _TakeObs(),
+            obs_source=_RecordingObs(),
+            obs_err_source=lambda t: t,
+        )
+
+
+def test_obs_err_source_needs_a_state():
+    cycle = DACycle(
+        _identity_forward(),
+        IdentityObs(),
+        _TakeObs(),
+        obs_source=_RecordingObs(),
+        obs_err_source=_r_source(),
+    )
+    with pytest.raises(TypeError, match="needs a state"):
+        cycle(0.0, None)
