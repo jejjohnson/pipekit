@@ -313,6 +313,29 @@ def test_cache_misses_when_the_simulator_changes(tmp_path):
     np.testing.assert_allclose(twice, 2.0 * params)
 
 
+def test_content_hash_covers_all_of_a_large_array_in_a_config():
+    class TableForward(_ScaledForward):
+        def __init__(self, table: np.ndarray) -> None:
+            self.table = table
+
+        def get_config(self) -> dict[str, Any]:
+            return {"table": self.table}
+
+    table = np.zeros(2000)
+    changed = table.copy()
+    # repr elides the middle of an array this long, so it can't see this element
+    changed[500] = 1.0
+
+    assert (
+        _simulation(TableForward(table)).content_hash()
+        != _simulation(TableForward(changed)).content_hash()
+    )
+    assert (
+        _simulation(TableForward(table)).content_hash()
+        == _simulation(TableForward(table.copy())).content_hash()
+    )
+
+
 def test_content_hash_covers_the_cycle_and_obs_op_configs():
     class Scale(Operator):
         def __init__(self, factor: float) -> None:
@@ -370,6 +393,34 @@ def test_content_hash_is_silent_when_the_simulator_is_identified():
         warnings.simplefilter("error")
         _simulation(_ScaledForward(1.0)).content_hash()
         _simulation(_MockForward(), simulator_version="a").content_hash()
+
+
+def test_simulation_dataset_hashes_all_of_a_large_array_in_cycle_state():
+    pc = pytest.importorskip("pipekit_cycle")
+    covariance = np.zeros(2000)
+    changed = covariance.copy()
+    # repr elides the middle of an array this long, so it can't see this element
+    changed[500] = 1.0
+    assert repr(pc.DAState(obs_err_cov=covariance)) == repr(
+        pc.DAState(obs_err_cov=changed)
+    )
+
+    def build(state: Any) -> SimulationDataset:
+        return SimulationDataset(
+            forward_model=_MockForward(),
+            prior=_MockPrior(),
+            n_samples=10,
+            cycle_state=state,
+        )
+
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        != build(pc.DAState(obs_err_cov=changed)).content_hash()
+    )
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        == build(pc.DAState(obs_err_cov=covariance.copy())).content_hash()
+    )
 
 
 def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
