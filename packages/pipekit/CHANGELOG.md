@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.4...pipekit-v0.1.5) (2026-11-04)
+
+
+### Bug Fixes
+
+* **core:** raise or warn when observers and Cache see a JAX tracer ([#171](https://github.com/jejjohnson/pipekit/issues/171)) ([026313a](https://github.com/jejjohnson/pipekit/commit/026313a05c2018c01290641732ce5ec585ae68fc))
+* **cycle:** accept a stateful Sequential as a cycle step ([#183](https://github.com/jejjohnson/pipekit/issues/183)) ([8b1620f](https://github.com/jejjohnson/pipekit/commit/8b1620f1b80548888e1f0d65c6ac5d9ab6ceaa46)), closes [#162](https://github.com/jejjohnson/pipekit/issues/162)
+
 ## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-v0.1.3...pipekit-v0.1.4) (2026-10-27)
 
 
