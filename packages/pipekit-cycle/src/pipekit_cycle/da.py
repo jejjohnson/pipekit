@@ -18,12 +18,50 @@ See master plan Report 10, section 2.4.
 from __future__ import annotations
 
 import copy
-from typing import Any
+from typing import Any, Literal
 
 from pipekit import Operator, StatefulOperator
 from pipekit._base.operator import nested_config
 
 from pipekit_cycle.protocols import AnalysisStep, ForwardModel, ObservationOperator
+
+
+ObsClock = Literal["call", "state"]
+
+
+def _check_obs_clock(obs_clock: str, owner: str) -> None:
+    """Raise ``ValueError`` unless ``obs_clock`` is a known clock."""
+    if obs_clock not in ("call", "state"):
+        raise ValueError(
+            f"{owner}.obs_clock must be 'call' or 'state', got {obs_clock!r}."
+        )
+
+
+def _obs_offset(obs_clock: str, state: Any, owner: str) -> int:
+    """Return what to add to a call-local index to get the observation index.
+
+    Args:
+        obs_clock: ``"call"`` restarts at 0 on every call; ``"state"`` continues
+            from the state's ``cycle_count``, so a resumed cycle reads the next
+            observations.
+        state: The carry state at the start of the call.
+        owner: The cycle's class name, for the error message.
+
+    Returns:
+        The offset for the first observation of this call.
+
+    Raises:
+        TypeError: If ``obs_clock`` is ``"state"`` and the state has no
+            ``cycle_count``.
+    """
+    if obs_clock == "call":
+        return 0
+    if not hasattr(state, "cycle_count"):
+        raise TypeError(
+            f"{owner}: obs_clock='state' needs a state with cycle_count, "
+            f"got {type(state).__name__}."
+        )
+    return state.cycle_count
 
 
 def _component_config(obj: Any) -> Any:
@@ -68,6 +106,9 @@ class DACycle(StatefulOperator):
         n_steps: Number of cycles per call.
         save_history: Append ``(forecast, analysis)`` pairs to
             ``self.history`` each cycle.
+        obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
+            call. ``"state"`` continues from ``state.cycle_count``, so calling
+            the cycle again on its returned state reads the next observations.
 
     Returns from ``_apply(carrier, state)``:
         ``(analysis_carrier, updated_state)``.
@@ -76,7 +117,7 @@ class DACycle(StatefulOperator):
         TypeError: If a component doesn't satisfy its protocol
             (`ForwardModel` / `ObservationOperator` / `AnalysisStep`),
             or ``obs_source`` is neither an `Operator` nor ``None``.
-        ValueError: If ``n_steps < 0``.
+        ValueError: If ``n_steps < 0``, or ``obs_clock`` is unknown.
     """
 
     __config_mixin_auto__ = False
@@ -89,6 +130,8 @@ class DACycle(StatefulOperator):
         obs_source: Operator | None = None,
         n_steps: int = 1,
         save_history: bool = True,
+        *,
+        obs_clock: ObsClock = "call",
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError(
@@ -112,20 +155,23 @@ class DACycle(StatefulOperator):
             )
         if n_steps < 0:
             raise ValueError(f"DACycle.n_steps must be >= 0, got {n_steps}.")
+        _check_obs_clock(obs_clock, "DACycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
         self.obs_source = obs_source
         self.n_steps = n_steps
         self.save_history = save_history
+        self.obs_clock = obs_clock
         self.history: list[tuple[Any, Any]] = []
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         self.history = []
+        offset = _obs_offset(self.obs_clock, state, "DACycle")
         for i in range(self.n_steps):
             forecast = self.forward_model.step(carrier, self.forward_model.dt)
             if self.obs_source is not None:
-                obs = self.obs_source(i)
+                obs = self.obs_source(offset + i)
                 carrier = self.analysis_step(
                     forecast,
                     obs,
@@ -147,6 +193,7 @@ class DACycle(StatefulOperator):
             "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "save_history": self.save_history,
+            **_obs_clock_config(self.obs_clock),
         }
 
 
@@ -170,6 +217,8 @@ class EnsembleDACycle(StatefulOperator):
         n_steps: Number of cycles per call.
         n_members: Expected ensemble size (keyword-only;
             length-checked at call time).
+        obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
+            call. ``"state"`` continues from ``state.cycle_count``.
 
     Raises:
         TypeError: If a component doesn't satisfy its protocol, or
@@ -190,6 +239,7 @@ class EnsembleDACycle(StatefulOperator):
         n_steps: int = 1,
         *,
         n_members: int,
+        obs_clock: ObsClock = "call",
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError("EnsembleDACycle.forward_model must satisfy ForwardModel.")
@@ -205,12 +255,14 @@ class EnsembleDACycle(StatefulOperator):
             )
         if n_steps < 0:
             raise ValueError(f"EnsembleDACycle.n_steps must be >= 0, got {n_steps}.")
+        _check_obs_clock(obs_clock, "EnsembleDACycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
         self.obs_source = obs_source
         self.n_steps = n_steps
         self.n_members = n_members
+        self.obs_clock = obs_clock
 
     def _apply(  # ty: ignore[invalid-method-override]
         self,
@@ -222,12 +274,13 @@ class EnsembleDACycle(StatefulOperator):
                 f"EnsembleDACycle expected {self.n_members} members, "
                 f"got {len(members)}."
             )
+        offset = _obs_offset(self.obs_clock, state, "EnsembleDACycle")
         for i in range(self.n_steps):
             forecasts = [
                 self.forward_model.step(m, self.forward_model.dt) for m in members
             ]
             if self.obs_source is not None:
-                obs = self.obs_source(i)
+                obs = self.obs_source(offset + i)
                 members = list(
                     self.analysis_step(
                         forecasts,
@@ -249,6 +302,7 @@ class EnsembleDACycle(StatefulOperator):
             "obs_source": _component_config(self.obs_source),
             "n_steps": self.n_steps,
             "n_members": self.n_members,
+            **_obs_clock_config(self.obs_clock),
         }
 
 
@@ -272,11 +326,14 @@ class SmootherCycle(StatefulOperator):
         stride: Number of windows to take per call (default 1).
         obs_source: Optional observation source; invoked per step
             inside the window. ``None`` skips the analysis step.
+        obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
+            call. ``"state"`` continues from ``state.cycle_count``.
 
     Raises:
         TypeError: If a component doesn't satisfy its protocol, or
             ``obs_source`` is neither an `Operator` nor ``None``.
-        ValueError: If ``window < 1`` or ``stride < 1``.
+        ValueError: If ``window < 1``, ``stride < 1``, or ``obs_clock`` is
+            unknown.
     """
 
     __config_mixin_auto__ = False
@@ -289,6 +346,8 @@ class SmootherCycle(StatefulOperator):
         window: int,
         stride: int = 1,
         obs_source: Operator | None = None,
+        *,
+        obs_clock: ObsClock = "call",
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError("SmootherCycle.forward_model must satisfy ForwardModel.")
@@ -302,15 +361,17 @@ class SmootherCycle(StatefulOperator):
             raise ValueError(f"SmootherCycle.window must be >= 1, got {window}.")
         if stride < 1:
             raise ValueError(f"SmootherCycle.stride must be >= 1, got {stride}.")
+        _check_obs_clock(obs_clock, "SmootherCycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
         self.obs_source = obs_source
         self.window = window
         self.stride = stride
+        self.obs_clock = obs_clock
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
-        global_step = 0
+        global_step = _obs_offset(self.obs_clock, state, "SmootherCycle")
         for _ in range(self.stride):
             forecasts: list[Any] = []
             observations: list[Any] = []
@@ -338,7 +399,13 @@ class SmootherCycle(StatefulOperator):
             "obs_source": _component_config(self.obs_source),
             "window": self.window,
             "stride": self.stride,
+            **_obs_clock_config(self.obs_clock),
         }
+
+
+def _obs_clock_config(obs_clock: str) -> dict[str, str]:
+    """Return the config entry, empty by default so existing hashes don't move."""
+    return {} if obs_clock == "call" else {"obs_clock": obs_clock}
 
 
 def _advance_da_state(state: Any, dt: float) -> Any:

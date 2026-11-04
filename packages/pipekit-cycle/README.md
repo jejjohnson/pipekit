@@ -54,6 +54,8 @@ da = pc.EnsembleDACycle(
 members, state = da(initial_members, pc.DAState(obs_err_cov=R))
 ```
 
+`obs_source` is indexed from 0 on every call by default. Pass `obs_clock="state"` to continue from `state.cycle_count`, so that calling a cycle again on its returned state reads the next observations and gives the same analysis as one uninterrupted run.
+
 ## Algorithm library integration
 
 Algorithm libraries (filterx, vardax, plumax, …) plug in by exposing

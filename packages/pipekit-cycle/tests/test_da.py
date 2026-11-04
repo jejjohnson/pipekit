@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pipekit import Operator
 from pipekit_cycle import (
+    CallableForward,
     DACycle,
     DAState,
     EnsembleDACycle,
@@ -203,3 +204,151 @@ def test_dacycle_does_not_mutate_input_state(ToyForward_cls, ToyAnalysis_cls):
     assert (before.t, before.cycle_count) == (0.0, 0)
     assert after.cycle_count == 3
     assert after is not before
+
+
+# --- obs_clock: a resumed cycle reads the next observations ----------------
+
+
+class _RecordingObs(Operator):
+    __config_mixin_auto__ = False
+
+    def __init__(self, values=None) -> None:
+        self.values = values
+        self.seen: list[int] = []
+
+    def _apply(self, index):
+        self.seen.append(index)
+        return float(index) if self.values is None else self.values[index]
+
+    def get_config(self):
+        return {}
+
+
+class _TakeObs:
+    def __call__(self, forecast, obs, *, obs_op=None, obs_err_cov=None):
+        return obs
+
+
+def _identity_forward() -> CallableForward:
+    return CallableForward(lambda x, dt: x, dt=1.0)
+
+
+# Scalar Kalman filter on a carrier (mean m, variance p):
+# forecast: m ← a m, p ← a² p + q
+# analysis: g = p / (p + r), m ← m + g (y - m), p ← (1 - g) p
+_A, _Q, _R = 0.9, 0.1, 0.5
+
+
+class _ScalarKalman:
+    def __call__(self, forecast, obs, *, obs_op=None, obs_err_cov=None):
+        mean, variance = forecast
+        gain = variance / (variance + _R)
+        return mean + gain * (obs - mean), (1.0 - gain) * variance
+
+
+def _kalman_cycle(obs_source: Operator, n_steps: int, obs_clock: str) -> DACycle:
+    forward = CallableForward(
+        lambda carrier, dt: (_A * carrier[0], _A**2 * carrier[1] + _Q), dt=1.0
+    )
+    return DACycle(
+        forward,
+        IdentityObs(),
+        _ScalarKalman(),
+        obs_source=obs_source,
+        n_steps=n_steps,
+        save_history=False,
+        obs_clock=obs_clock,
+    )
+
+
+def test_two_resumed_kalman_calls_equal_one_continuous_run():
+    obs = [1.0, 0.5, -0.2, 0.3, 1.1, 0.9, -0.4, 0.2, 0.7, 0.1]
+    start = (0.0, 1.0)
+
+    continuous, _ = _kalman_cycle(_RecordingObs(obs), 10, "state")(start, DAState())
+
+    source = _RecordingObs(obs)
+    half = _kalman_cycle(source, 5, "state")
+    resumed, state = half(start, DAState())
+    resumed, state = half(resumed, state)
+
+    assert resumed == continuous
+    assert source.seen == list(range(10))
+    assert state.cycle_count == 10
+
+
+def test_default_clock_still_restarts_on_every_call():
+    source = _RecordingObs()
+    cycle = DACycle(
+        _identity_forward(),
+        IdentityObs(),
+        _TakeObs(),
+        obs_source=source,
+        n_steps=5,
+        save_history=False,
+    )
+    x, state = cycle(0.0, DAState())
+    cycle(x, state)
+    assert source.seen == [0, 1, 2, 3, 4, 0, 1, 2, 3, 4]
+    assert "obs_clock" not in cycle.get_config()
+
+
+def test_ensemble_cycle_state_clock_continues():
+    source = _RecordingObs()
+
+    class TakeObsPerMember:
+        def __call__(self, forecasts, obs, *, obs_op=None, obs_err_cov=None):
+            return [obs for _ in forecasts]
+
+    cycle = EnsembleDACycle(
+        _identity_forward(),
+        IdentityObs(),
+        TakeObsPerMember(),
+        obs_source=source,
+        n_steps=2,
+        n_members=2,
+        obs_clock="state",
+    )
+    members, state = cycle([0.0, 0.0], DAState())
+    cycle(members, state)
+    assert source.seen == [0, 1, 2, 3]
+    assert cycle.get_config()["obs_clock"] == "state"
+
+
+def test_smoother_cycle_state_clock_continues():
+    source = _RecordingObs()
+
+    class LastForecast:
+        def __call__(self, forecasts, obs, *, obs_op=None, obs_err_cov=None):
+            return forecasts[-1]
+
+    cycle = SmootherCycle(
+        _identity_forward(),
+        IdentityObs(),
+        LastForecast(),
+        window=2,
+        stride=2,
+        obs_source=source,
+        obs_clock="state",
+    )
+    x, state = cycle(0.0, DAState())
+    cycle(x, state)
+    assert source.seen == list(range(8))
+    assert state.cycle_count == 4
+
+
+def test_state_clock_needs_a_cycle_count():
+    cycle = DACycle(
+        _identity_forward(),
+        IdentityObs(),
+        _TakeObs(),
+        obs_source=_RecordingObs(),
+        obs_clock="state",
+    )
+    with pytest.raises(TypeError, match="cycle_count"):
+        cycle(0.0, None)
+
+
+def test_unknown_obs_clock_is_rejected():
+    with pytest.raises(ValueError, match="obs_clock"):
+        DACycle(_identity_forward(), IdentityObs(), _TakeObs(), obs_clock="wall")

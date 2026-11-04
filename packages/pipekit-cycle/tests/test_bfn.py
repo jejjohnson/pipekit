@@ -182,3 +182,45 @@ def test_bfn_validation() -> None:
         BFNCycle(_identity_model(), object(), _gain(), window=1)
     with pytest.raises(TypeError, match="callable"):
         BFNCycle(_identity_model(), IdentityObs(), 42, window=1)
+
+
+def test_bfn_state_clock_reads_the_next_window():
+    seen: list[int] = []
+
+    class Source(Operator):
+        __config_mixin_auto__ = False
+
+        def _apply(self, index):
+            seen.append(index)
+            return 0.0
+
+        def get_config(self):
+            return {}
+
+    cycle = BFNCycle(
+        CallableForward(lambda x, dt: x, dt=1.0),
+        IdentityObs(),
+        lambda innovation: 0.1 * innovation,
+        window=3,
+        max_iters=1,
+        obs_source=Source(),
+        obs_clock="state",
+    )
+    x, state = cycle(1.0, DAState())
+    cycle(x, state)
+
+    assert seen == [0, 1, 2, 3, 4, 5]
+    assert state.cycle_count == 3
+    assert cycle.get_config()["obs_clock"] == "state"
+
+
+def test_bfn_default_clock_is_unchanged():
+    assert (
+        "obs_clock"
+        not in BFNCycle(
+            CallableForward(lambda x, dt: x, dt=1.0),
+            IdentityObs(),
+            lambda innovation: innovation,
+            window=1,
+        ).get_config()
+    )

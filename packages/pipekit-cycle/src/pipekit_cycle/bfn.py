@@ -22,7 +22,13 @@ from typing import Any, ClassVar
 
 from pipekit import Operator, StatefulOperator
 
-from pipekit_cycle.da import _advance_da_state
+from pipekit_cycle.da import (
+    ObsClock,
+    _advance_da_state,
+    _check_obs_clock,
+    _obs_clock_config,
+    _obs_offset,
+)
 from pipekit_cycle.forward import CompositeForward, NeuralForward
 from pipekit_cycle.protocols import ForwardModel, ObservationOperator
 
@@ -55,22 +61,25 @@ class BFNCycle(StatefulOperator):
         spectral_sigma: If set, Gaussian-filter the innovation before
             applying the gain (spectral nudging); needs ``scipy``.
         obs_source: Optional `Operator` invoked ``obs_source(step_index)``
-            for the observation at each step, where ``step_index`` is the
-            *call-local* index ``0..window-1`` (the same per-call convention
-            as `DACycle` / `SmootherCycle`). For a global clock across
-            repeated calls, supply a stateful or clock-aware ``obs_source``.
-            ``None`` skips nudging (a pure forth/back integration).
+            for the observation at each step, where ``step_index`` follows
+            ``obs_clock``. ``None`` skips nudging (a pure forth/back
+            integration).
         backward_model: Optional `ForwardModel` for the backward pass when
             the forward model is not time-reversible.
         convergence_fn: Optional ``(new_x0, old_x0) -> float`` measuring the
             change between successive back-pass initial states. Defaults to a
             dependency-free relative L2 norm (works for scalars and
             numpy / JAX arrays); inject your own for a domain metric.
+        obs_clock: ``"call"`` (default) uses the call-local index
+            ``0..window-1``, the same default as `DACycle` / `SmootherCycle`.
+            ``"state"`` continues from ``state.cycle_count``, so each call reads
+            the next window of observations.
 
     Raises:
         TypeError: if the model / obs operator / obs source have the wrong
             type, or ``nudging_gain`` is not callable.
-        ValueError: if ``window < 1`` or ``max_iters < 1``.
+        ValueError: if ``window < 1``, ``max_iters < 1``, or ``obs_clock`` is
+            unknown.
     """
 
     __config_mixin_auto__ = False
@@ -89,6 +98,7 @@ class BFNCycle(StatefulOperator):
         obs_source: Operator | None = None,
         backward_model: ForwardModel | None = None,
         convergence_fn: Callable[[Any, Any], float] | None = None,
+        obs_clock: ObsClock = "call",
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError("BFNCycle.forward_model must satisfy ForwardModel.")
@@ -116,6 +126,7 @@ class BFNCycle(StatefulOperator):
             raise ValueError(f"BFNCycle.window must be >= 1, got {window}.")
         if max_iters < 1:
             raise ValueError(f"BFNCycle.max_iters must be >= 1, got {max_iters}.")
+        _check_obs_clock(obs_clock, "BFNCycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.nudging_gain = nudging_gain
@@ -126,6 +137,7 @@ class BFNCycle(StatefulOperator):
         self.obs_source = obs_source
         self.backward_model = backward_model
         self.convergence_fn = convergence_fn
+        self.obs_clock = obs_clock
         self.iterations: int = 0
 
     def _relax(self, x: Any, obs: Any) -> Any:
@@ -163,7 +175,8 @@ class BFNCycle(StatefulOperator):
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         if self.obs_source is not None:
-            window_obs = [self.obs_source(i) for i in range(self.window)]
+            offset = _obs_offset(self.obs_clock, state, "BFNCycle")
+            window_obs = [self.obs_source(offset + i) for i in range(self.window)]
         else:
             window_obs = [None] * self.window
 
@@ -203,6 +216,7 @@ class BFNCycle(StatefulOperator):
                 if self.backward_model is not None
                 else None
             ),
+            **_obs_clock_config(self.obs_clock),
         }
 
 
