@@ -197,6 +197,21 @@ def test_svi_traces_the_model_once_across_steps() -> None:
     assert fit(2) == fit(100)
 
 
+def test_svi_scores_validation_on_the_final_state() -> None:
+    _, artifact = TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_linreg_dataset(),
+        val_dataset=_linreg_dataset(n=16, seed=1),
+        task=NumpyroTask(_model, predictive_site="obs", predictive_samples=4),
+        backend="numpyro-svi",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        max_steps=7,
+        eval_every_n_steps=5,
+        seed=0,
+    ).run()
+    assert set(artifact.backend_info["final_eval_metrics"]) == {"elbo"}
+
+
 def test_svi_compiled_elbo_matches_the_uncompiled_path() -> None:
     from numpyro.infer import SVI, Trace_ELBO
     from numpyro.infer.autoguide import AutoNormal

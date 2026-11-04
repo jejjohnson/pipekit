@@ -36,7 +36,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         `bayes.NumpyroPredictiveOp` over the fitted guide;
         ``backend_info`` carries the keys ``backend``, ``jax_version``,
         ``numpyro_version``, ``devices``, ``total_seconds``,
-        ``final_step``, ``final_elbo``, ``final_metrics``, ``guide``,
+        ``final_step``, ``final_elbo``, ``final_metrics``,
+        ``final_eval_metrics``, ``guide``,
         and ``param_shapes``.
     """
     import jax
@@ -78,7 +79,20 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     last_loss = float("nan")
+    last_eval_metrics: dict[str, float] = {}
+    metrics: dict[str, float] = {}
     step = 0
+
+    def validate(val_dataset: Any, carry: Any) -> dict[str, float]:
+        """Score the validation set, tell the callbacks, and return the metrics."""
+        x_val, y_val = bayes.materialize(val_dataset)
+        val_elbo = -float(evaluate(state, x_val, y_val))
+        bayes.dispatch(
+            loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
+        )
+        # Named as in final_metrics, so that a sweep's select_metric finds it.
+        return {"elbo": val_elbo}
+
     # try/finally: a raising callback must not leak the writer's file
     # handle (dropping its buffered lines).
     try:
@@ -97,14 +111,19 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
                 bayes.dispatch(loop.callbacks, "on_epoch_end", loop, carry, metrics)
 
             if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
-                x_val, y_val = bayes.materialize(loop.val_dataset)
-                val_elbo = -float(evaluate(state, x_val, y_val))
-                bayes.dispatch(
-                    loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
-                )
+                last_eval_metrics = validate(loop.val_dataset, carry)
 
             if bayes.any_should_stop(loop.callbacks):
                 break
+
+        # Score the final state too, as the Equinox backend does.
+        if (
+            loop.val_dataset is not None
+            and step > 0
+            and step % loop.eval_every_n_steps != 0
+        ):
+            carry = bayes.carry_state(loop, loop.model_op, step, metrics)
+            last_eval_metrics = validate(loop.val_dataset, carry)
     finally:
         if loop.metric_writer is not None:
             loop.metric_writer.close()
@@ -133,6 +152,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "total_seconds": time.time() - t0,
         "final_step": int(step),
         "final_elbo": -last_loss,
+        "final_eval_metrics": last_eval_metrics,
         "final_metrics": {"elbo": -last_loss},
         "guide": type(guide).__name__,
         "param_shapes": {k: list(np.shape(v)) for k, v in params.items()},

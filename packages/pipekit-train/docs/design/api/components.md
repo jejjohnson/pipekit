@@ -259,8 +259,10 @@ class HyperSweep(StatefulOperator):
         loop_template: (params) -> TrainingLoop.
         search_space: ParameterGrid or any iterable of param dicts
             (so Optuna trial generators plug in v0.2.1).
-        select_metric: Key inside artifact.backend_info["final_metrics"].
+        select_metric: Key inside the chosen split's metrics.
         select_mode: "min" / "max".
+        select_split: "auto" (validation when a trial has it, else training
+            with a warning) / "train" / "eval".
         n_trials: Optional cap.
         sweep_id: Stable identifier across trials (uuid by default).
         on_trial: Optional (SweepResult, SweepCarryState) -> None

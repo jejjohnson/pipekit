@@ -22,6 +22,7 @@ from __future__ import annotations
 import itertools
 import math
 import uuid
+import warnings
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
@@ -112,9 +113,8 @@ class SweepResult:
             the trial's `TrainingLoop.run`.
         artifact: The trial's `TrainingArtifact` (or `_LocalArtifact`
             fallback when `pipekit-experiment` is absent).
-        final_metric: The value of ``select_metric`` pulled from
-            ``artifact.backend_info["final_metrics"]`` — the number
-            this trial is ranked by.
+        final_metric: The value of ``select_metric`` this trial is ranked
+            by, from the split that ``HyperSweep.select_split`` chose.
         sweep_id: Stable identifier shared by every trial in this
             sweep (defaults to a uuid4 hex string).
         trial_index: **Global** 0-based index across the cumulative
@@ -189,6 +189,10 @@ class HyperSweep(StatefulOperator):
     lands in v0.3. Optuna / Ray Tune samplers land in v0.2.1 — for now
     any iterable of param dicts works as ``search_space``.
 
+    Trials rank on validation metrics when they have them: the backend's
+    ``final_eval_metrics``, scored on the final state. Without a
+    ``val_dataset`` they rank on the last training batch, with a warning.
+
     Args:
         loop_template: Callable ``(params: dict) -> TrainingLoop``.
             Each trial's loop is built fresh; ``loop_template`` should
@@ -196,8 +200,7 @@ class HyperSweep(StatefulOperator):
         search_space: A `ParameterGrid` or any iterable of param
             dicts. The latter accommodates Optuna trial generators in
             v0.2.1.
-        select_metric: Key to look up in
-            ``artifact.backend_info["final_metrics"]``. Default
+        select_metric: Key to look up in the chosen split's metrics. Default
             ``"loss"`` — match this to whatever your loss surfaces
             (e.g. ``"mse"`` for `MSE`).
         select_mode: ``"min"`` for losses, ``"max"`` for accuracies.
@@ -209,6 +212,10 @@ class HyperSweep(StatefulOperator):
         on_trial: Optional callback ``(SweepResult, SweepCarryState)
             -> None`` invoked after each trial completes. Useful for
             progress logging or early-stop heuristics.
+        select_split: Which metrics to rank on. ``"auto"`` (default) uses
+            validation metrics when a trial has any, else training metrics
+            with one warning per sweep. ``"eval"`` requires validation metrics,
+            and ``"train"`` always uses the last training batch.
 
     Returns from `run()`:
         ``list[SweepResult]`` sorted by ``select_metric``. Best result
@@ -235,6 +242,7 @@ class HyperSweep(StatefulOperator):
         n_trials: int | None = None,
         sweep_id: str | None = None,
         on_trial: Callable[[SweepResult, SweepCarryState], None] | None = None,
+        select_split: Literal["auto", "train", "eval"] = "auto",
     ) -> None:
         if not callable(loop_template):
             raise TypeError(
@@ -245,6 +253,11 @@ class HyperSweep(StatefulOperator):
             raise ValueError(
                 f"HyperSweep.select_mode must be 'min' or 'max'; got {select_mode!r}."
             )
+        if select_split not in {"auto", "train", "eval"}:
+            raise ValueError(
+                "HyperSweep.select_split must be 'auto', 'train' or 'eval'; "
+                f"got {select_split!r}."
+            )
         if n_trials is not None and n_trials < 1:
             raise ValueError(
                 f"HyperSweep.n_trials must be >= 1 or None; got {n_trials}."
@@ -253,6 +266,8 @@ class HyperSweep(StatefulOperator):
         self.search_space = search_space
         self.select_metric = select_metric
         self.select_mode = select_mode
+        self.select_split = select_split
+        self._warned_training_fallback = False
         self.n_trials = n_trials
         self.sweep_id = sweep_id or uuid.uuid4().hex
         self.on_trial = on_trial
@@ -273,6 +288,7 @@ class HyperSweep(StatefulOperator):
         """
         del carrier
         state = state or SweepCarryState()
+        self._warned_training_fallback = False
         # Trial indices are GLOBAL across the cumulative trial stream
         # (state.completed at entry), not stage-local. That keeps
         # `SweepResult.trial_index` and `state.best_trial_index`
@@ -353,15 +369,33 @@ class HyperSweep(StatefulOperator):
         params: dict[str, Any],
     ) -> float:
         backend_info = getattr(artifact, "backend_info", {}) or {}
-        final_metrics = backend_info.get("final_metrics", {}) or {}
-        if self.select_metric not in final_metrics:
+        key = self._metrics_key(backend_info)
+        metrics = backend_info.get(key, {}) or {}
+        if self.select_metric not in metrics:
             raise ValueError(
                 f"HyperSweep: trial {trial_index} (params={params!r}) "
                 f"artifact has no metric {self.select_metric!r} in "
-                f"backend_info['final_metrics']. Available keys: "
-                f"{sorted(final_metrics)}."
+                f"backend_info[{key!r}]. Available keys: "
+                f"{sorted(metrics)}."
             )
-        return float(final_metrics[self.select_metric])
+        return float(metrics[self.select_metric])
+
+    def _metrics_key(self, backend_info: dict[str, Any]) -> str:
+        """Return the ``backend_info`` key holding the metrics to rank on."""
+        if self.select_split == "train":
+            return "final_metrics"
+        if self.select_split == "eval" or backend_info.get("final_eval_metrics"):
+            return "final_eval_metrics"
+        if not self._warned_training_fallback:
+            self._warned_training_fallback = True
+            warnings.warn(
+                "HyperSweep is ranking on the last training batch, because a trial "
+                "has no validation metrics. Give the loop a val_dataset, or pass "
+                "select_split='train' to choose this explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return "final_metrics"
 
     def _is_better(self, new: float, current_best: float) -> bool:
         if self.select_mode == "min":
@@ -372,6 +406,7 @@ class HyperSweep(StatefulOperator):
         return {
             "select_metric": self.select_metric,
             "select_mode": self.select_mode,
+            "select_split": self.select_split,
             "n_trials": self.n_trials,
             "sweep_id": self.sweep_id,
             "search_space": type(self.search_space).__name__,
