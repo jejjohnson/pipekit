@@ -64,6 +64,55 @@ def _obs_offset(obs_clock: str, state: Any, owner: str) -> int:
     return state.cycle_count
 
 
+def _check_obs_err_source(obs_err_source: Any, obs_source: Any, owner: str) -> None:
+    """Validate ``obs_err_source`` against ``obs_source``.
+
+    Args:
+        obs_err_source: The candidate source of covariances.
+        obs_source: The cycle's observation source.
+        owner: The cycle's class name, for the error message.
+
+    Raises:
+        TypeError: If ``obs_err_source`` is neither an `Operator` nor ``None``.
+        ValueError: If it is set without ``obs_source``, because nothing would
+            read the covariance.
+    """
+    if obs_err_source is None:
+        return
+    if not isinstance(obs_err_source, Operator):
+        raise TypeError(f"{owner}.obs_err_source must be an Operator or None.")
+    if obs_source is None:
+        raise ValueError(f"{owner}.obs_err_source needs an obs_source.")
+
+
+def _with_obs_err_cov(state: Any, obs_err_cov: Any, owner: str) -> Any:
+    """Return a copy of ``state`` holding ``obs_err_cov``.
+
+    Args:
+        state: The carry state, which stays unchanged.
+        obs_err_cov: The covariance for this analysis.
+        owner: The cycle's class name, for the error message.
+
+    Returns:
+        The copy.
+
+    Raises:
+        TypeError: If ``state`` is ``None``, so can't carry a covariance.
+    """
+    if state is None:
+        raise TypeError(f"{owner}: obs_err_source needs a state, such as a DAState.")
+    updated = copy.copy(state)
+    updated.obs_err_cov = obs_err_cov
+    return updated
+
+
+def _obs_err_config(obs_err_source: Any) -> dict[str, Any]:
+    """Return the config entry, empty by default so existing hashes don't move."""
+    if obs_err_source is None:
+        return {}
+    return {"obs_err_source": _component_config(obs_err_source)}
+
+
 def _component_config(obj: Any) -> Any:
     """Debug-config payload for a DA component.
 
@@ -109,6 +158,10 @@ class DACycle(StatefulOperator):
         obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
             call. ``"state"`` continues from ``state.cycle_count``, so calling
             the cycle again on its returned state reads the next observations.
+        obs_err_source: Optional `Operator` invoked with the same index as
+            ``obs_source``. It returns the step's observation-error covariance,
+            which is written to a copy of the state and passed to the analysis
+            as ``obs_err_cov``. ``None`` keeps ``state.obs_err_cov``.
 
     Returns from ``_apply(carrier, state)``:
         ``(analysis_carrier, updated_state)``.
@@ -132,6 +185,7 @@ class DACycle(StatefulOperator):
         save_history: bool = True,
         *,
         obs_clock: ObsClock = "call",
+        obs_err_source: Operator | None = None,
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError(
@@ -156,6 +210,7 @@ class DACycle(StatefulOperator):
         if n_steps < 0:
             raise ValueError(f"DACycle.n_steps must be >= 0, got {n_steps}.")
         _check_obs_clock(obs_clock, "DACycle")
+        _check_obs_err_source(obs_err_source, obs_source, "DACycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
@@ -163,6 +218,7 @@ class DACycle(StatefulOperator):
         self.n_steps = n_steps
         self.save_history = save_history
         self.obs_clock = obs_clock
+        self.obs_err_source = obs_err_source
         self.history: list[tuple[Any, Any]] = []
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
@@ -172,6 +228,9 @@ class DACycle(StatefulOperator):
             forecast = self.forward_model.step(carrier, self.forward_model.dt)
             if self.obs_source is not None:
                 obs = self.obs_source(offset + i)
+                if self.obs_err_source is not None:
+                    obs_err_cov = self.obs_err_source(offset + i)
+                    state = _with_obs_err_cov(state, obs_err_cov, "DACycle")
                 carrier = self.analysis_step(
                     forecast,
                     obs,
@@ -194,6 +253,7 @@ class DACycle(StatefulOperator):
             "n_steps": self.n_steps,
             "save_history": self.save_history,
             **_obs_clock_config(self.obs_clock),
+            **_obs_err_config(self.obs_err_source),
         }
 
 
@@ -219,6 +279,10 @@ class EnsembleDACycle(StatefulOperator):
             length-checked at call time).
         obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
             call. ``"state"`` continues from ``state.cycle_count``.
+        obs_err_source: Optional `Operator` invoked with the same index as
+            ``obs_source``. It returns the step's observation-error covariance,
+            which is written to a copy of the state and passed to the analysis
+            as ``obs_err_cov``. ``None`` keeps ``state.obs_err_cov``.
 
     Raises:
         TypeError: If a component doesn't satisfy its protocol, or
@@ -240,6 +304,7 @@ class EnsembleDACycle(StatefulOperator):
         *,
         n_members: int,
         obs_clock: ObsClock = "call",
+        obs_err_source: Operator | None = None,
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError("EnsembleDACycle.forward_model must satisfy ForwardModel.")
@@ -256,6 +321,7 @@ class EnsembleDACycle(StatefulOperator):
         if n_steps < 0:
             raise ValueError(f"EnsembleDACycle.n_steps must be >= 0, got {n_steps}.")
         _check_obs_clock(obs_clock, "EnsembleDACycle")
+        _check_obs_err_source(obs_err_source, obs_source, "EnsembleDACycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
@@ -263,6 +329,7 @@ class EnsembleDACycle(StatefulOperator):
         self.n_steps = n_steps
         self.n_members = n_members
         self.obs_clock = obs_clock
+        self.obs_err_source = obs_err_source
 
     def _apply(  # ty: ignore[invalid-method-override]
         self,
@@ -281,6 +348,9 @@ class EnsembleDACycle(StatefulOperator):
             ]
             if self.obs_source is not None:
                 obs = self.obs_source(offset + i)
+                if self.obs_err_source is not None:
+                    obs_err_cov = self.obs_err_source(offset + i)
+                    state = _with_obs_err_cov(state, obs_err_cov, "EnsembleDACycle")
                 members = list(
                     self.analysis_step(
                         forecasts,
@@ -303,6 +373,7 @@ class EnsembleDACycle(StatefulOperator):
             "n_steps": self.n_steps,
             "n_members": self.n_members,
             **_obs_clock_config(self.obs_clock),
+            **_obs_err_config(self.obs_err_source),
         }
 
 
@@ -328,6 +399,11 @@ class SmootherCycle(StatefulOperator):
             inside the window. ``None`` skips the analysis step.
         obs_clock: ``"call"`` (default) indexes ``obs_source`` from 0 on every
             call. ``"state"`` continues from ``state.cycle_count``.
+        obs_err_source: Optional `Operator` invoked with the same index as
+            ``obs_source``. The window's covariances are collected into a list,
+            written to a copy of the state and passed to the analysis as
+            ``obs_err_cov``, matching how ``window_obs`` is passed. ``None``
+            keeps ``state.obs_err_cov``.
 
     Raises:
         TypeError: If a component doesn't satisfy its protocol, or
@@ -348,6 +424,7 @@ class SmootherCycle(StatefulOperator):
         obs_source: Operator | None = None,
         *,
         obs_clock: ObsClock = "call",
+        obs_err_source: Operator | None = None,
     ) -> None:
         if not isinstance(forward_model, ForwardModel):
             raise TypeError("SmootherCycle.forward_model must satisfy ForwardModel.")
@@ -362,6 +439,7 @@ class SmootherCycle(StatefulOperator):
         if stride < 1:
             raise ValueError(f"SmootherCycle.stride must be >= 1, got {stride}.")
         _check_obs_clock(obs_clock, "SmootherCycle")
+        _check_obs_err_source(obs_err_source, obs_source, "SmootherCycle")
         self.forward_model = forward_model
         self.obs_op = obs_op
         self.analysis_step = analysis_step
@@ -369,20 +447,26 @@ class SmootherCycle(StatefulOperator):
         self.window = window
         self.stride = stride
         self.obs_clock = obs_clock
+        self.obs_err_source = obs_err_source
 
     def _apply(self, carrier: Any, state: Any) -> tuple[Any, Any]:
         global_step = _obs_offset(self.obs_clock, state, "SmootherCycle")
         for _ in range(self.stride):
             forecasts: list[Any] = []
             observations: list[Any] = []
+            window_err_covs: list[Any] = []
             for _ in range(self.window):
                 carrier = self.forward_model.step(carrier, self.forward_model.dt)
                 forecasts.append(carrier)
                 if self.obs_source is not None:
                     observations.append(self.obs_source(global_step))
+                if self.obs_err_source is not None:
+                    window_err_covs.append(self.obs_err_source(global_step))
                 global_step += 1
                 state = _advance_da_state(state, dt=self.forward_model.dt)
             if self.obs_source is not None:
+                if self.obs_err_source is not None:
+                    state = _with_obs_err_cov(state, window_err_covs, "SmootherCycle")
                 carrier = self.analysis_step(
                     forecasts,
                     observations,
@@ -400,6 +484,7 @@ class SmootherCycle(StatefulOperator):
             "window": self.window,
             "stride": self.stride,
             **_obs_clock_config(self.obs_clock),
+            **_obs_err_config(self.obs_err_source),
         }
 
 
