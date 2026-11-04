@@ -22,9 +22,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --group train-extras
       - name: Run tests with coverage
-        run: uv run pytest --cov --cov-report=xml -v
+        run: uv run --group train-extras pytest --cov --cov-report=xml -v
       - name: Upload coverage report
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v7
