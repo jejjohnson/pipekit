@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pickle
 from typing import Any
 
 import numpy as np
@@ -281,6 +282,91 @@ def test_cached_dataset_invalidate_re_materialises(tmp_path):
     assert cached._materialised()
     cached.invalidate()
     assert not cached._materialised()
+
+
+def _count_store_opens(monkeypatch) -> list[str]:
+    zarr = pytest.importorskip("zarr")
+    opens: list[str] = []
+    real_open = zarr.open
+
+    def counting_open(*args, **kwargs):
+        opens.append(kwargs.get("mode", "?"))
+        return real_open(*args, **kwargs)
+
+    monkeypatch.setattr(zarr, "open", counting_open)
+    return opens
+
+
+def test_cached_getitem_does_not_reopen_store(tmp_path, monkeypatch):
+    """Regression for #141: the store used to reopen twice on every item."""
+    opens = _count_store_opens(monkeypatch)
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    cached = CachedDataset(source=sim, cache_dir=str(tmp_path))
+    first = cached[0]
+    opens.clear()
+    for i in range(100):
+        second = cached[i % len(cached)]
+    list(cached)
+    assert opens == []
+    assert len(second) == 2
+    np.testing.assert_array_equal(cached[0][0], first[0])
+
+
+def test_cached_dataset_reopens_after_invalidate(tmp_path):
+    pytest.importorskip("zarr")
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    cached = CachedDataset(source=sim, cache_dir=str(tmp_path))
+    x_before = np.asarray(cached[3][0])
+    cached.invalidate()
+    assert not cached._materialised()
+    np.testing.assert_array_equal(cached[3][0], x_before)
+    assert cached._materialised()
+
+
+def test_cached_dataset_follows_a_change_of_content_hash(tmp_path):
+    pytest.importorskip("zarr")
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    cached = CachedDataset(source=sim, cache_dir=str(tmp_path))
+    before = np.asarray(cached[0][0])
+    cached.source = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10, seed=7
+    )
+    assert not np.array_equal(cached[0][0], before)
+
+
+def test_cached_dataset_in_memory_serves_numpy_with_the_same_values(tmp_path):
+    pytest.importorskip("zarr")
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(dim=3), n_samples=10
+    )
+    on_disk = CachedDataset(source=sim, cache_dir=str(tmp_path))
+    in_memory = CachedDataset(source=sim, cache_dir=str(tmp_path), in_memory=True)
+    assert in_memory.content_hash() == on_disk.content_hash()
+    for (x_mem, y_mem), (x_disk, y_disk) in zip(in_memory, on_disk, strict=True):
+        np.testing.assert_array_equal(x_mem, x_disk)
+        np.testing.assert_array_equal(y_mem, y_disk)
+    assert isinstance(in_memory._arrays[1], np.ndarray)
+    assert in_memory.with_split("val").in_memory is True
+
+
+def test_cached_dataset_pickles_without_its_open_arrays(tmp_path):
+    pytest.importorskip("zarr")
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    cached = CachedDataset(source=sim, cache_dir=str(tmp_path), in_memory=True)
+    x = np.asarray(cached[1][0])
+    assert cached._arrays is not None
+    clone = pickle.loads(pickle.dumps(cached))
+    assert clone._arrays is None
+    assert cached._arrays is not None
+    np.testing.assert_array_equal(clone[1][0], x)
 
 
 def test_cached_dataset_empty_source_raises_clear_error(tmp_path):

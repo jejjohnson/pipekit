@@ -160,10 +160,13 @@ class CachedDataset(TrainingDataset):
         format: Storage format. "zarr" for array-shaped pairs;
             "parquet" for record-shaped; "tfrecord" for very large
             heterogeneous batches.
+        in_memory: Load the cache into NumPy arrays on first read. Use it
+            when the cache fits in memory and is read item by item.
     """
     source: TrainingDataset
     cache_dir: str
     format: Literal["zarr", "parquet", "tfrecord"] = "zarr"
+    in_memory: bool = False
 
     def content_hash(self) -> str:
         # Inherits source.content_hash() — the cache is just a

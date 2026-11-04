@@ -366,6 +366,10 @@ class CachedDataset(TrainingDataset):
         format: Storage format. v0.2 ships ``"zarr"`` only;
             ``"parquet"`` and ``"tfrecord"`` raise NotImplementedError
             and are scheduled for v0.3.
+        in_memory: Load the whole cache into NumPy arrays on first read
+            and serve items from them. A zarr read costs about 1 ms per
+            array, so turn this on when the cache fits in memory and the
+            dataset is read item by item, as in training.
 
     Raises:
         TypeError: if ``source`` doesn't provide ``__len__`` + ``__getitem__``.
@@ -385,6 +389,10 @@ class CachedDataset(TrainingDataset):
           differs.
         - To force re-cache, delete the cache directory or change a
           source-config field.
+        - The store is opened once per instance and process, and reopened
+          after `invalidate` or a change of content hash. Delete the cache
+          through `invalidate`: an instance holding the arrays does not see
+          a directory removed behind its back.
     """
 
     forbid_in_yaml: ClassVar[bool] = True
@@ -395,6 +403,7 @@ class CachedDataset(TrainingDataset):
         source: TrainingDataset,
         cache_dir: str | os.PathLike[str],
         format: Literal["zarr", "parquet", "tfrecord"] = "zarr",
+        in_memory: bool = False,
     ) -> None:
         if not isinstance(source, TrainingDataset):
             raise TypeError(
@@ -416,13 +425,20 @@ class CachedDataset(TrainingDataset):
         self.source = source
         self.cache_dir = str(cache_dir)
         self.format: Literal["zarr", "parquet", "tfrecord"] = format
+        self.in_memory = in_memory
+        self._arrays: tuple[str, Any, Any] | None = None
 
     def with_split(self, split: Split) -> CachedDataset:
         return CachedDataset(
             source=self.source.with_split(split),
             cache_dir=self.cache_dir,
             format=self.format,
+            in_memory=self.in_memory,
         )
+
+    def __getstate__(self) -> dict[str, Any]:
+        # Each worker process opens the store for itself.
+        return {**self.__dict__, "_arrays": None}
 
     def content_hash(self) -> str:
         # Inherits source.content_hash() — the cache is a materialisation
@@ -540,16 +556,24 @@ class CachedDataset(TrainingDataset):
     def __len__(self) -> int:
         return len(cast(Any, self.source))
 
+    def _cached_arrays(self) -> tuple[Any, Any]:
+        """The ``x`` and ``y`` arrays, opening the store at most once per hash."""
+        path = self._cache_path()
+        if self._arrays is None or self._arrays[0] != path:
+            if not self._materialised():
+                self._materialise()
+            x_arr, y_arr = self._open_cache()
+            if self.in_memory:
+                x_arr, y_arr = x_arr[:], y_arr[:]
+            self._arrays = (path, x_arr, y_arr)
+        return self._arrays[1], self._arrays[2]
+
     def __getitem__(self, idx: int) -> tuple[Any, Any]:
-        if not self._materialised():
-            self._materialise()
-        x_arr, y_arr = self._open_cache()
+        x_arr, y_arr = self._cached_arrays()
         return x_arr[idx], y_arr[idx]
 
     def __iter__(self) -> Iterator[tuple[Any, Any]]:
-        if not self._materialised():
-            self._materialise()
-        x_arr, y_arr = self._open_cache()
+        x_arr, y_arr = self._cached_arrays()
         n = x_arr.shape[0]
         for i in range(n):
             yield x_arr[i], y_arr[i]
@@ -564,6 +588,7 @@ class CachedDataset(TrainingDataset):
         you want to force a re-bake without changing source config.
         Works for both local paths and fsspec URIs.
         """
+        self._arrays = None
         path = self._cache_path()
         if self._is_fsspec_uri(self.cache_dir):
             import fsspec
@@ -583,4 +608,5 @@ class CachedDataset(TrainingDataset):
             "source_hash": self.source.content_hash(),
             "cache_dir": self.cache_dir,
             "format": self.format,
+            "in_memory": self.in_memory,
         }
