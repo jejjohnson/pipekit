@@ -326,7 +326,7 @@ class SimulationDataset(TrainingDataset):
         else:
             params = self.prior()
         if self.cycle is not None:
-            output = self._roll_out(params)
+            output = self._roll_out(self.cycle, params)
         else:
             output = self.forward_model.step(params, self.forward_model.dt)
         if self.obs_op is not None:
@@ -337,15 +337,15 @@ class SimulationDataset(TrainingDataset):
         for i in range(len(self)):
             yield self[i]
 
-    def _roll_out(self, params: Any) -> Any:
-        """Run ``self.cycle`` from ``params`` and return the final carrier."""
-        if not getattr(self.cycle, "_is_stateful", False):
-            return self.cycle(params)
+    def _roll_out(self, cycle: Operator, params: Any) -> Any:
+        """Run ``cycle`` from ``params`` and return the final carrier."""
+        if not getattr(cycle, "_is_stateful", False):
+            return cycle(params)
         if self.cycle_state is None:
             state = CarryState()
         else:
             state = copy.deepcopy(self.cycle_state)
-        output, _ = self.cycle(params, state)
+        output, _ = cycle(params, state)
         return output
 
     def _split_offset(self) -> int:
