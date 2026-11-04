@@ -22,7 +22,7 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit import Operator
 from pipekit_train import MSE, IterableDataset, TrainingLoop
-from pipekit_train.adapters.bayes import NumpyroPredictiveOp, NumpyroTask
+from pipekit_train.adapters.bayes import NumpyroPredictiveOp, NumpyroTask, materialize
 
 
 # --- fixtures -------------------------------------------------------------
@@ -167,6 +167,65 @@ def test_svi_dispatches_train_begin_state_and_epoch_end() -> None:
 
 
 # --- numpyro-svi ----------------------------------------------------------
+
+
+def test_svi_traces_the_model_once_across_steps() -> None:
+    # regression for #160: an uncompiled svi.update re-traced the model each step.
+    traces = 0
+
+    def counting_model(x: Any, y: Any = None) -> None:
+        nonlocal traces
+        traces += 1
+        _model(x, y)
+
+    def fit(max_steps: int) -> int:
+        nonlocal traces
+        traces = 0
+        TrainingLoop(
+            model_op=_DummyModelOp(),
+            dataset=_linreg_dataset(),
+            task=NumpyroTask(
+                counting_model, predictive_site="obs", predictive_samples=4
+            ),
+            backend="numpyro-svi",
+            optimizer_config={"name": "adam", "lr": 1e-2},
+            max_steps=max_steps,
+            seed=0,
+        ).run()
+        return traces
+
+    assert fit(2) == fit(100)
+
+
+def test_svi_compiled_elbo_matches_the_uncompiled_path() -> None:
+    from numpyro.infer import SVI, Trace_ELBO
+    from numpyro.infer.autoguide import AutoNormal
+
+    jax = pytest.importorskip("jax")
+    optax = pytest.importorskip("optax")
+
+    max_steps = 50
+    x, y = materialize(_linreg_dataset())
+    guide = AutoNormal(_model)
+    # The adapter splits the seed once before init, so the same split is used here.
+    _, init_key = jax.random.split(jax.random.key(0))
+    svi = SVI(_model, guide, optax.adam(1e-2), loss=Trace_ELBO())
+    state = svi.init(init_key, x, y)
+    for _ in range(max_steps):
+        state, loss = svi.update(state, x, y)
+
+    _, artifact = TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_linreg_dataset(),
+        task=NumpyroTask(_model, predictive_site="obs", predictive_samples=4),
+        backend="numpyro-svi",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        max_steps=max_steps,
+        seed=0,
+    ).run()
+
+    # float32: compiled and eager rounding differ by about 2e-5 after 50 steps.
+    assert artifact.backend_info["final_elbo"] == pytest.approx(-float(loss), rel=1e-4)
 
 
 @pytest.mark.slow

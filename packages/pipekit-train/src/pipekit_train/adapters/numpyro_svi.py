@@ -6,6 +6,9 @@ periodic eval, ``max_steps``, ``optimizer_config``). v1 is full-batch — the
 whole dataset is materialised once and each step evaluates the ELBO on all of
 it; minibatch SVI (via ``numpyro.plate(subsample_size=…)``) is a follow-on.
 
+The update and the ELBO evaluation are compiled once, so a model or guide's
+Python side effects run when it is traced, not on every step.
+
 The artifact is a `NumpyroPredictiveOp` around
 ``Predictive(model, guide, params, num_samples)``. See ADR D13 and
 ``docs/design/numpyro_adapter.md``.
@@ -66,6 +69,11 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     svi = SVI(task.model, guide, optimizer, loss=elbo)
     state = svi.init(init_key, x_train, y_train)
 
+    # Compile once: an eager step re-traces the model and guide every call, at
+    # about 500 times the cost for the same result (NumPyro's svi.run also jits).
+    update = jax.jit(svi.update)
+    evaluate = jax.jit(svi.evaluate)
+
     initial = bayes.carry_state(loop, loop.model_op, 0, {})
     bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
@@ -75,7 +83,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # handle (dropping its buffered lines).
     try:
         for step in range(1, loop.max_steps + 1):
-            state, loss = svi.update(state, x_train, y_train)
+            state, loss = update(state, x_train, y_train)
             last_loss = float(loss)
             metrics = {"elbo": -last_loss, "loss": last_loss}
 
@@ -90,7 +98,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
             if loop.val_dataset is not None and step % loop.eval_every_n_steps == 0:
                 x_val, y_val = bayes.materialize(loop.val_dataset)
-                val_elbo = -float(svi.evaluate(state, x_val, y_val))
+                val_elbo = -float(evaluate(state, x_val, y_val))
                 bayes.dispatch(
                     loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
                 )
