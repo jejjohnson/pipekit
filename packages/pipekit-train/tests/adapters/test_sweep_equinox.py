@@ -8,6 +8,7 @@ trial has loss below a sanity threshold and that `sweep_id` propagates.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -139,3 +140,85 @@ def test_hyper_sweep_artifact_carries_dataset_hash_per_trial():
     hashes = {r.artifact.dataset_hash for r in results}
     # Different seeds → different datasets → different hashes.
     assert len(hashes) == 2
+
+
+# ---------------------------------------------------------------------
+# Trials rank on validation metrics when they have them
+# ---------------------------------------------------------------------
+
+
+def _disagreeing_sweep(**kwargs: Any) -> tuple[HyperSweep, list[float]]:
+    """Two trials whose training and validation rankings disagree.
+
+    The validation targets are the untrained model's outputs, so the frozen trial
+    (lr=1e-12) is perfect on validation and poor on training, and the other trial
+    is the reverse.
+    """
+    init = eqx.nn.MLP(1, 1, 8, 1, key=jax.random.key(0))
+    train = _synth_dataset()
+    xs = np.random.default_rng(1).uniform(-1, 1, (16, 1)).astype(np.float32)
+    targets = np.asarray(jax.vmap(init)(xs))
+    val = IterableDataset(source=list(zip(xs, targets, strict=True)), content_hash="v")
+    val_mse: list[float] = []
+
+    class RecordVal:
+        def on_eval_end(self, loop, state, metrics) -> None:
+            val_mse.append(metrics["mse"])
+
+    def build(params: dict[str, Any]) -> TrainingLoop:
+        return TrainingLoop(
+            model_op=EquinoxModelOp(init),
+            dataset=train,
+            val_dataset=val,
+            loss=MSE(),
+            optimizer_config={"name": "adam", "lr": params["lr"]},
+            max_steps=40,
+            eval_every_n_steps=15,
+            batch_size=8,
+            backend="equinox",
+            callbacks=(RecordVal(),),
+            seed=0,
+        )
+
+    space = [{"lr": 1e-12}, {"lr": 1e-2}]
+    return HyperSweep(build, space, select_metric="mse", **kwargs), val_mse
+
+
+def test_sweep_ranks_on_validation_when_trials_have_it():
+    sweep, val_mse = _disagreeing_sweep()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        results = sweep.run()
+
+    assert results[0].params == {"lr": 1e-12}
+    # two periodic evals and one final eval per trial; the last one is what ranks
+    assert len(val_mse) == 6
+    assert results[0].final_metric == pytest.approx(val_mse[2])
+    assert results[1].final_metric == pytest.approx(val_mse[5])
+    assert results[0].artifact.backend_info["final_eval_metrics"]["mse"] < 1e-6
+
+
+def test_sweep_select_split_train_keeps_the_training_ranking():
+    sweep, _ = _disagreeing_sweep(select_split="train")
+    assert sweep.run()[0].params == {"lr": 1e-2}
+
+
+def test_sweep_without_validation_warns_once_and_ranks_on_training():
+    sweep = HyperSweep(_build_loop, [{"lr": 1e-3}, {"lr": 1e-2}], select_metric="mse")
+    with pytest.warns(UserWarning, match="last training batch") as caught:
+        results = sweep.run()
+    assert len([w for w in caught if "last training batch" in str(w.message)]) == 1
+    assert results[0].params == {"lr": 1e-2}
+
+
+def test_sweep_select_split_eval_requires_validation_metrics():
+    sweep = HyperSweep(
+        _build_loop, [{"lr": 1e-3}], select_metric="mse", select_split="eval"
+    )
+    with pytest.raises(ValueError, match="final_eval_metrics"):
+        sweep.run()
+
+
+def test_sweep_rejects_an_unknown_select_split():
+    with pytest.raises(ValueError, match="select_split"):
+        HyperSweep(_build_loop, [{"lr": 1e-3}], select_split="val")

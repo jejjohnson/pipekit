@@ -830,8 +830,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         is a `EquinoxModelOp` wrapping the trained ``eqx.Module``;
         ``backend_info`` is a dict with the keys ``backend``,
         ``jax_version``, ``equinox_version``, ``optax_version``,
-        ``devices``, ``total_seconds``, ``final_step``, and
-        ``final_metrics`` for inclusion in the TrainingArtifact.
+        ``devices``, ``total_seconds``, ``final_step``, ``final_metrics``
+        (the last training batch), and ``final_eval_metrics`` (the validation
+        set on the final state, empty without a ``val_dataset``) for inclusion
+        in the TrainingArtifact.
     """
     # Lazy imports — keep this module loadable without the full
     # [equinox] extra installed (see module docstring).
@@ -951,6 +953,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # the metric writer's file handle (dropping buffered lines) or leave
     # an async checkpoint half-written.
     last_metrics: dict[str, float] = {}
+    last_eval_metrics: dict[str, float] = {}
     try:
         # Inside the loop body, `train_iter` is guaranteed non-None because
         # the loop condition matches the guard that built it.
@@ -982,10 +985,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
                 and step % loop.eval_every_n_steps == 0
             ):
                 rng, eval_key = jax.random.split(rng)
-                eval_metrics = _evaluate(
+                last_eval_metrics = _evaluate(
                     state.model, loop.val_dataset, loop.batch_size, task, eval_key
                 )
-                _dispatch(loop.callbacks, "on_eval_end", loop, carry, eval_metrics)
+                _dispatch(loop.callbacks, "on_eval_end", loop, carry, last_eval_metrics)
 
             # Checkpoint — gated on the manager's configured cadence
             # (CheckpointManager.save_interval_steps, derived from the
@@ -1019,11 +1022,11 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             and int(state.step) % loop.eval_every_n_steps != 0
         ):
             rng, eval_key = jax.random.split(rng)
-            final_eval = _evaluate(
+            last_eval_metrics = _evaluate(
                 state.model, loop.val_dataset, loop.batch_size, task, eval_key
             )
             carry = _carry_state(state, loop, last_metrics)
-            _dispatch(loop.callbacks, "on_eval_end", loop, carry, final_eval)
+            _dispatch(loop.callbacks, "on_eval_end", loop, carry, last_eval_metrics)
     finally:
         # --- Wait for any async checkpoint + close the writer ---------
         if mngr is not None:
@@ -1047,6 +1050,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "total_seconds": time.time() - t0,
         "final_step": int(state.step),
         "final_metrics": last_metrics,
+        "final_eval_metrics": last_eval_metrics,
         "sharding": _sharding_info(sharding),
     }
     return trained_model_op, backend_info
