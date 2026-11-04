@@ -19,11 +19,12 @@ See ``docs/design/api/datasets.md``.
 
 from __future__ import annotations
 
+import inspect
 import os
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
-from pipekit import Operator
+from pipekit import Lambda, Operator
 from pipekit.hashing import sha256_hex, stable_json
 
 
@@ -41,6 +42,37 @@ def hash_config(*parts: Any) -> str:
     for p in parts:
         chunks += [stable_json(p), b"\x00"]
     return sha256_hex(*chunks)
+
+
+def _accepts_seed(prior: Operator) -> bool:
+    """Return whether ``prior(seed=...)`` reaches a parameter that takes it.
+
+    Args:
+        prior: The prior operator to inspect.
+
+    Returns:
+        ``True`` if the prior's signature has a ``seed`` parameter or ``**kwargs``.
+        ``False`` when the signature can't be read, as for some C functions.
+    """
+    if isinstance(prior, Lambda):
+        # Lambda forwards every keyword, so its function decides.
+        target = prior.fn
+    elif type(prior).__call__ is not Operator.__call__:
+        target = prior.__call__
+    else:
+        target = prior._apply
+    try:
+        parameters = inspect.signature(target).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        or (
+            parameter.name == "seed"
+            and parameter.kind is not inspect.Parameter.POSITIONAL_ONLY
+        )
+        for parameter in parameters
+    )
 
 
 class TrainingDataset(Operator):
@@ -196,7 +228,10 @@ class SimulationDataset(TrainingDataset):
             ``pipekit_cycle.ForwardModel`` — exposes ``step(state, dt)``
             and ``dt``. Workspace-internal package; resolves through the
             ``[cycle]`` extra at runtime.
-        prior: Zero-arg `Operator` returning a parameter sample.
+        prior: `Operator` returning a parameter sample. It is called with
+            ``seed=`` if its signature accepts that, and with no arguments
+            otherwise; the choice is made once, at construction. Observation
+            noise drawn inside the prior is seeded by this call.
         n_samples: Total samples per epoch.
         cycle: Optional ``pipekit_cycle.Cycle`` for trajectory rollouts.
             When ``None``, the dataset emits single-step pairs.
@@ -254,6 +289,7 @@ class SimulationDataset(TrainingDataset):
             )
         self.forward_model = forward_model
         self.prior = prior
+        self._prior_accepts_seed = _accepts_seed(prior)
         self.n_samples = int(n_samples)
         self.cycle = cycle
         self.obs_op = obs_op
@@ -274,11 +310,9 @@ class SimulationDataset(TrainingDataset):
             raise IndexError(idx)
         # Per-sample deterministic seed so splits don't overlap.
         sample_seed = self.seed + self._split_offset() + idx
-        # The prior's call protocol: takes an optional seed kwarg if it
-        # accepts one; otherwise just call.
-        try:
+        if self._prior_accepts_seed:
             params = self.prior(seed=sample_seed)
-        except TypeError:
+        else:
             params = self.prior()
         if self.cycle is not None:
             output = self.cycle(params)
