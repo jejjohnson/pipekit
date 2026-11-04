@@ -20,6 +20,7 @@ from importlib import import_module
 from typing import Any, ClassVar, Literal
 
 from pipekit import CarryState, Operator, StatefulOperator, dumps
+from pipekit.hashing import pipeline_hash
 
 from pipekit_train.dataset import TrainingDataset
 from pipekit_train.loss import Loss
@@ -423,6 +424,13 @@ class TrainingLoop(StatefulOperator):
                 model_registry_uri = last_uri
             if last_hash:
                 trained_model_hash = last_hash
+
+        # The hash a registry would store this model under, so that it identifies
+        # the weights with or without one.
+        if not trained_model_hash:
+            serialize = getattr(trained_model_op, "serialize_weights", None)
+            weights = serialize() if callable(serialize) else None
+            trained_model_hash = pipeline_hash(trained_model_op, weights)
 
         artifact_cls: Any
         try:
