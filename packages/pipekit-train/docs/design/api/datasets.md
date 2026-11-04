@@ -120,6 +120,8 @@ class SimulationDataset(TrainingDataset):
             to roll out trajectories rather than single steps.
         cycle_state: Optional initial carry state for a stateful cycle;
             deep-copied per item. Defaults to a new CarryState.
+        simulator_version: Optional label for the simulator's behaviour,
+            for changes its config can't show. Part of the content hash.
         obs_op: Optional pipekit_cycle.ObservationOperator applied
             after the forward model. Used for SBI training where the
             target is observed-space outputs, not model-space states.
