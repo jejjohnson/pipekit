@@ -21,6 +21,9 @@ lock-protected. The inner operator runs *outside* the lock, so
 concurrent misses on the same key may compute it more than once (the
 usual memoisation trade-off; correctness is unaffected).
 
+`Cache` raises on a JAX tracer: a tracer has no value to key on, and inside
+``jax.jit`` JAX's compilation cache already does this job.
+
 See master plan Report 2, Group G.
 """
 
@@ -30,6 +33,7 @@ import threading
 from typing import Any
 
 from pipekit._base.operator import Operator, nested_config, require_operator
+from pipekit._base.tracing import is_traced
 from pipekit.hashing import sha256_hex, stable_json, stable_repr
 
 
@@ -42,6 +46,9 @@ class Cache(Operator):
     Attributes:
         hits: Number of cache hits since construction.
         misses: Number of cache misses since construction.
+
+    Raises:
+        TypeError: If called on a JAX tracer, for example inside ``jax.jit``.
 
     Example::
 
@@ -64,6 +71,12 @@ class Cache(Operator):
         self.misses = 0
 
     def _apply(self, x: Any) -> Any:
+        if is_traced(x):
+            raise TypeError(
+                "Cache cannot key a traced value: it has no bytes to hash, so "
+                "different inputs share one entry. Inside jax.jit, JAX's "
+                "compilation cache already does this job."
+            )
         key = _make_key(x, self.inner.get_config())
         with self._lock:
             if key in self._store:

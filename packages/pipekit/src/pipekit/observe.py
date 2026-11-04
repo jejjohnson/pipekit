@@ -25,16 +25,24 @@ pattern: the class itself isn't an `Operator`, but its ``.at()`` /
 controller's state. This keeps the per-step operators tiny while the
 collected data lives on a single object the user can inspect.
 
+Under a JAX transformation these run at trace time. `Snapshot.at` raises,
+because a stored tracer is invalid once the trace ends. `Tap` and `Profile.wrap`
+warn once per instance, because a trace-time callback can be deliberate but a
+trace-time timing never measures the compiled function. `ShapeTrace` is meant
+to run at trace time, so it stays silent.
+
 See master plan Report 2, Group E.
 """
 
 from __future__ import annotations
 
 import time
+import warnings
 from collections.abc import Callable, Iterable
 from typing import Any, ClassVar
 
 from pipekit._base.operator import Operator, nested_config, require_operator
+from pipekit._base.tracing import is_traced
 
 
 class Tap(Operator):
@@ -63,8 +71,18 @@ class Tap(Operator):
     def __init__(self, fn: Callable[[Any], Any], name: str | None = None) -> None:
         self.fn = fn
         self.name = name or getattr(fn, "__name__", "Tap")
+        self._warned_traced = False
 
     def _apply(self, x: Any) -> Any:
+        if not self._warned_traced and is_traced(x):
+            self._warned_traced = True
+            warnings.warn(
+                f"Tap {self.name!r} is running at trace time, so it fires once "
+                "per compilation and sees a tracer. Use jax.debug.callback to "
+                "observe values on every call.",
+                UserWarning,
+                stacklevel=2,
+            )
         self.fn(x)
         return x
 
@@ -86,6 +104,11 @@ class _SnapshotAt(Operator):
         self.key = key
 
     def _apply(self, x: Any) -> Any:
+        if is_traced(x):
+            raise TypeError(
+                f"Snapshot.at({self.key!r}) cannot store a traced value: it is "
+                "invalid once the JAX trace ends."
+            )
         self.controller.captures[self.key] = x
         return x
 
@@ -204,8 +227,17 @@ class _ProfileWrap(Operator):
     def __init__(self, controller: Profile, inner: Operator) -> None:
         self.controller = controller
         self.inner = inner
+        self._warned_traced = False
 
     def _apply(self, *args: Any, **kwargs: Any) -> Any:
+        if not self._warned_traced and is_traced((args, kwargs)):
+            self._warned_traced = True
+            warnings.warn(
+                f"Profile.wrap({type(self.inner).__name__}) is running at trace "
+                "time, so its timings measure tracing, not the compiled function.",
+                UserWarning,
+                stacklevel=2,
+            )
         t0 = time.perf_counter()
         out = self.inner(*args, **kwargs)
         elapsed = time.perf_counter() - t0
