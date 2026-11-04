@@ -818,3 +818,70 @@ def test_evaluate_weights_a_short_last_batch_by_its_size():
 
     # equal batch weights would give mean(0, 0, 10) = 3.33…
     assert metrics["mean_y"] == pytest.approx(2.0)
+
+
+def test_evaluate_compiles_each_batch_shape_once_across_rounds():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    val = [(np.zeros(1, dtype=np.float32), np.float32(i)) for i in range(5)]
+    traces = 0
+
+    class CountTraces:
+        def loss_fn(self, model, batch, key):
+            nonlocal traces
+            traces += 1
+            _, y = batch
+            return jnp.mean(y), {"mean_y": jnp.mean(y)}
+
+    task = CountTraces()
+    for _ in range(3):
+        metrics = _evaluate(None, val, 2, task, jax.random.PRNGKey(0))
+
+    # batches of 2 and the last batch of 1: two shapes, so two traces in total
+    assert traces == 2
+    assert metrics["mean_y"] == pytest.approx(2.0)
+
+
+def test_evaluate_gives_each_batch_its_own_key_under_jit():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    val = [(np.zeros(1, dtype=np.float32), np.float32(0.0)) for _ in range(4)]
+
+    class Stochastic:
+        def loss_fn(self, model, batch, key):
+            draw = jax.random.uniform(key)
+            return draw, {"draw": draw}
+
+    task = Stochastic()
+    first = _evaluate(None, val, 2, task, jax.random.PRNGKey(0))["draw"]
+    second = _evaluate(None, val, 2, task, jax.random.PRNGKey(1))["draw"]
+
+    # one key per batch: the mean of two draws, not one draw repeated
+    k = jax.random.PRNGKey(0)
+    k, a = jax.random.split(k)
+    k, b = jax.random.split(k)
+    expected = (float(jax.random.uniform(a)) + float(jax.random.uniform(b))) / 2
+    assert first == pytest.approx(expected)
+    assert first != second
+
+
+def test_compiled_evaluate_matches_the_eager_loop():
+    from pipekit_train.adapters.equinox import _eval_pass, _evaluate
+
+    model = _toy_mlp(jax.random.PRNGKey(0))
+    val = _synthetic_regression(n=21)
+    task = _SynthesisedTask(MSE())
+    metrics = _evaluate(model, val, 4, task, jax.random.PRNGKey(0))
+
+    total = 0.0
+    n = 0
+    key = jax.random.PRNGKey(0)
+    for batch in _eval_pass(val, 4):
+        key, batch_key = jax.random.split(key)
+        _, aux = task.loss_fn(model, batch, batch_key)
+        size = len(batch[0])
+        total += float(aux["mse"]) * size
+        n += size
+
+    assert n == 21
+    assert metrics["mse"] == pytest.approx(total / n, rel=1e-5)

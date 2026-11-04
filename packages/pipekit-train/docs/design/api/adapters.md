@@ -48,8 +48,9 @@ class TrainState(eqx.Module):
 class TrainTask(Protocol):
     """User-defined Equinox training target. Mirrors eqx_trainer D4.
 
-    Provide `loss_fn`; optionally provide `eval_fn`. The adapter
-    synthesises a TrainTask from `loop.loss` if none is supplied.
+    Provide `loss_fn`. The adapter synthesises a TrainTask from
+    `loop.loss` if none is supplied. Evaluation compiles `loss_fn` and
+    averages its aux metrics per sample; an `eval_fn` hook is planned.
     """
     def loss_fn(
         self,
@@ -57,13 +58,6 @@ class TrainTask(Protocol):
         batch: Any,
         key: jax.Array,
     ) -> tuple[jax.Array, dict[str, jax.Array]]: ...
-
-    def eval_fn(
-        self,
-        model: eqx.Module,
-        batch: Any,
-        key: jax.Array,
-    ) -> dict[str, jax.Array]: ...
 
 
 @eqx.filter_jit

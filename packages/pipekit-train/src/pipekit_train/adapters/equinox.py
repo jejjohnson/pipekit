@@ -243,13 +243,15 @@ def shard_train_state(state: TrainState, spec: ShardingSpec) -> TrainState:
 class TrainTask(Protocol):
     """User-defined Equinox training target.
 
-    Provide ``loss_fn`` (required); optionally provide ``eval_fn``.
-    The adapter synthesises a `TrainTask` from ``loop.loss`` when no
-    explicit task is supplied.
+    Provide ``loss_fn``. The adapter synthesises a `TrainTask` from
+    ``loop.loss`` when no explicit task is supplied.
+
+    Evaluation also calls ``loss_fn``, compiled, and averages its aux metrics
+    per sample across the validation set. An ``eval_fn`` hook is planned but
+    isn't called yet.
 
     Signatures:
         loss_fn(model, batch, key) -> (scalar_loss, aux_metrics_dict)
-        eval_fn(model, batch, key) -> metrics_dict  (optional)
     """
 
     def loss_fn(
@@ -664,6 +666,22 @@ def _iter_streaming(
 # ---------------------------------------------------------------------
 
 
+@eqx.filter_jit
+def _eval_step(
+    model: eqx.Module,
+    batch: Any,
+    key: jax.Array,
+    task: TrainTask,
+) -> dict[str, jax.Array]:
+    """Compiled aux metrics for one validation batch.
+
+    ``task`` is a static argument, as in `train_step`. A full batch and the
+    shorter last batch each compile once, and later eval rounds reuse both.
+    """
+    _, aux = task.loss_fn(model, batch, key)
+    return aux
+
+
 def _evaluate(
     model: eqx.Module,
     val_dataset: Any,
@@ -690,7 +708,7 @@ def _evaluate(
     iterator = _eval_pass(val_dataset, batch_size)
     for batch in iterator:
         key, batch_key = jax.random.split(key)
-        _, aux = task.loss_fn(model, batch, batch_key)
+        aux = _eval_step(model, batch, batch_key, task)
         size = len(batch[0])
         for k, v in aux.items():
             sums[k] = sums.get(k, 0.0) + float(np.asarray(v)) * size
