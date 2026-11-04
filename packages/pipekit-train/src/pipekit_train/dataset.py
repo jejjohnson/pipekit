@@ -76,6 +76,36 @@ def _accepts_seed(prior: Operator) -> bool:
     )
 
 
+def _content_key(value: Any) -> Any:
+    """Return a JSON-safe key that covers all of ``value``'s content.
+
+    ``repr`` truncates large arrays and rounds floats, so two different states
+    could share a hash and then a cache. Arrays are keyed by their bytes instead.
+
+    Args:
+        value: A carry state, or any value held in one.
+
+    Returns:
+        Nested dicts and lists, with a digest for each array and ``stable_repr``
+        for anything else.
+    """
+    if isinstance(value, CarryState):
+        fields = _content_key(value.to_dict())
+        return {"class": type(value).__qualname__, "fields": fields}
+    if isinstance(value, dict):
+        return {str(key): _content_key(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_content_key(item) for item in value]
+    is_array = hasattr(value, "shape") and hasattr(value, "dtype")
+    if is_array and callable(getattr(value, "tobytes", None)):
+        return {
+            "dtype": str(value.dtype),
+            "shape": list(value.shape),
+            "sha256": sha256_hex(value.tobytes()),
+        }
+    return stable_repr(value)
+
+
 class TrainingDataset(Operator):
     """Abstract base — yields ``(input, target)`` pairs.
 
@@ -380,7 +410,7 @@ class SimulationDataset(TrainingDataset):
         }
         # Only when set, so that existing hashes and caches stay valid.
         if self.cycle_state is not None:
-            recipe["cycle_state"] = stable_repr(self.cycle_state)
+            recipe["cycle_state"] = _content_key(self.cycle_state)
         return hash_config("SimulationDataset", recipe)
 
     def get_config(self) -> dict[str, Any]:

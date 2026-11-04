@@ -264,6 +264,34 @@ def test_simulation_dataset_hashes_cycle_state_only_when_set():
     assert equal_a.content_hash() != build().content_hash()
 
 
+def test_simulation_dataset_hashes_all_of_a_large_array_in_cycle_state():
+    pc = pytest.importorskip("pipekit_cycle")
+    covariance = np.zeros(2000)
+    changed = covariance.copy()
+    # repr elides the middle of an array this long, so it can't see this element
+    changed[500] = 1.0
+    assert repr(pc.DAState(obs_err_cov=covariance)) == repr(
+        pc.DAState(obs_err_cov=changed)
+    )
+
+    def build(state: Any) -> SimulationDataset:
+        return SimulationDataset(
+            forward_model=_MockForward(),
+            prior=_MockPrior(),
+            n_samples=10,
+            cycle_state=state,
+        )
+
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        != build(pc.DAState(obs_err_cov=changed)).content_hash()
+    )
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        == build(pc.DAState(obs_err_cov=covariance.copy())).content_hash()
+    )
+
+
 def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
