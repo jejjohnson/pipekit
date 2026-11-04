@@ -92,6 +92,15 @@ class Sequential(Operator):
         """
         return any(getattr(op, "_is_stateful", False) for op in self.operators)
 
+    @property
+    def is_stateful(self) -> bool:
+        """True if any contained operator is a `StatefulOperator`.
+
+        Such a pipeline is called as ``pipe(carrier, state)`` and returns
+        ``(carrier, state)``, so it can step a pipekit-cycle cycle.
+        """
+        return self._is_stateful
+
     def _apply(self, carrier: Carrier = _MISSING, state: Any = _MISSING) -> Any:
         """Run the pipeline, dispatching between stateless and stateful modes.
 

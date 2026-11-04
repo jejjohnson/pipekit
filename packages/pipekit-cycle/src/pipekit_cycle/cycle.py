@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pipekit import Operator, StatefulOperator
+from pipekit import Operator, Sequential, StatefulOperator
 from pipekit._base.operator import nested_config
 
 from pipekit_cycle.protocols import ForwardModel
@@ -47,23 +47,34 @@ class _ForwardModelAdapter(StatefulOperator):
         return {"model_class": type(self.model).__name__}
 
 
-def _coerce_step(step_op: Any) -> StatefulOperator:
-    """Return ``step_op`` as a `StatefulOperator`.
+def _coerce_step(step_op: Any) -> StatefulOperator | Sequential:
+    """Return ``step_op`` as something called with ``(carrier, state)``.
 
     Accepts:
       - A `StatefulOperator` instance — returned as-is.
+      - A `Sequential` holding at least one stateful step — returned as-is,
+        since it already threads the state.
       - A `ForwardModel` (anything satisfying the Protocol that isn't
         already a `StatefulOperator`) — wrapped in `_ForwardModelAdapter`.
 
     Raises:
-        TypeError: if neither shape matches.
+        TypeError: if neither shape matches, including a `Sequential` with no
+            stateful step, which isn't a transition of the carry state.
     """
     if isinstance(step_op, StatefulOperator):
         return step_op
+    if isinstance(step_op, Sequential):
+        if step_op.is_stateful:
+            return step_op
+        raise TypeError(
+            "A Sequential with no stateful step is not a transition of the carry "
+            "state; wrap it in a CallableForward or a ForwardModel."
+        )
     if isinstance(step_op, ForwardModel):
         return _ForwardModelAdapter(step_op)
     raise TypeError(
-        "step_op must be a StatefulOperator or a ForwardModel, "
+        "step_op must be a StatefulOperator, a stateful Sequential or a "
+        "ForwardModel, "
         f"got {type(step_op).__name__}."
     )
 
@@ -74,9 +85,10 @@ class Cycle(StatefulOperator):
     Equivalent in shape to ``jax.lax.scan`` but carrier-agnostic.
 
     Args:
-        step_op: A `StatefulOperator` or a `ForwardModel`. The latter
-            is wrapped automatically so domain libraries can pass their
-            forward-model adapters directly.
+        step_op: A `StatefulOperator`, a `Sequential` holding a stateful
+            step, or a `ForwardModel`. The latter is wrapped automatically
+            so domain libraries can pass their forward-model adapters
+            directly.
         n_steps: Number of steps to take. Must be ≥ 0; ``0`` is a
             no-op that returns the inputs unchanged.
         save_history: When ``True``, intermediate ``(carrier, state)``

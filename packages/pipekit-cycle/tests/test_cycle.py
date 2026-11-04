@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from pipekit import Lambda, Sequential, StatefulOperator
 from pipekit_cycle import (
     Cycle,
     EnsembleCycle,
@@ -118,3 +120,75 @@ def test_windowed_cycle_short_stream_raises(AddOneStateful_cls):
     cyc = WindowedCycle(step_op=AddOneStateful_cls(), window=5)
     with pytest.raises(ValueError, match="shorter than one window"):
         cyc([1.0, 2.0], None)
+
+
+# --- A Sequential with a stateful step is a valid cycle step ---------------
+
+
+class _Count(StatefulOperator):
+    def _apply(self, carrier, state):
+        state.count += 1
+        return carrier, state
+
+
+def _composed_step(matrix) -> Sequential:
+    return Sequential([Lambda(lambda x: matrix @ x), _Count()])
+
+
+def test_cycle_accepts_a_stateful_sequential(SimpleState_cls):
+    matrix = np.array([[2.0, 1.0], [0.0, 3.0]])
+    x0 = np.array([1.0, -1.0])
+
+    carrier, state = Cycle(_composed_step(matrix), n_steps=3)(x0, SimpleState_cls())
+
+    np.testing.assert_array_equal(carrier, np.linalg.matrix_power(matrix, 3) @ x0)
+    assert state.count == 3
+
+
+def test_ensemble_cycle_accepts_a_stateful_sequential(SimpleState_cls):
+    matrix = 2.0 * np.eye(1)
+    members = [np.array([1.0]), np.array([2.0])]
+
+    out, state = EnsembleCycle(_composed_step(matrix), n_steps=2, n_members=2)(
+        members, SimpleState_cls()
+    )
+
+    np.testing.assert_array_equal(out[0], np.array([4.0]))
+    np.testing.assert_array_equal(out[1], np.array([8.0]))
+    assert state.count == 4
+
+
+def test_windowed_cycle_accepts_a_stateful_sequential(SimpleState_cls):
+    matrix = 2.0 * np.eye(1)
+    stream = [np.array([1.0]), np.array([3.0]), np.array([5.0])]
+
+    outputs, state = WindowedCycle(_composed_step(matrix), window=2)(
+        stream, SimpleState_cls()
+    )
+
+    np.testing.assert_array_equal(outputs[0], np.array([4.0]))
+    np.testing.assert_array_equal(outputs[1], np.array([12.0]))
+    assert state.count == 4
+
+
+def test_recurrence_accepts_a_stateful_sequential(SimpleState_cls):
+    matrix = 2.0 * np.eye(1)
+    condition = Lambda(lambda state: state.count >= 3)
+
+    carrier, state = Recurrence(_composed_step(matrix), condition, max_iters=10)(
+        np.array([1.0]), SimpleState_cls()
+    )
+
+    np.testing.assert_array_equal(carrier, np.array([8.0]))
+    assert state.count == 3
+
+
+def test_cycle_rejects_a_stateless_sequential_and_says_what_to_use():
+    step = Sequential([Lambda(lambda x: 2.0 * x)])
+    with pytest.raises(TypeError, match="CallableForward"):
+        Cycle(step, n_steps=1)
+
+
+def test_sequential_reports_whether_it_is_stateful():
+    assert _composed_step(np.eye(1)).is_stateful
+    assert not Sequential([Lambda(lambda x: x)]).is_stateful
