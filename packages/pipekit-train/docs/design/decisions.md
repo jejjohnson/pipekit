@@ -164,8 +164,10 @@ pipelines without rewrite. `pipekit-array.ModelOp` and (planned)
 `pipekit-jax.JaxModelOp` already exist as the operator wrappers.
 
 **Decision:** The Layer 4 adapter's `run()` returns a
-`pipekit.Operator`. For Equinox, this is a `JaxModelOp` (or a
-domain-specific subclass). For Lightning / Keras, it's a `ModelOp`.
+`pipekit.Operator`. For Equinox, this is the wrapper the user passed in:
+a `JaxModelOp` stays a `JaxModelOp`, which keeps pipekit-train independent
+of pipekit-jax, and an `EquinoxModelOp` stays one. For Lightning / Keras,
+it's a `ModelOp`.
 The wrapper round-trips its weights through a backend-defined
 weight blob (`bytes`) that `ModelRegistry.store(..., weights=...)`
 persists alongside the operator config.

@@ -106,11 +106,8 @@ def test_checkpoint_with_registry_stores_trained_model(tmp_path):
     """The Checkpoint(registry=…) callback stores the trained model
     by content hash and wires the URI back into the artifact.
 
-    Note: round-tripping a trained `eqx.Module` from JSON config alone
-    is a `pipekit-jax.JaxModelOp` v0.2 feature; the in-package
-    `EquinoxModelOp` here only round-trips the operator wrapper, not
-    the array leaves. v0.1's contract is "the hash and URI are recorded
-    in the artifact", not "the weights round-trip through the registry".
+    Reloading a trained `eqx.Module` is a `pipekit-jax.JaxModelOp` feature;
+    `EquinoxModelOp` writes its weights but can't read them back.
     """
     registry = LocalModelRegistry(tmp_path / "models")
     ckpt = Checkpoint(every_n_steps=100, registry=registry)
@@ -189,3 +186,118 @@ def test_run_falls_back_to_local_artifact_without_experiment(monkeypatch):
     assert isinstance(artifact, _LocalArtifact)
     assert artifact.dataset_hash == loop.dataset.content_hash()
     assert artifact.backend_info == {"backend": "equinox"}
+
+
+# ---------------------------------------------------------------------
+# The trained model round-trips, and its hash identifies its weights.
+# ---------------------------------------------------------------------
+
+
+def _jax_model_op():
+    pipekit_jax = pytest.importorskip("pipekit_jax")
+    return pipekit_jax.JaxModelOp(
+        eqx.nn.MLP(1, 1, width_size=8, depth=1, key=jax.random.key(0))
+    )
+
+
+def _loop_on(model_op, **kwargs):
+    loop = _make_loop(dataset=_synth_dataset(), **kwargs)
+    loop.model_op = model_op
+    return loop
+
+
+def _outputs(op):
+    return np.asarray(jax.vmap(op.module)(np.linspace(-1, 1, 7)[:, None]))
+
+
+def test_trained_jax_model_op_reloads_from_the_registry(tmp_path):
+    registry = LocalModelRegistry(tmp_path / "models")
+    skeleton = _jax_model_op()
+    trained, artifact = _loop_on(
+        skeleton, callbacks=(Checkpoint(every_n_steps=100, registry=registry),)
+    ).run()
+
+    assert type(trained) is type(skeleton)
+    assert registry.load_weights(artifact.trained_model_hash)
+    reloaded = skeleton.from_registry(registry, artifact.trained_model_hash)
+    np.testing.assert_array_equal(_outputs(reloaded), _outputs(trained))
+    assert not np.array_equal(_outputs(skeleton), _outputs(trained))
+
+
+def test_trained_equinox_model_op_stores_weights_a_jax_model_op_can_read(tmp_path):
+    registry = LocalModelRegistry(tmp_path / "models")
+    trained, artifact = _make_loop(
+        dataset=_synth_dataset(),
+        callbacks=(Checkpoint(every_n_steps=100, registry=registry),),
+    ).run()
+
+    assert isinstance(trained, EquinoxModelOp)
+    blob = registry.load_weights(artifact.trained_model_hash)
+    reloaded = _jax_model_op().with_weights(blob)
+    np.testing.assert_array_equal(_outputs(reloaded), _outputs(trained))
+
+
+def test_trained_model_hash_needs_no_registry_and_matches_one(tmp_path):
+    registry = LocalModelRegistry(tmp_path / "models")
+    _, without = _make_loop(dataset=_synth_dataset()).run()
+    _, with_registry = _make_loop(
+        dataset=_synth_dataset(),
+        callbacks=(Checkpoint(every_n_steps=100, registry=registry),),
+    ).run()
+
+    assert without.trained_model_hash
+    assert without.trained_model_hash == with_registry.trained_model_hash
+
+
+def test_trained_model_hash_changes_with_the_weights():
+    _, first = _make_loop(dataset=_synth_dataset()).run()
+    _, longer = _make_loop(dataset=_synth_dataset(), max_steps=7).run()
+    assert first.trained_model_hash != longer.trained_model_hash
+
+
+def test_wrapper_keeps_its_other_attributes_through_training():
+    op = _jax_model_op()
+    op.note = "kept"
+    trained, _ = _loop_on(op).run()
+    assert trained.note == "kept"
+    assert op.module is not trained.module
+
+
+def test_equinox_weights_with_a_scalar_field_reload_into_a_jax_model_op():
+    pipekit_jax = pytest.importorskip("pipekit_jax")
+
+    class Scaled(eqx.Module):
+        weight: jax.Array
+        gain: float
+
+        def __call__(self, x):
+            return self.gain * self.weight * x
+
+    blob = EquinoxModelOp(Scaled(jax.numpy.ones(1), 3.0)).serialize_weights()
+    skeleton = pipekit_jax.JaxModelOp(Scaled(jax.numpy.zeros(1), 0.0))
+    reloaded = skeleton.with_weights(blob)
+
+    assert reloaded.module.gain == 3.0
+    np.testing.assert_array_equal(reloaded.module.weight, np.ones(1))
+
+
+def test_module_operator_with_a_module_child_comes_back_trained():
+    pipekit_jax = pytest.importorskip("pipekit_jax")
+
+    class Wrapping(pipekit_jax.JaxOperator):
+        module: eqx.nn.MLP
+
+        def _apply(self, x):
+            return self.module(x)
+
+    start = Wrapping(eqx.nn.MLP(1, 1, width_size=8, depth=1, key=jax.random.key(0)))
+    # This operator's config can't hold an MLP, so it has no hash; training survives.
+    with pytest.warns(UserWarning, match="Can't hash"):
+        trained, artifact = _loop_on(start).run()
+
+    assert artifact.trained_model_hash == ""
+    assert isinstance(trained, Wrapping)
+    assert not np.array_equal(
+        np.asarray(trained.module.layers[0].weight),
+        np.asarray(start.module.layers[0].weight),
+    )

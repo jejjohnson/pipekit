@@ -20,9 +20,9 @@ Module surface:
 - `EquinoxModelOp(Operator)` — wraps a trained ``eqx.Module`` as a
   `pipekit.Operator`. Deliberate in-package twin of
   `pipekit_jax.JaxModelOp` (kept separate so pipekit-train depends only
-  on pipekit core); unlike `JaxModelOp` it has no weight-blob
-  round-trip — wrap the trained module in a `JaxModelOp` when you need
-  `serialize_weights` / `from_registry`.
+  on pipekit core). It can write its weights with `serialize_weights`, but
+  it can't reload them; pass a `JaxModelOp` to `TrainingLoop` for that, and
+  `run` returns the trained model in the same wrapper.
 - `run(loop)` — full end-to-end training entry point.
 
 See ADRs D8, D9, D10 in ``docs/design/decisions.md``.
@@ -30,6 +30,8 @@ See ADRs D8, D9, D10 in ``docs/design/decisions.md``.
 
 from __future__ import annotations
 
+import copy
+import io
 import os
 import time
 from collections.abc import Iterator
@@ -68,9 +70,10 @@ class EquinoxModelOp(Operator):
 
     Public surface used in notebooks and downstream packages. Same
     constructor signature and ``_apply`` shape as
-    ``pipekit_jax.JaxModelOp`` — swap the import when you need the
-    registry weight round-trip (``serialize_weights`` /
-    ``with_weights`` / ``from_registry``), which this in-package twin
+    ``pipekit_jax.JaxModelOp``. It writes its array leaves with
+    ``serialize_weights``, so a registry can store them and two trained
+    models get different hashes. Swap the import when you need to reload
+    them (``with_weights`` / ``from_registry``), which this in-package twin
     deliberately omits so pipekit-train depends only on pipekit core.
 
     The wrapper is marked ``forbid_in_yaml = True`` because an
@@ -97,6 +100,17 @@ class EquinoxModelOp(Operator):
         # eqx.Module is callable (instance method __call__), but ty
         # doesn't know that statically.
         return cast(Any, self.module)(x)
+
+    def serialize_weights(self) -> bytes:
+        """Return the module's leaves as ``tree_serialise_leaves`` bytes.
+
+        Unfiltered, so that Python scalar fields are written too.
+        ``pipekit_jax.JaxModelOp.with_weights`` reads these bytes against an
+        unfiltered skeleton of the same structure.
+        """
+        buffer = io.BytesIO()
+        eqx.tree_serialise_leaves(buffer, self.module)
+        return buffer.getvalue()
 
     def get_config(self) -> dict[str, Any]:
         # __qualname__ matches pipekit_jax.JaxModelOp so the two twins emit
@@ -751,6 +765,29 @@ _any_should_stop = _common.any_should_stop
 # ---------------------------------------------------------------------
 
 
+def _wrap_trained_model(model_op: Any, trained: eqx.Module) -> Operator:
+    """Return ``trained`` in the form the user passed the model in.
+
+    Args:
+        model_op: The operator given to `TrainingLoop`.
+        trained: The module after training.
+
+    Returns:
+        ``trained`` itself when ``model_op`` was already a module, such as a
+        `JaxOperator`; a copy of ``model_op`` holding ``trained`` when it wraps
+        a ``.module``, so a `JaxModelOp` keeps its weight round trip; otherwise
+        a new `EquinoxModelOp`. The order matches how ``run`` unwraps its input:
+        a module may also have a child named ``module``, and it is frozen.
+    """
+    if isinstance(model_op, eqx.Module):
+        return trained if isinstance(trained, Operator) else EquinoxModelOp(trained)
+    if isinstance(getattr(model_op, "module", None), eqx.Module):
+        wrapped = copy.copy(model_op)
+        wrapped.module = trained
+        return wrapped
+    return EquinoxModelOp(trained)
+
+
 def _resolve_checkpoint_dir(checkpoint_dir: str | None, callback: Any) -> str | None:
     """Return the absolute directory for checkpoints, or ``None`` for no saving.
 
@@ -995,7 +1032,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             loop.metric_writer.close()
 
     # --- Wrap the trained module + dispatch on_train_end -------------
-    trained_model_op = EquinoxModelOp(state.model)
+    trained_model_op = _wrap_trained_model(loop.model_op, state.model)
     final_carry = _carry_state(
         state, loop, last_metrics, model_override=trained_model_op
     )

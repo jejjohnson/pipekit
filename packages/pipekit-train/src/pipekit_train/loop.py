@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import json
 import subprocess
+import warnings
 from dataclasses import asdict, dataclass, field
 from importlib import import_module
 from typing import Any, ClassVar, Literal
 
 from pipekit import CarryState, Operator, StatefulOperator, dumps
+from pipekit.hashing import pipeline_hash
 
 from pipekit_train.dataset import TrainingDataset
 from pipekit_train.loss import Loss
@@ -86,6 +88,33 @@ class TrainerCarryState(CarryState):
 # ---------------------------------------------------------------------
 # ValidationStep
 # ---------------------------------------------------------------------
+
+
+def _trained_model_hash(trained_model_op: Operator) -> str:
+    """Return the hash a registry would store this model under.
+
+    It identifies the weights with or without a registry. An operator whose
+    config can't be recorded has no such hash, and that must not lose a run
+    that has already finished training.
+
+    Args:
+        trained_model_op: The operator the backend returned.
+
+    Returns:
+        The content hash, or an empty string if it can't be computed.
+    """
+    serialize = getattr(trained_model_op, "serialize_weights", None)
+    try:
+        weights = serialize() if callable(serialize) else None
+        return pipeline_hash(trained_model_op, weights)
+    except TypeError as error:
+        warnings.warn(
+            f"Can't hash the trained {type(trained_model_op).__name__}, so "
+            f"trained_model_hash stays empty: {error}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return ""
 
 
 class ValidationStep(Operator):
@@ -423,6 +452,9 @@ class TrainingLoop(StatefulOperator):
                 model_registry_uri = last_uri
             if last_hash:
                 trained_model_hash = last_hash
+
+        if not trained_model_hash:
+            trained_model_hash = _trained_model_hash(trained_model_op)
 
         artifact_cls: Any
         try:
