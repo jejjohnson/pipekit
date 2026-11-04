@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.3...pipekit-train-v0.1.4) (2026-11-04)
+
+
+### Features
+
+* **train:** jit the Equinox eval step ([#173](https://github.com/jejjohnson/pipekit/issues/173)) ([e902ca9](https://github.com/jejjohnson/pipekit/commit/e902ca975e8ce487f3886c1472ebe2258fd2fbc6)), closes [#122](https://github.com/jejjohnson/pipekit/issues/122)
+
+
+### Bug Fixes
+
+* **train:** compile the numpyro-svi step ([#170](https://github.com/jejjohnson/pipekit/issues/170)) ([5b6e497](https://github.com/jejjohnson/pipekit/commit/5b6e49742efed2def704bd26248faf897d7364c8)), closes [#160](https://github.com/jejjohnson/pipekit/issues/160)
+* **train:** hash the simulator, so existing SimulationDataset caches miss once ([#176](https://github.com/jejjohnson/pipekit/issues/176)) ([8363a5f](https://github.com/jejjohnson/pipekit/commit/8363a5f562dd3df4749f53c89329601be594317a)), closes [#155](https://github.com/jejjohnson/pipekit/issues/155)
+* **train:** honour Checkpoint.save_dir and save the final step ([#179](https://github.com/jejjohnson/pipekit/issues/179)) ([56b7d8b](https://github.com/jejjohnson/pipekit/commit/56b7d8b3b5dd3bcb58a64aec790871ccea2f7382)), closes [#158](https://github.com/jejjohnson/pipekit/issues/158)
+* **train:** let a trained Equinox model round-trip through the registry ([#181](https://github.com/jejjohnson/pipekit/issues/181)) ([197d65e](https://github.com/jejjohnson/pipekit/commit/197d65e966b5485652f2ddce6024d5a09edcb572))
+* **train:** make SimulationDataset work with a real cycle ([#175](https://github.com/jejjohnson/pipekit/issues/175)) ([90b8d44](https://github.com/jejjohnson/pipekit/commit/90b8d44633eb861c4454f60cb861c3bbc0214950))
+* **train:** rank HyperSweep trials on validation metrics ([#182](https://github.com/jejjohnson/pipekit/issues/182)) ([507b2aa](https://github.com/jejjohnson/pipekit/commit/507b2aa784f300fac9780ec155e24ede64b3f3ef)), closes [#153](https://github.com/jejjohnson/pipekit/issues/153)
+* **train:** stop CachedDataset reopening its zarr store on every item ([#142](https://github.com/jejjohnson/pipekit/issues/142)) ([7c446f1](https://github.com/jejjohnson/pipekit/commit/7c446f141c23164918e2e8b708428b860206120c)), closes [#141](https://github.com/jejjohnson/pipekit/issues/141)
+* **train:** stop SimulationDataset swallowing a TypeError from the prior ([#174](https://github.com/jejjohnson/pipekit/issues/174)) ([94abffd](https://github.com/jejjohnson/pipekit/commit/94abffd0d370fd7a0627e9917867373d37e2e557)), closes [#156](https://github.com/jejjohnson/pipekit/issues/156)
+
 ## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.2...pipekit-train-v0.1.3) (2026-10-27)
 
 

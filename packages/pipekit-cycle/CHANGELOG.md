@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.4](https://github.com/jejjohnson/pipekit/compare/pipekit-cycle-v0.0.3...pipekit-cycle-v0.0.4) (2026-11-04)
+
+
+### Features
+
+* **cycle:** add obs_err_source for a per-step observation-error covariance ([#185](https://github.com/jejjohnson/pipekit/issues/185)) ([2c78c79](https://github.com/jejjohnson/pipekit/commit/2c78c79e0386145fc26c65807f7721e205386d2e)), closes [#164](https://github.com/jejjohnson/pipekit/issues/164)
+
+
+### Bug Fixes
+
+* **cycle:** accept a stateful Sequential as a cycle step ([#183](https://github.com/jejjohnson/pipekit/issues/183)) ([8b1620f](https://github.com/jejjohnson/pipekit/commit/8b1620f1b80548888e1f0d65c6ac5d9ab6ceaa46)), closes [#162](https://github.com/jejjohnson/pipekit/issues/162)
+* **cycle:** let a resumed DA cycle read the next observations ([#184](https://github.com/jejjohnson/pipekit/issues/184)) ([7778186](https://github.com/jejjohnson/pipekit/commit/777818634caed05bd9598e4ace72dd6634c70244)), closes [#163](https://github.com/jejjohnson/pipekit/issues/163)
+
 ## [0.0.3](https://github.com/jejjohnson/pipekit/compare/pipekit-cycle-v0.0.2...pipekit-cycle-v0.0.3) (2026-10-17)
 
 
