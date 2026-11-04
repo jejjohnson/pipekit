@@ -118,6 +118,8 @@ class SimulationDataset(TrainingDataset):
             steps-per-epoch.
         cycle: Optional pipekit_cycle.Cycle wrapping forward_model
             to roll out trajectories rather than single steps.
+        cycle_state: Optional initial carry state for a stateful cycle;
+            deep-copied per item. Defaults to a new CarryState.
         obs_op: Optional pipekit_cycle.ObservationOperator applied
             after the forward model. Used for SBI training where the
             target is observed-space outputs, not model-space states.

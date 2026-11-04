@@ -19,13 +19,14 @@ See ``docs/design/api/datasets.md``.
 
 from __future__ import annotations
 
+import copy
 import inspect
 import os
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
-from pipekit import Lambda, Operator
-from pipekit.hashing import sha256_hex, stable_json
+from pipekit import CarryState, Lambda, Operator
+from pipekit.hashing import sha256_hex, stable_json, stable_repr
 
 
 Split = Literal["train", "val", "test"]
@@ -234,7 +235,10 @@ class SimulationDataset(TrainingDataset):
             noise drawn inside the prior is seeded by this call.
         n_samples: Total samples per epoch.
         cycle: Optional ``pipekit_cycle.Cycle`` for trajectory rollouts.
-            When ``None``, the dataset emits single-step pairs.
+            When ``None``, the dataset emits single-step pairs. A stateful
+            cycle is called as ``cycle(params, state)``, and the dataset
+            keeps the carrier it returns; any other operator as
+            ``cycle(params)``.
         obs_op: Optional ``pipekit_cycle.ObservationOperator``. When
             set, the output is passed through it before yielding
             (used for SBI training where the target is observed-space
@@ -243,6 +247,10 @@ class SimulationDataset(TrainingDataset):
             ``seed + split_offset + i`` so splits don't overlap.
         split: ``"train"``, ``"val"``, or ``"test"``. Partitions the
             seed space (80/10/10 by default).
+        cycle_state: Initial carry state for a stateful ``cycle``, such as a
+            ``pipekit_cycle.DAState``. Defaults to a new ``CarryState``. Each
+            item gets its own deep copy, so samples don't depend on the order
+            they're read in. Part of the content hash when set.
 
     The content hash includes the forward-model ``state_signature``
     (when available) and ``dt``, the prior config, ``n_samples``,
@@ -269,6 +277,8 @@ class SimulationDataset(TrainingDataset):
         obs_op: Any | None = None,
         seed: int = 0,
         split: Split = "train",
+        *,
+        cycle_state: CarryState | None = None,
     ) -> None:
         super().__init__(seed=seed, split=split)
         for name in ("step", "dt"):
@@ -292,6 +302,7 @@ class SimulationDataset(TrainingDataset):
         self._prior_accepts_seed = _accepts_seed(prior)
         self.n_samples = int(n_samples)
         self.cycle = cycle
+        self.cycle_state = cycle_state
         self.obs_op = obs_op
 
     # --- iteration / indexing -------------------------------------------
@@ -315,7 +326,7 @@ class SimulationDataset(TrainingDataset):
         else:
             params = self.prior()
         if self.cycle is not None:
-            output = self.cycle(params)
+            output = self._roll_out(params)
         else:
             output = self.forward_model.step(params, self.forward_model.dt)
         if self.obs_op is not None:
@@ -325,6 +336,17 @@ class SimulationDataset(TrainingDataset):
     def __iter__(self) -> Iterator[tuple[Any, Any]]:
         for i in range(len(self)):
             yield self[i]
+
+    def _roll_out(self, params: Any) -> Any:
+        """Run ``self.cycle`` from ``params`` and return the final carrier."""
+        if not getattr(self.cycle, "_is_stateful", False):
+            return self.cycle(params)
+        if self.cycle_state is None:
+            state = CarryState()
+        else:
+            state = copy.deepcopy(self.cycle_state)
+        output, _ = self.cycle(params, state)
+        return output
 
     def _split_offset(self) -> int:
         """Stable per-split offset into the seed space."""
@@ -336,29 +358,30 @@ class SimulationDataset(TrainingDataset):
     def content_hash(self) -> str:
         fm_sig = getattr(self.forward_model, "state_signature", None)
         fm_dt = getattr(self.forward_model, "dt", None)
-        return hash_config(
-            "SimulationDataset",
-            {
-                "forward_model": {
-                    "class": type(self.forward_model).__qualname__,
-                    "state_signature": repr(fm_sig),
-                    "dt": fm_dt,
-                },
-                "prior": {
-                    "class": type(self.prior).__qualname__,
-                    "config": self.prior.get_config(),
-                },
-                "n_samples": self.n_samples,
-                "cycle": (
-                    type(self.cycle).__qualname__ if self.cycle is not None else None
-                ),
-                "obs_op": (
-                    type(self.obs_op).__qualname__ if self.obs_op is not None else None
-                ),
-                "seed": self.seed,
-                "split": self.split,
+        recipe: dict[str, Any] = {
+            "forward_model": {
+                "class": type(self.forward_model).__qualname__,
+                "state_signature": repr(fm_sig),
+                "dt": fm_dt,
             },
-        )
+            "prior": {
+                "class": type(self.prior).__qualname__,
+                "config": self.prior.get_config(),
+            },
+            "n_samples": self.n_samples,
+            "cycle": (
+                type(self.cycle).__qualname__ if self.cycle is not None else None
+            ),
+            "obs_op": (
+                type(self.obs_op).__qualname__ if self.obs_op is not None else None
+            ),
+            "seed": self.seed,
+            "split": self.split,
+        }
+        # Only when set, so that existing hashes and caches stay valid.
+        if self.cycle_state is not None:
+            recipe["cycle_state"] = stable_repr(self.cycle_state)
+        return hash_config("SimulationDataset", recipe)
 
     def get_config(self) -> dict[str, Any]:
         return {
@@ -370,6 +393,9 @@ class SimulationDataset(TrainingDataset):
             ),
             "obs_op": (
                 type(self.obs_op).__qualname__ if self.obs_op is not None else None
+            ),
+            "cycle_state": (
+                stable_repr(self.cycle_state) if self.cycle_state is not None else None
             ),
             "seed": self.seed,
             "split": self.split,
