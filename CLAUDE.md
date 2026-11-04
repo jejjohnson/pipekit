@@ -28,13 +28,24 @@ pipekit-train, 12 covers pipekit-experiment.
 ## Common Commands
 
 ```bash
-make install              # uv sync --all-groups + pre-commit hooks
+make install              # uv sync --all-groups, minus train-extras, + pre-commit hooks
 make test                 # uv run pytest -v (all packages)
 make format               # ruff format . && ruff check --fix .
 make lint                 # ruff check .
 make typecheck            # ty check across all package src dirs
 make precommit            # pre-commit run --all-files
 make docs-serve           # local MkDocs preview
+```
+
+### Running the pipekit-train adapter tests
+
+The Equinox and Bayesian adapter tests skip unless the `train-extras` group is
+installed, as the CI test job does. `make install` leaves it out because ty
+reports new diagnostics once it can see those libraries.
+
+```bash
+uv sync --group dev --group train-extras
+uv run --group train-extras pytest packages/pipekit-train/tests
 ```
 
 ### Running a single test

@@ -97,7 +97,7 @@ version: ## 📋 Display package version and git hash
 
 install: ## 📦 Install all dependency groups via uv + pre-commit hooks
 	@printf "$(YELLOW)>>> Installing all dependencies...$(RESET)\n"
-	uv sync --all-groups
+	uv sync --all-groups --no-group train-extras
 	uv run pre-commit install
 	@printf "$(GREEN)>>> ✅ Installation complete!$(RESET)\n"
 

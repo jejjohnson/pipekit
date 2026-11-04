@@ -58,6 +58,13 @@ dev = [
     "pipekit-train",
     "pipekit-jax",
 ]
+# The pipekit-train extras that have test modules behind them. Only the test job
+# installs these: the typecheck job syncs the default `dev` group, and ty reports
+# new diagnostics once it can see these libraries. Lightning stays out because
+# torch is too large for the job.
+train-extras = [
+    "pipekit-train[equinox,numpyro,blackjax,cache]",
+]
 lint = [
     "ruff>=0.15.11",
 ]
