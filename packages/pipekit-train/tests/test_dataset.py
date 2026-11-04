@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Operator
+from pipekit import Lambda, Operator
 from pipekit_train.dataset import (
     CachedDataset,
     IterableDataset,
@@ -141,6 +141,57 @@ def test_iterable_dataset_content_hash_depends_on_user_hash_and_split():
 
 
 # --- SimulationDataset ----------------------------------------------------
+
+
+def test_simulation_dataset_raises_a_typeerror_from_inside_the_prior():
+    calls = []
+
+    class BrokenPrior(Operator):
+        def _apply(self, *, seed=None):
+            calls.append(seed)
+            raise TypeError("a real bug inside the prior")
+
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=BrokenPrior(), n_samples=10
+    )
+    with pytest.raises(TypeError, match="real bug"):
+        sim[0]
+    assert calls == [0]
+
+
+def test_simulation_dataset_calls_a_seedless_prior_without_seed():
+    class Fixed(Operator):
+        def _apply(self):
+            return np.ones(2)
+
+    sim = SimulationDataset(forward_model=_MockForward(), prior=Fixed(), n_samples=10)
+    np.testing.assert_array_equal(sim[0][0], np.ones(2))
+
+
+def test_simulation_dataset_reads_a_lambda_priors_function_signature():
+    seedless = Lambda(lambda: np.ones(2))
+    seeded = Lambda(lambda seed: np.full(2, float(seed)))
+
+    sim = SimulationDataset(forward_model=_MockForward(), prior=seedless, n_samples=10)
+    np.testing.assert_array_equal(sim[3][0], np.ones(2))
+
+    sim = SimulationDataset(forward_model=_MockForward(), prior=seeded, n_samples=10)
+    np.testing.assert_array_equal(sim[3][0], np.full(2, 3.0))
+
+
+def test_simulation_dataset_seeds_each_sample_by_its_index():
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    np.testing.assert_array_equal(sim[2][0], sim[2][0])
+    assert not np.array_equal(sim[2][0], sim[3][0])
+
+
+def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
+    sim = SimulationDataset(
+        forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
+    )
+    np.testing.assert_array_equal(pickle.loads(pickle.dumps(sim))[2][0], sim[2][0])
 
 
 def test_simulation_dataset_yields_pairs():
