@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 import inspect
 import os
+import warnings
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
@@ -74,6 +75,25 @@ def _accepts_seed(prior: Operator) -> bool:
         )
         for parameter in parameters
     )
+
+
+def _component_identity(component: Any) -> dict[str, Any] | None:
+    """Return the class and config that identify a simulation component.
+
+    Args:
+        component: A forward model, cycle or observation operator, or ``None``.
+
+    Returns:
+        ``None`` for no component. Otherwise its class name and its
+        ``get_config()``, with a config of ``None`` if it has no such method.
+    """
+    if component is None:
+        return None
+    get_config = getattr(component, "get_config", None)
+    return {
+        "class": type(component).__qualname__,
+        "config": get_config() if callable(get_config) else None,
+    }
 
 
 class TrainingDataset(Operator):
@@ -251,10 +271,18 @@ class SimulationDataset(TrainingDataset):
             ``pipekit_cycle.DAState``. Defaults to a new ``CarryState``. Each
             item gets its own deep copy, so samples don't depend on the order
             they're read in. Part of the content hash when set.
+        simulator_version: Label for the simulator's behaviour, such as
+            ``"qg-v2"``. Change it whenever the simulator changes in a way its
+            config can't show, because a Python function can't be hashed
+            reliably.
 
-    The content hash includes the forward-model ``state_signature``
-    (when available) and ``dt``, the prior config, ``n_samples``,
-    ``seed``, and ``split`` — anything that affects the data.
+    The content hash covers the class and ``get_config()`` of the forward
+    model, cycle and observation operator, the forward model's
+    ``state_signature`` and ``dt``, the prior config, ``n_samples``, ``seed``,
+    ``split``, ``cycle_state`` and ``simulator_version``. Code changes that
+    none of these show aren't detected. `content_hash` warns once per dataset
+    when the forward model is a wrapped function or has no ``get_config``, and
+    no ``simulator_version`` is set.
     """
 
     forbid_in_yaml: ClassVar[bool] = True  # forward_model often carries closures
@@ -279,6 +307,7 @@ class SimulationDataset(TrainingDataset):
         split: Split = "train",
         *,
         cycle_state: CarryState | None = None,
+        simulator_version: str | None = None,
     ) -> None:
         super().__init__(seed=seed, split=split)
         for name in ("step", "dt"):
@@ -303,6 +332,8 @@ class SimulationDataset(TrainingDataset):
         self.n_samples = int(n_samples)
         self.cycle = cycle
         self.cycle_state = cycle_state
+        self.simulator_version = simulator_version
+        self._warned_unidentified = False
         self.obs_op = obs_op
 
     # --- iteration / indexing -------------------------------------------
@@ -355,30 +386,44 @@ class SimulationDataset(TrainingDataset):
 
     # --- hashing / config ----------------------------------------------
 
+    def _warn_if_simulator_unidentified(self) -> None:
+        """Warn once if the hash can't tell this simulator from another."""
+        if self._warned_unidentified or self.simulator_version is not None:
+            return
+        wraps_function = callable(getattr(self.forward_model, "fn", None))
+        has_config = callable(getattr(self.forward_model, "get_config", None))
+        if has_config and not wraps_function:
+            return
+        self._warned_unidentified = True
+        warnings.warn(
+            f"SimulationDataset can't tell this {type(self.forward_model).__name__} "
+            "from another of the same class, so a cache may serve stale outputs "
+            "after the simulator changes. Pass simulator_version= to identify it.",
+            UserWarning,
+            stacklevel=3,
+        )
+
     def content_hash(self) -> str:
+        self._warn_if_simulator_unidentified()
         fm_sig = getattr(self.forward_model, "state_signature", None)
         fm_dt = getattr(self.forward_model, "dt", None)
         recipe: dict[str, Any] = {
             "forward_model": {
-                "class": type(self.forward_model).__qualname__,
+                **cast(dict[str, Any], _component_identity(self.forward_model)),
                 "state_signature": repr(fm_sig),
                 "dt": fm_dt,
+                "version": self.simulator_version,
             },
             "prior": {
                 "class": type(self.prior).__qualname__,
                 "config": self.prior.get_config(),
             },
             "n_samples": self.n_samples,
-            "cycle": (
-                type(self.cycle).__qualname__ if self.cycle is not None else None
-            ),
-            "obs_op": (
-                type(self.obs_op).__qualname__ if self.obs_op is not None else None
-            ),
+            "cycle": _component_identity(self.cycle),
+            "obs_op": _component_identity(self.obs_op),
             "seed": self.seed,
             "split": self.split,
         }
-        # Only when set, so that existing hashes and caches stay valid.
         if self.cycle_state is not None:
             recipe["cycle_state"] = stable_repr(self.cycle_state)
         return hash_config("SimulationDataset", recipe)
@@ -397,6 +442,7 @@ class SimulationDataset(TrainingDataset):
             "cycle_state": (
                 stable_repr(self.cycle_state) if self.cycle_state is not None else None
             ),
+            "simulator_version": self.simulator_version,
             "seed": self.seed,
             "split": self.split,
         }

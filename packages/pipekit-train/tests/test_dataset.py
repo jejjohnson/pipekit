@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 from typing import Any
 
 import numpy as np
@@ -262,6 +263,113 @@ def test_simulation_dataset_hashes_cycle_state_only_when_set():
     assert equal_a.content_hash() == equal_b.content_hash()
     assert equal_a.content_hash() != other.content_hash()
     assert equal_a.content_hash() != build().content_hash()
+
+
+class _ScaledForward:
+    """A forward model whose config shows its behaviour."""
+
+    dt: float = 1.0
+    state_signature: Any = None
+
+    def __init__(self, scale: float) -> None:
+        self.scale = scale
+
+    def step(self, state: Any, dt: float) -> Any:
+        return self.scale * state
+
+    def get_config(self) -> dict[str, Any]:
+        return {"scale": self.scale}
+
+
+def _simulation(forward: Any, **kwargs: Any) -> SimulationDataset:
+    return SimulationDataset(
+        forward_model=forward, prior=_MockPrior(), n_samples=10, **kwargs
+    )
+
+
+def test_content_hash_changes_with_the_simulators_config():
+    assert (
+        _simulation(_ScaledForward(1.0)).content_hash()
+        != _simulation(_ScaledForward(2.0)).content_hash()
+    )
+    assert (
+        _simulation(_ScaledForward(1.0)).content_hash()
+        == _simulation(_ScaledForward(1.0)).content_hash()
+    )
+
+
+def test_cache_misses_when_the_simulator_changes(tmp_path):
+    pytest.importorskip("zarr")
+    first = CachedDataset(
+        source=_simulation(_ScaledForward(1.0)), cache_dir=str(tmp_path)
+    )
+    second = CachedDataset(
+        source=_simulation(_ScaledForward(2.0)), cache_dir=str(tmp_path)
+    )
+    params, once = first[0]
+    _, twice = second[0]
+
+    np.testing.assert_allclose(once, params)
+    np.testing.assert_allclose(twice, 2.0 * params)
+
+
+def test_content_hash_covers_the_cycle_and_obs_op_configs():
+    class Scale(Operator):
+        def __init__(self, factor: float) -> None:
+            self.factor = factor
+
+        def _apply(self, x: Any) -> Any:
+            return self.factor * x
+
+    forward = _ScaledForward(1.0)
+    base = _simulation(forward)
+    assert (
+        _simulation(forward, obs_op=Scale(1.0)).content_hash()
+        != _simulation(forward, obs_op=Scale(2.0)).content_hash()
+    )
+    assert (
+        _simulation(forward, cycle=Scale(1.0)).content_hash()
+        != _simulation(forward, cycle=Scale(2.0)).content_hash()
+    )
+    assert _simulation(forward, cycle=Scale(1.0)).content_hash() != base.content_hash()
+
+
+def test_simulator_version_separates_wrapped_functions():
+    pc = pytest.importorskip("pipekit_cycle")
+    first = pc.CallableForward(lambda x, dt: x, dt=1.0)
+    second = pc.CallableForward(lambda x, dt: 2 * x, dt=1.0)
+
+    assert (
+        _simulation(first, simulator_version="a").content_hash()
+        != _simulation(second, simulator_version="b").content_hash()
+    )
+    assert (
+        _simulation(first, simulator_version="a").content_hash()
+        == _simulation(second, simulator_version="a").content_hash()
+    )
+
+
+@pytest.mark.parametrize("kind", ["function", "no_config"])
+def test_content_hash_warns_once_when_the_simulator_is_unidentified(kind):
+    if kind == "function":
+        pc = pytest.importorskip("pipekit_cycle")
+        forward = pc.CallableForward(lambda x, dt: x, dt=1.0)
+    else:
+        forward = _MockForward()
+    sim = _simulation(forward)
+
+    with pytest.warns(UserWarning, match="simulator_version"):
+        sim.content_hash()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        sim.content_hash()
+
+
+def test_content_hash_is_silent_when_the_simulator_is_identified():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _simulation(_ScaledForward(1.0)).content_hash()
+        _simulation(_MockForward(), simulator_version="a").content_hash()
 
 
 def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
