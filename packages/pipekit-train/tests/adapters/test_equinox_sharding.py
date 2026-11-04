@@ -243,3 +243,39 @@ def test_sharded_training_converges(dataset_kind: str) -> None:
         "data_pspec": str(PartitionSpec("data")),
         "num_processes": 1,
     }
+
+
+def test_sharded_training_runs_compiled_eval_with_a_short_last_batch() -> None:
+    from pipekit_train.adapters.equinox import run as equinox_run
+
+    class RecordEval:
+        def __init__(self) -> None:
+            self.metrics: list[dict[str, float]] = []
+
+        def on_eval_end(self, loop: Any, state: Any, metrics: dict[str, float]) -> None:
+            self.metrics.append(metrics)
+
+    record = RecordEval()
+    model = _toy_mlp(jax.random.key(3))
+    pairs = _pairs(n=64)
+    # 21 validation rows in batches of 8 leave a short last batch of 5
+    val_pairs = _pairs(n=21, seed=1)
+
+    loop = TrainingLoop(
+        model_op=EquinoxModelOp(model),
+        dataset=IterableDataset(source=pairs, content_hash="synth-64"),
+        val_dataset=IterableDataset(source=val_pairs, content_hash="synth-21"),
+        loss=MSE(),
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        max_steps=20,
+        eval_every_n_steps=10,
+        batch_size=8,
+        backend="equinox",
+        sharding=_spec(),
+        callbacks=(record,),
+        seed=0,
+    )
+    equinox_run(loop)
+
+    assert len(record.metrics) == 2
+    assert all(np.isfinite(m["mse"]) for m in record.metrics)

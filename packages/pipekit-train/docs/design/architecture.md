@@ -178,8 +178,8 @@ The adapter is responsible for:
    (Equinox: Grain DataLoader; Lightning: `LightningDataModule`;
    Keras: `tf.data.Dataset` or generator).
 2. Translating `loop.loss` and `loop.task` into the backend's
-   loss / step idiom (Equinox: `TrainTask` Protocol with `loss_fn` +
-   optional `eval_fn`; Lightning: `LightningModule.training_step`;
+   loss / step idiom (Equinox: `TrainTask` Protocol with `loss_fn`;
+   Lightning: `LightningModule.training_step`;
    Keras: `Model.compile(loss=...)`).
 3. Threading `loop.callbacks` into the backend's callback hooks.
 4. Running the training loop.
@@ -198,8 +198,8 @@ The full eqx_trainer design lives inside this one module. Specifically:
   Built by `TrainState.create(model, optimizer)`.
 - `TrainTask(Protocol)` — the user-supplied loss/eval interface.
   Single method `loss_fn(model, batch, key) -> (scalar_loss,
-  aux_metrics_dict)`; optional `eval_fn(model, batch, key) ->
-  metrics_dict`.
+  aux_metrics_dict)`, which evaluation also uses; an `eval_fn` hook
+  is planned.
 - `train_step(state, batch, key, task, optimizer)` — the
   compiled inner loop, `eqx.filter_jit` + `eqx.filter_grad`. Pure
   function; identical to the eqx_trainer primitive.
