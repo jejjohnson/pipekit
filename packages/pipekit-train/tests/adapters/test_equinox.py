@@ -28,6 +28,7 @@ import numpy as np
 import optax
 from pipekit_train import (
     MSE,
+    Checkpoint,
     EarlyStopping,
     IterableDataset,
     JSONLWriter,
@@ -885,3 +886,98 @@ def test_compiled_evaluate_matches_the_eager_loop():
 
     assert n == 21
     assert metrics["mse"] == pytest.approx(total / n, rel=1e-5)
+
+
+# --- Checkpoint directory and final step -----------------------------------
+
+
+def _checkpoint_loop(**kwargs: Any) -> TrainingLoop:
+    return TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.PRNGKey(0))),
+        dataset=_synthetic_regression(),
+        loss=MSE(),
+        backend="equinox",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        batch_size=8,
+        seed=0,
+        **kwargs,
+    )
+
+
+def _saved_steps(directory: Any) -> list[int]:
+    return sorted(int(p.name) for p in directory.iterdir() if p.name.isdigit())
+
+
+def test_checkpoint_save_dir_alone_writes_there(tmp_path):
+    save_dir = tmp_path / "save_dir"
+    _checkpoint_loop(
+        max_steps=25,
+        callbacks=(Checkpoint(every_n_steps=10, keep_last=5, save_dir=save_dir),),
+    ).run()
+    assert 25 in _saved_steps(save_dir)
+
+
+def test_checkpoint_without_a_directory_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _checkpoint_loop(max_steps=5, callbacks=(Checkpoint(every_n_steps=2),)).run()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_checkpoint_rejects_two_different_directories(tmp_path):
+    loop = _checkpoint_loop(
+        max_steps=1,
+        checkpoint_dir=str(tmp_path / "a"),
+        callbacks=(Checkpoint(save_dir=tmp_path / "b"),),
+    )
+    with pytest.raises(ValueError, match="different directories"):
+        loop.run()
+
+
+def test_checkpoint_accepts_the_same_directory_written_two_ways(tmp_path):
+    _checkpoint_loop(
+        max_steps=2,
+        checkpoint_dir=str(tmp_path / "a"),
+        callbacks=(Checkpoint(save_dir=tmp_path / "x" / ".." / "a"),),
+    ).run()
+    assert 2 in _saved_steps(tmp_path / "a")
+
+
+def test_checkpoint_rejects_a_uri():
+    loop = _checkpoint_loop(max_steps=1, callbacks=(Checkpoint(save_dir="s3://b/k"),))
+    with pytest.raises(ValueError, match="local paths"):
+        loop.run()
+
+
+def test_early_stop_saves_its_final_step_and_a_resume_starts_there(tmp_path):
+    class StopAt:
+        def __init__(self, at: int) -> None:
+            self.at = at
+            self.should_stop = False
+
+        def on_step_end(self, loop, state, metrics) -> None:
+            self.should_stop = state.step >= self.at
+
+    directory = tmp_path / "ckpt"
+    checkpoint = Checkpoint(every_n_steps=10, keep_last=5, save_dir=directory)
+    _checkpoint_loop(max_steps=100, callbacks=(checkpoint, StopAt(22))).run()
+    assert _saved_steps(directory)[-1] == 22
+
+    class Steps:
+        def __init__(self) -> None:
+            self.seen: list[int] = []
+
+        def on_step_end(self, loop, state, metrics) -> None:
+            self.seen.append(int(state.step))
+
+    steps = Steps()
+    _checkpoint_loop(max_steps=24, callbacks=(checkpoint, steps)).run()
+    assert steps.seen == [23, 24]
+
+
+def test_final_step_on_the_cadence_is_not_saved_twice(tmp_path):
+    directory = tmp_path / "ckpt"
+    _checkpoint_loop(
+        max_steps=20,
+        callbacks=(Checkpoint(every_n_steps=10, keep_last=5, save_dir=directory),),
+    ).run()
+    assert _saved_steps(directory)[-1] == 20

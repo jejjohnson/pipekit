@@ -80,14 +80,15 @@ class Checkpoint(Operator):
     Args:
         every_n_steps: Cadence.
         keep_last: Number of recent checkpoints to retain on disk.
-        save_dir: Local directory or fsspec URI.
+        save_dir: Local directory, used when
+            `TrainingLoop.checkpoint_dir` isn't set.
         registry: Optional pipekit-experiment.ModelRegistry; when set,
             the final checkpoint is also stored by content hash and
             the URI is wired back into TrainingArtifact.
     """
     every_n_steps: int = 1000
     keep_last: int = 3
-    save_dir: str = "./ckpts"
+    save_dir: str | None = None
     registry: Any | None = None     # pipekit_experiment.ModelRegistry
 ```
 

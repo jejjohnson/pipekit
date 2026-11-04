@@ -13,6 +13,7 @@ contradicts the design's optional-hook model. Adapters dispatch via
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol
 
 from pipekit import Operator
@@ -175,10 +176,10 @@ class EarlyStopping(Operator):
 class Checkpoint(Operator):
     """Save (model_op, optimizer_state) every N steps; final to a registry.
 
-    On each ``on_step_end``, when ``state.step`` is a multiple of
-    ``every_n_steps``, the adapter is expected to save its native
-    checkpoint into ``save_dir``. (The actual save call lives in the
-    adapter; this callback just signals when to fire.)
+    The Equinox adapter saves into ``TrainingLoop.checkpoint_dir`` or
+    ``save_dir`` on this cadence, and always saves the final step. (The
+    actual save call lives in the adapter; this callback only configures it.)
+    Only the Equinox backend writes on-disk snapshots.
 
     When ``registry`` is set, ``on_train_end`` stores the final model
     operator in the registry by content hash, and the URI is recorded
@@ -191,7 +192,11 @@ class Checkpoint(Operator):
             Honored by the adapter's native checkpoint manager
             (Orbax `CheckpointManager.max_to_keep`, Lightning
             `ModelCheckpoint.save_top_k`).
-        save_dir: Local directory or fsspec URI.
+        save_dir: Local directory for snapshots, used when
+            ``TrainingLoop.checkpoint_dir`` isn't set. Setting the two to
+            different directories raises ``ValueError``. With neither set,
+            nothing is written to disk, which suits a callback that only uses
+            ``registry``.
         registry: Optional anything satisfying
             ``pipekit_experiment.ModelRegistry``. When set, the final
             checkpoint is also stored by content hash and the URI is
@@ -214,7 +219,7 @@ class Checkpoint(Operator):
         self,
         every_n_steps: int = 1000,
         keep_last: int = 3,
-        save_dir: str = "./ckpts",
+        save_dir: str | os.PathLike[str] | None = None,
         registry: Any | None = None,
     ) -> None:
         if every_n_steps < 1:
@@ -225,7 +230,7 @@ class Checkpoint(Operator):
             raise ValueError(f"Checkpoint.keep_last must be >= 1; got {keep_last}.")
         self.every_n_steps = int(every_n_steps)
         self.keep_last = int(keep_last)
-        self.save_dir = str(save_dir)
+        self.save_dir = None if save_dir is None else os.fspath(save_dir)
         self.registry = registry
         self.last_uri: str | None = None
         self.last_hash: str | None = None
