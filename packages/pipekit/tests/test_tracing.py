@@ -115,6 +115,32 @@ def test_observers_stay_silent_on_concrete_values() -> None:
     assert "z" in snapshot.captures
 
 
+def test_operators_accept_a_dict_jax_cannot_flatten() -> None:
+    # JAX sorts dict keys when flattening, and 0 and "a" can't be compared.
+    carrier = {0: "zero", "a": "letter"}
+    with pytest.raises(TypeError):
+        jax.tree_util.tree_leaves(carrier)
+
+    assert not is_traced(carrier)
+    fired: list[object] = []
+    written: list[object] = []
+    snapshot = Snapshot()
+    profile = Profile()
+    cache = Cache(Lambda(lambda x: x))
+    pipe = Sequential(
+        [
+            Tap(fired.append),
+            snapshot.at("z"),
+            Sink(written.append),
+            profile.wrap(Lambda(lambda x: x)),
+            cache,
+        ]
+    )
+    assert pipe(carrier) == carrier
+    assert fired == written == [carrier]
+    assert snapshot.captures["z"] == carrier
+
+
 def test_core_works_with_jax_absent() -> None:
     # Setting a sys.modules entry to None makes `import jax` raise ImportError.
     code = (
