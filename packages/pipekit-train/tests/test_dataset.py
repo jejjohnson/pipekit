@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Lambda, Operator
+from pipekit import Lambda, Operator, StatefulOperator
 from pipekit_train.dataset import (
     CachedDataset,
     IterableDataset,
@@ -185,6 +185,111 @@ def test_simulation_dataset_seeds_each_sample_by_its_index():
     )
     np.testing.assert_array_equal(sim[2][0], sim[2][0])
     assert not np.array_equal(sim[2][0], sim[3][0])
+
+
+def _prior_of_ones() -> Lambda:
+    return Lambda(lambda: np.ones(2))
+
+
+def test_simulation_dataset_rolls_out_a_real_cycle():
+    pc = pytest.importorskip("pipekit_cycle")
+    forward = _MockForward()
+    sim = SimulationDataset(
+        forward_model=forward,
+        prior=_prior_of_ones(),
+        n_samples=10,
+        cycle=pc.Cycle(forward, n_steps=24),
+    )
+
+    expected = np.ones(2)
+    for _ in range(24):
+        expected = forward.step(expected, forward.dt)
+    params, output = sim[0]
+
+    np.testing.assert_array_equal(params, np.ones(2))
+    np.testing.assert_array_equal(output, expected)
+
+
+def test_simulation_dataset_samples_dont_depend_on_read_order():
+    pc = pytest.importorskip("pipekit_cycle")
+
+    class AddCount(StatefulOperator):
+        def _apply(self, carrier, state):
+            state.cycle_count += 1
+            return carrier + state.cycle_count, state
+
+    def build() -> SimulationDataset:
+        return SimulationDataset(
+            forward_model=_MockForward(),
+            prior=_MockPrior(),
+            n_samples=10,
+            cycle=AddCount(),
+            cycle_state=pc.DAState(),
+        )
+
+    in_order = build()
+    out_of_order = build()
+    first = [in_order[i][1] for i in (1, 3)]
+    second = out_of_order[3][1], out_of_order[1][1]
+
+    np.testing.assert_array_equal(first[0], second[1])
+    np.testing.assert_array_equal(first[1], second[0])
+    assert in_order.cycle_state.cycle_count == 0
+
+
+def test_simulation_dataset_calls_a_stateless_cycle_with_params_only():
+    sim = SimulationDataset(
+        forward_model=_MockForward(),
+        prior=_prior_of_ones(),
+        n_samples=10,
+        cycle=Lambda(lambda x: 3.0 * x),
+    )
+    np.testing.assert_array_equal(sim[0][1], np.full(2, 3.0))
+
+
+def test_simulation_dataset_hashes_cycle_state_only_when_set():
+    pc = pytest.importorskip("pipekit_cycle")
+
+    def build(**kwargs: Any) -> SimulationDataset:
+        return SimulationDataset(
+            forward_model=_MockForward(), prior=_MockPrior(), n_samples=10, **kwargs
+        )
+
+    assert build().content_hash() == build().content_hash()
+    equal_a = build(cycle_state=pc.DAState(t=1.0))
+    equal_b = build(cycle_state=pc.DAState(t=1.0))
+    other = build(cycle_state=pc.DAState(t=2.0))
+    assert equal_a.content_hash() == equal_b.content_hash()
+    assert equal_a.content_hash() != other.content_hash()
+    assert equal_a.content_hash() != build().content_hash()
+
+
+def test_simulation_dataset_hashes_all_of_a_large_array_in_cycle_state():
+    pc = pytest.importorskip("pipekit_cycle")
+    covariance = np.zeros(2000)
+    changed = covariance.copy()
+    # repr elides the middle of an array this long, so it can't see this element
+    changed[500] = 1.0
+    assert repr(pc.DAState(obs_err_cov=covariance)) == repr(
+        pc.DAState(obs_err_cov=changed)
+    )
+
+    def build(state: Any) -> SimulationDataset:
+        return SimulationDataset(
+            forward_model=_MockForward(),
+            prior=_MockPrior(),
+            n_samples=10,
+            cycle_state=state,
+        )
+
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        != build(pc.DAState(obs_err_cov=changed)).content_hash()
+    )
+    assert (
+        build(pc.DAState(obs_err_cov=covariance)).content_hash()
+        == build(pc.DAState(obs_err_cov=covariance.copy())).content_hash()
+    )
 
 
 def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
