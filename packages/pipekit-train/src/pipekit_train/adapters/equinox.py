@@ -357,6 +357,7 @@ def save_state(
     step: int,
     *,
     data_iter_state: Any = None,
+    force: bool = False,
 ) -> None:
     """Persist the array leaves of ``state`` at ``step``.
 
@@ -373,6 +374,7 @@ def save_state(
             (``<directory>/<step>/data_iter.json``) so resume-from-
             checkpoint restores byte-identical data-iter position
             alongside the weights. See #17.
+        force: Save even if ``step`` is off the manager's cadence.
     """
     import json
     import os
@@ -381,7 +383,7 @@ def save_state(
     import orbax.checkpoint as ocp  # ty: ignore[unresolved-import]
 
     arrays, _ = eqx.partition(state, eqx.is_array)
-    mngr.save(step, args=ocp.args.StandardSave(arrays))
+    mngr.save(step, args=ocp.args.StandardSave(arrays), force=force)
 
     if data_iter_state is not None:
         # Orbax writes the checkpoint asynchronously; the per-step dir
@@ -749,6 +751,40 @@ _any_should_stop = _common.any_should_stop
 # ---------------------------------------------------------------------
 
 
+def _resolve_checkpoint_dir(checkpoint_dir: str | None, callback: Any) -> str | None:
+    """Return the absolute directory for checkpoints, or ``None`` for no saving.
+
+    Args:
+        checkpoint_dir: ``TrainingLoop.checkpoint_dir``.
+        callback: The loop's `Checkpoint` callback, if any; its ``save_dir`` is
+            used when the loop sets no directory.
+
+    Returns:
+        The absolute local path, or ``None`` if neither sets a directory.
+
+    Raises:
+        ValueError: If the two name different directories, or either is a URI,
+            because the data-iterator side-car is written with local paths.
+    """
+    save_dir = getattr(callback, "save_dir", None)
+    for candidate in (checkpoint_dir, save_dir):
+        if candidate and "://" in candidate:
+            raise ValueError(
+                f"Checkpoint directories must be local paths; got {candidate!r}."
+            )
+    directory = checkpoint_dir or save_dir
+    if not directory:
+        return None
+    resolved = os.path.abspath(directory)
+    if checkpoint_dir and save_dir and os.path.abspath(save_dir) != resolved:
+        raise ValueError(
+            f"TrainingLoop.checkpoint_dir ({checkpoint_dir!r}) and "
+            f"Checkpoint.save_dir ({save_dir!r}) name different directories. "
+            "Set one of them."
+        )
+    return resolved
+
+
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     """Train ``loop`` end-to-end. The entry point for the Equinox backend.
 
@@ -820,19 +856,26 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     state = TrainState.create(eqx_module, optimizer, sharding=sharding)
     rng = jax.random.key(loop.seed)
 
-    # --- Checkpoint manager (if checkpoint_dir set) --------------------
+    # --- Checkpoint manager (if a directory is set) --------------------
     mngr: ocp.CheckpointManager | None = None
-    if loop.checkpoint_dir:
-        # Look for a Checkpoint callback to learn cadence + retention.
+    # A Checkpoint callback sets cadence and retention, and may set the directory.
+    checkpoint_cb = next(
+        (
+            cb
+            for cb in loop.callbacks
+            if hasattr(cb, "every_n_steps") and hasattr(cb, "keep_last")
+        ),
+        None,
+    )
+    checkpoint_dir = _resolve_checkpoint_dir(loop.checkpoint_dir, checkpoint_cb)
+    if checkpoint_dir is not None:
         every_n = loop.eval_every_n_steps
         keep_last = 3
-        for cb in loop.callbacks:
-            if hasattr(cb, "every_n_steps") and hasattr(cb, "keep_last"):
-                every_n = int(cb.every_n_steps)
-                keep_last = int(cb.keep_last)
-                break
+        if checkpoint_cb is not None:
+            every_n = int(checkpoint_cb.every_n_steps)
+            keep_last = int(checkpoint_cb.keep_last)
         mngr = ocp.CheckpointManager(
-            directory=os.path.abspath(loop.checkpoint_dir),
+            directory=checkpoint_dir,
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=keep_last,
                 save_interval_steps=every_n,
@@ -918,6 +961,20 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             # Early-stopping check — break before next step.
             if _any_should_stop(loop.callbacks):
                 break
+
+        # --- Save the final step, which is usually off the cadence ---------
+        if (
+            mngr is not None
+            and train_iter is not None
+            and int(state.step) != mngr.latest_step()
+        ):
+            save_state(
+                mngr,
+                state,
+                int(state.step),
+                data_iter_state=train_iter.get_state(),
+                force=True,
+            )
 
         # --- Final eval (if val_dataset and we didn't just eval) ------
         if (
