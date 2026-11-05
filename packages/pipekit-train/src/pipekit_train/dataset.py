@@ -275,6 +275,10 @@ class SimulationDataset(TrainingDataset):
             ``"qg-v2"``. Change it whenever the simulator changes in a way its
             config can't show, because a Python function can't be hashed
             reliably.
+        invert: ``False`` yields ``(params, output)``, for training an emulator.
+            ``True`` yields ``(output, params)``, for training an amortized
+            posterior that maps an observation to parameters. Part of the
+            content hash when set, because the two orders must not share a cache.
 
     The content hash covers the class and ``get_config()`` of the forward
     model, cycle and observation operator, the forward model's
@@ -308,6 +312,7 @@ class SimulationDataset(TrainingDataset):
         *,
         cycle_state: CarryState | None = None,
         simulator_version: str | None = None,
+        invert: bool = False,
     ) -> None:
         super().__init__(seed=seed, split=split)
         for name in ("step", "dt"):
@@ -333,6 +338,7 @@ class SimulationDataset(TrainingDataset):
         self.cycle = cycle
         self.cycle_state = cycle_state
         self.simulator_version = simulator_version
+        self.invert = invert
         self._warned_unidentified = False
         self.obs_op = obs_op
 
@@ -362,7 +368,7 @@ class SimulationDataset(TrainingDataset):
             output = self.forward_model.step(params, self.forward_model.dt)
         if self.obs_op is not None:
             output = self.obs_op(output)
-        return params, output
+        return (output, params) if self.invert else (params, output)
 
     def __iter__(self) -> Iterator[tuple[Any, Any]]:
         for i in range(len(self)):
@@ -426,6 +432,9 @@ class SimulationDataset(TrainingDataset):
         }
         if self.cycle_state is not None:
             recipe["cycle_state"] = _content_key(self.cycle_state)
+        # Only when set, so that the default keeps its hash.
+        if self.invert:
+            recipe["invert"] = True
         return hash_config("SimulationDataset", recipe)
 
     def get_config(self) -> dict[str, Any]:
@@ -443,6 +452,7 @@ class SimulationDataset(TrainingDataset):
                 stable_repr(self.cycle_state) if self.cycle_state is not None else None
             ),
             "simulator_version": self.simulator_version,
+            "invert": self.invert,
             "seed": self.seed,
             "split": self.split,
         }
