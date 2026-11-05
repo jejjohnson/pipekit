@@ -204,8 +204,6 @@ loader idiom:
 |-------------|------------------------------------------------------|
 | Equinox     | Wrap as a `grain.MapDataset` source, then            |
 |             | `grain.DataLoader(operations=[..., grain.Batch(N)])` |
-| Lightning   | Wrap as a `torch.utils.data.IterableDataset`, then   |
-|             | `LightningDataModule` with train/val/test loaders    |
 | Keras       | `tf.data.Dataset.from_generator(dataset.__iter__)`   |
 
 The user does not normally see this — they pass the

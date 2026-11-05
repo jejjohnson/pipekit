@@ -30,8 +30,7 @@ class Loss(Protocol):
 ```
 
 Loss is the *contract* the adapter sees. The adapter is free to wrap
-it in its own native form (Equinox: into a synthesised `TrainTask`;
-Lightning: into `training_step`). Power users who want per-backend
+it in its own native form (Equinox: into a synthesised `TrainTask`). Power users who want per-backend
 custom training behaviour supply the adapter's native interface
 directly and `Loss` is ignored.
 
@@ -78,8 +77,8 @@ with the rest of pipekit (e.g. `Tap` for inspection,
 ## Per-adapter primitives — Equinox
 
 The eqx_trainer primitives live inside the Equinox adapter
-unchanged. They are documented here for completeness; Lightning and
-Keras adapters define their own equivalents.
+unchanged. They are documented here for completeness; the Keras
+adapter defines its own equivalents.
 
 ### `train_step` (Equinox)
 
@@ -155,16 +154,6 @@ The pipekit-train extension on top of these is:
   so users configure cadence in one place.
 
 ---
-
-## Per-adapter primitives — Lightning (v0.2 scaffold)
-
-Lightning's idiom is `LightningModule.training_step` +
-`LightningDataModule`. The Lightning adapter (when implemented)
-synthesises both from `Loss` and `TrainingDataset`. The primitive
-this adapter ships is `_build_lightning_module(loss, model_op)`
-which returns a `LightningModule` whose `training_step` calls
-`loss(model_op(x), y)`. Documented in
-[adapters.md](adapters.md#lightning-v02).
 
 ## Per-adapter primitives — Keras (v0.3 scaffold)
 

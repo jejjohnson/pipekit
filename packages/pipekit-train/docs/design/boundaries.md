@@ -23,26 +23,22 @@ sharded template yields a sharding-aware `restore`). `TrainingLoop` gains
 
 Verified on a CPU-simulated 2-device mesh
 (`tests/adapters/test_equinox_sharding.py`) and a scripted 2-process
-`jax.distributed` smoke (`scripts/multihost_sharding_smoke.py`). The
-Lightning adapter still inherits its distributed support from Lightning
-itself (`Trainer(devices=N)`).
+`jax.distributed` smoke (`scripts/multihost_sharding_smoke.py`).
 
 ### Q2: Gradient accumulation
 
 Should the trainer support micro-batching natively, or should this be
 delegated to the backend? For Equinox, `optax.MultiSteps` is the
 clean answer — it composes with the optimizer transformation without
-any trainer-level changes. For Lightning, `accumulate_grad_batches`
-is a `Trainer` argument that the adapter forwards. Decision:
-**delegate to the backend**; pipekit-train does not invent its own
-accumulation API.
+any trainer-level changes. Decision: **delegate to the backend**;
+pipekit-train does not invent its own accumulation API.
 
 ### Q3: Mixed precision
 
 Equinox doesn't have a built-in mixed-precision API. The cleanest
 approach is a `jmp`-based callback or an `eqx.filter_jit` wrapper
-that casts arrays. Lightning has native `precision=` support; Keras
-has `keras.mixed_precision.set_global_policy`. **Per-backend, no
+that casts arrays. Keras has
+`keras.mixed_precision.set_global_policy`. **Per-backend, no
 carrier-agnostic API.** Documented in each adapter's docs.
 
 ### Q4: Stateful layers (`eqx.nn.State`)
@@ -80,9 +76,8 @@ logging to prevent host-device sync stalls. Deferred to v0.2.
 
 ### Q8: Foundation-model fine-tuning at scale
 
-LoRA / PEFT / QLoRA plug in naturally on the Lightning side (e.g.
-through `peft`'s `LightningModule` wrappers) but pipekit-train adds
-no machinery for them. The training loop sees a `model_op` with the
+LoRA / PEFT / QLoRA plug in at the model level, but
+pipekit-train adds no machinery for them. The training loop sees a `model_op` with the
 right shape; the user is responsible for constructing it with the
 right adapter modules attached. Not a gap in pipekit-train; a
 documentation item.
@@ -95,8 +90,8 @@ These were explicitly considered and rejected for the v0.1 scope.
   processes or manage SLURM / K8s jobs. Use your existing infra.
 - **Hyperparameter search.** Use Optuna, Ray Tune, etc. The trainer
   is a single-run loop. See Q5.
-- **Dataset preparation.** Grain / Lightning DataModule / Keras
-  `tf.data` handle this. We accept their loaders directly.
+- **Dataset preparation.** Grain / Keras `tf.data` handle
+  this. We accept their loaders directly.
 - **Model definition DSL.** Your models are `Operator`s wrapping
   Equinox / PyTorch / Keras modules. We don't wrap them again.
 - **Reinforcement learning.** No environment-step / reward loop.
@@ -112,9 +107,9 @@ All boxes ticked as of the v0.1 polish PR.
   TrainingLoop).
 - [x] Equinox adapter (Layer 4) implemented and tested end-to-end
   on a toy MLP regression task.
-- [x] Lightning and Keras adapter modules exist as scaffolds and
-  raise `NotImplementedError` from `run()` with a clear "this
-  adapter ships in v0.2 / v0.3" message.
+- [x] The Keras adapter module exists as a scaffold and
+  raises `NotImplementedError` from `run()` with a clear "this
+  adapter ships in v0.3" message.
 - [x] `TrainingArtifact` round-trip works against
   `LocalModelRegistry` — `tests/test_experiment_handoff.py`. The
   v0.1 contract is "the hash + URI land in the artifact and the
@@ -183,7 +178,7 @@ the design as written; logged here for honesty.
 ## 14. Versioning targets
 
 - **v0.1** — Layers 0–3 + Equinox adapter (this design).
-- **v0.2** — Lightning adapter; `sweep.py`; multi-device for Equinox
+- **v0.2** — `sweep.py`; multi-device for Equinox
   (Q1); gradient accumulation polish (Q2).
 - **v0.3** — Keras 3 adapter; async logging (Q7); stateful layers
   (Q4); online trainer (Q6).

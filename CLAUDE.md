@@ -128,7 +128,6 @@ packages/
             ├── equinox.py    # reference backend (Equinox+Optax+Orbax+Grain)
             ├── bayes.py      # shared NumPyro/BlackJAX seam (NumpyroTask, …)
             ├── numpyro_svi.py / numpyro_mcmc.py / blackjax.py
-            ├── lightning.py  # v0.2 — raises NotImplementedError
             └── keras.py      # v0.3 — raises NotImplementedError
 ```
 
@@ -144,9 +143,9 @@ top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
   are gated behind optional extras (`[dvc]`, `[hydra]`, `[metaflow]`,
   `[s3]`).
 - `pipekit-train` depends on `pipekit` only; backend tools
-  (Lightning, Equinox+Optax, Keras 3) and data sources (geocatalog,
+  (Equinox+Optax, Keras 3) and data sources (geocatalog,
   pipekit-cycle) are gated behind optional extras
-  (`[equinox]`, `[lightning]`, `[keras]`, `[catalog]`, `[cycle]`,
+  (`[equinox]`, `[keras]`, `[catalog]`, `[cycle]`,
   `[experiment]`).
 - Algorithm libraries (filterx, vardax, plumax, …) are *not* internal
   deps; they plug in by satisfying the runtime-checkable Protocols

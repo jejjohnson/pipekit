@@ -166,7 +166,7 @@ as in the Equinox and NumPyro adapters.
 ## 5. Current state
 
 - `pipekit-train` ships the **Equinox** backend (implemented) and
-  **Lightning / Keras** scaffolds; the **NumPyro** adapters
+  **Keras** scaffold; the **NumPyro** adapters
   (`numpyro-svi` / `numpyro-mcmc`) are designed
   ([`numpyro_adapter.md`](numpyro_adapter.md), ADR D13) — `numpyro-mcmc`'s
   oracle runs as a single blocking `mcmc.run`.
@@ -387,7 +387,7 @@ pipelines and round-trip through the model registry like any trained model
 
 ```
 1. [blackjax] extra + registry/Literal entry + scaffold run() raising
-   NotImplementedError (matches the lightning/keras scaffolds).
+   NotImplementedError (matches the keras scaffold).
 2. Factor the shared bayes seam (model->logdensity bridge + Predictive
    wrapping) shared with the NumPyro adapters; BlackjaxTask + predictive op.
 3. Full-batch per-step path: window_adaptation warmup + kernel.step loop

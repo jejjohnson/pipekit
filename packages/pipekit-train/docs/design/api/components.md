@@ -18,8 +18,8 @@ class Callback(Protocol):
     """Per-step / per-epoch / per-eval hooks.
 
     The adapter translates these calls into the backend's native
-    callback API (Lightning: lit.Callback; Equinox: explicit hook
-    points in the outer loop; Keras: keras.callbacks.Callback).
+    callback API (Equinox: explicit hook points in the outer loop;
+    Keras: keras.callbacks.Callback).
     """
 
     def on_train_begin(self, loop: TrainingLoop, state: CarryState) -> None: ...
@@ -93,8 +93,7 @@ class Checkpoint(Operator):
 ```
 
 The adapter is responsible for the actual save. The Equinox adapter
-uses Orbax `CheckpointManager.save_interval_steps`; Lightning uses
-its built-in `ModelCheckpoint`. The `registry` field is the
+uses Orbax `CheckpointManager.save_interval_steps`. The `registry` field is the
 pipekit-train ↔ pipekit-experiment bridge — it fills
 `TrainingArtifact.model_registry_uri` and `trained_model_hash`.
 
@@ -118,9 +117,7 @@ class EarlyStopping(Operator):
 ```
 
 The adapter checks the returned "should_stop" flag on each
-`on_eval_end` and exits cleanly if set. Lightning's native
-`EarlyStopping` callback is used directly when the Lightning adapter
-is in play.
+`on_eval_end` and exits cleanly if set.
 
 ### `LogToExperiment`
 

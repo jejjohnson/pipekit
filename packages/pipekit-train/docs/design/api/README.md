@@ -29,7 +29,6 @@ detail file below.
 | `ValidationStep`   | 3     | `loop`               | `Operator`                 |
 | `TrainingLoop`     | 3     | `loop`               | `StatefulOperator`         |
 | `adapters.equinox` | 4     | `adapters/equinox`   | `run(loop) -> (op, info)`  |
-| `adapters.lightning`| 4    | `adapters/lightning` | scaffold (v0.2)            |
 | `adapters.keras`   | 4     | `adapters/keras`     | scaffold (v0.3)            |
 
 ## Import conventions
@@ -77,6 +76,6 @@ jax / tensorflow.
 | [primitives.md](primitives.md)| Layer 1 — Loss surface + per-adapter primitives    |
 | [components.md](components.md)| Layer 2 — Callbacks, MetricWriter, ValidationStep  |
 | [models.md](models.md)        | Layer 3 — TrainingLoop, TrainerCarryState          |
-| [adapters.md](adapters.md)    | Layer 4 — Equinox reference + Lightning/Keras stubs|
+| [adapters.md](adapters.md)    | Layer 4 — Equinox reference + Keras stub            |
 
 For usage patterns, see [../examples/](../examples/).

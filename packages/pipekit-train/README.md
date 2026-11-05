@@ -5,8 +5,8 @@
 > The design lives under [`docs/design/`](docs/design/).
 
 Planned: training pipelines for emulators and amortized inference. A
-thin orchestration layer over existing training tools (PyTorch
-Lightning, Equinox+Optax, Keras 3), not a fourth training-loop
+thin orchestration layer over existing training tools (Equinox+Optax,
+Keras 3), not a fourth training-loop
 implementation. Trained models are first-class `pipekit.Operator`s
 that drop into inference pipelines.
 

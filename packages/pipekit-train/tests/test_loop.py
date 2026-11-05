@@ -263,16 +263,15 @@ def test_training_loop_default_optimizer_config():
 # --- TrainingLoop — adapter dispatch -------------------------------------
 
 
-def test_training_loop_dispatches_to_lightning_stub_with_clear_error():
-    loop = TrainingLoop(
-        model_op=_IdentityModel(),
-        dataset=_toy_dataset(),
-        loss=MSE(),
-        max_steps=10,
-        backend="lightning",
-    )
-    with pytest.raises(NotImplementedError, match=r"v0\.2"):
-        loop.run()
+def test_training_loop_has_no_lightning_backend():
+    with pytest.raises(ValueError, match="equinox"):
+        TrainingLoop(
+            model_op=_IdentityModel(),
+            dataset=_toy_dataset(),
+            loss=MSE(),
+            max_steps=10,
+            backend="lightning",
+        )
 
 
 def test_training_loop_dispatches_to_keras_stub_with_clear_error():

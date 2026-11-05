@@ -24,8 +24,7 @@ class TrainerCarryState(CarryState):
         model: The current model operator (possibly partially trained).
             Round-trips through ModelRegistry on checkpoint.
         opt_state: Backend-specific optimizer state. The Equinox
-            adapter stores an optax.OptState; Lightning stores a
-            torch.optim.Optimizer.state_dict(); Keras stores a
+            adapter stores an optax.OptState; Keras stores a
             dict of variable names → arrays.
         step: Global step counter.
         epoch: Derived from step // steps_per_epoch (0 if
@@ -74,8 +73,7 @@ class TrainingLoop(StatefulOperator):
 
     Args:
         model_op: Untrained model Operator. Typically wraps an
-            equinox.Module, lightning.LightningModule, or
-            keras.Model. Must be picklable / serializable through its
+            equinox.Module or keras.Model. Must be picklable / serializable through its
             backend-specific channel.
         dataset: A pipekit_train.TrainingDataset.
         val_dataset: Optional held-out TrainingDataset for eval.
@@ -94,7 +92,7 @@ class TrainingLoop(StatefulOperator):
             None means epoch boundaries are never reported.
         batch_size: Per-step minibatch size. The dataset's loader is
             wrapped with the appropriate Batch op.
-        backend: One of "equinox", "lightning", "keras", and the planned
+        backend: One of "equinox", "keras", and the planned
             Bayesian backends "numpyro-svi", "numpyro-mcmc", "blackjax".
             Maps to the adapter module.
         callbacks: Tuple of pipekit_train.Callback instances.
@@ -119,7 +117,7 @@ class TrainingLoop(StatefulOperator):
     steps_per_epoch: int | None = None
     batch_size: int = 32
     backend: Literal[
-        "equinox", "lightning", "keras",
+        "equinox", "keras",
         "numpyro-svi", "numpyro-mcmc", "blackjax",   # planned (Bayesian)
     ] = "equinox"
     callbacks: tuple[Callback, ...] = ()
@@ -150,7 +148,6 @@ class TrainingLoop(StatefulOperator):
 ```python
 _BACKEND_MODULES = {
     "equinox": "pipekit_train.adapters.equinox",
-    "lightning": "pipekit_train.adapters.lightning",
     "keras": "pipekit_train.adapters.keras",
     # planned Bayesian backends (see design/numpyro_adapter.md, blackjax_adapter.md):
     "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
