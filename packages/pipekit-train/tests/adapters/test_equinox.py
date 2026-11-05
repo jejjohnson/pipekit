@@ -981,3 +981,120 @@ def test_final_step_on_the_cadence_is_not_saved_twice(tmp_path):
         callbacks=(Checkpoint(every_n_steps=10, keep_last=5, save_dir=directory),),
     ).run()
     assert _saved_steps(directory)[-1] == 20
+
+
+# --- Padded evaluation through eval_fn --------------------------------------
+
+
+class _MaskedMean:
+    """Scores the targets' mean, leaving out padded rows, and counts traces."""
+
+    def __init__(self) -> None:
+        self.traces = 0
+        self.batches: list[tuple[Any, Any]] = []
+
+    def loss_fn(self, model, batch, key):
+        raise AssertionError("eval_fn should be used instead")
+
+    def eval_fn(self, model, batch, key, valid):
+        self.traces += 1
+        _, y = batch
+        total = jnp.where(valid, y, 0.0).sum()
+        return {"mean_y": total / valid.sum()}
+
+
+def _targets(values: list[float]) -> list[tuple[np.ndarray, np.float32]]:
+    return [(np.zeros(1, dtype=np.float32), np.float32(v)) for v in values]
+
+
+def test_eval_fn_gives_the_exact_mean_with_a_short_last_batch():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    values = [0.0, 0.0, 0.0, 0.0, 10.0]
+    metrics = _evaluate(None, _targets(values), 2, _MaskedMean(), jax.random.PRNGKey(0))
+    assert metrics["mean_y"] == pytest.approx(2.0)
+
+
+def test_eval_fn_compiles_once_across_rounds():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    task = _MaskedMean()
+    for _ in range(3):
+        _evaluate(None, _targets([1.0] * 5), 2, task, jax.random.PRNGKey(0))
+    assert task.traces == 1
+
+
+def test_pad_batch_copies_the_last_row_and_marks_it_invalid():
+    from pipekit_train.adapters.equinox import _pad_batch
+
+    x = jnp.arange(6.0).reshape(3, 2)
+    y = jnp.array([1, 2, 3])
+    (padded_x, padded_y), valid = _pad_batch((x, y), 5)
+
+    np.testing.assert_array_equal(padded_x[3:], np.asarray([[4.0, 5.0], [4.0, 5.0]]))
+    np.testing.assert_array_equal(padded_y, np.asarray([1, 2, 3, 3, 3]))
+    np.testing.assert_array_equal(valid, np.asarray([True, True, True, False, False]))
+    assert padded_y.dtype == y.dtype
+
+
+def test_pad_batch_leaves_a_full_batch_alone():
+    from pipekit_train.adapters.equinox import _pad_batch
+
+    (padded,), valid = _pad_batch((jnp.ones((4, 1)),), 4)
+    assert padded.shape == (4, 1)
+    assert bool(valid.all())
+
+
+def test_a_task_without_eval_fn_keeps_the_ragged_path():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    shapes: list[tuple[int, ...]] = []
+
+    class Ragged:
+        def loss_fn(self, model, batch, key):
+            _, y = batch
+            shapes.append(y.shape)
+            return jnp.mean(y), {"mean_y": jnp.mean(y)}
+
+    metrics = _evaluate(
+        None, _targets([0.0, 0.0, 0.0]), 2, Ragged(), jax.random.PRNGKey(0)
+    )
+    assert shapes == [(2,), (1,)]
+    assert metrics["mean_y"] == pytest.approx(0.0)
+
+
+def test_eval_fn_pads_a_streaming_validation_set():
+    from pipekit_train.adapters.equinox import _evaluate
+
+    def stream():
+        yield from _targets([0.0, 0.0, 0.0, 0.0, 10.0])
+
+    val = IterableDataset(source=stream, content_hash="stream")
+    metrics = _evaluate(None, val, 2, _MaskedMean(), jax.random.PRNGKey(0))
+    assert metrics["mean_y"] == pytest.approx(2.0)
+
+
+def test_training_loop_reports_eval_fn_metrics():
+    class Task:
+        def loss_fn(self, model, batch, key):
+            x, y = batch
+            err = (jax.vmap(model)(x) - y) ** 2
+            return err.mean(), {"mse": err.mean()}
+
+        def eval_fn(self, model, batch, key, valid):
+            x, y = batch
+            err = ((jax.vmap(model)(x) - y) ** 2).mean(axis=-1)
+            return {"mse": jnp.where(valid, err, 0.0).sum() / valid.sum()}
+
+    _, artifact = TrainingLoop(
+        model_op=EquinoxModelOp(_toy_mlp(jax.random.PRNGKey(0))),
+        dataset=_synthetic_regression(),
+        val_dataset=_synthetic_regression(n=21, seed=1),
+        task=Task(),
+        backend="equinox",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        batch_size=8,
+        max_steps=4,
+        seed=0,
+    ).run()
+    assert math.isfinite(artifact.backend_info["final_eval_metrics"]["mse"])

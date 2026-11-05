@@ -437,6 +437,30 @@ question, not decided here.
 
 ---
 
+## D16: Padded evaluation is opt-in through `TrainTask.eval_fn`
+
+**Status:** accepted
+
+**Context:** Evaluation compiles `loss_fn` on ragged batches, which gives exact
+per-sample means and no API change. A ragged batch can't split evenly across
+devices, though, and a task can't tell padding from data unless something passes
+it a mask.
+
+**Decision:** A task may define `eval_fn(model, batch, key, valid) -> metrics`.
+Its presence, checked with `hasattr`, switches the Equinox adapter to padded
+batches. Padding copies the last real row across the batch pytree, so padded rows
+are finite and in distribution. Each batch's metrics are weighted by `valid.sum()`.
+
+**Consequences:** A masked per-sample mean is exact across the validation set, and
+the step compiles once. A task that doesn't define `eval_fn` is unaffected. A
+non-mean metric such as a quantile isn't exact across batches, because returning
+sufficient statistics would make every task's contract heavier. Tasks can't ignore
+the mask by accident, because `valid` is a required argument of `eval_fn`, whereas
+adding it to `loss_fn` would let a task silently average padded rows. The adapter
+doesn't shard evaluation yet; this makes that possible.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |

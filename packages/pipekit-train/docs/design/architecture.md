@@ -195,8 +195,9 @@ The full eqx_trainer design lives inside this one module. Specifically:
   Built by `TrainState.create(model, optimizer)`.
 - `TrainTask(Protocol)` — the user-supplied loss/eval interface.
   Single method `loss_fn(model, batch, key) -> (scalar_loss,
-  aux_metrics_dict)`, which evaluation also uses; an `eval_fn` hook
-  is planned.
+  aux_metrics_dict)`, which evaluation also uses, plus an optional
+  `eval_fn(model, batch, key, valid) -> metrics_dict` for padded,
+  fixed-shape eval (D16).
 - `train_step(state, batch, key, task, optimizer)` — the
   compiled inner loop, `eqx.filter_jit` + `eqx.filter_grad`. Pure
   function; identical to the eqx_trainer primitive.

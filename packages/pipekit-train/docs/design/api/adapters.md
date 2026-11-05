@@ -50,7 +50,8 @@ class TrainTask(Protocol):
 
     Provide `loss_fn`. The adapter synthesises a TrainTask from
     `loop.loss` if none is supplied. Evaluation compiles `loss_fn` and
-    averages its aux metrics per sample; an `eval_fn` hook is planned.
+    averages its aux metrics per sample, unless the task defines the
+    optional `eval_fn(model, batch, key, valid) -> metrics_dict`.
     """
     def loss_fn(
         self,
@@ -85,6 +86,29 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             equinox_version, optax_version, devices, total_seconds.
     """
 ```
+
+### Padded evaluation with `eval_fn`
+
+Defining `eval_fn` switches evaluation to padded batches, where every batch has
+`batch_size` rows and compiles once. Padded rows are copies of the last real row,
+and `valid` is True for real rows.
+
+```python
+class Regression:
+    def loss_fn(self, model, batch, key):
+        x, y = batch
+        err = (jax.vmap(model)(x) - y) ** 2
+        return err.mean(), {"mse": err.mean()}
+
+    def eval_fn(self, model, batch, key, valid):
+        x, y = batch
+        err = ((jax.vmap(model)(x) - y) ** 2).mean(axis=-1)    # (batch_size,)
+        return {"mse": jnp.where(valid, err, 0.0).sum() / valid.sum()}
+```
+
+Each batch's metrics are weighted by `valid.sum()`, so a masked per-sample mean
+is exact across the validation set. A metric that isn't a mean of per-sample
+terms, such as a quantile, is only exact when the whole set fits in one batch.
 
 ### What `run` does
 

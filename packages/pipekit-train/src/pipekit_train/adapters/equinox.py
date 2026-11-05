@@ -260,12 +260,19 @@ class TrainTask(Protocol):
     Provide ``loss_fn``. The adapter synthesises a `TrainTask` from
     ``loop.loss`` when no explicit task is supplied.
 
-    Evaluation also calls ``loss_fn``, compiled, and averages its aux metrics
-    per sample across the validation set. An ``eval_fn`` hook is planned but
-    isn't called yet.
+    By default evaluation also calls ``loss_fn``, compiled, on ragged batches,
+    and averages its aux metrics per sample across the validation set.
+
+    A task may also define ``eval_fn``, which switches evaluation to padded
+    batches. Every batch then has ``batch_size`` rows, padded with copies of the
+    last real row, and compiles once. ``valid`` is ``(batch_size,)`` bool, True
+    for a real row, and the task must leave the other rows out of its metrics.
+    Each batch's metrics are weighted by ``valid.sum()``, so a masked per-sample
+    mean is exact across the set; a metric such as a quantile is not.
 
     Signatures:
         loss_fn(model, batch, key) -> (scalar_loss, aux_metrics_dict)
+        eval_fn(model, batch, key, valid) -> metrics_dict  (optional)
     """
 
     def loss_fn(
@@ -698,6 +705,41 @@ def _eval_step(
     return aux
 
 
+@eqx.filter_jit
+def _padded_eval_step(
+    model: eqx.Module,
+    batch: Any,
+    key: jax.Array,
+    valid: jax.Array,
+    task: Any,
+) -> dict[str, jax.Array]:
+    """Compiled ``task.eval_fn`` for one padded batch; one shape, one compile."""
+    return task.eval_fn(model, batch, key, valid)
+
+
+def _pad_batch(batch: Any, batch_size: int) -> tuple[Any, jax.Array]:
+    """Pad a batch to ``batch_size`` rows with copies of its last row.
+
+    Copies rather than zeros, so that padded rows hold finite, in-distribution
+    values, and any normalisation inside the model stays well behaved.
+
+    Args:
+        batch: A pytree of arrays with a shared leading dim of at most
+            ``batch_size``.
+        batch_size: The number of rows to return.
+
+    Returns:
+        The padded pytree, and a ``(batch_size,)`` bool mask, True for a real row.
+    """
+    size = len(jax.tree.leaves(batch)[0])
+    extra = batch_size - size
+    padded = jax.tree.map(
+        lambda leaf: jnp.concatenate([leaf, jnp.repeat(leaf[-1:], extra, axis=0)]),
+        batch,
+    )
+    return padded, jnp.arange(batch_size) < size
+
+
 def _evaluate(
     model: eqx.Module,
     val_dataset: Any,
@@ -712,6 +754,8 @@ def _evaluate(
     result is the mean over the validation set for any metric that is a
     per-batch mean.
 
+    A task with an ``eval_fn`` gets padded batches instead; see `TrainTask`.
+
     ``key`` seeds stochastic tasks (dropout, reparameterised sampling)
     and is split per batch so every batch — and every eval round —
     sees distinct randomness. Deterministic tasks ignore it.
@@ -724,7 +768,11 @@ def _evaluate(
     iterator = _eval_pass(val_dataset, batch_size)
     for batch in iterator:
         key, batch_key = jax.random.split(key)
-        aux = _eval_step(model, batch, batch_key, task)
+        if hasattr(task, "eval_fn"):
+            padded, valid = _pad_batch(batch, batch_size)
+            aux = _padded_eval_step(model, padded, batch_key, valid, task)
+        else:
+            aux = _eval_step(model, batch, batch_key, task)
         size = len(batch[0])
         for k, v in aux.items():
             sums[k] = sums.get(k, 0.0) + float(np.asarray(v)) * size
