@@ -105,9 +105,9 @@ inference.
 class SimulationDataset(TrainingDataset):
     """Yields (parameters, simulator_output) pairs.
 
-    Used for both emulator training (network learns forward map) and
-    amortized inference (network learns inverse map — the loss
-    differs, not the data).
+    Used for emulator training, where the network learns the forward map.
+    With `invert=True` it yields (simulator_output, parameters), for
+    amortized inference, where the network learns the inverse map.
 
     Args:
         forward_model: Anything satisfying pipekit_cycle.ForwardModel.
@@ -122,6 +122,7 @@ class SimulationDataset(TrainingDataset):
             deep-copied per item. Defaults to a new CarryState.
         simulator_version: Optional label for the simulator's behaviour,
             for changes its config can't show. Part of the content hash.
+        invert: Yield (simulator_output, parameters) instead.
         obs_op: Optional pipekit_cycle.ObservationOperator applied
             after the forward model. Used for SBI training where the
             target is observed-space outputs, not model-space states.

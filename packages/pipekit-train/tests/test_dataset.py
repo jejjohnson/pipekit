@@ -423,6 +423,52 @@ def test_simulation_dataset_hashes_all_of_a_large_array_in_cycle_state():
     )
 
 
+@pytest.mark.parametrize("split", ["train", "val", "test"])
+def test_invert_flips_each_pair_in_every_split(split):
+    plain = _simulation(_ScaledForward(2.0), split=split)
+    flipped = _simulation(_ScaledForward(2.0), split=split, invert=True)
+
+    for i in range(len(plain)):
+        params, output = plain[i]
+        got_output, got_params = flipped[i]
+        np.testing.assert_array_equal(got_output, output)
+        np.testing.assert_array_equal(got_params, params)
+
+
+def test_invert_applies_the_obs_op_to_the_input():
+    class Halve(Operator):
+        def _apply(self, x: Any) -> Any:
+            return 0.5 * x
+
+    flipped = _simulation(_ScaledForward(4.0), obs_op=Halve(), invert=True)
+    inputs, params = flipped[0]
+    np.testing.assert_array_equal(inputs, 2.0 * params)
+
+
+def test_invert_changes_the_hash_and_the_cache(tmp_path):
+    pytest.importorskip("zarr")
+    plain = _simulation(_ScaledForward(2.0))
+    flipped = _simulation(_ScaledForward(2.0), invert=True)
+    assert plain.content_hash() != flipped.content_hash()
+    assert flipped.content_hash() == flipped.with_split("train").content_hash()
+
+    first = CachedDataset(source=plain, cache_dir=str(tmp_path))
+    second = CachedDataset(source=flipped, cache_dir=str(tmp_path))
+    params, output = first[0]
+    got_output, got_params = second[0]
+    np.testing.assert_allclose(got_output, output)
+    np.testing.assert_allclose(got_params, params)
+
+
+def test_invert_defaults_off_and_keeps_the_hash():
+    assert not _simulation(_ScaledForward(2.0)).invert
+    assert "invert" in _simulation(_ScaledForward(2.0)).get_config()
+    assert (
+        _simulation(_ScaledForward(2.0)).content_hash()
+        == _simulation(_ScaledForward(2.0), invert=False).content_hash()
+    )
+
+
 def test_simulation_dataset_keeps_its_seed_choice_through_pickle():
     sim = SimulationDataset(
         forward_model=_MockForward(), prior=_MockPrior(), n_samples=10
