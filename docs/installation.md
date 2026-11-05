@@ -79,7 +79,6 @@ when no extras are installed. Each adapter raises a clean
 ```bash
 uv add pipekit-train                    # core training surface (no backend)
 uv add 'pipekit-train[equinox]'         # Equinox + Optax + Grain + Orbax adapter
-uv add 'pipekit-train[lightning]'       # Lightning adapter (v0.2 — pending)
 uv add 'pipekit-train[keras]'           # Keras 3 adapter (v0.3 — pending)
 uv add 'pipekit-train[cycle]'           # SimulationDataset over pipekit-cycle
 uv add 'pipekit-train[experiment]'      # LogToExperiment callback

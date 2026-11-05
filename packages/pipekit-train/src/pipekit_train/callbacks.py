@@ -190,8 +190,7 @@ class Checkpoint(Operator):
         every_n_steps: Cadence for on-disk snapshots.
         keep_last: Number of recent checkpoints to retain on disk.
             Honored by the adapter's native checkpoint manager
-            (Orbax `CheckpointManager.max_to_keep`, Lightning
-            `ModelCheckpoint.save_top_k`).
+            (Orbax `CheckpointManager.max_to_keep`).
         save_dir: Local directory for snapshots, used when
             ``TrainingLoop.checkpoint_dir`` isn't set. Setting the two to
             different directories raises ``ValueError``. With neither set,

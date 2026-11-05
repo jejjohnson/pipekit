@@ -1,10 +1,10 @@
 """pipekit-train — training pipelines on top of pipekit.
 
 v0.0 ships the carrier-agnostic Protocols (`Loss`, `Callback`,
-`MetricWriter`), the default `JSONLWriter`, and stub adapter modules
-(Lightning, Keras) that raise ``NotImplementedError`` per the v0.1
-design. The full surface (datasets, training loop, Equinox adapter)
-is documented under ``docs/design/`` and lands in v0.1.
+`MetricWriter`), the default `JSONLWriter`, and a stub Keras adapter
+module that raises ``NotImplementedError`` per the v0.1 design. The full
+surface (datasets, training loop, Equinox adapter) is documented under
+``docs/design/`` and lands in v0.1.
 
 See ``docs/design/`` for the design.
 """

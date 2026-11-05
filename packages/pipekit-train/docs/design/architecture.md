@@ -36,7 +36,6 @@ maps to one file in `api/`.
 ```
 +--------------------------------------------------------------+
 | Layer 4 — Adapters         pipekit_train.adapters.equinox    |
-|                            pipekit_train.adapters.lightning  |
 |                            pipekit_train.adapters.keras      |
 +--------------------------------------------------------------+
 | Layer 3 — TrainingLoop     loop.py — StatefulOperator        |
@@ -65,7 +64,7 @@ pipekit experience uses Layer 3 with a Layer 4 adapter.
 
 ```
 packages/pipekit-train/
-├── pyproject.toml             # extras: [equinox], [lightning], [keras],
+├── pyproject.toml             # extras: [equinox], [keras],
 │                              #         [catalog], [cycle], [experiment]
 ├── README.md
 ├── CHANGELOG.md
@@ -83,7 +82,6 @@ packages/pipekit-train/
 │   └── adapters/
 │       ├── __init__.py
 │       ├── equinox.py         # v0.1 reference adapter
-│       ├── lightning.py       # scaffold — raises NotImplementedError
 │       └── keras.py           # scaffold — raises NotImplementedError
 ├── tests/
 └── docs/
@@ -175,11 +173,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 The adapter is responsible for:
 
 1. Translating `loop.dataset` into the backend's loader idiom
-   (Equinox: Grain DataLoader; Lightning: `LightningDataModule`;
+   (Equinox: Grain DataLoader;
    Keras: `tf.data.Dataset` or generator).
 2. Translating `loop.loss` and `loop.task` into the backend's
    loss / step idiom (Equinox: `TrainTask` Protocol with `loss_fn`;
-   Lightning: `LightningModule.training_step`;
    Keras: `Model.compile(loss=...)`).
 3. Threading `loop.callbacks` into the backend's callback hooks.
 4. Running the training loop.
@@ -236,7 +233,7 @@ and the `Loss` argument is ignored. See
                   │                                    │
                   │   ┌── adapter.run(loop) ────────┐  │
                   │   │  backend training loop      │  │
-                  │   │  (Equinox / Lightning / …)  │  │
+                  │   │  (Equinox / Keras / …)      │  │
                   │   └─────────────┬───────────────┘  │
                   └─────────────────┼──────────────────┘
                                     │
@@ -267,7 +264,6 @@ out of scope, per [boundaries.md](boundaries.md)).
 | 3        | loop.py         | pipekit       | pipekit-experiment                 |
 | 4 (eqx)  | adapters/eqx    | pipekit       | equinox, optax, jax, grain,        |
 |          |                 |               | orbax-checkpoint, jaxtyping        |
-| 4 (lit)  | adapters/lit    | pipekit       | lightning, torch                   |
 | 4 (kr)   | adapters/keras  | pipekit       | keras                              |
 
 Hard deps stay minimal. Backend extras pin only what that backend
@@ -293,5 +289,5 @@ convention:
    reloads, verifies hash.
 
 CI runs ring 1 by default, ring 2 in the `[equinox]` matrix job, and
-ring 3 in the `[experiment, cycle]` matrix job. Lightning and Keras
-adapter tests don't exist in v0.1 because the adapters don't.
+ring 3 in the `[experiment, cycle]` matrix job. The Keras
+adapter tests don't exist in v0.1 because the adapter doesn't.

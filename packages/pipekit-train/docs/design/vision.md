@@ -7,8 +7,8 @@ version: 0.1.0
 
 ## 1. Motivation
 
-Three training tools already do the heavy work. PyTorch Lightning,
-Equinox+Optax, and Keras 3 each have battle-tested training loops,
+Two training tools already do the heavy work. Equinox+Optax and
+Keras 3 each have battle-tested training loops,
 distributed primitives, mixed precision, and profiling. Reimplementing
 that machinery is wrong.
 
@@ -50,7 +50,7 @@ pieces, all on top of `pipekit` core:
   `pipekit-experiment.ExperimentTracker`.
 - **Backend adapters** under `pipekit_train.adapters.*`, one per
   training tool, extras-gated. The Equinox adapter is the v0.1
-  reference; Lightning and Keras are scaffolded.
+  reference; Keras is scaffolded.
 
 The trained model is itself a `pipekit.Operator`. After training, the
 output is a `pipekit-array.ModelOp` (PyTorch / Keras) or a
@@ -65,7 +65,7 @@ echo and extend the principles from `eqx_trainer`'s vision: the same
 operator-graph context.
 
 - **Thin orchestration, not a fourth training-loop implementation.**
-  Wrap Lightning / Equinox+Optax / Keras 3; don't compete with them.
+  Wrap Equinox+Optax / Keras 3; don't compete with them.
 - **Datasets and losses are pipekit Operators.** Same YAML
   round-trip discipline, same content-hashing, same composition
   surface as everything else in pipekit.
@@ -110,11 +110,11 @@ The two designs do not compete; they layer.
 
 - Distributed orchestration (SLURM, K8s, multi-node) — that's the
   orchestrator's job. Single-node multi-GPU is delegated to the
-  backend (Lightning does it natively; Equinox via `jax.sharding`).
+  backend (Equinox via `jax.sharding`).
 - Hyperparameter search — see `pipekit_train.sweep` as deferred work
   (Section 11.5 in [boundaries.md](boundaries.md)). Optuna / Ray Tune
   plug in through `LogToExperiment`.
 - Online / streaming training — pipekit-train assumes batch training.
 - Reinforcement learning — different abstraction entirely.
-- Dataset preparation — Grain / Lightning DataModule / Keras
-  `tf.data` handle that. We accept their loaders directly.
+- Dataset preparation — Grain / Keras `tf.data` handle
+  that. We accept their loaders directly.

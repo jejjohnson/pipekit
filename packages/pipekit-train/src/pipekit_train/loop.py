@@ -38,8 +38,7 @@ class TrainerCarryState(CarryState):
 
     The optimizer state and RNG are backend-specific opaque types
     (an `optax.OptState` and a `jax.Array` PRNG key for the Equinox
-    adapter; a `torch.optim.Optimizer.state_dict()` + tuple for
-    Lightning). The pipekit-train side carries them as `Any` and
+    adapter). The pipekit-train side carries them as `Any` and
     delegates serialisation to the adapter's native checkpoint
     machinery.
 
@@ -231,7 +230,6 @@ class _LocalArtifact:
 
 _BACKEND_MODULES: dict[str, str] = {
     "equinox": "pipekit_train.adapters.equinox",
-    "lightning": "pipekit_train.adapters.lightning",
     "keras": "pipekit_train.adapters.keras",
     "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
     "numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc",
@@ -251,7 +249,7 @@ class TrainingLoop(StatefulOperator):
 
     Args:
         model_op: Untrained model Operator. Backend-specific (an
-            equinox/lightning/keras module wrapped in a
+            equinox/keras module wrapped in a
             pipekit.Operator).
         dataset: A `TrainingDataset`.
         val_dataset: Optional held-out `TrainingDataset` for eval.
@@ -265,7 +263,7 @@ class TrainingLoop(StatefulOperator):
             see ADR D10.)
         steps_per_epoch: Optional. Controls when on_epoch_end fires.
         batch_size: Per-step minibatch size.
-        backend: One of ``"equinox"``, ``"lightning"``, ``"keras"``,
+        backend: One of ``"equinox"``, ``"keras"``,
             ``"numpyro-svi"``, ``"numpyro-mcmc"``, ``"blackjax"``.
         callbacks: Tuple of `Callback` instances.
         metric_writer: Optional `MetricWriter`.
@@ -303,7 +301,6 @@ class TrainingLoop(StatefulOperator):
         batch_size: int = 32,
         backend: Literal[
             "equinox",
-            "lightning",
             "keras",
             "numpyro-svi",
             "numpyro-mcmc",

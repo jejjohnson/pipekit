@@ -419,6 +419,24 @@ first, MCLMC / SMC / VI as follow-ons.
 
 ---
 
+## D15: Drop the Lightning backend
+
+**Status:** accepted (supersedes the Lightning part of D5)
+
+**Context:** D5 listed Lightning as a scaffolded backend for v0.2.
+The project does not want to maintain PyTorch training integration.
+
+**Decision:** pipekit-train does not support Lightning or PyTorch
+training. The `lightning` backend stub, the `[lightning]` extra and
+the Lightning documentation are removed. Keras (v0.3 scaffold) and the
+Equinox, NumPyro and BlackJAX backends are unaffected.
+
+**Consequences:** `backend="lightning"` is no longer a valid choice.
+Whether pipekit-array keeps `torch` carrier support is a separate
+question, not decided here.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |
@@ -432,8 +450,8 @@ first, MCLMC / SMC / VI as follow-ons.
 | User loss interface                 | Per-backend TrainTask Protocol (D9)                |
 | Training unit                       | Per-step (D10)                                     |
 | Config representation               | Operator.get_config() — YAML for free (D11)        |
-| Distributed training                | Delegated to backend (Lightning native; JAX        |
-|                                     | sharding for Equinox) — see boundaries.md          |
+| Distributed training                | Delegated to backend (JAX sharding for Equinox)    |
+|                                     | — see boundaries.md                                |
 | Hyperparameter search               | Deferred to v0.2 sweep.py — see boundaries.md      |
 
 ## Open Questions (see boundaries.md)

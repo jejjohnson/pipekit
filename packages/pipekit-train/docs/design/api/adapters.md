@@ -7,8 +7,8 @@ version: 0.1.0
 
 One module per backend under `pipekit_train.adapters.*`. Each
 exports a single `run(loop) → (trained_model_op, backend_info)`
-function. v0.1 ships the Equinox adapter as the reference; Lightning
-and Keras are scaffolded.
+function. v0.1 ships the Equinox adapter as the reference; Keras
+is scaffolded.
 
 ---
 
@@ -191,45 +191,6 @@ test_equinox_sharding.py`) and a scripted 2-process `jax.distributed` smoke
 
 ---
 
-## Lightning (v0.2 scaffold)
-
-`pipekit_train.adapters.lightning`. Extras:
-`pipekit-train[lightning]`.
-
-v0.1 ships the module with a single function that raises:
-
-```python
-def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
-    raise NotImplementedError(
-        "The Lightning adapter is scheduled for v0.2. Use "
-        "backend='equinox' for v0.1, or pin pipekit-train when "
-        "v0.2 lands."
-    )
-```
-
-### Planned design
-
-When v0.2 lands, the adapter will:
-
-1. Synthesise a `LightningModule` from `loop.model_op` + `loop.loss`
-   (or accept a user-supplied `task` that is itself a
-   `LightningModule` factory).
-2. Synthesise a `LightningDataModule` from `loop.dataset` /
-   `loop.val_dataset`.
-3. Build a `Trainer` with `max_steps=loop.max_steps`, mapping
-   pipekit callbacks to Lightning's `pl.Callback` subclass surface
-   (e.g. `LogToExperiment → MLFlowLogger` or `WandbLogger`).
-4. Call `trainer.fit(module, datamodule)`.
-5. Wrap the final module's `nn.Module` in `pipekit-array.ModelOp` and
-   return.
-
-The Lightning adapter inherits all of Lightning's distributed,
-mixed-precision, and accumulation features without pipekit-train
-adding any code — they're configured via `optimizer_config` or
-`extra_trainer_kwargs`.
-
----
-
 ## Keras (v0.3 scaffold)
 
 `pipekit_train.adapters.keras`. Extras: `pipekit-train[keras]`.
@@ -319,7 +280,6 @@ via `_BatchSource`), tempered SMC, and `pathfinder`/`svgd` VI. **Full design:
 
 ```python
 loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
-loop = TrainingLoop(..., backend="lightning") # uses adapters.lightning
 loop = TrainingLoop(..., backend="keras")        # uses adapters.keras
 loop = TrainingLoop(..., backend="numpyro-svi")  # adapters.numpyro_svi  (planned)
 loop = TrainingLoop(..., backend="numpyro-mcmc") # adapters.numpyro_mcmc (planned)
@@ -327,6 +287,6 @@ loop = TrainingLoop(..., backend="blackjax")     # adapters.blackjax     (planne
 ```
 
 The selection happens at `run()` time, not at construction, so a
-`TrainingLoop` YAML can be authored with `backend="lightning"` even
-on a machine that hasn't installed `[lightning]` — the missing extra
+`TrainingLoop` YAML can be authored with `backend="keras"` even
+on a machine that hasn't installed `[keras]` — the missing extra
 is reported at run time only.

@@ -61,7 +61,7 @@ class TrainingArtifact(_JsonArtifact):
             attached.
         model_registry_uri: URI under which the model was stored.
         backend_info: Free-form dict describing the training stack
-            (lightning version, JAX version, GPUs, …).
+            (backend version, JAX version, GPUs, …).
         deps_lock: Contents of the uv / poetry lockfile.
         metadata: Optional arbitrary metadata (author, date, notes).
     """

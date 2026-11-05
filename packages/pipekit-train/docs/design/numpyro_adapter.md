@@ -159,13 +159,13 @@ adapter. The pieces the adapter touches:
 
 - `TrainingLoop` (a `StatefulOperator`, D3) dispatches to
   `pipekit_train.adapters.<backend>.run(loop)` via `_BACKEND_MODULES` and a
-  `backend: Literal["equinox", "lightning", "keras"]`.
+  `backend: Literal["equinox", "keras"]`.
 - **Equinox** is the implemented reference (loss-first *or* task-first); it
   synthesises a `TrainTask` from the carrier-agnostic `Loss(pred, target)`
   (D4), runs an `eqx.filter_jit` per-step loop, threads callbacks /
   `metric_writer` / Orbax checkpoints, and returns
   `(EquinoxModelOp, backend_info)`.
-- **Lightning / Keras** are `NotImplementedError` scaffolds.
+- **Keras** is a `NotImplementedError` scaffold.
 - **There is no probabilistic / Bayesian backend.** A user who wants a
   NumPyro posterior must hand-roll an inference script *outside* pipekit and
   forfeit the artifact, registry, checkpoint, callback and metric-writer

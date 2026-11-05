@@ -17,7 +17,7 @@ def _make_training_artifact() -> TrainingArtifact:
         trained_model_hash="cd34",
         tracker_run_id="mlflow://runs/xyz",
         model_registry_uri="s3://bucket/",
-        backend_info={"backend": "lightning", "version": "2.4.0"},
+        backend_info={"backend": "equinox", "version": "0.13.0"},
         deps_lock="uv.lock contents",
         metadata={"author": "ej"},
     )
