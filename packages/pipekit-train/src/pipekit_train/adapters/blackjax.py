@@ -199,6 +199,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         )
     model = None
     constrain_fn = None
+    model_kwargs: dict[str, Any] = {}
     if task.numpyro_task is not None:
         model = task.numpyro_task.model
         # The bridged NumpyroTask is the source of truth for the model's
@@ -207,9 +208,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         # Materialise the dataset only on the numpyro path — the raw target
         # carries its own logdensity, so it needn't touch loop.dataset (and
         # should work with an empty placeholder dataset).
-        x_train, y_train = bayes.materialize(loop.dataset)
+        args = bayes.model_args(task.numpyro_task, loop.dataset)
+        model_kwargs = task.numpyro_task.model_kwargs
         logdensity_fn, init_position, constrain_fn = bayes.numpyro_logdensity(
-            model, x_train, y_train, init_key
+            model, args, model_kwargs, init_key
         )
     elif task.logdensity_fn is not None and task.init_position is not None:
         predictive_site = task.predictive_site
@@ -274,6 +276,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             predictive_site=predictive_site,
             seed=loop.seed,
             posterior=dict(constrained),
+            model_kwargs=model_kwargs,
         )
     else:
         # ``samples`` mirrors ``init_position`` (an arbitrary pytree, not

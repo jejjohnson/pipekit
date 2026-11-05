@@ -234,10 +234,17 @@ class NumpyroTask:
     num_warmup: int = 1000
     num_samples: int = 1000
     num_chains: int = 1
+    kernel_kwargs: dict = field(default_factory=dict)  # NUTS(model, **kernel_kwargs)
+    kernel_factory: Callable | None = None             # replaces NUTS
+    # both
+    supervised: bool = True            # False: model(data, **model_kwargs)
+    model_kwargs: dict = field(default_factory=dict)   # constants under jit
 ```
 
 There is no `method` field — the **backend string** selects the paradigm;
-each adapter reads only its own fields. `predictive_site` resolves the
+each adapter reads only its own fields. `supervised=False` stacks a dataset of
+single items instead of `(x, y)` pairs, for density estimation and extreme-value
+fits. `predictive_site` resolves the
 "which site?" ambiguity; `predictive_samples` is required because NumPyro's
 SVI `Predictive` needs a sample count.
 
