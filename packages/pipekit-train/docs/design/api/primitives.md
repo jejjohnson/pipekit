@@ -54,8 +54,14 @@ class NLL(Operator):
     def __call__(self, predicted, target) -> float: ...
 
 class KL(Operator):
-    """KL divergence — for variational training."""
-    def __call__(self, q_dist, p_dist) -> float: ...
+    """KL divergence — for variational training.
+
+    Analytic when q_dist has kl_divergence; otherwise a Monte Carlo estimate
+    from n_samples draws, which needs a key. The Equinox adapter supplies one.
+    """
+    n_samples: int = 32
+
+    def __call__(self, q_dist, p_dist, key=None) -> tuple[float, dict]: ...
 
 class Composite(Operator):
     """Weighted sum: loss = sum(w_i * L_i)."""
