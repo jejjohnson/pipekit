@@ -47,14 +47,15 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     t0 = time.time()
     task = bayes.validate_task(loop)
-    x_train, y_train = bayes.materialize(loop.dataset)
+    args = bayes.model_args(task, loop.dataset)
     rng = jax.random.key(loop.seed)
 
     initial = bayes.carry_state(loop, loop.model_op, 0, {})
     bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
+    kernel_factory = task.kernel_factory or NUTS
     mcmc = MCMC(
-        NUTS(task.model),
+        kernel_factory(task.model, **task.kernel_kwargs),
         num_warmup=task.num_warmup,
         num_samples=task.num_samples,
         num_chains=task.num_chains,
@@ -63,7 +64,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # try/finally: close the writer even if sampling raises, for symmetry
     # with the per-step backends.
     try:
-        mcmc.run(rng, x_train, y_train, extra_fields=("diverging",))
+        mcmc.run(rng, *args, extra_fields=("diverging",), **task.model_kwargs)
     finally:
         if loop.metric_writer is not None:
             loop.metric_writer.close()
@@ -77,6 +78,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         predictive_site=task.predictive_site,
         seed=loop.seed,
         posterior=dict(samples),
+        model_kwargs=task.model_kwargs,
     )
 
     final_step = task.num_samples * task.num_chains

@@ -271,6 +271,33 @@ the BlackJAX sampler backend (below). **Full design — user story, math, CS
 background, API, examples, build order, references:
 [`../numpyro_adapter.md`](../numpyro_adapter.md).**
 
+Unsupervised fits, kernel settings and full posterior draws:
+
+```python
+def model(data=None, *, prior_scale=10.0):
+    mu = numpyro.sample("mu", dist.Normal(0.0, prior_scale))
+    sigma = numpyro.sample("sigma", dist.HalfNormal(5.0))
+    with numpyro.plate("n", 32 if data is None else data.shape[0]):
+        numpyro.sample("obs", dist.Normal(mu, sigma), obs=data)
+
+task = NumpyroTask(
+    model,
+    supervised=False,                               # a dataset of single items
+    model_kwargs={"prior_scale": 10.0},
+    kernel_kwargs={"target_accept_prob": 0.995},    # NUTS(model, **kernel_kwargs)
+)
+op, artifact = TrainingLoop(..., task=task, backend="numpyro-mcmc").run()
+
+op.posterior_samples()["mu"]        # (num_samples,)
+op.predictive_draws(None)["obs"]    # (num_samples, 32): None draws new data
+op(None)                            # the posterior-predictive mean, as before
+
+# after Checkpoint(registry=registry); the model is a closure, so it isn't stored
+op = NumpyroPredictiveOp.from_registry(
+    registry, artifact.trained_model_hash, model=model
+)
+```
+
 ---
 
 ## BlackJAX (planned) — sampler-library backend

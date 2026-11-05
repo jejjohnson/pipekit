@@ -333,3 +333,182 @@ def test_same_task_runs_under_both_backends() -> None:
     ).run()
     assert _truth_mse(svi_op, dataset) < 0.3
     assert _truth_mse(mcmc_op, dataset) < 0.3
+
+
+# --- Kernel settings, unsupervised fits and full posterior draws ------------
+
+
+def _location_scale(data: Any = None, *, prior_scale: float = 10.0) -> None:
+    mu = numpyro.sample("mu", dist.Normal(0.0, prior_scale))
+    sigma = numpyro.sample("sigma", dist.HalfNormal(5.0))
+    with numpyro.plate("n", 32 if data is None else data.shape[0]):
+        numpyro.sample("obs", dist.Normal(mu, sigma), obs=data)
+
+
+def _unpaired_dataset(n: int = 200) -> IterableDataset:
+    draws = np.random.default_rng(0).normal(3.0, 0.5, size=n).astype(np.float32)
+    return IterableDataset(source=list(draws), content_hash=f"unpaired-{n}")
+
+
+def _unsupervised_task(**kwargs: Any) -> NumpyroTask:
+    return NumpyroTask(
+        _location_scale,
+        supervised=False,
+        model_kwargs={"prior_scale": 10.0},
+        num_warmup=100,
+        num_samples=100,
+        predictive_samples=16,
+        **kwargs,
+    )
+
+
+def _fit(task: Any, backend: str, **kwargs: Any) -> Any:
+    return TrainingLoop(
+        model_op=_DummyModelOp(),
+        dataset=_unpaired_dataset(),
+        task=task,
+        backend=backend,
+        seed=0,
+        **kwargs,
+    ).run()
+
+
+def test_kernel_kwargs_reach_nuts(monkeypatch: pytest.MonkeyPatch) -> None:
+    import numpyro.infer as infer
+
+    seen: dict[str, Any] = {}
+    real_nuts = infer.NUTS
+
+    def spy(model: Any, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return real_nuts(model, **kwargs)
+
+    monkeypatch.setattr(infer, "NUTS", spy)
+    settings = {"target_accept_prob": 0.9, "max_tree_depth": 5}
+    _fit(_unsupervised_task(kernel_kwargs=settings), "numpyro-mcmc")
+    assert seen == settings
+
+
+def test_kernel_factory_replaces_nuts() -> None:
+    from numpyro.infer import HMC
+
+    built: list[Any] = []
+
+    def factory(model: Any, **kwargs: Any) -> Any:
+        built.append(kwargs)
+        return HMC(model, **kwargs)
+
+    task = _unsupervised_task(kernel_factory=factory, kernel_kwargs={"num_steps": 4})
+    op, _ = _fit(task, "numpyro-mcmc")
+    assert built == [{"num_steps": 4}]
+    assert op.posterior_samples()["mu"].shape == (100,)
+
+
+def test_unsupervised_mcmc_recovers_the_location() -> None:
+    op, _ = _fit(_unsupervised_task(), "numpyro-mcmc")
+    samples = op.posterior_samples()
+    assert samples["mu"].shape == (100,)
+    assert float(np.mean(samples["mu"])) == pytest.approx(3.0, abs=0.2)
+
+
+def test_full_predictive_draws_have_a_sample_dim() -> None:
+    op, _ = _fit(_unsupervised_task(), "numpyro-mcmc")
+    draws = op.predictive_draws(None)
+    assert draws["obs"].shape == (100, 32)
+    # the operator surface stays the posterior-predictive mean
+    assert op(None).shape == (32,)
+
+
+def test_predictive_draws_take_a_key() -> None:
+    import jax
+
+    op, _ = _fit(_unsupervised_task(), "numpyro-mcmc")
+    first = op.predictive_draws(None, key=jax.random.key(1))["obs"]
+    again = op.predictive_draws(None, key=jax.random.key(1))["obs"]
+    other = op.predictive_draws(None, key=jax.random.key(2))["obs"]
+    np.testing.assert_array_equal(first, again)
+    assert not np.array_equal(first, other)
+
+
+def test_unsupervised_svi_draws_from_its_guide() -> None:
+    op, _ = _fit(
+        _unsupervised_task(),
+        "numpyro-svi",
+        optimizer_config={"name": "adam", "lr": 5e-2},
+        max_steps=300,
+    )
+    samples = op.posterior_samples(num_samples=50)
+    assert samples["mu"].shape == (50,)
+    assert float(np.mean(samples["mu"])) == pytest.approx(3.0, abs=0.5)
+    assert op.posterior_samples()["mu"].shape == (16,)
+
+
+def test_svi_with_a_custom_guide_says_it_cant_sample() -> None:
+    def guide(data: Any = None, *, prior_scale: float = 10.0) -> None:
+        loc = numpyro.param("loc", 0.0)
+        numpyro.sample("mu", dist.Delta(loc))
+        numpyro.sample("sigma", dist.Delta(numpyro.param("s", 1.0)))
+
+    op = NumpyroPredictiveOp(None, posterior={"loc": 0.0}, guide=guide)
+    with pytest.raises(TypeError, match="sample_posterior"):
+        op.posterior_samples(num_samples=2)
+
+
+def test_blackjax_samples_an_unsupervised_numpyro_task() -> None:
+    pytest.importorskip("blackjax")
+    from pipekit_train.adapters.blackjax import BlackjaxTask
+
+    op, _ = _fit(
+        BlackjaxTask(numpyro_task=_unsupervised_task(), num_warmup=100),
+        "blackjax",
+        max_steps=100,
+    )
+    assert float(np.mean(op.posterior_samples()["mu"])) == pytest.approx(3.0, abs=0.2)
+    assert op.predictive_draws(None)["obs"].shape == (100, 32)
+
+
+def test_unsupervised_fit_round_trips_through_the_registry(tmp_path: Any) -> None:
+    pytest.importorskip("pipekit_experiment")
+    from pipekit_experiment import LocalModelRegistry
+    from pipekit_train import Checkpoint
+
+    registry = LocalModelRegistry(tmp_path / "models")
+    op, artifact = _fit(
+        _unsupervised_task(), "numpyro-mcmc", callbacks=(Checkpoint(registry=registry),)
+    )
+
+    reloaded = NumpyroPredictiveOp.from_registry(
+        registry,
+        artifact.trained_model_hash,
+        model=_location_scale,
+        model_kwargs={"prior_scale": 10.0},
+    )
+    np.testing.assert_array_equal(
+        reloaded.posterior_samples()["mu"], op.posterior_samples()["mu"]
+    )
+    assert reloaded.predictive_draws(None)["obs"].shape == (100, 32)
+
+
+def test_reloading_without_a_model_still_gives_the_samples(tmp_path: Any) -> None:
+    pytest.importorskip("pipekit_experiment")
+    from pipekit_experiment import LocalModelRegistry
+    from pipekit_train import Checkpoint
+
+    registry = LocalModelRegistry(tmp_path / "models")
+    _, artifact = _fit(
+        _unsupervised_task(), "numpyro-mcmc", callbacks=(Checkpoint(registry=registry),)
+    )
+    reloaded = NumpyroPredictiveOp.from_registry(registry, artifact.trained_model_hash)
+
+    assert reloaded.posterior_samples()["mu"].shape == (100,)
+    with pytest.raises(TypeError, match="no model"):
+        reloaded.predictive_draws(None)
+
+
+def test_reloading_a_hash_with_no_weights_raises() -> None:
+    class Empty:
+        def load_weights(self, ref: str) -> None:
+            return None
+
+    with pytest.raises(ValueError, match="no weights"):
+        NumpyroPredictiveOp.from_registry(Empty(), "abc")

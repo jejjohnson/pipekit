@@ -16,6 +16,7 @@ The artifact is a `NumpyroPredictiveOp` around
 
 from __future__ import annotations
 
+import functools
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -63,17 +64,17 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     elbo = task.loss if task.loss is not None else Trace_ELBO()
     optimizer = bayes.build_optimizer(loop.optimizer_config)
 
-    x_train, y_train = bayes.materialize(loop.dataset)
+    args = bayes.model_args(task, loop.dataset)
     rng = jax.random.key(loop.seed)
     rng, init_key = jax.random.split(rng)
 
     svi = SVI(task.model, guide, optimizer, loss=elbo)
-    state = svi.init(init_key, x_train, y_train)
+    state = svi.init(init_key, *args, **task.model_kwargs)
 
     # Compile once: an eager step re-traces the model and guide every call, at
     # about 500 times the cost for the same result (NumPyro's svi.run also jits).
-    update = jax.jit(svi.update)
-    evaluate = jax.jit(svi.evaluate)
+    update = jax.jit(functools.partial(svi.update, **task.model_kwargs))
+    evaluate = jax.jit(functools.partial(svi.evaluate, **task.model_kwargs))
 
     initial = bayes.carry_state(loop, loop.model_op, 0, {})
     bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
@@ -85,8 +86,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     def validate(val_dataset: Any, carry: Any) -> dict[str, float]:
         """Score the validation set, tell the callbacks, and return the metrics."""
-        x_val, y_val = bayes.materialize(val_dataset)
-        val_elbo = -float(evaluate(state, x_val, y_val))
+        val_elbo = -float(evaluate(state, *bayes.model_args(task, val_dataset)))
         bayes.dispatch(
             loop.callbacks, "on_eval_end", loop, carry, {"val_elbo": val_elbo}
         )
@@ -97,7 +97,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # handle (dropping its buffered lines).
     try:
         for step in range(1, loop.max_steps + 1):
-            state, loss = update(state, x_train, y_train)
+            state, loss = update(state, *args)
             last_loss = float(loss)
             metrics = {"elbo": -last_loss, "loss": last_loss}
 
@@ -137,6 +137,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         predictive_site=task.predictive_site,
         seed=loop.seed,
         posterior=dict(params),
+        guide=guide,
+        model_kwargs=task.model_kwargs,
     )
 
     final = bayes.carry_state(
