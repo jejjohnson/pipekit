@@ -13,7 +13,7 @@ def accepts_keyword(target: Any, name: str) -> bool:
 
     Args:
         target: An operator or a plain callable. `Lambda` forwards every keyword,
-            so for it the wrapped function decides.
+            so for it whatever it wraps decides, however deeply nested.
         name: The keyword to look for.
 
     Returns:
@@ -25,10 +25,12 @@ def accepts_keyword(target: Any, name: str) -> bool:
         True
         >>> accepts_keyword(Lambda(lambda x: x), "key")
         False
+        >>> accepts_keyword(Lambda(Lambda(lambda x, key=None: x)), "key")
+        True
     """
     if isinstance(target, Lambda):
-        function = target.fn
-    elif isinstance(target, Operator) and type(target).__call__ is Operator.__call__:
+        return accepts_keyword(target.fn, name)
+    if isinstance(target, Operator) and type(target).__call__ is Operator.__call__:
         function = target._apply
     else:
         function = target

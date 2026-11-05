@@ -289,3 +289,15 @@ def test_call_loss_passes_a_key_only_to_a_loss_that_takes_one():
     assert call_loss(lambda p, t, key=None: key is not None, None, None, key)
     assert call_loss(Lambda(lambda p, t: "lambda"), None, None, key) == "lambda"
     assert call_loss(MSE(), np.ones(2), np.ones(2), key)[0] == 0.0
+
+
+def test_call_loss_looks_through_lambda_wrappers():
+    key = jax.random.key(0)
+    x = np.ones(2)
+    # MSE takes no key, however many Lambdas wrap it
+    assert call_loss(Lambda(MSE()), x, x, key)[0] == 0.0
+    assert call_loss(Lambda(Lambda(MSE())), x, x, key)[0] == 0.0
+    # a wrapped KL does take one
+    seen = _Normal(0.5, 1.0)
+    loss, _ = call_loss(Lambda(KL()), seen, seen, key)
+    assert float(loss) == 0.0
