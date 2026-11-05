@@ -14,9 +14,15 @@ posterior parameters. Maps to master plan §2.3 + §4.3.
 
 This toy has a closed-form answer to check against. The simulator adds two
 parameters that have standard normal priors, so that the observation
-$y = \theta_1 + \theta_2$ can't separate them. Each parameter's posterior is
-$\theta_i \mid y \sim \mathcal{N}(y / 2, 1 / 2)$. The density head belongs to the
+$y = \theta_1 + \theta_2$ can't separate them. Each parameter's marginal posterior
+is $\theta_i \mid y \sim \mathcal{N}(y / 2, 1 / 2)$. The density head belongs to the
 user or a model library rather than pipekit-train, as `boundaries.md` says.
+
+This recipe only targets those marginals. The head below is a diagonal Gaussian,
+whereas the true joint posterior is perfectly anticorrelated, because
+$\theta_1 + \theta_2 = y$ exactly. Don't draw both parameters from this head and
+expect them to add up to $y$. A joint posterior needs a head with correlations,
+such as the flow in the sketch further down.
 
 ```python
 import equinox as eqx
@@ -75,7 +81,7 @@ trained, artifact = pt.TrainingLoop(
     backend="equinox",
 ).run()
 
-# calibration on held-out simulations: about 95 % of parameters within ±2σ
+# marginal calibration on held-out simulations: about 95 % of parameters within ±2σ
 y, theta = (np.stack(a) for a in zip(*dataset.with_split("test")))
 posterior = jax.vmap(trained.module)(jnp.asarray(y))
 inside = jnp.abs(theta - posterior.loc) <= 2 * jnp.exp(posterior.log_scale)

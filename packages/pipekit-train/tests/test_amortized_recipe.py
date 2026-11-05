@@ -1,8 +1,11 @@
 """The amortized inference recipe in ``docs/design/examples/amortized.md``.
 
 The simulator adds two parameters with standard normal priors, so that each
-parameter's posterior given y = θ₁ + θ₂ is N(y / 2, 1 / 2). That closed form is
-what the trained posterior is checked against.
+parameter's marginal posterior given y = θ₁ + θ₂ is N(y / 2, 1 / 2). That closed
+form is what the trained posterior is checked against.
+
+Only the marginals: the diagonal head can't represent the true joint posterior,
+in which θ₁ + θ₂ = y exactly.
 """
 
 from __future__ import annotations
