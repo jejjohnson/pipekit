@@ -512,3 +512,44 @@ def test_reloading_a_hash_with_no_weights_raises() -> None:
 
     with pytest.raises(ValueError, match="no weights"):
         NumpyroPredictiveOp.from_registry(Empty(), "abc")
+
+
+def test_kernel_without_divergence_diagnostics_still_fits() -> None:
+    from numpyro.infer import BarkerMH
+
+    op, artifact = _fit(_unsupervised_task(kernel_factory=BarkerMH), "numpyro-mcmc")
+    assert op.posterior_samples()["mu"].shape == (100,)
+    assert artifact.backend_info["num_divergences"] is None
+
+
+def test_nuts_still_reports_divergences() -> None:
+    _, artifact = _fit(_unsupervised_task(), "numpyro-mcmc")
+    assert isinstance(artifact.backend_info["num_divergences"], int)
+
+
+def test_guide_that_replays_the_model_gets_its_arguments() -> None:
+    from numpyro.infer.autoguide import AutoDelta
+
+    def with_deterministic(data: Any = None, *, prior_scale: float = 10.0) -> None:
+        mu = numpyro.sample("mu", dist.Normal(0.0, prior_scale))
+        numpyro.deterministic("doubled", 2.0 * mu)
+        sigma = numpyro.sample("sigma", dist.HalfNormal(5.0))
+        with numpyro.plate("n", 32 if data is None else data.shape[0]):
+            numpyro.sample("obs", dist.Normal(mu, sigma), obs=data)
+
+    data = np.asarray(list(_unpaired_dataset()))
+    task = NumpyroTask(
+        with_deterministic,
+        guide=AutoDelta(with_deterministic),
+        supervised=False,
+        model_kwargs={"prior_scale": 10.0},
+        predictive_samples=4,
+    )
+    op, _ = _fit(
+        task,
+        "numpyro-svi",
+        optimizer_config={"name": "adam", "lr": 1e-2},
+        max_steps=5,
+    )
+    samples = op.posterior_samples(data)
+    np.testing.assert_allclose(samples["doubled"], 2.0 * samples["mu"])

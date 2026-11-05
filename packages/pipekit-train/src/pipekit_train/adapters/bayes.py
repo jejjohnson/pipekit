@@ -168,7 +168,7 @@ class NumpyroPredictiveOp(Operator):
         return self.predictive(key, *arrays, **self.model_kwargs)
 
     def posterior_samples(
-        self, *, num_samples: int | None = None, key: Any = None
+        self, *args: Any, num_samples: int | None = None, key: Any = None
     ) -> dict[str, Any]:
         """Return full posterior draws of the latent sites.
 
@@ -176,6 +176,9 @@ class NumpyroPredictiveOp(Operator):
         its guide, which must have ``sample_posterior``, as the autoguides do.
 
         Args:
+            *args: SVI only; the model's positional arguments, needed by a guide
+                that replays the model, such as ``AutoDelta`` with deterministic
+                sites. ``model_kwargs`` are passed too.
             num_samples: SVI only; defaults to the fit's ``predictive_samples``.
             key: SVI only; PRNG key, defaulting to one built from ``seed``.
 
@@ -205,7 +208,11 @@ class NumpyroPredictiveOp(Operator):
         if key is None:
             key = jax.random.key(self.seed)
         return self.guide.sample_posterior(
-            key, self.posterior, sample_shape=(num_samples,)
+            key,
+            self.posterior,
+            *args,
+            sample_shape=(num_samples,),
+            **self.model_kwargs,
         )
 
     @classmethod
