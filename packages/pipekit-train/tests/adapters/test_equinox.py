@@ -27,6 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from pipekit_train import (
+    KL,
     MSE,
     Checkpoint,
     EarlyStopping,
@@ -1098,3 +1099,51 @@ def test_training_loop_reports_eval_fn_metrics():
         seed=0,
     ).run()
     assert math.isfinite(artifact.backend_info["final_eval_metrics"]["mse"])
+
+
+# --- Sample-based KL through the adapter ------------------------------------
+
+
+class _GaussianHead(eqx.Module):
+    """A distribution as a pytree, so that it passes through ``jax.vmap``."""
+
+    loc: jax.Array
+    log_scale: jax.Array
+
+    def sample(self, key, sample_shape=()):
+        draws = jax.random.normal(key, (*sample_shape, *jnp.shape(self.loc)))
+        return self.loc + jnp.exp(self.log_scale) * draws
+
+    def log_prob(self, x):
+        z = (x - self.loc) * jnp.exp(-self.log_scale)
+        return -0.5 * z**2 - self.log_scale - 0.5 * jnp.log(2.0 * jnp.pi)
+
+
+class _Variational(eqx.Module):
+    loc: jax.Array
+    log_scale: jax.Array
+
+    def __call__(self, x):
+        return _GaussianHead(self.loc, self.log_scale)
+
+
+def test_sample_based_kl_trains_through_the_synthesised_task():
+    def kl_to_standard_normal(predicted, target, key=None):
+        prior = _GaussianHead(jnp.zeros(()), jnp.zeros(()))
+        return KL(n_samples=16)(predicted, prior, key=key)
+
+    start = _Variational(jnp.asarray(3.0), jnp.asarray(1.0))
+    trained, artifact = TrainingLoop(
+        model_op=EquinoxModelOp(start),
+        dataset=_synthetic_regression(),
+        loss=kl_to_standard_normal,
+        backend="equinox",
+        optimizer_config={"name": "adam", "lr": 5e-2},
+        batch_size=8,
+        max_steps=300,
+        seed=0,
+    ).run()
+
+    assert abs(float(trained.module.loc)) < 0.5
+    assert abs(float(trained.module.log_scale)) < 0.5
+    assert artifact.backend_info["final_metrics"]["kl"] < 0.5

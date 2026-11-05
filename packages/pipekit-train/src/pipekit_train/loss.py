@@ -11,9 +11,8 @@ The carrier-agnostic loss surface from the v0.1 design.
   density heads). For Gaussian-NLL on raw (mean, log_var) tuples,
   wrap them in a small density head that exposes ``.log_prob``.
 - `KL` — Kullback-Leibler divergence. Prefers ``predicted.kl_divergence
-  (target)`` if available; otherwise falls back to
-  ``-(target.log_prob(samples) - predicted.log_prob(samples)).mean()``
-  with samples drawn from ``predicted``.
+  (target)`` if available; otherwise estimates it with samples drawn from
+  ``predicted``, which needs a PRNG ``key``.
 - `Composite` — weighted sum of `Loss` components, emitting the
   per-component values as auxiliary metrics.
 
@@ -22,9 +21,12 @@ See ``docs/design/api/primitives.md``.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Protocol, runtime_checkable
 
 from pipekit import Operator
+
+from pipekit_train._signatures import accepts_keyword
 
 
 @runtime_checkable
@@ -33,7 +35,8 @@ class Loss(Protocol):
 
     Implementations may return either a scalar loss directly, or a
     ``(scalar, aux_metrics_dict)`` tuple. The adapter distinguishes
-    by introspection.
+    by introspection. A loss that needs randomness may also take a keyword
+    ``key``, which the adapter supplies per batch; see `call_loss`.
 
     See ``docs/design/api/primitives.md`` and ADR D4 in
     ``docs/design/decisions.md``.
@@ -44,6 +47,23 @@ class Loss(Protocol):
         predicted: Any,
         target: Any,
     ) -> float | tuple[float, dict[str, float]]: ...
+
+
+def call_loss(loss: Any, predicted: Any, target: Any, key: Any = None) -> Any:
+    """Call ``loss``, passing ``key`` only if it takes one.
+
+    Args:
+        loss: Any `Loss`-shaped callable.
+        predicted: The model's prediction.
+        target: The target.
+        key: Optional PRNG key.
+
+    Returns:
+        Whatever ``loss`` returns.
+    """
+    if key is not None and accepts_keyword(loss, "key"):
+        return loss(predicted, target, key=key)
+    return loss(predicted, target)
 
 
 class MSE(Operator):
@@ -138,34 +158,81 @@ class NLL(Operator):
 class KL(Operator):
     """Kullback-Leibler divergence between two distributions.
 
-    Contract:
-        ``predicted`` and ``target`` must both expose either
-        ``.kl_divergence(other)`` (fast analytic path) or
-        ``.log_prob(samples)`` + ``.sample(key)`` (sample-based
-        fallback). The fast path is tried first.
+    KL(q ‖ p) = E_q[log q(z) - log p(z)], where q is ``predicted`` and p is
+    ``target``. The analytic path is used when ``predicted`` has
+    ``.kl_divergence(target)``. Otherwise it is estimated by Monte Carlo:
+    (1 / S) Σ_s [log q(z_s) - log p(z_s)], with S draws z_s from q.
+
+    Algorithm:
+        1. Use ``predicted.kl_divergence(target)`` if it exists.
+        2. Otherwise draw ``n_samples`` from ``predicted`` with ``key``.
+        3. Average ``log_prob`` differences over draws and any batch dims.
+
+    Gradients flow through the draws only if ``predicted`` samples by
+    reparameterisation.
+
+    Args:
+        n_samples: Monte Carlo draws S for the estimate. Its error falls as
+            1 / √S.
 
     Returns from ``__call__``:
         ``(loss, {"kl": loss})``.
 
-    Note:
-        The sample-based fallback requires a PRNG key. v0.1 ships the
-        analytic path only; sample-based KL lands in v0.1.1 when the
-        Equinox adapter exposes the per-batch RNG.
+    Raises:
+        ValueError: If ``n_samples`` is below 1.
+        TypeError: If the estimate is needed and no ``key`` was given.
+
+    Examples:
+        >>> class Point:
+        ...     def kl_divergence(self, other):
+        ...         import numpy as np
+        ...
+        ...         return np.array([0.5, 1.5])
+        >>> KL()(Point(), None)[0].item()
+        1.0
     """
+
+    def __init__(self, n_samples: int = 32) -> None:
+        if n_samples < 1:
+            raise ValueError(f"KL.n_samples must be >= 1; got {n_samples}.")
+        self.n_samples = n_samples
 
     def _apply(
         self,
         predicted: Any,
         target: Any,
+        key: Any = None,
     ) -> tuple[Any, dict[str, Any]]:
         if hasattr(predicted, "kl_divergence"):
             loss = predicted.kl_divergence(target).mean()
             return loss, {"kl": loss}
-        raise TypeError(
-            "KL requires `predicted` to expose `.kl_divergence(target)`. "
-            "Sample-based KL fallback is scheduled for v0.1.1; see "
-            "docs/design/api/primitives.md."
-        )
+        if key is None:
+            raise TypeError(
+                "Sample-based KL requires a PRNG key. The Equinox adapter "
+                "supplies one per batch; for ad-hoc use, pass "
+                "key=jax.random.key(seed)."
+            )
+        # z_s ~ q
+        samples = _draw_samples(predicted, key, self.n_samples)
+        # log q(z_s)
+        log_q = predicted.log_prob(samples)
+        # log p(z_s)
+        log_p = target.log_prob(samples)
+        # KL(q ‖ p) ≈ (1 / S) Σ_s [log q(z_s) - log p(z_s)]
+        loss = (log_q - log_p).mean()
+        return loss, {"kl": loss}
+
+
+def _draw_samples(distribution: Any, key: Any, n_samples: int) -> Any:
+    """Draw from a distribution in the library's own calling convention.
+
+    NumPyro takes ``sample(key, sample_shape)``, whereas distrax and TFP take
+    ``sample(seed=..., sample_shape=...)``.
+    """
+    parameters = inspect.signature(distribution.sample).parameters
+    if "seed" in parameters:
+        return distribution.sample(seed=key, sample_shape=(n_samples,))
+    return distribution.sample(key, sample_shape=(n_samples,))
 
 
 class Composite(Operator):
@@ -173,7 +240,8 @@ class Composite(Operator):
 
     The aggregate loss is ``sum(w_i * L_i(predicted, target))``. Each
     component's scalar value is surfaced as an auxiliary metric so
-    the adapter logs them individually.
+    the adapter logs them individually. A component that takes a ``key`` gets
+    its own, split from the one passed in.
 
     Args:
         components: Tuple of ``(weight, loss)`` pairs. ``weight`` is
@@ -200,11 +268,17 @@ class Composite(Operator):
         self,
         predicted: Any,
         target: Any,
+        key: Any = None,
     ) -> tuple[Any, dict[str, Any]]:
         aux: dict[str, Any] = {}
         total = None
+        keys: Any = [None] * len(self.components)
+        if key is not None:
+            import jax
+
+            keys = jax.random.split(key, len(self.components))
         for i, (weight, loss) in enumerate(self.components):
-            result = loss(predicted, target)
+            result = call_loss(loss, predicted, target, keys[i])
             value = result[0] if isinstance(result, tuple) else result
             name = f"{type(loss).__name__}_{i}"
             aux[name] = value

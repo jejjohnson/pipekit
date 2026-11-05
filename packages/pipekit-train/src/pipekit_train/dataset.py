@@ -20,14 +20,15 @@ See ``docs/design/api/datasets.md``.
 from __future__ import annotations
 
 import copy
-import inspect
 import os
 import warnings
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
-from pipekit import CarryState, Lambda, Operator
+from pipekit import CarryState, Operator
 from pipekit.hashing import sha256_hex, stable_json, stable_repr
+
+from pipekit_train._signatures import accepts_keyword
 
 
 Split = Literal["train", "val", "test"]
@@ -44,37 +45,6 @@ def hash_config(*parts: Any) -> str:
     for p in parts:
         chunks += [stable_json(p), b"\x00"]
     return sha256_hex(*chunks)
-
-
-def _accepts_seed(prior: Operator) -> bool:
-    """Return whether ``prior(seed=...)`` reaches a parameter that takes it.
-
-    Args:
-        prior: The prior operator to inspect.
-
-    Returns:
-        ``True`` if the prior's signature has a ``seed`` parameter or ``**kwargs``.
-        ``False`` when the signature can't be read, as for some C functions.
-    """
-    if isinstance(prior, Lambda):
-        # Lambda forwards every keyword, so its function decides.
-        target = prior.fn
-    elif type(prior).__call__ is not Operator.__call__:
-        target = prior.__call__
-    else:
-        target = prior._apply
-    try:
-        parameters = inspect.signature(target).parameters.values()
-    except (TypeError, ValueError):
-        return False
-    return any(
-        parameter.kind is inspect.Parameter.VAR_KEYWORD
-        or (
-            parameter.name == "seed"
-            and parameter.kind is not inspect.Parameter.POSITIONAL_ONLY
-        )
-        for parameter in parameters
-    )
 
 
 def _component_identity(component: Any) -> dict[str, Any] | None:
@@ -358,7 +328,7 @@ class SimulationDataset(TrainingDataset):
             )
         self.forward_model = forward_model
         self.prior = prior
-        self._prior_accepts_seed = _accepts_seed(prior)
+        self._prior_accepts_seed = accepts_keyword(prior, "seed")
         self.n_samples = int(n_samples)
         self.cycle = cycle
         self.cycle_state = cycle_state

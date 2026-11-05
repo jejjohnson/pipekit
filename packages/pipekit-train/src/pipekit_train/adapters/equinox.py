@@ -45,6 +45,7 @@ import numpy as np
 from pipekit import Operator
 
 from pipekit_train.adapters import _common
+from pipekit_train.loss import call_loss
 
 
 # `optax` and `orbax.checkpoint` are lazy-imported inside the
@@ -301,10 +302,9 @@ class _SynthesisedTask:
         batch: tuple[jax.Array, jax.Array],
         key: jax.Array,
     ) -> tuple[jax.Array, dict[str, jax.Array]]:
-        del key
         x, y = batch
         pred = jax.vmap(model)(x)
-        result = self.loss(pred, y)
+        result = call_loss(self.loss, pred, y, key)
         if isinstance(result, tuple):
             scalar, aux = result
             aux = dict(aux)
