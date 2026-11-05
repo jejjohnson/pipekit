@@ -32,6 +32,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         ``numpyro_version``, ``devices``, ``total_seconds``,
         ``final_step``, ``num_warmup``, ``num_samples``, ``num_chains``,
         ``num_divergences``, ``final_metrics``, and ``sites``.
+        ``num_divergences`` is ``None`` for a kernel that doesn't report them.
     """
     import jax
     import numpy as np
@@ -43,7 +44,13 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             "backend='numpyro-mcmc' needs the [numpyro] extra. Install with "
             "`pip install pipekit-train[numpyro]`."
         ) from exc
-    from numpyro.infer import MCMC, NUTS, Predictive  # ty: ignore[unresolved-import]
+    from numpyro.infer import (  # ty: ignore[unresolved-import]
+        HMC,
+        MCMC,
+        NUTS,
+        SA,
+        Predictive,
+    )
 
     t0 = time.time()
     task = bayes.validate_task(loop)
@@ -54,8 +61,12 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     bayes.dispatch(loop.callbacks, "on_train_begin", loop, initial)
 
     kernel_factory = task.kernel_factory or NUTS
+    kernel = kernel_factory(task.model, **task.kernel_kwargs)
+    # Only these kernels' states have the field; asking any other kernel for it
+    # raises, for example BarkerMH.
+    extra_fields = ("diverging",) if isinstance(kernel, HMC | SA) else ()
     mcmc = MCMC(
-        kernel_factory(task.model, **task.kernel_kwargs),
+        kernel,
         num_warmup=task.num_warmup,
         num_samples=task.num_samples,
         num_chains=task.num_chains,
@@ -64,13 +75,13 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     # try/finally: close the writer even if sampling raises, for symmetry
     # with the per-step backends.
     try:
-        mcmc.run(rng, *args, extra_fields=("diverging",), **task.model_kwargs)
+        mcmc.run(rng, *args, extra_fields=extra_fields, **task.model_kwargs)
     finally:
         if loop.metric_writer is not None:
             loop.metric_writer.close()
     samples = mcmc.get_samples()
     extra = mcmc.get_extra_fields()
-    num_divergences = int(np.sum(np.asarray(extra["diverging"]))) if extra else 0
+    num_divergences = int(np.sum(np.asarray(extra["diverging"]))) if extra else None
 
     predictive = Predictive(task.model, posterior_samples=samples)
     model_op = bayes.NumpyroPredictiveOp(
