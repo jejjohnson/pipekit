@@ -97,6 +97,7 @@ from pipekit_ops.serial import (
     loads_sandboxed,
     register,
     unregister,
+    upgrade_state,
 )
 from pipekit_ops.signature import Signature, compute_output_signature
 from pipekit_ops.state import CarryState, StatefulOperator
@@ -168,6 +169,7 @@ __all__ = [
     "signature_of",
     "unregister",
     "unregister_adapter",
+    "upgrade_state",
 ]
 
 __version__ = "0.1.5"  # x-release-please-version

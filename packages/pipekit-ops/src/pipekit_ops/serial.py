@@ -85,6 +85,39 @@ def loads(s: str) -> Operator:
 _ALLOWED: dict[str, type[Operator]] = {}
 
 
+def upgrade_state(state: Any) -> Any:
+    """``state`` with module names saved before pipekit 0.2.0 renamed.
+
+    The core was imported as ``pipekit`` until 0.2.0, so a state saved
+    earlier names ``pipekit.control`` where today's says
+    ``pipekit_ops.control``. Loading accepts both; this rewrites the old
+    names in operator records (``module`` beside ``class``) and exception
+    records (``{"exception": "module.Name"}``), so a stored state can be
+    compared with ``op.state`` of the operator rebuilt from it. Everything
+    else is returned unchanged.
+
+    Args:
+        state: An operator state, or any JSON value inside one.
+
+    Returns:
+        A new value with today's module names.
+
+    Examples:
+        >>> upgrade_state({"module": "pipekit.blocks", "class": "Const", "config": {}})
+        {'module': 'pipekit_ops.blocks', 'class': 'Const', 'config': {}}
+    """
+    if isinstance(state, list):
+        return [upgrade_state(item) for item in state]
+    if not isinstance(state, dict):
+        return state
+    out = {key: upgrade_state(value) for key, value in state.items()}
+    if set(out) == {"exception"} and isinstance(out["exception"], str):
+        out["exception"] = current_module(out["exception"])
+    elif "class" in out and isinstance(out.get("module"), str):
+        out["module"] = current_module(out["module"])
+    return out
+
+
 def register(cls: type[Operator]) -> type[Operator]:
     """Register ``cls`` as loadable via `loads_sandboxed`.
 

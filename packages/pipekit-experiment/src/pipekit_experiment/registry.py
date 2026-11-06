@@ -45,7 +45,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pipekit_ops import Operator
+from pipekit_ops import Operator, upgrade_state
 from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_json
 
 
@@ -177,7 +177,10 @@ class _ModelRegistryBase:
 
         The stored content is checked against its hash, and so is the
         rebuilt operator: ``pipeline_hash(op, load_weights(ref))`` equals
-        the resolved hash.
+        the resolved hash. An entry stored before pipekit 0.2.0 names the
+        core's modules ``pipekit.*``; it loads when its state matches the
+        rebuilt operator's once those names are updated (`upgrade_state`),
+        and its operator then hashes to a new value.
 
         Raises:
             KeyError: If nothing is stored under ``ref``.
@@ -186,9 +189,14 @@ class _ModelRegistryBase:
         """
         h = self._resolve(ref)
         text, weights = self._read_verified(h)
-        op = Operator.from_state(json.loads(text))
+        stored = json.loads(text)
+        op = Operator.from_state(stored)
         rebuilt = pipeline_hash(op, weights)
-        if rebuilt != h:
+        # An entry stored before pipekit 0.2.0 names `pipekit.*` modules, so the
+        # operator rebuilt from it hashes differently. The text was checked
+        # against `h` above; accept it when only those module names differ.
+        renamed = stable_json(upgrade_state(stored)) == stable_json(op.state)
+        if rebuilt != h and not renamed:
             raise HashMismatchError(
                 f"Model {h!r} in {self._where()} rebuilds to an operator with "
                 f"hash {rebuilt!r}: its state does not "

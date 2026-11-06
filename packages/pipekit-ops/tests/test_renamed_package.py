@@ -17,6 +17,7 @@ from pipekit_ops import (
     loads_sandboxed,
     register,
     unregister,
+    upgrade_state,
 )
 from pipekit_ops._base.operator import current_module
 
@@ -81,3 +82,13 @@ def test_a_pre_0_2_state_loads_sandboxed() -> None:
             if f"{cls.__module__}.{cls.__name__}" not in before:
                 unregister(cls)
     assert back(0) == 3
+
+
+def test_upgrade_state_renames_operator_and_exception_records_only() -> None:
+    old = json.loads(_as_saved_before_0_2(dumps(_pipeline())))
+    assert json.dumps(upgrade_state(old), sort_keys=True) == json.dumps(
+        json.loads(dumps(_pipeline())), sort_keys=True
+    )
+    # a config value that only looks like a module name is left alone
+    other = {"module": "pipekit.not_an_operator", "note": "pipekit.control"}
+    assert upgrade_state(other) == other
