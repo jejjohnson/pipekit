@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.4...pipekit-train-v0.1.5) (2026-11-06)
+
+
+### Features
+
+* **train:** add a sample-based fallback to the KL loss ([#195](https://github.com/jejjohnson/pipekit/issues/195)) ([1c6fbe2](https://github.com/jejjohnson/pipekit/commit/1c6fbe2ede2b41a9242ce8f00a4e3c1a9e2b8492))
+* **train:** add opt-in padded evaluation through TrainTask.eval_fn ([#192](https://github.com/jejjohnson/pipekit/issues/192)) ([c506375](https://github.com/jejjohnson/pipekit/commit/c5063757a0ee97a4e5156e64eb6df296deaca746)), closes [#125](https://github.com/jejjohnson/pipekit/issues/125)
+* **train:** add SimulationDataset(invert=True) and an amortized recipe ([#196](https://github.com/jejjohnson/pipekit/issues/196)) ([9c29999](https://github.com/jejjohnson/pipekit/commit/9c29999e6803bbd121700ac4ff114aa7037eb36d))
+* **train:** support unsupervised NumPyro fits and full posterior draws ([#194](https://github.com/jejjohnson/pipekit/issues/194)) ([ff6160b](https://github.com/jejjohnson/pipekit/commit/ff6160b473f20486b18288c1b946ace5679af1f7))
+
 ## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.3...pipekit-train-v0.1.4) (2026-11-04)
 
 
