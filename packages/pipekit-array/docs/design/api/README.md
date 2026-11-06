@@ -47,6 +47,8 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `concat`     | `ConcatenateAlong(dim=)` | join along an existing dim                 |
 | `combine`    | `Combine`   | element-wise function of same-dim carriers (`forbid_in_yaml`) |
 
+The missing ones (`rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims`, `pad`, `roll`, `shift`, `diff`, `cumreduce`, `where`, `window`, `coarsen`, `quantile`, `dot`) are proposed in **[dim_functions.md](dim_functions.md)**, with an xarray parity table.
+
 An adapter may override any of them with a method of the same name
 (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one
 `jax.vmap`); the test kit proves the override equals the generic path.
