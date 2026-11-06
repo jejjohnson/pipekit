@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Const, Operator, StatefulOperator
+from pipekit_ops import Const, Operator, StatefulOperator
 from pipekit_train import (
     MSE,
     IterableDataset,
@@ -183,7 +183,7 @@ def test_training_loop_is_stateful_operator():
         backend="equinox",
     )
     assert isinstance(loop, StatefulOperator)
-    # Verify the class-level marker that pipekit.Sequential uses.
+    # Verify the class-level marker that pipekit_ops.Sequential uses.
     assert TrainingLoop._is_stateful is True
 
 

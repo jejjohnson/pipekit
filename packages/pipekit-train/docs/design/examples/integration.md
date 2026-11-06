@@ -38,7 +38,7 @@ the inference pipeline pins its hash; the whole pipeline is then a
 YAML round-trip.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 import pipekit_train as pt
 import pipekit_experiment as pe
 
@@ -51,11 +51,13 @@ trained_op, artifact = pt.TrainingLoop(
 artifact.save("./artifacts/train_v3.json")
 
 # Build the inference pipeline.
-inference = pk.Sequential([
-    preprocess,
-    trained_op,
-    postprocess,
-])
+inference = pk.Sequential(
+    [
+        preprocess,
+        trained_op,
+        postprocess,
+    ]
+)
 
 # Pin the model hash into an InferenceArtifact for byte-identical replay.
 inf_artifact = pe.InferenceArtifact(
@@ -120,12 +122,15 @@ import pipekit_train as pt
 from pipekit_train.adapters.equinox import TrainTask
 import somax
 
+
 class OceanParamTask:
     """Learn ocean model parameters by differentiating through the solver."""
+
     def loss_fn(self, model, batch, key):
         trajectory = model.integrate(batch["state0"], t0=0, t1=T, dt=dt)
-        loss = jnp.mean((trajectory.ys - batch["observations"])**2)
+        loss = jnp.mean((trajectory.ys - batch["observations"]) ** 2)
         return loss, {"mse": loss}
+
 
 loop = pt.TrainingLoop(
     model_op=pj.JaxModelOp(somax.SomaxModel(...)),
@@ -145,6 +150,7 @@ The `MetricWriter` Protocol is ten lines for any backend tracker:
 ```python
 import wandb
 
+
 class WandbWriter:
     """MetricWriter implementation for W&B."""
 
@@ -156,6 +162,7 @@ class WandbWriter:
 
     def close(self) -> None:
         wandb.finish()
+
 
 loop = pt.TrainingLoop(..., metric_writer=WandbWriter("plumes", "v3"))
 ```

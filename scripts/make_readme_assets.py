@@ -590,7 +590,7 @@ def packages_figure(theme: str) -> str:
         text(
             x0 + 18,
             cy + 30,
-            "pipekit",
+            "pipekit-ops",
             size=18,
             fill=t["accent_ink"],
             weight=700,
@@ -632,7 +632,7 @@ def packages_figure(theme: str) -> str:
         H,
         "".join(b),
         "The pipekit workspace: six sister packages (cycle, train, experiment, "
-        "evaluate, array, jax) on the dependency-free pipekit core",
+        "evaluate, array, jax) on the dependency-free pipekit-ops core",
     )
 
 

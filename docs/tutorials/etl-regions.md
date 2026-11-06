@@ -16,7 +16,7 @@ harmonise (assay plates, survey tiles, instrument logs).
 **Prerequisites:**
 
 ```bash
-uv add pipekit numpy jaxtyping
+uv add pipekit-ops numpy jaxtyping
 ```
 
 ```mermaid
@@ -49,7 +49,7 @@ from typing import Any
 
 import numpy as np
 from jaxtyping import Bool, Float, Int
-from pipekit import (
+from pipekit_ops import (
     BatchedMap,
     Cache,
     Operator,

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-dark.svg">
+    <img alt="pipekit-evaluate" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-light.svg" width="457">
+  </picture>
+</p>
+
 # pipekit-evaluate
 
 > **Status — v0.0 / early.** The `benchmark` subpackage (the orchestration layer of the benchmark ladder), the `Unit × Lens × Stage` scorer taxonomy and the evaluation report have landed.
@@ -58,8 +65,8 @@ pev.tags_of(scorers[1]).lens  # Lens.STRUCTURAL
 ```python
 report = pev.evaluate(prediction, truth, scorers, model_ref=model_hash)
 report.filter(lens="structural").to_pandas()
-report.diff(last_week)   # {key: (last week's value, this value)} for changed keys
-report.content_hash      # equal for two runs that score the same values
+report.diff(last_week)  # {key: (last week's value, this value)} for changed keys
+report.content_hash  # equal for two runs that score the same values
 ```
 
 A benchmark-ladder run becomes the same kind of report: `Benchmark(...).run().to_report()` gives one entry per scored value, keyed `"<cell>:<reference>:<scorer>.<metric>"`, so `report.filter(reference="known_theta")` cuts across the cube.

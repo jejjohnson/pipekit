@@ -381,7 +381,7 @@ def test_hyper_sweep_rejects_non_dict_param_yield(monkeypatch):
 
 def test_hyper_sweep_is_stateful_operator():
     """HyperSweep is a StatefulOperator so it composes into Sequential."""
-    from pipekit import StatefulOperator
+    from pipekit_ops import StatefulOperator
 
     sweep = HyperSweep(
         loop_template=_make_dummy_loop,

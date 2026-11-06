@@ -8,7 +8,7 @@ from pipekit_array import DimArray, Estimator, to_rows
 
 
 sklearn = pytest.importorskip("sklearn")
-import pipekit
+import pipekit_ops
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
@@ -136,8 +136,8 @@ def test_the_original_estimator_is_never_fitted() -> None:
 def test_it_is_a_fittable_transformer_that_composes() -> None:
     scene = _scene()
     op = Estimator(PCA(2), sample_dims=("y", "x"), feature_dim="component").fit(scene)
-    assert isinstance(op, pipekit.FittableTransformer)
-    pipe = pipekit.Sequential([op])
+    assert isinstance(op, pipekit_ops.FittableTransformer)
+    pipe = pipekit_ops.Sequential([op])
     np.testing.assert_allclose(pipe(scene).data, op.transform(scene).data)
     assert op.forbid_in_yaml
 

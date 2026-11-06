@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Identity, Operator
 from pipekit_cycle import (
     CallableForward,
     CompositeForward,
     ForwardModel,
     NeuralForward,
 )
+from pipekit_ops import Identity, Operator
 
 
 def test_callable_forward_step_and_apply():

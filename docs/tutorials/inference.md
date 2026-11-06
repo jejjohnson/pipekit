@@ -16,7 +16,7 @@ instrument, a clinical monitor, a telescope's housekeeping data.
 **Prerequisites:**
 
 ```bash
-uv add pipekit pipekit-experiment numpy jaxtyping
+uv add pipekit-ops pipekit-experiment numpy jaxtyping
 ```
 
 ```mermaid
@@ -52,7 +52,7 @@ from typing import Any
 
 import numpy as np
 from jaxtyping import Bool, Float, Real
-from pipekit import Graph, Input, Operator, Sequential, Sink
+from pipekit_ops import Graph, Input, Operator, Sequential, Sink
 from pipekit_experiment import LocalModelRegistry
 
 

@@ -17,7 +17,7 @@ from pipekit_train.adapters import bayes
 
 
 if TYPE_CHECKING:
-    from pipekit import Operator
+    from pipekit_ops import Operator
 
     from pipekit_train.loop import TrainingLoop
 

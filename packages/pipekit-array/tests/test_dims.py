@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 import pipekit_array as pa
 import pytest
-from pipekit import Signature, get_adapter
 from pipekit_array import (
     ArgReduce,
     Combine,
@@ -22,6 +21,7 @@ from pipekit_array import (
     TakeAlong,
     Transpose,
 )
+from pipekit_ops import Signature, get_adapter
 
 
 BANDS = ("B4", "B8")
@@ -361,7 +361,7 @@ def test_reduce_operator_predicts_the_dtype(fn: str, dtype: type) -> None:
 
 
 def test_meanscalar_states_saved_before_the_rename_load() -> None:
-    from pipekit import Operator
+    from pipekit_ops import Operator
 
     state = pa.MeanScalar(axis=0).state
     state = {**state, "module": "pipekit_array.reduce"}
@@ -441,7 +441,7 @@ def test_sel_operator_keeps_a_tuple_label() -> None:
 @pytest.mark.parametrize("label", [(0, 1), [(0, 1), (1, 1)], ["a", "b"], "a"])
 def test_sel_tuple_labels_survive_dumps_loads(label: Any) -> None:
     """Codex #110: JSON turns tuples into lists; the config keeps them apart."""
-    from pipekit import dumps, loads
+    from pipekit_ops import dumps, loads
 
     again = loads(dumps(Sel(dim="cell", label=label)))
     assert again.label == label
@@ -459,7 +459,7 @@ def test_numpy_conversion_honours_copy() -> None:
 
 def test_sel_with_a_label_array_keeps_the_dim_in_its_signature() -> None:
     """Codex #110: a 1-D label array is several labels, in the signature too."""
-    from pipekit import dumps, loads
+    from pipekit_ops import dumps, loads
 
     cube = DimArray(np.zeros((3, 2)), ("band", "x"), {"band": ("a", "b", "c")})
     op = Sel(dim="band", label=np.array(["a", "c"]))
@@ -500,7 +500,7 @@ def test_isel_signature_counts_selected_entries(index: Any) -> None:
 )
 def test_isel_numpy_indices_survive_dumps_loads(index: Any, native: Any) -> None:
     """Codex #110: NumPy indices become JSON-native, and select the same."""
-    from pipekit import dumps, loads
+    from pipekit_ops import dumps, loads
 
     cube = DimArray(np.arange(3.0), ("t",))
     op = ISel(dim="t", index=index)

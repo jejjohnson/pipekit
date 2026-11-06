@@ -25,6 +25,7 @@ Extras: `pipekit-train[equinox]`.
 ```python
 # pipekit_train/adapters/equinox.py
 
+
 class TrainState(eqx.Module):
     """Equinox-side training state. Stored inside TrainerCarryState.opt_state.
 
@@ -34,12 +35,15 @@ class TrainState(eqx.Module):
     keeps the JAX-specific PyTree concerns inside the adapter and
     the carrier-agnostic concerns inside the loop.
     """
+
     model: eqx.Module
     opt_state: optax.OptState
     step: int
 
     @staticmethod
-    def create(model: eqx.Module, optimizer: optax.GradientTransformation) -> "TrainState":
+    def create(
+        model: eqx.Module, optimizer: optax.GradientTransformation
+    ) -> "TrainState":
         opt_state = optimizer.init(eqx.filter(model, eqx.is_array))
         return TrainState(model=model, opt_state=opt_state, step=0)
 
@@ -53,6 +57,7 @@ class TrainTask(Protocol):
     averages its aux metrics per sample, unless the task defines the
     optional `eval_fn(model, batch, key, valid) -> metrics_dict`.
     """
+
     def loss_fn(
         self,
         model: eqx.Module,
@@ -73,7 +78,9 @@ def train_step(
 
 
 def save_state(mngr: ocp.CheckpointManager, state: TrainState, step: int) -> None: ...
-def restore_state(mngr: ocp.CheckpointManager, template: TrainState, step: int) -> TrainState: ...
+def restore_state(
+    mngr: ocp.CheckpointManager, template: TrainState, step: int
+) -> TrainState: ...
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
@@ -102,7 +109,7 @@ class Regression:
 
     def eval_fn(self, model, batch, key, valid):
         x, y = batch
-        err = ((jax.vmap(model)(x) - y) ** 2).mean(axis=-1)    # (batch_size,)
+        err = ((jax.vmap(model)(x) - y) ** 2).mean(axis=-1)  # (batch_size,)
         return {"mse": jnp.where(valid, err, 0.0).sum() / valid.sum()}
 ```
 
@@ -160,16 +167,16 @@ from pipekit_train.adapters.equinox import ShardingSpec
 mesh = Mesh(jax.devices(), axis_names=("data",))
 spec = ShardingSpec(
     mesh=mesh,
-    model_pspec=PartitionSpec(),        # replicate the model on every device
-    data_pspec=PartitionSpec("data"),   # shard each batch along its leading axis
+    model_pspec=PartitionSpec(),  # replicate the model on every device
+    data_pspec=PartitionSpec("data"),  # shard each batch along its leading axis
 )
 
 loop = TrainingLoop(
     model_op=model_op,
     dataset=dataset,
     loss=loss,
-    batch_size=256,                     # must be divisible by the "data" axis size
-    sharding=spec,                      # None => single-device (the default)
+    batch_size=256,  # must be divisible by the "data" axis size
+    sharding=spec,  # None => single-device (the default)
 )
 trained_op, artifact = loop.run()
 ```
@@ -280,17 +287,18 @@ def model(data=None, *, prior_scale=10.0):
     with numpyro.plate("n", 32 if data is None else data.shape[0]):
         numpyro.sample("obs", dist.Normal(mu, sigma), obs=data)
 
+
 task = NumpyroTask(
     model,
-    supervised=False,                               # a dataset of single items
+    supervised=False,  # a dataset of single items
     model_kwargs={"prior_scale": 10.0},
-    kernel_kwargs={"target_accept_prob": 0.995},    # NUTS(model, **kernel_kwargs)
+    kernel_kwargs={"target_accept_prob": 0.995},  # NUTS(model, **kernel_kwargs)
 )
 op, artifact = TrainingLoop(..., task=task, backend="numpyro-mcmc").run()
 
-op.posterior_samples()["mu"]        # (num_samples,)
-op.predictive_draws(None)["obs"]    # (num_samples, 32): None draws new data
-op(None)                            # the posterior-predictive mean, as before
+op.posterior_samples()["mu"]  # (num_samples,)
+op.predictive_draws(None)["obs"]  # (num_samples, 32): None draws new data
+op(None)  # the posterior-predictive mean, as before
 
 # after Checkpoint(registry=registry); the model is a closure, so it isn't stored
 op = NumpyroPredictiveOp.from_registry(
@@ -330,11 +338,11 @@ via `_BatchSource`), tempered SMC, and `pathfinder`/`svgd` VI. **Full design:
 `TrainingLoop.run()` selects the adapter by string:
 
 ```python
-loop = TrainingLoop(..., backend="equinox")   # uses adapters.equinox
-loop = TrainingLoop(..., backend="keras")        # uses adapters.keras
+loop = TrainingLoop(..., backend="equinox")  # uses adapters.equinox
+loop = TrainingLoop(..., backend="keras")  # uses adapters.keras
 loop = TrainingLoop(..., backend="numpyro-svi")  # adapters.numpyro_svi  (planned)
-loop = TrainingLoop(..., backend="numpyro-mcmc") # adapters.numpyro_mcmc (planned)
-loop = TrainingLoop(..., backend="blackjax")     # adapters.blackjax     (planned)
+loop = TrainingLoop(..., backend="numpyro-mcmc")  # adapters.numpyro_mcmc (planned)
+loop = TrainingLoop(..., backend="blackjax")  # adapters.blackjax     (planned)
 ```
 
 The selection happens at `run()` time, not at construction, so a

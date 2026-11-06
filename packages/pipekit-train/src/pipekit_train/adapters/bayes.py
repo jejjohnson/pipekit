@@ -8,7 +8,7 @@ This module holds what they share:
 - `NumpyroTask` — the per-backend task (the model + predictive config plus
   per-paradigm fields). No ``method`` field: the **backend string** selects
   SVI vs MCMC, so the same task works under either.
-- `NumpyroPredictiveOp` — the trained artifact: a `pipekit.Operator` wrapping
+- `NumpyroPredictiveOp` — the trained artifact: a `pipekit_ops.Operator` wrapping
   a ``numpyro.infer.Predictive`` that returns the posterior-predictive mean
   of a chosen site, and gives access to the full draws.
 - small helpers: dataset materialisation, the optax optimiser builder, and
@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_train.adapters import _common
 from pipekit_train.adapters._common import any_should_stop, dispatch  # noqa: F401
@@ -78,7 +78,7 @@ class NumpyroTask:
 
 
 class NumpyroPredictiveOp(Operator):
-    """Wrap a NumPyro posterior as a posterior-predictive `pipekit.Operator`.
+    """Wrap a NumPyro posterior as a posterior-predictive `pipekit_ops.Operator`.
 
     ``_apply(x)`` draws from the wrapped ``Predictive`` and returns the mean
     over draws of ``predictive_site``. `predictive_draws` and

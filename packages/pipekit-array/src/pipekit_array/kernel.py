@@ -50,7 +50,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, Protocol, cast, runtime_checkable
 
-from pipekit import (
+from pipekit_ops import (
     NamedArrayAdapter,
     Operator,
     Signature,
@@ -496,7 +496,7 @@ class KernelOp(Operator):
             parameter named ``geometry`` through ``params=``).
 
     ``KernelOp`` holds a user function, so its config is a debug repr only
-    (``forbid_in_yaml``, like `pipekit.Lambda`); a named operator built on
+    (``forbid_in_yaml``, like `pipekit_ops.Lambda`); a named operator built on
     one by composition (``geoops.NDVI``) is what serialises.
 
     Example:

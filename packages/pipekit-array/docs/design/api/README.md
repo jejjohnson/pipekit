@@ -6,9 +6,9 @@ version: 0.1.0
 # API — Operator Catalog
 
 The v0.1 surface is 12 operators across 7 modules. The grouping
-mirrors `pipekit` core where it makes sense
-(`combinators` ↔ `pipekit.combine`, `qc` ↔ `pipekit.qc`,
-`observe` ↔ `pipekit.observe`, `parallel` ↔ `pipekit.parallel`).
+mirrors `pipekit-ops` core where it makes sense
+(`combinators` ↔ `pipekit_ops.combine`, `qc` ↔ `pipekit_ops.qc`,
+`observe` ↔ `pipekit_ops.observe`, `parallel` ↔ `pipekit_ops.parallel`).
 
 ## At a glance
 
@@ -29,7 +29,7 @@ mirrors `pipekit` core where it makes sense
 
 ## Named carriers: dim-level functions
 
-On any carrier with a registered `pipekit.NamedArrayAdapter` (a `DimArray`,
+On any carrier with a registered `pipekit_ops.NamedArrayAdapter` (a `DimArray`,
 an `xr.DataArray`, a geoarray carrier), by dim name rather than axis.
 Each is a function in `dims` and, where it serialises, an operator in
 `dim_operators` (GA-Q3; geostack `docs/design/pipekit_kernels.md`).

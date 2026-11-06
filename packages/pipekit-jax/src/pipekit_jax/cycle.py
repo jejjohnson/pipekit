@@ -32,9 +32,9 @@ from typing import Any, ClassVar
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from pipekit import Operator, StatefulOperator
-from pipekit._base.operator import nested_config
 from pipekit_cycle.protocols import ForwardModel
+from pipekit_ops import Operator, StatefulOperator
+from pipekit_ops._base.operator import nested_config
 
 from pipekit_jax.operator import JaxOperator
 
@@ -48,7 +48,7 @@ class _ForwardModelStep(StatefulOperator, JaxOperator):
     """
 
     # The model is arbitrary user code (callables, diffrax vector fields):
-    # flag it so `pipekit.check_pickleable` reports it, as
+    # flag it so `pipekit_ops.check_pickleable` reports it, as
     # `pipekit_cycle`'s adapter does.
     forbid_in_yaml: ClassVar[bool] = True
 
@@ -392,7 +392,7 @@ class Rollout(JaxOperator):
         step: A pipekit operator ``carrier -> carrier``, or a
             `pipekit_cycle.ForwardModel` (wrapped to call ``step(c, dt)``;
             the wrapper is flagged ``forbid_in_yaml`` so
-            `pipekit.check_pickleable` reports it).
+            `pipekit_ops.check_pickleable` reports it).
         n_steps: Number of steps; must be a multiple of ``save_every``.
         save_every: Record every ``save_every``-th state.
         include_initial: Prepend ``c₀`` to the trajectory.

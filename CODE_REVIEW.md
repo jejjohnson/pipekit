@@ -134,12 +134,11 @@ When reviewing, specifically verify the patterns below.
 
 ```python
 # ❌ Missing type hints
-def process_data(items, threshold):
-    ...
+def process_data(items, threshold): ...
+
 
 # ✅ Complete type hints
-def process_data(items: list[DataItem], threshold: float) -> ProcessedResult:
-    ...
+def process_data(items: list[DataItem], threshold: float) -> ProcessedResult: ...
 ```
 
 ### Modern Syntax
@@ -148,11 +147,14 @@ def process_data(items: list[DataItem], threshold: float) -> ProcessedResult:
 # ❌ Old-style
 from typing import Optional, Union, List, Dict
 
+
 def fetch(id: Optional[int] = None) -> Union[Data, None]:
     result: Dict[str, List[int]] = {}
 
+
 # ✅ Modern (Python 3.12+)
 from __future__ import annotations
+
 
 def fetch(id: int | None = None) -> Data | None:
     result: dict[str, list[int]] = {}
@@ -168,10 +170,12 @@ class Config:
         self.port = port
         self.timeout = timeout
 
+
 # ✅ Dataclass
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 
 @dataclass
 class Config:
@@ -185,6 +189,7 @@ class Config:
 ```python
 # ❌ os.path
 import os
+
 path = os.path.join(base_dir, "data", filename)
 if os.path.exists(path):
     with open(path) as f:
@@ -192,6 +197,7 @@ if os.path.exists(path):
 
 # ✅ pathlib
 from pathlib import Path
+
 path = base_dir / "data" / filename
 if path.exists():
     content = path.read_text()
@@ -219,6 +225,7 @@ except json.JSONDecodeError as e:
 # ❌ No explanation for non-obvious algorithm
 def calculate_score(items):
     return sum(i.weight * (1 - i.age / 365) for i in items if i.active)
+
 
 # ✅ Clear explanation of the logic
 def calculate_score(items: list[Item]) -> float:

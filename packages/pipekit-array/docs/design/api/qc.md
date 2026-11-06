@@ -6,7 +6,7 @@ version: 0.1.0
 # QC — numeric assertions
 
 Four pass-through assertions that look inside the array. They sit
-above `pipekit.qc` (which stays carrier-agnostic — see its module
+above `pipekit_ops.qc` (which stays carrier-agnostic — see its module
 docstring's explicit deferral to pipekit-array) and below
 `geoops.qc` / `xr_toolz.qa` (which subclass these with
 carrier-specific defaults).
@@ -14,7 +14,7 @@ carrier-specific defaults).
 All four follow the same pass-through shape:
 
 - On success: return the carrier unchanged.
-- On failure: raise `QCError` (re-exported from `pipekit.qc`) or, for
+- On failure: raise `QCError` (re-exported from `pipekit_ops.qc`) or, for
   ops that take `on_fail="warn"`, emit a `UserWarning` and return
   unchanged.
 
@@ -209,7 +209,7 @@ all five backends agree on the cast-to-int-then-sum semantics.
 ## Failure messages
 
 All four operators raise `QCError` (subclass of `AssertionError`,
-re-exported from `pipekit.qc`) on failure. The message format is
+re-exported from `pipekit_ops.qc`) on failure. The message format is
 operator-specific but follows a common shape:
 
 ```

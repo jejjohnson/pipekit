@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pipekit import Operator
-from pipekit.signature import Signature
+from pipekit_ops import Operator
+from pipekit_ops.signature import Signature
 
 from pipekit_array._namespace import array_namespace
 

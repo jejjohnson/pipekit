@@ -22,6 +22,7 @@ class Loss(Protocol):
     (scalar, aux_metrics_dict) tuple. The adapter distinguishes by
     introspection.
     """
+
     def __call__(
         self,
         predicted: Any,
@@ -39,9 +40,11 @@ directly and `Loss` is ignored.
 ```python
 class MSE(Operator):
     """Mean squared error. Carrier-agnostic over array-like leaves."""
+
     reduction: Literal["mean", "sum", "none"] = "mean"
 
     def __call__(self, predicted, target) -> float: ...
+
 
 class NLL(Operator):
     """Negative log-likelihood for distributional outputs.
@@ -51,7 +54,9 @@ class NLL(Operator):
     The `predicted` carrier is expected to be either a tuple
     (mean, log_var) or an object with .log_prob(target).
     """
+
     def __call__(self, predicted, target) -> float: ...
+
 
 class KL(Operator):
     """KL divergence — for variational training.
@@ -59,17 +64,22 @@ class KL(Operator):
     Analytic when q_dist has kl_divergence; otherwise a Monte Carlo estimate
     from n_samples draws, which needs a key. The Equinox adapter supplies one.
     """
+
     n_samples: int = 32
 
     def __call__(self, q_dist, p_dist, key=None) -> tuple[float, dict]: ...
 
+
 class Composite(Operator):
     """Weighted sum: loss = sum(w_i * L_i)."""
+
     components: tuple[tuple[float, Loss], ...]
 
     def __call__(self, predicted, target) -> tuple[float, dict[str, float]]:
-        terms = {f"{type(L).__name__}_{i}": L(predicted, target)
-                 for i, (w, L) in enumerate(self.components)}
+        terms = {
+            f"{type(L).__name__}_{i}": L(predicted, target)
+            for i, (w, L) in enumerate(self.components)
+        }
         total = sum(w * v for (w, _), v in zip(self.components, terms.values()))
         return total, terms
 ```
@@ -133,6 +143,7 @@ Orbax `CheckpointManager` ↔ Equinox `eqx.Module` bridge via
 def save_state(mngr: ocp.CheckpointManager, state: TrainState, step: int) -> None:
     arrays, static = eqx.partition(state, eqx.is_array)
     mngr.save(step, args=ocp.args.StandardSave(arrays))
+
 
 def restore_state(
     mngr: ocp.CheckpointManager,

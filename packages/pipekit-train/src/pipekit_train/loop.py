@@ -1,11 +1,11 @@
 """Layer 3 — TrainingLoop.
 
 The headline composable. `TrainingLoop` is a
-`pipekit.StatefulOperator` carrying ``(model, opt_state, step, epoch,
+`pipekit_ops.StatefulOperator` carrying ``(model, opt_state, step, epoch,
 metrics, rng)``; running it produces ``(trained_model_op, artifact)``.
 
 This module also ships the supporting `TrainerCarryState` (subclass of
-`pipekit.CarryState`) and `ValidationStep` (an `Operator` that
+`pipekit_ops.CarryState`) and `ValidationStep` (an `Operator` that
 evaluates a trained model against a held-out dataset).
 
 See ``docs/design/api/models.md``.
@@ -20,8 +20,8 @@ from dataclasses import asdict, dataclass, field
 from importlib import import_module
 from typing import Any, ClassVar, Literal
 
-from pipekit import CarryState, Operator, StatefulOperator, dumps
-from pipekit.hashing import pipeline_hash
+from pipekit_ops import CarryState, Operator, StatefulOperator, dumps
+from pipekit_ops.hashing import pipeline_hash
 
 from pipekit_train.dataset import TrainingDataset
 from pipekit_train.loss import Loss
@@ -250,7 +250,7 @@ class TrainingLoop(StatefulOperator):
     Args:
         model_op: Untrained model Operator. Backend-specific (an
             equinox/keras module wrapped in a
-            pipekit.Operator).
+            pipekit_ops.Operator).
         dataset: A `TrainingDataset`.
         val_dataset: Optional held-out `TrainingDataset` for eval.
         loss: A `Loss`. Ignored if ``task`` is supplied.
@@ -461,7 +461,7 @@ class TrainingLoop(StatefulOperator):
         except ImportError:
             artifact_cls = _LocalArtifact
 
-        # `pipekit.dumps` already returns a JSON string; don't re-encode it.
+        # `pipekit_ops.dumps` already returns a JSON string; don't re-encode it.
         # Pretty-print by round-tripping through json.loads for readability.
         try:
             training_pipeline_yaml = json.dumps(

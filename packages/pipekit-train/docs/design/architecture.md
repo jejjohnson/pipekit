@@ -94,7 +94,7 @@ Three seams matter most.
 
 ### 4.1 Seam to pipekit core — `StatefulOperator`
 
-`TrainingLoop` is a `pipekit.StatefulOperator` (Group M). Its
+`TrainingLoop` is a `pipekit_ops.StatefulOperator` (Group M). Its
 `_apply(carrier, state) -> (carrier, state)` signature lets it
 participate in any `Sequential` that threads state through. The
 carry-state is a `TrainerCarryState(CarryState)` carrying:
@@ -134,7 +134,7 @@ returns a tuple `(trained_model_op, training_artifact)`. The artifact
 contains:
 
 - `training_pipeline_yaml` — the serialised `TrainingLoop` (via
-  `pipekit.dumps`)
+  `pipekit_ops.dumps`)
 - `dataset_hash` — `dataset.content_hash()`
 - `trained_model_hash` — content hash of the model operator after
   training (via `ModelRegistry.store`)
@@ -164,7 +164,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     Returns:
         A tuple of (trained_model_op, backend_info_dict). The
-        trained_model_op is a pipekit.Operator wrapping the trained
+        trained_model_op is a pipekit_ops.Operator wrapping the trained
         weights. The backend_info_dict is merged into the
         TrainingArtifact under the `backend_info` field.
     """
@@ -180,7 +180,7 @@ The adapter is responsible for:
    Keras: `Model.compile(loss=...)`).
 3. Threading `loop.callbacks` into the backend's callback hooks.
 4. Running the training loop.
-5. Wrapping the trained weights in a `pipekit.Operator` (typically
+5. Wrapping the trained weights in a `pipekit_ops.Operator` (typically
    `pipekit-array.ModelOp` or `pipekit-jax.JaxModelOp`).
 
 The adapter does **not** reimplement gradients, optimiser updates, or

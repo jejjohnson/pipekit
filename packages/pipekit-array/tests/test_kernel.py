@@ -7,8 +7,8 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Signature, get_adapter, register_adapter, unregister_adapter
 from pipekit_array import BackendError, DimArray, KernelOp, KernelSpec
+from pipekit_ops import Signature, get_adapter, register_adapter, unregister_adapter
 
 
 BANDS = ("B1", "B2", "B3", "B4")

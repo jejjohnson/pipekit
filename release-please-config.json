@@ -27,6 +27,17 @@
         "src/pipekit/__init__.py"
       ]
     },
+    "packages/pipekit-ops": {
+      "release-type": "python",
+      "package-name": "pipekit-ops",
+      "component": "pipekit-ops",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/pipekit_ops/__init__.py"
+      ]
+    },
     "packages/pipekit-array": {
       "release-type": "python",
       "package-name": "pipekit-array",

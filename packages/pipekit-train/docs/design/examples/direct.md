@@ -9,7 +9,7 @@ The simplest training shape. A catalog of labeled scenes + a
 preprocessing pipeline + a UNet. Maps to master plan §2.1 + §4.1.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 import pipekit_train as pt
 import pipekit_experiment as pe
 import geocatalog as gc
@@ -17,10 +17,12 @@ import geopatcher as gp
 import geoops as gz
 
 # 1. Preprocess pipeline — re-used at inference time.
-preprocess = pk.Sequential([
-    gz.radiometry.ToFloat32(),
-    gz.radiometry.PercentileClip(p_min=2, p_max=98),
-])
+preprocess = pk.Sequential(
+    [
+        gz.radiometry.ToFloat32(),
+        gz.radiometry.PercentileClip(p_min=2, p_max=98),
+    ]
+)
 
 # 2. Catalog of labeled scenes.
 catalog = gc.open_catalog("s3://imeo/labeled-scenes.parquet")
@@ -39,12 +41,16 @@ val_ds = train_ds.with_split("val")
 # 4. Model (JAX/Equinox). Wrapped as a pipekit operator.
 import pipekit_jax as pj
 import equinox as eqx
+
+
 class UNet(eqx.Module): ...
+
+
 model_op = pj.JaxModelOp(UNet(in_channels=4, out_channels=2, key=...))
 
 # 5. Pipekit-experiment integration (optional but recommended).
 registry = pe.LocalModelRegistry(root="./models")
-tracker  = pe.adapters.mlflow.MLflowTracker(tracking_uri="http://mlflow:5000")
+tracker = pe.adapters.mlflow.MLflowTracker(tracking_uri="http://mlflow:5000")
 
 # 6. The training loop.
 loop = pt.TrainingLoop(
@@ -60,8 +66,12 @@ loop = pt.TrainingLoop(
     backend="equinox",
     callbacks=(
         pt.EarlyStopping(metric="val_loss", patience=5, mode="min"),
-        pt.Checkpoint(every_n_steps=2_000, keep_last=3,
-                      save_dir="./ckpts/cloud_mask", registry=registry),
+        pt.Checkpoint(
+            every_n_steps=2_000,
+            keep_last=3,
+            save_dir="./ckpts/cloud_mask",
+            registry=registry,
+        ),
         pt.LogToExperiment(tracker=tracker, run_name="cloud_mask_unet"),
     ),
     metric_writer=pt.JSONLWriter(path="./logs/cloud_mask.jsonl"),
@@ -70,17 +80,19 @@ loop = pt.TrainingLoop(
 
 # 7. Run it.
 trained_model_op, artifact = loop.run()
-# trained_model_op is a pipekit.Operator — drops into any inference pipeline.
+# trained_model_op is a pipekit_ops.Operator — drops into any inference pipeline.
 # artifact is a pipekit_experiment.TrainingArtifact with:
 #   training_pipeline_yaml, dataset_hash, trained_model_hash,
 #   tracker_run_id, model_registry_uri, backend_info, deps_lock.
 
 # 8. Inference pipeline — train and inference share the preprocess step.
-inference = pk.Sequential([
-    preprocess,
-    trained_model_op,
-    gz.cloud.PostProcessMask(threshold=0.5),
-])
+inference = pk.Sequential(
+    [
+        preprocess,
+        trained_model_op,
+        gz.cloud.PostProcessMask(threshold=0.5),
+    ]
+)
 
 # 9. Reproduce later from the artifact alone.
 artifact.save("./artifacts/cloud_mask_v3.json")
@@ -93,7 +105,7 @@ reloaded_model = loaded.reload_model(registry)
 **What this example demonstrates:**
 
 - `CatalogDataset` opening a `geocatalog` URI lazily, applying a
-  `pipekit.Sequential` preprocess per row, tiling via
+  `pipekit_ops.Sequential` preprocess per row, tiling via
   `geopatcher.SpatialRegularStride`, splitting by row-hash.
 - The training loop runs against the v0.1 Equinox adapter with the
   user's loss synthesised into a `TrainTask` automatically.

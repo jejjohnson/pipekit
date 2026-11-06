@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Self, cast
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 class _JsonArtifact:

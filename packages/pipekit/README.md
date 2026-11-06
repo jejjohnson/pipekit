@@ -1,59 +1,32 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/logo-dark.svg">
+    <img alt="pipekit" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/logo-light.svg" width="308">
+  </picture>
+</p>
+
 # pipekit
 
-Carrier-agnostic operator-graph framework. The composition primitives
-— `Operator`, `Sequential`, `Graph` — that every sister package
-builds on. Pure Python; no third-party dependencies.
+> The [pipekit monorepo](https://github.com/jejjohnson/pipekit) in one install.
 
-## Install
+`pip install pipekit` installs the seven packages of the workspace. The umbrella holds no code; import each package under its own name:
 
-From the workspace checkout:
-
-```bash
-uv sync --all-groups
-```
-
-Once published:
-
-```bash
-uv add pipekit
-```
-
-## What's shipped (v0.0.1)
-
-| Module        | Symbols                                                                              |
-|---------------|--------------------------------------------------------------------------------------|
-| `_base`       | `Operator`, `ConfigMixin`, `Carrier`, `Sequential`, `Graph`, `Input`, `Node`         |
-| `compose`     | `pipe`, `compose`, `compose_left`, `complement`, `juxt`                              |
-| `blocks`      | `Identity`, `Const`, `Lambda`, `Sink`                                                |
-| `control`     | `Branch`, `Switch`, `Try`, `Coalesce`, `Retry`                                       |
-| `observe`     | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`                              |
-| `combine`     | `Fanout`                                                                             |
-| `cache`       | `Cache`, `Memoize`                                                                   |
-| `qc`          | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`   |
-| `signature`   | `Signature` (named-dimension shape inference)                                        |
-| `parallel`    | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable`              |
-| `serial`      | `dumps`, `loads`, `register`, `loads_sandboxed`                                      |
-| `state`       | `StatefulOperator`, `CarryState` (the substrate for `pipekit-cycle`)                 |
-
-## Quickstart
+| Distribution | Import | Use it for |
+|---|---|---|
+| `pipekit-ops` | `pipekit_ops` | `Operator`, `Sequential`, `Graph` and the ready-made operators |
+| `pipekit-array` | `pipekit_array` | Named-array and Array API operators |
+| `pipekit-cycle` | `pipekit_cycle` | Time stepping and data assimilation |
+| `pipekit-experiment` | `pipekit_experiment` | Model registry and run tracking |
+| `pipekit-evaluate` | `pipekit_evaluate` | Benchmarks and scoring |
+| `pipekit-train` | `pipekit_train` | Training pipelines |
+| `pipekit-jax` | `pipekit_jax` | Equinox models and diffrax forward models |
 
 ```python
-from pipekit import Operator, Sequential, Tap
-
-
-class Scale(Operator):
-    def __init__(self, factor: float) -> None:
-        self.factor = factor
-
-    def _apply(self, x):
-        return x * self.factor
-
-
-pipe = Scale(2.0) | Tap(print, name="log") | Scale(3.0)
-assert pipe(5.0) == 30.0
+import pipekit_ops as pk
+import pipekit_cycle as pc
 ```
 
-## References
+Extras stay with the package that owns them: `pip install 'pipekit-train[equinox]'`, `pip install 'pipekit-array[xarray]'`.
 
-Master plan: [Report 2](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_2_pipekit.md).
-API reference: [pipekit](https://github.com/jejjohnson/pipekit/blob/main/docs/api/pipekit.md).
+Before 0.2.0, `pipekit` was the core package. It is now `pipekit-ops` (import `pipekit_ops`); `from pipekit import Operator` raises an `ImportError` that says where it went.
+A library that only needs the core should depend on `pipekit-ops`, which has no third-party dependencies; this umbrella installs JAX through `pipekit-jax`.

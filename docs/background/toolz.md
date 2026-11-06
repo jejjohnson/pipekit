@@ -70,7 +70,7 @@ pipe(
     "  HELLO  ",
     str.strip,
     str.lower,
-    do(print),                  # side effect: prints "hello"
+    do(print),  # side effect: prints "hello"
     lambda s: s.split("l"),
 )
 # → ['he', '', 'o']
@@ -120,17 +120,16 @@ are from real runs.
 === "pipekit"
 
     ```python title="The same steps as pipekit operators: named, indexable, in order."
-    from pipekit import Lambda, Tap
+    from pipekit_ops import Lambda, Tap
 
     steps = (
-        Lambda(str.strip) | Lambda(str.lower) | Tap(print)
-        | Lambda(lambda s: s.split("l"))
+        Lambda(str.strip) | Lambda(str.lower) | Tap(print) | Lambda(lambda s: s.split("l"))
     )
     print(steps)
     # Sequential([Lambda(name='strip'), Lambda(name='lower'),
     #             Tap(name='print'), Lambda(name='<lambda>')])
-    steps[2]                   # → Tap(name='print')
-    steps("  HELLO  ")         # prints "hello"; → ['he', '', 'o']
+    steps[2]  # → Tap(name='print')
+    steps("  HELLO  ")  # prints "hello"; → ['he', '', 'o']
     ```
 
 `toolz` is the design template. pipekit is the typed, introspectable,
@@ -175,12 +174,12 @@ its whole configuration: each nested operator as its own record, and for a
 through `_target_` YAML with `pipekit-experiment`'s `HydraConfigLoader`:
 
 ```python title="A nested pipeline round-trips, from a real run."
-import pipekit as pk
-from pipekit import Cache, Const, Identity, Sequential
+import pipekit_ops as pk
+from pipekit_ops import Cache, Const, Identity, Sequential
 
 pipe = Cache(Sequential([Const(3), Identity()]))
 back = pk.loads(pk.dumps(pipe))
-back.state == pipe.state                         # → True
+back.state == pipe.state  # → True
 pk.pipeline_hash(back) == pk.pipeline_hash(pipe)  # → True
 ```
 
@@ -254,6 +253,7 @@ separately.
     def my_op(x):
         return ...
 
+
     pipe(value, my_op, other_op, third_op)
     ```
 
@@ -271,6 +271,7 @@ separately.
 
     ```python
     from typing import Protocol
+
 
     class OperatorLike(Protocol):
         def __call__(self, x): ...
@@ -304,18 +305,18 @@ separately.
 
     ```python title="The Operator base class, simplified."
     class Operator(ConfigMixin):
-        forbid_in_yaml: ClassVar[bool] = False   # closure-holding operators set True
-        _terminal: ClassVar[bool] = False        # may only end a Sequential
+        forbid_in_yaml: ClassVar[bool] = False  # closure-holding operators set True
+        _terminal: ClassVar[bool] = False  # may only end a Sequential
 
-        def __call__(self, *args, **kwargs):     # dual-mode dispatch
+        def __call__(self, *args, **kwargs):  # dual-mode dispatch
             if any(isinstance(a, Node) for a in args):
-                ...                              # build a graph node
+                ...  # build a graph node
             return self._apply(*args, **kwargs)  # run eagerly
 
-        def _apply(self, *args, **kwargs):       # the one method subclasses write
+        def _apply(self, *args, **kwargs):  # the one method subclasses write
             raise NotImplementedError
 
-        def __or__(self, other) -> Sequential:   # pipe syntax, defined once
+        def __or__(self, other) -> Sequential:  # pipe syntax, defined once
             ...
 
         @classmethod
@@ -399,7 +400,7 @@ The carrier trajectory is different, and not settled.
 
 | Axis | Where it lands | Status |
 |---|---|---|
-| Operators | a typed concrete base class, `pipekit.Operator` | settled |
+| Operators | a typed concrete base class, `pipekit_ops.Operator` | settled |
 | Carriers, pipekit core | `Carrier = Any` | settled: the core stays carrier-agnostic |
 | Carriers, multi-backend | Array API Protocols, in pipekit-array | in progress |
 | Carriers, domain libraries | your own: `GeoTensor` in geotoolz, `xr.DataArray` / `xr.Dataset` in xrtoolz, … | in use |

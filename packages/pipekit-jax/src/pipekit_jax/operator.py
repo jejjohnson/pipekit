@@ -45,7 +45,7 @@ from typing import Any
 
 import equinox as eqx
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_jax.weights import WeightsMixin
 

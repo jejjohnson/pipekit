@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pipekit import StatefulOperator
+from pipekit_ops import StatefulOperator
 
 
 class AddOneStateful(StatefulOperator):

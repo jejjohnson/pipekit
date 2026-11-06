@@ -37,6 +37,7 @@ PKG_VERSION := $(shell grep -E '^version\s*=' pyproject.toml 2>/dev/null \
 # Paths (override via .env or command line)
 # ---------------------------------------------------------------------------
 PKGROOTS ?= packages/pipekit/src/pipekit \
+            packages/pipekit-ops/src/pipekit_ops \
             packages/pipekit-array/src/pipekit_array \
             packages/pipekit-cycle/src/pipekit_cycle \
             packages/pipekit-experiment/src/pipekit_experiment \

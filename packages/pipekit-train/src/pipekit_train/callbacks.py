@@ -16,11 +16,11 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 if TYPE_CHECKING:
-    from pipekit import CarryState
+    from pipekit_ops import CarryState
 
 
 # ---------------------------------------------------------------------

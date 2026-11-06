@@ -66,7 +66,7 @@ the *full* hook surface; runtime conformance is duck-typed via
 
 ## Bundled callbacks
 
-All are `pipekit.Operator`s so they round-trip through YAML.
+All are `pipekit_ops.Operator`s so they round-trip through YAML.
 
 ### `Checkpoint`
 
@@ -86,10 +86,11 @@ class Checkpoint(Operator):
             the final checkpoint is also stored by content hash and
             the URI is wired back into TrainingArtifact.
     """
+
     every_n_steps: int = 1000
     keep_last: int = 3
     save_dir: str | None = None
-    registry: Any | None = None     # pipekit_experiment.ModelRegistry
+    registry: Any | None = None  # pipekit_experiment.ModelRegistry
 ```
 
 The adapter is responsible for the actual save. The Equinox adapter
@@ -110,6 +111,7 @@ class EarlyStopping(Operator):
         mode: "min" for losses, "max" for accuracies.
         min_delta: Minimum change to count as improvement.
     """
+
     metric: str
     patience: int = 10
     mode: Literal["min", "max"] = "min"
@@ -134,7 +136,8 @@ class LogToExperiment(Operator):
         config: Extra config dict merged into the run start. The
             tracker also sees the TrainingLoop's get_config().
     """
-    tracker: Any                    # pipekit_experiment.ExperimentTracker
+
+    tracker: Any  # pipekit_experiment.ExperimentTracker
     run_name: str
     config: dict[str, Any] | None = None
 ```
@@ -161,6 +164,7 @@ class MetricWriter(Protocol):
     Implementations: JSONL, in-memory list, W&B, TensorBoard.
     The trainer calls write() per logged step.
     """
+
     def write(self, step: int, metrics: dict[str, float]) -> None: ...
     def close(self) -> None: ...
 ```
@@ -176,6 +180,7 @@ class JSONLWriter:
         path: Output file path. Created if missing.
         flush_every: How many writes between fsync() calls.
     """
+
     path: str
     flush_every: int = 100
 
@@ -206,6 +211,7 @@ class ValidationStep(Operator):
             the pipekit ecosystem — pipekit-evaluate metrics, custom
             user metrics, …
     """
+
     model_op: Operator
     dataset: TrainingDataset
     metrics: tuple[Operator, ...]
@@ -235,15 +241,17 @@ class ParameterGrid(Operator):
     empty grid ({}) — the pragmatic "no axes ⇒ no trials"
     departure from the math convention that ∏ over zero axes = 1.
     """
+
     grid: dict[str, list[Any]]
 
 
 @dataclass
 class SweepResult:
     """One trial's result; sorted by HyperSweep.select_metric."""
+
     params: dict[str, Any]
     trained_model_op: Operator
-    artifact: Any                 # TrainingArtifact | _LocalArtifact
+    artifact: Any  # TrainingArtifact | _LocalArtifact
     final_metric: float
     sweep_id: str
     trial_index: int

@@ -19,7 +19,7 @@ Once any of the packages publish to PyPI, you install only what you
 need:
 
 ```bash
-uv add pipekit                   # carrier-agnostic core only
+uv add pipekit-ops               # carrier-agnostic core only
 uv add pipekit-cycle             # adds time-stepping / DA
 uv add pipekit-train             # adds training pipelines
 uv add 'pipekit-train[equinox]'  # plus the Equinox backend adapter
@@ -33,7 +33,7 @@ see [Installation](installation.md).
 A pipeline is a chain of `Operator`s. Compose them with `|`:
 
 ```python
-from pipekit import Operator, Tap
+from pipekit_ops import Operator, Tap
 
 
 class Scale(Operator):
@@ -81,7 +81,7 @@ satisfy the `AnalysisStep` protocol — for example
 algorithm-agnostic:
 
 ```python
-from filterx.adapters.pipekit import EnKFAnalysis
+from filterx.adapters.pipekit_ops import EnKFAnalysis
 
 da = pc.EnsembleDACycle(
     forward_model=my_forward_model,
@@ -108,13 +108,19 @@ from pipekit_train import IterableDataset, MSE, TrainingLoop
 from pipekit_train.adapters.equinox import EquinoxModelOp
 
 
-model_op = EquinoxModelOp(eqx.nn.MLP(
-    in_size=1, out_size=1, width_size=16, depth=2, key=jax.random.key(0),
-))
+model_op = EquinoxModelOp(
+    eqx.nn.MLP(
+        in_size=1,
+        out_size=1,
+        width_size=16,
+        depth=2,
+        key=jax.random.key(0),
+    )
+)
 
 loop = TrainingLoop(
     model_op=model_op,
-    dataset=my_dataset,                       # any TrainingDataset
+    dataset=my_dataset,  # any TrainingDataset
     loss=MSE(),
     optimizer_config={"name": "adam", "learning_rate": 1e-2},
     max_steps=100,
@@ -126,7 +132,7 @@ loop = TrainingLoop(
 trained_op, artifact = loop.run()
 ```
 
-`trained_op` is a `pipekit.Operator` that wraps the trained module;
+`trained_op` is a `pipekit_ops.Operator` that wraps the trained module;
 it composes into any `Sequential` / `Graph` / `Cycle` for inference.
 The `artifact` is a `TrainingArtifact` carrying the config hash,
 dataset hash, and registry URI (when wired to a `ModelRegistry`).
@@ -196,4 +202,4 @@ end-to-end notebook is at
 - **[Installation](installation.md)** — per-package install matrix.
 - **[Tutorials](tutorials/train-emulator.md)** — substantive
   end-to-end walkthroughs.
-- **[API reference](api/pipekit.md)** — generated from docstrings.
+- **[API reference](api/pipekit-ops.md)** — generated from docstrings.

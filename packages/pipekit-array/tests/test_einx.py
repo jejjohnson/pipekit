@@ -11,8 +11,8 @@ from pipekit_array import DimArray
 
 
 einx = pytest.importorskip("einx")
-from pipekit import BackendError
 from pipekit_array import einx as px
+from pipekit_ops import BackendError
 
 
 def _cube() -> DimArray:

@@ -296,7 +296,7 @@ def test_run_with_early_stopping_breaks_early():
     assert expected_step == final_step
     assert expected_step < loop.max_steps
     # Sanity: TrainerCarryState API accepts the shape _apply uses.
-    from pipekit import Const
+    from pipekit_ops import Const
 
     cs = TrainerCarryState(
         model=Const(0),
@@ -380,7 +380,7 @@ def test_run_requires_loss_or_task():
 
 def test_run_rejects_non_eqx_model_op():
     """A non-Equinox model_op fails with a clear TypeError."""
-    from pipekit import Const
+    from pipekit_ops import Const
 
     dataset = _synthetic_regression(n=8, seed=0)
     loop = TrainingLoop(

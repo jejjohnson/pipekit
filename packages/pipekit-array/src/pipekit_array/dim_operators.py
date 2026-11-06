@@ -4,7 +4,7 @@ Each wraps one function of `pipekit_array.dims` and computes its output
 `Signature` without running. Operators that take only names and numbers
 (`ISel`, `Sel`, `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`)
 round-trip through ``dumps`` / ``loads``; those that hold a user function
-(`MapOver`, `Combine`) set ``forbid_in_yaml``, like `pipekit.Lambda`.
+(`MapOver`, `Combine`) set ``forbid_in_yaml``, like `pipekit_ops.Lambda`.
 
 `Reduce` and `ArgReduce` take the reduction by its array-namespace name
 (``"mean"``, ``"argmax"``) so they serialise; the function forms in
@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
-from pipekit import Operator, Signature
+from pipekit_ops import Operator, Signature
 
 from pipekit_array import dims as _dims
 from pipekit_array.dimarray import is_mask

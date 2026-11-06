@@ -20,7 +20,7 @@ pytest.importorskip("jax")
 
 import numpyro
 import numpyro.distributions as dist
-from pipekit import Operator
+from pipekit_ops import Operator
 from pipekit_train import IterableDataset, TrainingLoop
 from pipekit_train.adapters.bayes import NumpyroTask
 from pipekit_train.adapters.blackjax import BlackjaxPredictiveOp, BlackjaxTask

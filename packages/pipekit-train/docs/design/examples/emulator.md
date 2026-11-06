@@ -11,7 +11,7 @@ expensive forward model, then drop the emulator back into a
 + §4.2.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 import pipekit_train as pt
 import pipekit_cycle as pc
 import pipekit_experiment as pe
@@ -19,15 +19,20 @@ import pipekit_jax as pj
 import equinox as eqx
 
 # 1. The expensive physics. From an external library (e.g. plumax).
-from plumax.adapters.pipekit import ChemistryForward
+from plumax.adapters.pipekit_ops import ChemistryForward
+
 expensive_forward = ChemistryForward(species=["CH4", "NH3"], dt=3600.0)
 # `expensive_forward` satisfies pipekit_cycle.ForwardModel.
+
 
 # 2. The parameter / state prior — domain-specific.
 class AtmosphericPrior(pk.Operator):
     """Samples initial atmospheric states from a climatology."""
+
     distribution: str
+
     def __call__(self) -> dict[str, jax.Array]: ...
+
 
 prior = AtmosphericPrior(distribution="climatology")
 
@@ -53,10 +58,14 @@ val_ds = pt.CachedDataset(
     format="zarr",
 )
 
+
 # 5. The neural emulator.
 class EmulatorNet(eqx.Module):
     """A small MLP / CNN / Transformer that maps state_t → state_{t+24h}."""
+
     ...
+
+
 model_op = pj.JaxModelOp(EmulatorNet(...))
 
 # 6. Pipekit-experiment integration.
@@ -75,8 +84,9 @@ loop = pt.TrainingLoop(
     eval_every_n_steps=1_000,
     backend="equinox",
     callbacks=(
-        pt.Checkpoint(every_n_steps=5_000, save_dir="./ckpts/chemistry",
-                      registry=registry),
+        pt.Checkpoint(
+            every_n_steps=5_000, save_dir="./ckpts/chemistry", registry=registry
+        ),
     ),
     metric_writer=pt.JSONLWriter(path="./logs/chemistry.jsonl"),
 )
@@ -121,5 +131,5 @@ change, the cache is reused across runs and across machines (when
 `cache_dir` is an S3 / GCS URI).
 
 For very large simulators, generation itself should run via
-`pipekit.parallel.ProcessMap` over the seed space — that's separate
+`pipekit_ops.parallel.ProcessMap` over the seed space — that's separate
 from the dataset and lives at the orchestrator layer.

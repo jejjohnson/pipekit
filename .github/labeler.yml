@@ -48,7 +48,7 @@
 
 "layer:0-primitives":
   - changed-files:
-    - any-glob-to-any-file: "packages/pipekit/src/**"
+    - any-glob-to-any-file: "packages/pipekit-ops/src/**"
 
 "layer:1-components":
   - changed-files:

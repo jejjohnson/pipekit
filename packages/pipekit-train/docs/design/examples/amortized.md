@@ -29,7 +29,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pipekit as pk
+import pipekit_ops as pk
 import pipekit_train as pt
 from pipekit_train.adapters.equinox import EquinoxModelOp
 
@@ -96,25 +96,30 @@ closed form.
 The sketch below hasn't been run, because it depends on plumax and pyrox.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 import pipekit_train as pt
 import pipekit_cycle as pc
 import pipekit_experiment as pe
 
 # 1. The simulator — plume forward + observation operator.
-from plumax.adapters.pipekit import PlumeForward, ColumnObs
+from plumax.adapters.pipekit_ops import PlumeForward, ColumnObs
+
 plume_forward = PlumeForward()
-obs_op        = ColumnObs(instrument="TROPOMI")
+obs_op = ColumnObs(instrument="TROPOMI")
 # plume_forward satisfies pipekit_cycle.ForwardModel.
 # obs_op satisfies pipekit_cycle.ObservationOperator.
+
 
 # 2. Prior over source parameters.
 class SourcePrior(pk.Operator):
     """Prior over (lat, lon, strength, height)."""
+
     loc_bounds: tuple[float, float, float, float]
     strength_loguniform: tuple[float, float]
     height_uniform: tuple[float, float]
+
     def __call__(self) -> jax.Array: ...
+
 
 prior = SourcePrior(
     loc_bounds=(-10, 10, 30, 40),
@@ -129,8 +134,8 @@ sbi_ds = pt.SimulationDataset(
     forward_model=plume_forward,
     prior=prior,
     n_samples=100_000,
-    obs_op=obs_op,             # ← key difference vs emulator training
-    invert=True,               # ← inputs are observations, targets are params
+    obs_op=obs_op,  # ← key difference vs emulator training
+    invert=True,  # ← inputs are observations, targets are params
     seed=42,
     split="train",
 )
@@ -138,9 +143,10 @@ val_ds = sbi_ds.with_split("val")
 
 # 4. The conditional density estimator — from pyrox.
 from pyrox.adapters.pipekit_train import ConditionalNormalizingFlow
+
 posterior_model = ConditionalNormalizingFlow(
-    n_dim=4,                         # 4 source params
-    condition_dim=obs_op.output_dim, # observation embedding size
+    n_dim=4,  # 4 source params
+    condition_dim=obs_op.output_dim,  # observation embedding size
     flow_type="masked_autoregressive",
     n_layers=8,
     hidden_dim=128,
@@ -148,7 +154,7 @@ posterior_model = ConditionalNormalizingFlow(
 
 # 5. Pipekit-experiment.
 registry = pe.LocalModelRegistry(root="./models")
-tracker  = pe.adapters.mlflow.MLflowTracker(tracking_uri="http://mlflow:5000")
+tracker = pe.adapters.mlflow.MLflowTracker(tracking_uri="http://mlflow:5000")
 
 # 6. Train as a normalising-flow likelihood. NLL ⇒ the flow learns
 #    log p(params | obs).
@@ -156,15 +162,16 @@ loop = pt.TrainingLoop(
     model_op=posterior_model,
     dataset=pt.CachedDataset(sbi_ds, cache_dir="./cache/plume_sbi/"),
     val_dataset=pt.CachedDataset(val_ds, cache_dir="./cache/plume_sbi/"),
-    loss=pt.NLL(),                   # flow's own log_prob
+    loss=pt.NLL(),  # flow's own log_prob
     optimizer_config={"name": "adamw", "lr": 1e-3},
     max_steps=200_000,
     batch_size=128,
-    backend="equinox",               # JAX-traceable
+    backend="equinox",  # JAX-traceable
     callbacks=(
         pt.EarlyStopping(metric="val_loss", patience=10),
-        pt.Checkpoint(every_n_steps=5_000, save_dir="./ckpts/plume_sbi",
-                      registry=registry),
+        pt.Checkpoint(
+            every_n_steps=5_000, save_dir="./ckpts/plume_sbi", registry=registry
+        ),
         pt.LogToExperiment(tracker=tracker, run_name="plume_npe"),
     ),
     metric_writer=pt.JSONLWriter(path="./logs/plume_sbi.jsonl"),
@@ -180,13 +187,15 @@ new_obs = load_real_tropomi_pixel("2026-04-12T13:00:00Z")
 posterior_samples = posterior_op.sample(condition=new_obs, n_samples=10_000)
 # posterior_samples: array of shape (10_000, 4) — lat, lon, strength, height.
 
-# 8. The posterior_op is a pipekit.Operator — drops into a full
+# 8. The posterior_op is a pipekit_ops.Operator — drops into a full
 #    attribution pipeline.
-attribution_pipeline = pk.Sequential([
-    obs_op_preprocess,               # any obs-side preprocessing
-    posterior_op,                    # samples posterior
-    posterior_summary_op,            # MAP / credible intervals / etc.
-])
+attribution_pipeline = pk.Sequential(
+    [
+        obs_op_preprocess,  # any obs-side preprocessing
+        posterior_op,  # samples posterior
+        posterior_summary_op,  # MAP / credible intervals / etc.
+    ]
+)
 ```
 
 **What this example demonstrates:**
@@ -196,7 +205,7 @@ attribution_pipeline = pk.Sequential([
   with the observation operator. The same dataset as emulator training
   with its pair flipped; the loss and head differ too.
 - Pyrox's `ConditionalNormalizingFlow` plugged in as a
-  `pipekit.Operator` via the `pyrox.adapters.pipekit_train`
+  `pipekit_ops.Operator` via the `pyrox.adapters.pipekit_train`
   extra-gated adapter. Pipekit-train sees only an `Operator`; the
   algorithmic core lives in pyrox.
 - `NLL` here is computed by the flow itself (each batch is scored

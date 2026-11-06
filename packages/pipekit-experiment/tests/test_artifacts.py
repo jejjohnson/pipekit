@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from pipekit import Const
 from pipekit_experiment import (
     InferenceArtifact,
     LocalModelRegistry,
     TrainingArtifact,
 )
+from pipekit_ops import Const
 
 
 def _make_training_artifact() -> TrainingArtifact:

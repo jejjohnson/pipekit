@@ -29,7 +29,7 @@ iterable of carriers. The carrier flows through; each operator does
 its work and returns the next carrier.
 
 ```python
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 class Scale(Operator):
@@ -52,7 +52,7 @@ and content hashing. You only implement `_apply`.
 The pipe operator chains operators into a `Sequential`:
 
 ```python
-from pipekit import Sequential, Tap
+from pipekit_ops import Sequential, Tap
 
 
 pipe = Scale(2.0) | Tap(print, name="log") | Scale(3.0)
@@ -66,7 +66,7 @@ For non-linear flows — multiple inputs, fan-in, fan-out — use
 `Graph` with named nodes:
 
 ```python
-from pipekit import Graph, Input
+from pipekit_ops import Graph, Input
 
 
 g = Graph()
@@ -135,9 +135,9 @@ from pipekit_array import MeanScalar
 
 
 # Same operator, different backends — picked at call time:
-MeanScalar()(numpy_array)    # uses numpy
-MeanScalar()(jax_array)      # uses jax.numpy
-MeanScalar()(torch_tensor)   # uses array_api_compat.torch
+MeanScalar()(numpy_array)  # uses numpy
+MeanScalar()(jax_array)  # uses jax.numpy
+MeanScalar()(torch_tensor)  # uses array_api_compat.torch
 ```
 
 [api]: https://data-apis.org/array-api/
@@ -153,7 +153,7 @@ Operators that reshape or reduce can opt into static shape inference
 via `compute_output_signature(input_sig) -> Signature | None`:
 
 ```python
-from pipekit.signature import Signature
+from pipekit_ops.signature import Signature
 
 
 sig = Signature(dims=(("band", 3), ("y", 256), ("x", 256)), dtype="float32")
@@ -182,13 +182,13 @@ Every operator implements `get_config() -> dict[str, Any]` (often
 auto-derived from `__init__` parameter names). The framework uses
 this for:
 
-- **Serialisation** — `pipekit.dumps(op)` → `pipekit.loads(json_text)`
+- **Serialisation** — `pipekit_ops.dumps(op)` → `pipekit_ops.loads(json_text)`
   rebuilds a whole pipeline, nested operators and `Graph`s included;
   `pipekit-experiment`'s `HydraConfigLoader.to_yaml` / `from_yaml` do
   the same through `_target_` YAML. For pipelines you did not write,
   `loads_sandboxed` and `from_yaml_sandboxed` build only registered
   classes.
-- **Content hashing** — `pipekit.pipeline_hash(op)` is a stable hash of
+- **Content hashing** — `pipekit_ops.pipeline_hash(op)` is a stable hash of
   the whole configuration. Same pipeline + same config = same hash,
   deterministically. It is the identifier `pipekit-experiment`'s
   `ModelRegistry` stores models under.
@@ -206,4 +206,4 @@ round-trip.
   with every extras combination.
 - **[Tutorials](tutorials/train-emulator.md)** — substantive
   walkthroughs: train an emulator, run a DA cycle.
-- **[API reference](api/pipekit.md)** — generated from docstrings.
+- **[API reference](api/pipekit-ops.md)** — generated from docstrings.

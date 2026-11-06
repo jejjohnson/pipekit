@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Const, Identity, Operator
 from pipekit_experiment import LocalModelRegistry, ModelRegistry
+from pipekit_ops import Const, Identity, Operator
 
 
 def test_local_registry_creates_root(tmp_path):
@@ -213,8 +213,8 @@ def test_hash_framing_unchanged():
     """`pipeline_hash` reproduces the registry's original framing exactly."""
     import hashlib
 
-    from pipekit import Identity
-    from pipekit.hashing import pipeline_hash, stable_json
+    from pipekit_ops import Identity
+    from pipekit_ops.hashing import pipeline_hash, stable_json
 
     op = Identity()
     h = hashlib.sha256()
@@ -231,8 +231,8 @@ def test_hash_framing_unchanged():
 
 def test_store_returns_pipeline_hash(tmp_path):
     """What the registry stores under is what `pipeline_hash` computes."""
-    from pipekit import Identity
-    from pipekit.hashing import pipeline_hash
+    from pipekit_ops import Identity
+    from pipekit_ops.hashing import pipeline_hash
 
     registry = LocalModelRegistry(tmp_path)
     op = Identity() | Identity()
@@ -253,7 +253,9 @@ def registry_and_writer(request, tmp_path):
         reg = LocalModelRegistry(tmp_path / "models")
 
         def write_raw(data: bytes, *parts: str) -> None:
-            reg.root.joinpath(*parts).write_bytes(data)
+            path = reg.root.joinpath(*parts)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
 
         return reg, write_raw
     fsspec = pytest.importorskip("fsspec")
@@ -273,9 +275,9 @@ def registry_and_writer(request, tmp_path):
 def _sequential() -> Operator:
     pytest.importorskip("numpy")
     pytest.importorskip("pipekit_array")
-    from pipekit import Cache, Fanout
-    from pipekit.qc import AssertShape
     from pipekit_array import MeanScalar
+    from pipekit_ops import Cache, Fanout
+    from pipekit_ops.qc import AssertShape
 
     return (
         Identity()
@@ -288,9 +290,9 @@ def _sequential() -> Operator:
 def _graph() -> Operator:
     pytest.importorskip("numpy")
     pytest.importorskip("pipekit_array")
-    from pipekit import Graph, Input
-    from pipekit.qc import AssertShape
     from pipekit_array import MeanScalar
+    from pipekit_ops import Graph, Input
+    from pipekit_ops.qc import AssertShape
 
     x = Input("x")
     checked = AssertShape((4, 3))(x)
@@ -315,7 +317,7 @@ def test_registry_round_trip_keeps_hash_and_outputs(
     registry_and_writer, build, weights
 ):
     import numpy as np
-    from pipekit.hashing import pipeline_hash
+    from pipekit_ops.hashing import pipeline_hash
 
     reg, _ = registry_and_writer
     op = build()
@@ -338,7 +340,7 @@ def test_registry_load_rejects_tampered_content(registry_and_writer, target):
         # A valid state for a different pipeline: it would load silently.
         tampered = _sequential()
         tampered.operators[1] = type(tampered.operators[1])((5, 3))
-        from pipekit.hashing import stable_json
+        from pipekit_ops.hashing import stable_json
 
         write_raw(stable_json(tampered.state).encode(), h, target)
     else:
@@ -349,6 +351,46 @@ def test_registry_load_rejects_tampered_content(registry_and_writer, target):
             reg.load(ref)
         with pytest.raises(HashMismatchError, match="corrupted"):
             reg.load_weights(ref)
+
+
+def _as_stored_before_0_2(state):
+    """``state`` with the core's modules named ``pipekit.*``, as before 0.2.0."""
+    if isinstance(state, list):
+        return [_as_stored_before_0_2(item) for item in state]
+    if not isinstance(state, dict):
+        return state
+    out = {key: _as_stored_before_0_2(value) for key, value in state.items()}
+    for key in ("module", "exception"):
+        value = out.get(key)
+        if isinstance(value, str) and value.startswith("pipekit_ops"):
+            out[key] = "pipekit" + value.removeprefix("pipekit_ops")
+    return out
+
+
+@pytest.mark.parametrize("build", [_sequential, _graph], ids=["sequential", "graph"])
+@pytest.mark.parametrize("weights", [None, b"\x00\x01opaque"], ids=["bare", "weights"])
+def test_registry_loads_an_entry_stored_before_the_rename(
+    registry_and_writer, build, weights
+):
+    import numpy as np
+    from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_json
+
+    reg, write_raw = registry_and_writer
+    op = build()
+    text = stable_json(_as_stored_before_0_2(op.state))
+    assert '"pipekit.' in text
+    # the hash `store` gave this entry before 0.2.0
+    h = sha256_hex(text, b"\x00", weights or b"")
+    write_raw(text.encode(), h, "operator.json")
+    if weights is not None:
+        write_raw(weights, h, "weights.bin")
+
+    loaded = reg.load(h)
+    assert reg.load_weights(h) == weights
+    # the rebuilt operator hashes under today's module names
+    assert pipeline_hash(loaded, weights) == pipeline_hash(op, weights) != h
+    x = np.arange(12, dtype=np.float64).reshape(4, 3) / 7.0
+    _assert_bitwise_equal(loaded(x), op(x))
 
 
 class _Drifting(Operator):

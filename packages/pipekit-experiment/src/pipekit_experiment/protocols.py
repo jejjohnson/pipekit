@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 
 if TYPE_CHECKING:
-    from pipekit import Operator
+    from pipekit_ops import Operator
 
     from pipekit_experiment.run import Run
 

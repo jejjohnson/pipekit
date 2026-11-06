@@ -6,7 +6,7 @@ version: 0.1.0
 # pipekit-train Design Doc
 
 **A thin orchestration layer over existing training tools, exposed as
-`pipekit.Operator`s. Trained models drop into inference pipelines
+`pipekit_ops.Operator`s. Trained models drop into inference pipelines
 without rewrite.**
 
 ## Structure

@@ -13,7 +13,7 @@ the same number of leaves and compatible shapes — would silently receive
 weights it was never trained with. The blob therefore starts with a
 signature header (`tree_signature`): the node types of the tree
 (``module.QualName`` of every pytree node, from the root down, with the
-structural aux data of non-Equinox nodes such as a `pipekit.Graph`'s
+structural aux data of non-Equinox nodes such as a `pipekit_ops.Graph`'s
 wiring) and the key path, shape and dtype of every array leaf. Only
 array leaves are stored; every non-array value comes from the skeleton.
 `with_weights` compares the signature with the skeleton before loading.
@@ -73,7 +73,7 @@ def _stable(value: Any) -> Any:
 def _node_types(treedef: Any) -> Any:
     """Nested ``[type name, aux, [children...]]`` of a treedef; ``None`` for a leaf.
 
-    Aux data that encodes *structure* is included — `pipekit.Graph` keeps
+    Aux data that encodes *structure* is included — `pipekit_ops.Graph` keeps
     its whole wiring there, dicts their keys. An ``eqx.Module``'s aux is
     its static field values, i.e. configuration; like every non-array
     value it comes from the skeleton, so it is left out.

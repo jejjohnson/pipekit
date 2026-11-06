@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_array import dims
 from pipekit_array._namespace import array_namespace

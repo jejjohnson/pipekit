@@ -139,7 +139,7 @@ slice tuples per the Array API. No special handling.
 ## `Histogram(bins: int | array | "auto" = 10, range: tuple[float, float] | None = None)`
 
 Controller that captures distributions at named tap sites. Same
-pattern as `pipekit.observe.Histogram` but with array-aware defaults
+pattern as `pipekit_ops.observe.Histogram` but with array-aware defaults
 (`to_array = xp.reshape(x, (-1,))` is implicit).
 
 ```python
@@ -197,7 +197,7 @@ floating dtype per the Array API `mean` contract — see the
 [api-mean]: https://data-apis.org/array-api/latest/API_specification/generated/array_api.mean.html
 
 ```python
-out = MeanScalar()(image)               # scalar
+out = MeanScalar()(image)  # scalar
 out = MeanScalar(axis=(-2, -1))(image)  # per-band mean: shape (B,)
 out = MeanScalar(axis=0, keepdims=True)(image)  # shape (1, H, W)
 ```
@@ -224,7 +224,7 @@ dtype=sig.dtype)`.
 
 Split the input array along `axis` into chunks of `batch_size`,
 apply `inner` to each chunk, concatenate the results along `axis`.
-The array-shaped analogue of `pipekit.parallel.BatchedMap` (which
+The array-shaped analogue of `pipekit_ops.parallel.BatchedMap` (which
 takes an iterable). See ADR A5 for the boundary.
 
 ```python

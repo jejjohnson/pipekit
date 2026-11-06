@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Lambda, Operator
 from pipekit_cycle import (
     CallableForward,
     DACycle,
@@ -12,6 +11,7 @@ from pipekit_cycle import (
     IdentityObs,
     SmootherCycle,
 )
+from pipekit_ops import Lambda, Operator
 
 
 class FixedObsSource(Operator):

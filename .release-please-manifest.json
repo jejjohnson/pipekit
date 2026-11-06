@@ -1,5 +1,6 @@
 {
   "packages/pipekit": "0.1.5",
+  "packages/pipekit-ops": "0.1.5",
   "packages/pipekit-array": "0.0.9",
   "packages/pipekit-cycle": "0.0.4",
   "packages/pipekit-experiment": "0.0.5",

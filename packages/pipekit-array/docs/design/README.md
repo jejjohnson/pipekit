@@ -58,12 +58,12 @@ The design synthesises two upstream sources:
   three-library carrier story (`pipekit-array` for arrays, `geotoolz`
   for `GeoTensor`, `xr_toolz` for xarray) and the operator catalogue
   (~12 operators, ~400 LOC) that pipekit-array v0.1 ships.
-- The existing `pipekit` core surface — particularly
-  [`pipekit.qc`][pipekit-qc] (which explicitly defers numeric checks
+- The existing `pipekit-ops` core surface — particularly
+  [`pipekit_ops.qc`][pipekit-qc] (which explicitly defers numeric checks
   to `pipekit-array`, see its module docstring),
-  [`pipekit.observe.Histogram`][pipekit-observe] (the controller
+  [`pipekit_ops.observe.Histogram`][pipekit-observe] (the controller
   pattern this design extends with a carrier-aware `to_array=...`
-  default), and [`pipekit.parallel.BatchedMap`][pipekit-parallel]
+  default), and [`pipekit_ops.parallel.BatchedMap`][pipekit-parallel]
   (the iterable-shaped variant that pipekit-array's array-shaped
   `BatchedMap` deliberately does *not* shadow — see ADR A5).
 

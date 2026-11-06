@@ -342,7 +342,7 @@ def test_to_dict_is_strict_json_for_non_finite_values() -> None:
 
 
 def test_an_evaluate_entry_hashes_without_the_ladder_fields() -> None:
-    from pipekit.hashing import sha256_hex, stable_json
+    from pipekit_ops.hashing import sha256_hex, stable_json
 
     entry = ReportEntry("m", "value", 1.0)
     report = EvaluationReport((entry,))

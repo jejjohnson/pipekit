@@ -15,6 +15,7 @@ jobs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       paths_released: ${{ steps.release.outputs.paths_released }}
       pipekit_released: ${{ steps.release.outputs['packages/pipekit--release_created'] }}
+      pipekit_ops_released: ${{ steps.release.outputs['packages/pipekit-ops--release_created'] }}
       pipekit_array_released: ${{ steps.release.outputs['packages/pipekit-array--release_created'] }}
       pipekit_cycle_released: ${{ steps.release.outputs['packages/pipekit-cycle--release_created'] }}
       pipekit_experiment_released: ${{ steps.release.outputs['packages/pipekit-experiment--release_created'] }}
@@ -51,6 +52,30 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/pipekit/dist
+
+  publish-pipekit-ops:
+    name: Publish pipekit-ops to PyPI
+    needs: release-please
+    if: needs.release-please.outputs.pipekit_ops_released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipekit-ops
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: uv build
+        working-directory: packages/pipekit-ops
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/pipekit-ops/dist
 
   publish-pipekit-array:
     name: Publish pipekit-array to PyPI

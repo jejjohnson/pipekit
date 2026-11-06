@@ -22,7 +22,8 @@ Once any of the packages publish to PyPI, you install only what you
 need:
 
 ```bash
-uv add pipekit                    # core
+uv add pipekit-ops                # core
+uv add pipekit                    # everything below, in one install
 uv add pipekit-cycle              # time-stepping + DA
 uv add pipekit-experiment         # registry + tracker protocols
 uv add pipekit-train              # training pipelines
@@ -32,15 +33,17 @@ uv add pipekit-jax                # JaxModelOp (Equinox round-trip)
 
 `pipekit-evaluate` is pre-alpha: it ships the benchmark ladder, the `Unit × Lens × Stage` scorer taxonomy and the evaluation report.
 
-### `pipekit` core
+### `pipekit-ops` (the core)
 
 ```bash
-uv add pipekit
+uv add pipekit-ops
 ```
 
 Pure Python; zero third-party dependencies. The composition
 primitives (`Operator`, `Sequential`, `Graph`, control flow,
-observation, parallel maps, caching, QC, YAML round-trip).
+observation, parallel maps, caching, QC, YAML round-trip), imported as
+`pipekit_ops`. Until 0.2.0 this package was `pipekit`; `pipekit` is now the
+umbrella that installs every package below, JAX included.
 
 ### `pipekit-cycle`
 

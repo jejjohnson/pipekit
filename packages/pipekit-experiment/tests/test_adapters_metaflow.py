@@ -9,8 +9,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from pipekit import Const, Identity, Operator
 from pipekit_experiment.adapters.metaflow import MetaflowStepAdapter
+from pipekit_ops import Const, Identity, Operator
 
 
 class Concat(Operator):

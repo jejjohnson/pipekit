@@ -12,8 +12,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Operator
 from pipekit_jax import JaxModelOp
+from pipekit_ops import Operator
 
 
 def _toy_mlp(key: int = 0) -> eqx.nn.MLP:
@@ -231,8 +231,8 @@ def test_with_weights_structure_mismatch_raises():
 def test_registry_round_trip_keeps_hash_and_outputs(tmp_path):
     """Gate E1: a model restored from the registry has the hash it was
     stored under, and bitwise-equal outputs."""
-    from pipekit.hashing import pipeline_hash
     from pipekit_experiment import LocalModelRegistry
+    from pipekit_ops.hashing import pipeline_hash
 
     registry = LocalModelRegistry(tmp_path / "models")
     trained = JaxModelOp(_toy_mlp(key=0))

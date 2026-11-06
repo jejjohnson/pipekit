@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Lambda, Operator, StatefulOperator
+from pipekit_ops import Lambda, Operator, StatefulOperator
 from pipekit_train.dataset import (
     CachedDataset,
     IterableDataset,

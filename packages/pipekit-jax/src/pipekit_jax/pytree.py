@@ -1,6 +1,6 @@
 """Register pipekit's composition containers as JAX pytrees.
 
-Importing `pipekit_jax` registers `pipekit.Sequential`, `pipekit.Graph`
+Importing `pipekit_jax` registers `pipekit_ops.Sequential`, `pipekit_ops.Graph`
 and `pipekit_jax.JaxModelOp` with `jax.tree_util`, so JAX transformations
 see *through* a pipeline to the leaves of the operators it holds:
 
@@ -18,7 +18,7 @@ registration is an import side effect of this package, like enabling a
 
 What the leaves are depends on the operators. An operator that is
 itself a pytree (an ``eqx.Module`` subclass, or `JaxModelOp` via its
-module) contributes its own leaves. A plain `pipekit.Operator` is one opaque
+module) contributes its own leaves. A plain `pipekit_ops.Operator` is one opaque
 leaf — fine under ``eqx.filter_jit`` / ``eqx.filter_grad`` (non-array
 leaves are static there), but not as a direct argument to
 ``jax.jit``.
@@ -37,7 +37,7 @@ Caveats:
 Example:
     >>> import equinox as eqx, jax, jax.numpy as jnp
     >>> import pipekit_jax  # registers the containers
-    >>> from pipekit import Operator, Sequential
+    >>> from pipekit_ops import Operator, Sequential
     >>> class Scale(Operator, eqx.Module):
     ...     factor: jax.Array
     ...     def _apply(self, x):
@@ -52,8 +52,8 @@ from __future__ import annotations
 from typing import Any, NamedTuple
 
 import jax
-from pipekit import Graph, Sequential
-from pipekit._base.graph import Input, Node
+from pipekit_ops import Graph, Sequential
+from pipekit_ops._base.graph import Input, Node
 
 from pipekit_jax.model_op import JaxModelOp
 

@@ -178,7 +178,7 @@ def test_dimarray_parameter_is_a_leaf() -> None:
 
 def test_converted_op_keeps_the_kernel_signature() -> None:
     """Codex #115: a `(c)->()` kernel drops `band` after conversion too."""
-    from pipekit import Signature
+    from pipekit_ops import Signature
 
     scene, params = _problem()
     op = _score(params)

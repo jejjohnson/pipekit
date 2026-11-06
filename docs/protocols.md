@@ -10,7 +10,7 @@ geotoolz, and xrtoolz stay dependency-free.
 This page is the inventory: what each protocol is for, where it lives,
 and who satisfies it.
 
-## Core (`pipekit.protocols`)
+## Core (`pipekit_ops.protocols`)
 
 Carrier-agnostic seams for model-inference wrappers.
 

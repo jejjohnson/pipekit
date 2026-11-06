@@ -84,7 +84,7 @@ Tracked via a single follow-up issue once v0.1 lands.
 These were explicitly considered and rejected for the v0.1 scope.
 
 - **A new framework primitive.** pipekit-array adds zero base
-  classes; every operator subclasses `pipekit.Operator`. The library
+  classes; every operator subclasses `pipekit_ops.Operator`. The library
   is a bag of operators.
 - **Backend conversion.** No `to_numpy()`, no `device=` argument, no
   auto-`x.cpu().numpy()`. Conversion lives in user code or in a

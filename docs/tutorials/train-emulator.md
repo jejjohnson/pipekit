@@ -23,7 +23,10 @@ import equinox as eqx
 import numpy as np
 
 from pipekit_train import (
-    IterableDataset, MSE, TrainingLoop, JSONLWriter,
+    IterableDataset,
+    MSE,
+    TrainingLoop,
+    JSONLWriter,
 )
 from pipekit_train.adapters.equinox import EquinoxModelOp
 ```
@@ -33,7 +36,7 @@ target, but the loop is identical for any `(x, y)` pair stream.
 
 ## Step 1 — Build the dataset
 
-`TrainingDataset` is a `pipekit.Operator` that yields `(input,
+`TrainingDataset` is a `pipekit_ops.Operator` that yields `(input,
 target)` pairs and exposes a content hash. The simplest concrete
 class is `IterableDataset`, which wraps a list / iterator:
 
@@ -60,13 +63,15 @@ model's artifact records it so the run is replayable.
 `eqx.nn.Conv2d`, …) so it composes as a pipekit `Operator`:
 
 ```python
-model_op = EquinoxModelOp(eqx.nn.MLP(
-    in_size=1,
-    out_size=1,
-    width_size=16,
-    depth=2,
-    key=jax.random.key(0),
-))
+model_op = EquinoxModelOp(
+    eqx.nn.MLP(
+        in_size=1,
+        out_size=1,
+        width_size=16,
+        depth=2,
+        key=jax.random.key(0),
+    )
+)
 ```
 
 After training the loop returns *another* `EquinoxModelOp` — same
@@ -121,6 +126,7 @@ To swap in cloud storage just change the registry class:
 
 ```python
 import fsspec
+
 registry = pe.S3ModelRegistry("s3://my-bucket/models", fs=fsspec.filesystem("s3"))
 ```
 

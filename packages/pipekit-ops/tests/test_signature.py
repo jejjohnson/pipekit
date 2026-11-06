@@ -1,0 +1,173 @@
+"""Tests for `pipekit_ops.signature` — Group I."""
+
+from __future__ import annotations
+
+import pytest
+from pipekit_ops import Operator, Sequential, Signature
+from pipekit_ops.signature import compute_output_signature
+
+
+def test_signature_format():
+    sig = Signature(dims=(("time", 12), ("y", 256), ("x", 256)), dtype="float32")
+    assert sig.format() == "(time=12, y=256, x=256) float32"
+
+
+def test_signature_format_unknown_sizes():
+    sig = Signature(dims=(("batch", None), ("c", 3)), dtype=None)
+    assert sig.format() == "(batch=?, c=3) ?"
+
+
+def test_signature_drop_dims():
+    sig = Signature(dims=(("t", 5), ("y", 4), ("x", 3)), dtype="i4")
+    dropped = sig.drop_dims(("t",))
+    assert dropped == Signature(dims=(("y", 4), ("x", 3)), dtype="i4")
+
+
+def test_signature_drop_dims_unknown_raises():
+    sig = Signature(dims=(("y", 4),))
+    with pytest.raises(KeyError):
+        sig.drop_dims(("nope",))
+
+
+def test_signature_replace_dims():
+    sig = Signature(dims=(("y", 4), ("x", 3)), dtype="f4")
+    new = sig.replace_dims({"x": 128})
+    assert new == Signature(dims=(("y", 4), ("x", 128)), dtype="f4")
+
+
+def test_signature_replace_dims_unknown_raises():
+    sig = Signature(dims=(("y", 4),))
+    with pytest.raises(KeyError):
+        sig.replace_dims({"nope": 1})
+
+
+def test_signature_rejects_duplicate_dim_names():
+    with pytest.raises(ValueError):
+        Signature(dims=(("y", 4), ("y", 5)))
+
+
+def test_signature_is_immutable():
+    sig = Signature(dims=(("y", 4),))
+    with pytest.raises((AttributeError, Exception)):  # FrozenInstanceError
+        sig.dtype = "f4"  # type: ignore[misc]
+
+
+def test_operator_default_compute_output_signature_passes_through(Scale_cls):
+    sig = Signature(dims=(("x", 3),), dtype="f4")
+    op = Scale_cls(2.0)
+    assert op.compute_output_signature(sig) is sig
+
+
+def test_sequential_threads_signature_through_passthrough_ops(Scale_cls):
+    pipe = Sequential([Scale_cls(2.0), Scale_cls(3.0)])
+    sig = Signature(dims=(("x", 3),), dtype="f4")
+    assert pipe.compute_output_signature(sig) == sig
+
+
+def test_sequential_summary_renders_table(Scale_cls):
+    pipe = Sequential([Scale_cls(2.0), Scale_cls(3.0)])
+    table = pipe.summary(Signature(dims=(("x", 3),), dtype="f4"))
+    assert "Scale" in table
+    assert "x=3" in table
+
+
+def test_operator_overrides_compute_output_signature():
+    class DropTime(Operator):
+        def _apply(self, x):
+            return x
+
+        def compute_output_signature(self, sig):
+            if sig is None:
+                return None
+            return sig.drop_dims(("time",))
+
+    sig = Signature(dims=(("time", 5), ("y", 4)), dtype="f4")
+    out = DropTime().compute_output_signature(sig)
+    assert out == Signature(dims=(("y", 4),), dtype="f4")
+
+
+def test_free_function_dispatch(Scale_cls):
+    sig = Signature(dims=(("x", 3),))
+    assert compute_output_signature(Scale_cls(2.0), sig) is sig
+
+
+# -- dims patterns (#99) -------------------------------------------------------
+
+
+def _sig(*names: str) -> Signature:
+    return Signature(dims=tuple((name, 3) for name in names), dtype="float32")
+
+
+@pytest.mark.parametrize(
+    ("names", "pattern", "expected"),
+    [
+        (("band", "y", "x"), "band y x", True),
+        (("band", "y", "x"), "... y x", True),
+        (("time", "band", "y", "x"), "... y x", True),
+        (("y", "x"), "... y x", True),
+        (("time", "band", "y", "x"), "time ... x", True),
+        (("time", "x"), "time ... x", True),
+        (("time", "band", "y", "x"), "time band y x ...", True),
+        (("band", "y", "x"), "y x", False),
+        (("band", "x", "y"), "band y x", False),
+        (("band", "y", "x"), "band row col", False),
+        (("x",), "... y x", False),
+        (("y", "x"), "y ... y x", False),
+    ],
+)
+def test_signature_matches(
+    names: tuple[str, ...], pattern: str, expected: bool
+) -> None:
+    assert _sig(*names).matches(pattern) is expected
+
+
+def test_signature_matches_ignores_sizes() -> None:
+    sig = Signature(dims=(("y", None), ("x", 600)))
+    assert sig.matches("y x")
+
+
+def test_scalar_signature_and_the_empty_pattern() -> None:
+    scalar = Signature(dims=())
+    assert scalar.matches("")
+    assert scalar.matches("...")
+    assert not scalar.matches("x")
+    assert not _sig("x").matches("")
+
+
+def test_two_ellipses_raise() -> None:
+    with pytest.raises(ValueError, match="at most one"):
+        _sig("y", "x").matches("... y ... x")
+
+
+def test_from_pattern() -> None:
+    sig = Signature.from_pattern("band y x", dtype="float32")
+    assert sig.dims == (("band", None), ("y", None), ("x", None))
+    assert sig.dtype == "float32"
+    assert sig.matches("band y x")
+    assert Signature.from_pattern("") == Signature(dims=())
+
+
+def test_from_pattern_rejects_ellipsis_and_repeats() -> None:
+    with pytest.raises(ValueError, match="concrete"):
+        Signature.from_pattern("... y x")
+    with pytest.raises(ValueError, match="unique"):
+        Signature.from_pattern("y y")
+
+
+def test_matches_property_on_random_dims() -> None:
+    """from_pattern(names) matches its own names, and '... last' matches too."""
+    import random
+
+    rng = random.Random(0)
+    vocabulary = ["time", "member", "level", "band", "variable", "patch", "y", "x"]
+    for _ in range(500):
+        k = rng.randint(1, len(vocabulary))
+        names = rng.sample(vocabulary, k)
+        sig = Signature(dims=tuple((n, rng.randint(1, 9)) for n in names))
+        pattern = " ".join(names)
+        assert Signature.from_pattern(pattern).matches(pattern)
+        assert sig.matches(pattern)
+        assert sig.matches("... " + names[-1])
+        assert sig.matches(names[0] + " ...")
+        if k > 1:
+            assert not sig.matches(" ".join(reversed(names)))

@@ -1,4 +1,4 @@
-"""`JaxModelOp` — pipekit.Operator wrapper around an `eqx.Module`.
+"""`JaxModelOp` — pipekit_ops.Operator wrapper around an `eqx.Module`.
 
 Closes the v0.1 reproducibility caveat documented in
 ``pipekit-train/docs/design/boundaries.md §13.1``: the in-package
@@ -32,7 +32,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import equinox as eqx
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_jax.weights import WeightsMixin
 
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 
 class JaxModelOp(WeightsMixin, Operator):
-    """Wrap an `eqx.Module` as a `pipekit.Operator` with weight round-trip.
+    """Wrap an `eqx.Module` as a `pipekit_ops.Operator` with weight round-trip.
 
     Drop-in replacement for the in-package
     ``pipekit_train.adapters.equinox.EquinoxModelOp`` stand-in.

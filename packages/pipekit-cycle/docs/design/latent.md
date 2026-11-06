@@ -253,7 +253,7 @@ class LiftedObservationOperator(Operator):
 
     def linearize(self, latent):
         x_hat = self.decoder.decode(latent)
-        H_lin = self.inner.linearize(x_hat)         # x-space tangent
+        H_lin = self.inner.linearize(x_hat)  # x-space tangent
         psi_lin = _jacobian_of(self.decoder.decode, latent)
         return _compose_linops(H_lin, psi_lin)
 ```
@@ -336,8 +336,10 @@ class LatentDAState(DAState):
         latent_signature: Any = None,
     ) -> None:
         super().__init__(
-            t=t, cycle_count=cycle_count,
-            obs_err_cov=obs_err_cov, extras=extras,
+            t=t,
+            cycle_count=cycle_count,
+            obs_err_cov=obs_err_cov,
+            extras=extras,
         )
         self.latent_state = latent_state
         self.last_encoded_t = last_encoded_t
@@ -380,26 +382,26 @@ Calling convention notes (matching the existing `DACycle` in
 class LatentDACycle(StatefulOperator):
     forward_model: ForwardModel | LatentForwardModel
     latent_map: LatentMap
-    obs_op: ObservationOperator             # x-space, always
+    obs_op: ObservationOperator  # x-space, always
     analysis_step: AnalysisStep
     obs_source: Operator | None = None
 
     forecast_space: Literal["x", "z"] = "z"
     update_space: Literal["x", "z"] = "z"
-    re_encode_every: int | None = 1         # None = never; 0 = unused; k>=1 = every k
+    re_encode_every: int | None = 1  # None = never; 0 = unused; k>=1 = every k
     n_steps: int = 1
     save_history: bool = False
 
     def _apply(self, carrier, state: LatentDAState):
-        dt = self.forward_model.dt          # integration timestep
+        dt = self.forward_model.dt  # integration timestep
 
         # 1. Forecast
         if self.forecast_space == "z":
             z = state.latent_state
-            z = self.forward_model.step(z, dt)       # LatentForwardModel
+            z = self.forward_model.step(z, dt)  # LatentForwardModel
             x = None  # lazily decoded if needed by save_history
         else:
-            x = self.forward_model.step(carrier, dt) # ForwardModel
+            x = self.forward_model.step(carrier, dt)  # ForwardModel
             z = None
 
         # 2. Get observations (in y-space, never lifted).
@@ -413,17 +415,20 @@ class LatentDACycle(StatefulOperator):
                 z = z if z is not None else self.latent_map.encode(x)
                 # LatentMap is a subtype of Decoder — pass it directly.
                 lifted_H = LiftedObservationOperator(
-                    decoder=self.latent_map, inner=self.obs_op,
+                    decoder=self.latent_map,
+                    inner=self.obs_op,
                 )
                 z = self.analysis_step(
-                    forecast=z, obs=y,
+                    forecast=z,
+                    obs=y,
                     obs_op=lifted_H,
                     obs_err_cov=state.obs_err_cov,
                 )
             else:  # update_space == "x"
                 x = x if x is not None else self.latent_map.decode(z)
                 x = self.analysis_step(
-                    forecast=x, obs=y,
+                    forecast=x,
+                    obs=y,
                     obs_op=self.obs_op,
                     obs_err_cov=state.obs_err_cov,
                 )
@@ -460,16 +465,22 @@ import pipekit_cycle as pc
 import filterax as flx
 import equinox as eqx
 
+
 class AE(eqx.Module):
     enc: eqx.nn.MLP
     dec: eqx.nn.MLP
     latent_dim: int = 8
     state_signature = None
-    def encode(self, x): return self.enc(x)
-    def decode(self, z): return self.dec(z)
+
+    def encode(self, x):
+        return self.enc(x)
+
+    def decode(self, z):
+        return self.dec(z)
+
 
 ae = AE(...)  # pretrained
-assert isinstance(ae, pc.LatentMap)        # structural check passes
+assert isinstance(ae, pc.LatentMap)  # structural check passes
 
 # Either a learned latent M_z ...
 latent_mz = MyLearnedDynamics(...)
@@ -481,17 +492,20 @@ latent_mz = pc.EncodedForwardModel(latent_map=ae, inner=physics_model)
 cycle = pc.LatentDACycle(
     forward_model=latent_mz,
     latent_map=ae,
-    obs_op=H_x,                            # untouched x-space H
-    analysis_step=flx.LatentETKF(ae=ae),   # filterax wrapper, see below
+    obs_op=H_x,  # untouched x-space H
+    analysis_step=flx.LatentETKF(ae=ae),  # filterax wrapper, see below
     obs_source=satellite_obs,
-    forecast_space="z", update_space="z",
-    re_encode_every=None,                  # never re-encode (strong-latent)
+    forecast_space="z",
+    update_space="z",
+    re_encode_every=None,  # never re-encode (strong-latent)
     n_steps=24,
 )
 
 initial = pc.LatentDAState(
-    t=0.0, cycle_count=0,
-    obs_err_cov=R, latent_state=ae.encode(x0),
+    t=0.0,
+    cycle_count=0,
+    obs_err_cov=R,
+    latent_state=ae.encode(x0),
 )
 analyses, state = cycle(x0, initial)
 ```
@@ -502,18 +516,19 @@ analyses, state = cycle(x0, initial)
 import vardax as vdx
 
 cycle = pc.LatentDACycle(
-    forward_model=somax_model,                 # x-space physics
+    forward_model=somax_model,  # x-space physics
     latent_map=ae,
     obs_op=H_x,
-    analysis_step=vdx.LatentStrongFourDVar(    # vardax model, see below
+    analysis_step=vdx.LatentStrongFourDVar(  # vardax model, see below
         forward=somax_model,
         latent_map=ae,
         obs_op=H_x,
         B_z_op=B_z,
     ),
     obs_source=L4_obs,
-    forecast_space="x", update_space="z",
-    re_encode_every=1,                         # encode once per window
+    forecast_space="x",
+    update_space="z",
+    re_encode_every=1,  # encode once per window
     n_steps=8,
 )
 ```
@@ -523,12 +538,13 @@ cycle = pc.LatentDACycle(
 ```python
 cycle = pc.LatentDACycle(
     forward_model=physics_model,
-    latent_map=ae,                              # only used inside cost
+    latent_map=ae,  # only used inside cost
     obs_op=H_x,
-    analysis_step=vdx.FourDVarNet1D(            # existing class, unchanged
-        prior=vdx.BilinAEPrior1D(...),          # now satisfies LatentMap
+    analysis_step=vdx.FourDVarNet1D(  # existing class, unchanged
+        prior=vdx.BilinAEPrior1D(...),  # now satisfies LatentMap
     ),
-    forecast_space="x", update_space="x",
+    forecast_space="x",
+    update_space="x",
     re_encode_every=0,
 )
 ```
@@ -554,7 +570,7 @@ working. The point is that any AE prior that exposes `.encode` and
 * `pipekit-jax.JaxModelOp` already weights-serialises arbitrary
   `eqx.Module`s, so AE weights round-trip with no new machinery.
 
-No changes are required to `pipekit` core (`Operator`, `Sequential`,
+No changes are required to `pipekit-ops` core (`Operator`, `Sequential`,
 `Graph`) or to `pipekit-experiment`.
 
 ---

@@ -1,7 +1,7 @@
 """Dim-level functions: selection, reduction, stacking and mapping by dim name.
 
 Each is written once, over the carrier's registered
-`pipekit.NamedArrayAdapter`, and behaves the same on every registered
+`pipekit_ops.NamedArrayAdapter`, and behaves the same on every registered
 carrier: a `DimArray`, an ``xr.DataArray`` (``[xarray]``), a geoarray
 carrier. The rule for joining this list (GA-Q3): a function never reads
 coordinate values or geometry. ``resample``, ``groupby`` and ``rolling``
@@ -35,8 +35,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
-from pipekit import NamedArrayAdapter, get_adapter
-from pipekit.adapters import BackendError, backend_name
+from pipekit_ops import NamedArrayAdapter, get_adapter
+from pipekit_ops.adapters import BackendError, backend_name
 
 from pipekit_array._namespace import array_namespace
 from pipekit_array.dimarray import DimArray
