@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Operator
 from pipekit_array import ConcatenateAlong, StackAlong
+from pipekit_ops import Operator
 
 
 # --- StackAlong -----------------------------------------------------------

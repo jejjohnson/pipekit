@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-dark.svg">
+    <img alt="pipekit-experiment" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-light.svg" width="518">
+  </picture>
+</p>
+
 # pipekit-experiment
 
 The boundary between pipekit pipelines and external orchestration
@@ -48,8 +55,7 @@ import pipekit_experiment as pe
 registry = pe.LocalModelRegistry("/tmp/models")
 
 # Store; the hash is the canonical identifier
-h = registry.store(trained_op, name="methane_emulator_v3",
-                   tags={"family": "methane"})
+h = registry.store(trained_op, name="methane_emulator_v3", tags={"family": "methane"})
 
 # Load by hash, or by tag name
 op = registry.load(h)
@@ -64,8 +70,8 @@ registry.tag(h, "production", force=True)
 ```python
 from pipekit_experiment.adapters.hydra import HydraConfigLoader
 
-yaml_text = HydraConfigLoader.to_yaml(my_op)        # via hydra-zen.builds
-restored  = HydraConfigLoader.from_yaml(yaml_text)  # via hydra.utils.instantiate
+yaml_text = HydraConfigLoader.to_yaml(my_op)  # via hydra-zen.builds
+restored = HydraConfigLoader.from_yaml(yaml_text)  # via hydra.utils.instantiate
 ```
 
 ## Quickstart — Metaflow step

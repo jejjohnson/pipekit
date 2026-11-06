@@ -12,8 +12,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pipekit import Operator
 from pipekit_cycle import BFNCycle, CallableForward, DAState, IdentityObs
+from pipekit_ops import Operator
 
 
 def _identity_model(dt: float = 1.0) -> CallableForward:

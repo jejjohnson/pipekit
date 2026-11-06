@@ -47,7 +47,7 @@ import equinox as eqx
 import jax
 import numpy as np
 from jaxtyping import Bool, Float, Float32
-from pipekit import AssertShape, Operator, Sequential, Sink
+from pipekit_ops import AssertShape, Operator, Sequential, Sink
 from pipekit_cycle import Cycle, NeuralForward
 from pipekit_experiment import LocalModelRegistry
 from pipekit_jax import JaxModelOp

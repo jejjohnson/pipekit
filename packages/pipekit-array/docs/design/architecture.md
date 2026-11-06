@@ -10,7 +10,7 @@ version: 0.1.0
 Every operator follows the same three-line core:
 
 ```python
-from pipekit import Operator
+from pipekit_ops import Operator
 from pipekit_array._namespace import array_namespace
 
 
@@ -62,7 +62,7 @@ inherently immutable.
 # ❌ Don't:
 xp1 = array_namespace(x)
 xp2 = array_namespace(y)  # different namespace?
-return xp1.add(x, y)      # crashes if y is JAX and x is numpy
+return xp1.add(x, y)  # crashes if y is JAX and x is numpy
 
 # ✅ Do:
 xp = array_namespace(x, y)  # asserts both are same backend
@@ -127,8 +127,8 @@ src/pipekit_array/
 └── inference.py         # ModelOp
 ```
 
-The module boundaries mirror `pipekit` core's grouping
-(`combinators` ↔ `pipekit.combine`, `qc` ↔ `pipekit.qc`, etc.) so
+The module boundaries mirror `pipekit-ops` core's grouping
+(`combinators` ↔ `pipekit_ops.combine`, `qc` ↔ `pipekit_ops.qc`, etc.) so
 discovery is consistent. Re-exports through `__init__.py`:
 
 ```python
@@ -191,11 +191,14 @@ def array_namespace(*xs: Any) -> Any:
     """
     try:
         from array_api_compat import array_namespace as _compat_ns
+
         return _compat_ns(*xs)
     except ImportError:
         pass
 
-    namespaces = {x.__array_namespace__() for x in xs if hasattr(x, "__array_namespace__")}
+    namespaces = {
+        x.__array_namespace__() for x in xs if hasattr(x, "__array_namespace__")
+    }
     if len(namespaces) == 0:
         raise TypeError(
             "No input implements the Array API. Install one of: "
@@ -218,7 +221,7 @@ coverage. Tracked as a v0.2 polish.
 
 ## 5. Integration with pipekit core
 
-pipekit-array operators are *just* `pipekit.Operator` subclasses.
+pipekit-array operators are *just* `pipekit_ops.Operator` subclasses.
 They inherit:
 
 - **Composition** — `|` operator chains them into `Sequential`;

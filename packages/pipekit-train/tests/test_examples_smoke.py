@@ -40,8 +40,8 @@ pytest.importorskip("orbax.checkpoint")
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from pipekit import Operator
 from pipekit_cycle import NeuralForward
+from pipekit_ops import Operator
 from pipekit_train import (
     MSE,
     IterableDataset,

@@ -3,7 +3,8 @@
 **Composable scientific pipelines. Train, register, deploy — one
 operator interface end-to-end.**
 
-`pipekit` is a uv workspace of seven Python packages that together
+`pipekit` is a uv workspace of seven Python packages (plus a code-free
+`pipekit` umbrella that installs them all) that together
 turn the pieces of a scientific ML workflow into composable
 `Operator`s: data loading, QC, training, data assimilation, model
 registry, reproducibility. The same operator that returns a trained
@@ -54,7 +55,7 @@ final_state, _ = forecast(x0, None)
 
     Per-package install matrix. Every extra spelled out.
 
--   :material-api: **[API Reference](api/pipekit.md)**
+-   :material-api: **[API Reference](api/pipekit-ops.md)**
 
     ---
 
@@ -73,7 +74,7 @@ final_state, _ = forecast(x0, None)
 
 | Package              | Status        | Purpose                                                              |
 |----------------------|---------------|----------------------------------------------------------------------|
-| `pipekit`            | ✅ implemented | Core: `Operator`, `Sequential`, `Graph`, control, observe, …         |
+| `pipekit-ops`        | ✅ implemented | Core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, observe, …         |
 | `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A landed; B-D pending).                   |
 | `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
 | `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |

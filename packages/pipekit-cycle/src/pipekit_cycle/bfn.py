@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit import Operator, StatefulOperator
+from pipekit_ops import Operator, StatefulOperator
 
 from pipekit_cycle.da import (
     ObsClock,

@@ -12,9 +12,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Operator, Sequential, StatefulOperator
 from pipekit_cycle import Cycle
 from pipekit_jax import JaxOperator, Rollout, ScanCycle, truncated_scan
+from pipekit_ops import Operator, Sequential, StatefulOperator
 
 
 class Relax(StatefulOperator):
@@ -350,7 +350,7 @@ def test_zero_step_histories_keep_the_carrier_dtype(value):
 
 
 def test_forward_model_wrappers_are_reported_as_pickle_hazards():
-    from pipekit import check_pickleable
+    from pipekit_ops import check_pickleable
 
     model = Oscillator(omega=jnp.asarray(2.0))
     assert check_pickleable(ScanCycle(step_op=model, n_steps=2))

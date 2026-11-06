@@ -10,9 +10,9 @@ Bridges pipekit operator graphs and Hydra configs. Two directions:
   through ``hydra-zen``'s ``to_yaml`` / ``instantiate``.
 - ``from_yaml_sandboxed(text)`` — build a pipeline from untrusted
   ``_target_`` YAML, allowing only classes registered with
-  `pipekit.register`. It never calls ``hydra.utils.instantiate``
+  `pipekit_ops.register`. It never calls ``hydra.utils.instantiate``
   (which will call any dotted path): the YAML is translated into a
-  pipekit state record and built by `pipekit.from_state_sandboxed`.
+  pipekit state record and built by `pipekit_ops.from_state_sandboxed`.
 
 The adapter doesn't import ``hydra`` or ``hydra_zen`` at module load
 — each method imports lazily so a user can ``from … import hydra as
@@ -30,8 +30,8 @@ import re
 import sys
 from typing import Any
 
-from pipekit import Operator, from_state_sandboxed
-from pipekit._base.operator import resolve_loaded
+from pipekit_ops import Operator, from_state_sandboxed
+from pipekit_ops._base.operator import resolve_loaded
 
 
 # Hydra's own keys: instructions to `instantiate`, not constructor arguments.
@@ -170,7 +170,7 @@ class HydraConfigLoader:
     def from_yaml_sandboxed(text: str) -> Operator:
         """Build a pipeline from untrusted ``_target_`` YAML, safely.
 
-        Only classes registered with `pipekit.register` can be built, at
+        Only classes registered with `pipekit_ops.register` can be built, at
         any depth (pipekit's own containers included); every class is
         checked before anything is constructed. The YAML is parsed with
         ``yaml.safe_load``, interpolations (``${...}``) are not resolved,

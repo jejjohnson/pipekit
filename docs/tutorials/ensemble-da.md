@@ -18,7 +18,7 @@ any library.
 **Prerequisites:**
 
 ```bash
-uv add pipekit pipekit-cycle numpy jaxtyping
+uv add pipekit-ops pipekit-cycle numpy jaxtyping
 ```
 
 ```mermaid
@@ -48,7 +48,7 @@ from typing import Any, NoReturn
 
 import numpy as np
 from jaxtyping import Bool, Float, Int
-from pipekit import Operator, Sequential
+from pipekit_ops import Operator, Sequential
 from pipekit_cycle import CallableForward, DAState, EnsembleDACycle
 
 

@@ -101,7 +101,7 @@ A real DA cycle has three more pieces:
 Wire them together:
 
 ```python
-from filterx.adapters.pipekit import EnKFAnalysis  # external lib
+from filterx.adapters.pipekit_ops import EnKFAnalysis  # external lib
 
 
 da = pc.EnsembleDACycle(

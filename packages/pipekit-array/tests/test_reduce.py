@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Operator
-from pipekit.signature import Signature
 from pipekit_array import MeanScalar
+from pipekit_ops import Operator
+from pipekit_ops.signature import Signature
 
 
 def test_mean_scalar_full_reduction(backend, make_array):

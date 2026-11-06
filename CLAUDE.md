@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pipekit` is a uv workspace of seven Python packages that together
+`pipekit` is a uv workspace of seven Python packages, plus a code-free
+`pipekit` umbrella that installs them all. Together they
 provide a carrier-agnostic operator-graph framework for composable
 scientific pipelines. Built with Python 3.12+, uv, pytest, and MkDocs.
 
@@ -12,7 +13,7 @@ The packages, in dependency order:
 
 | Package              | Status        | Purpose                                                                       |
 |----------------------|---------------|-------------------------------------------------------------------------------|
-| `pipekit`            | implemented   | Carrier-agnostic core: `Operator`, `Sequential`, `Graph`, control, observe, … |
+| `pipekit-ops`        | implemented   | Carrier-agnostic core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, observe, … |
 | `pipekit-array`      | partial       | Array-API operators (Phase A: namespace dispatch + MeanScalar + Stack/Concat). Phases B-D pending. |
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
@@ -51,7 +52,7 @@ uv run --group train-extras pytest packages/pipekit-train/tests
 ### Running a single test
 
 ```bash
-uv run pytest packages/pipekit/tests/test_observe.py::test_tap_passes_through -v
+uv run pytest packages/pipekit-ops/tests/test_observe.py::test_tap_passes_through -v
 ```
 
 ### Pre-commit checklist (all four must pass)
@@ -60,7 +61,7 @@ uv run pytest packages/pipekit/tests/test_observe.py::test_tap_passes_through -v
 uv run pytest -q                                    # Tests
 uv run --group lint ruff check .                    # Lint — ENTIRE repo
 uv run --group lint ruff format --check .           # Format — ENTIRE repo
-uv run --group typecheck ty check packages/pipekit/src/pipekit \
+uv run --group typecheck ty check packages/pipekit-ops/src/pipekit_ops \
     packages/pipekit-cycle/src/pipekit_cycle \
     packages/pipekit-experiment/src/pipekit_experiment   # Typecheck
 ```
@@ -74,8 +75,9 @@ uv run --group typecheck ty check packages/pipekit/src/pipekit \
 
 ```
 packages/
-├── pipekit/                  # Core framework (no internal deps)
-│   ├── src/pipekit/
+├── pipekit/                  # Umbrella: no code, installs every package below
+├── pipekit-ops/              # Core framework (no internal deps), import pipekit_ops
+│   ├── src/pipekit_ops/
 │   │   ├── _base/            # Operator, Sequential, Graph (the foundations)
 │   │   ├── blocks.py         # Identity, Const, Lambda, Sink
 │   │   ├── compose.py        # pipe, compose, juxt, complement
@@ -92,7 +94,7 @@ packages/
 │   │   └── hashing.py        # stable_json, stable_repr, sha256_hex (shared)
 │   └── tests/
 ├── pipekit-array/            # Array-API operators (Phase A landed; B-D pending)
-├── pipekit-cycle/            # Time-stepping + DA on top of pipekit.state
+├── pipekit-cycle/            # Time-stepping + DA on top of pipekit_ops.state
 │   ├── src/pipekit_cycle/
 │   │   ├── cycle.py          # Cycle, EnsembleCycle, WindowedCycle, Recurrence
 │   │   ├── da.py             # DACycle, EnsembleDACycle, SmootherCycle
@@ -137,12 +139,14 @@ top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
 
 ### Dependency rules
 
-- `pipekit` has no internal deps; pure Python, no third-party.
-- `pipekit-cycle` depends on `pipekit` only.
-- `pipekit-experiment` depends on `pipekit` only; tool integrations
+- `pipekit-ops` has no internal deps; pure Python, no third-party.
+- `pipekit` (the umbrella) depends on every package and holds no code;
+  no package may depend on it.
+- `pipekit-cycle` depends on `pipekit-ops` only.
+- `pipekit-experiment` depends on `pipekit-ops` only; tool integrations
   are gated behind optional extras (`[dvc]`, `[hydra]`, `[metaflow]`,
   `[s3]`).
-- `pipekit-train` depends on `pipekit` only; backend tools
+- `pipekit-train` depends on `pipekit-ops` only; backend tools
   (Equinox+Optax, Keras 3) and data sources (geocatalog,
   pipekit-cycle) are gated behind optional extras
   (`[equinox]`, `[keras]`, `[catalog]`, `[cycle]`,
@@ -181,7 +185,7 @@ source of rendered figures.
 - Operators carrying user closures (`Lambda`, `Tap`, `Branch`, …)
   set `forbid_in_yaml: ClassVar[bool] = True`; the same flag doubles
   as the pre-deployment pickleability lint via
-  `pipekit.check_pickleable`.
+  `pipekit_ops.check_pickleable`.
 
 ## Plans
 

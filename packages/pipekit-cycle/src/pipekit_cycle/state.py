@@ -2,7 +2,7 @@
 
 Each cycle pattern brings its own state shape — pipekit-cycle ships
 the three most common ones. Algorithm libraries are free to subclass
-`pipekit.CarryState` directly with their own fields.
+`pipekit_ops.CarryState` directly with their own fields.
 
 - `DAState` — clock + cycle bookkeeping for `DACycle` /
   `EnsembleDACycle`.
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit import CarryState
+from pipekit_ops import CarryState
 
 
 class DAState(CarryState):

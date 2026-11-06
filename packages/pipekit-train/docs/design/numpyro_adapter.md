@@ -37,7 +37,7 @@ version: 0.1.0
 > on observations — I want to **fit it through the same `TrainingLoop` I
 > already use for neural nets**: pick variational (SVI) or MCMC (NUTS)
 > inference, get the usual callbacks / metric logging / checkpoints /
-> `TrainingArtifact`, and receive back a `pipekit.Operator` I can drop into
+> `TrainingArtifact`, and receive back a `pipekit_ops.Operator` I can drop into
 > an inference pipeline and store in the model registry — without
 > hand-rolling an inference script that re-implements all of that.*
 
@@ -188,7 +188,7 @@ After this lands:
   minibatching). `numpyro-mcmc` is a **single `mcmc.run`** (begin/end
   callbacks only).
 - Both `run()`s return `(NumpyroPredictiveOp, backend_info)` — a
-  posterior-predictive `pipekit.Operator` plus diagnostics (final ELBO for
+  posterior-predictive `pipekit_ops.Operator` plus diagnostics (final ELBO for
   SVI; $\hat r$ / divergences / sample counts for MCMC).
 - The trained `Operator` drops into inference pipelines and the model
   registry like any other (D7), its weight-blob being the variational
@@ -224,21 +224,22 @@ task):
 @dataclass
 class NumpyroTask:
     """A NumPyro inference target (loop.task for backend='numpyro-svi'|'numpyro-mcmc')."""
-    model: Callable           # def model(x, y=None): numpyro.sample("obs", ..., obs=y)
-    predictive_site: str = "obs"       # which model site the trained op returns
-    predictive_samples: int = 200      # Predictive draw count (num_samples)
+
+    model: Callable  # def model(x, y=None): numpyro.sample("obs", ..., obs=y)
+    predictive_site: str = "obs"  # which model site the trained op returns
+    predictive_samples: int = 200  # Predictive draw count (num_samples)
     # numpyro-svi fields
-    guide: Callable | None = None      # default: AutoNormal(model)
-    loss: Any = None                   # SVI objective; default Trace_ELBO()
+    guide: Callable | None = None  # default: AutoNormal(model)
+    loss: Any = None  # SVI objective; default Trace_ELBO()
     # numpyro-mcmc fields
     num_warmup: int = 1000
     num_samples: int = 1000
     num_chains: int = 1
     kernel_kwargs: dict = field(default_factory=dict)  # NUTS(model, **kernel_kwargs)
-    kernel_factory: Callable | None = None             # replaces NUTS
+    kernel_factory: Callable | None = None  # replaces NUTS
     # both
-    supervised: bool = True            # False: model(data, **model_kwargs)
-    model_kwargs: dict = field(default_factory=dict)   # constants under jit
+    supervised: bool = True  # False: model(data, **model_kwargs)
+    model_kwargs: dict = field(default_factory=dict)  # constants under jit
 ```
 
 There is no `method` field — the **backend string** selects the paradigm;
@@ -256,7 +257,7 @@ NumPyro adapters (and the BlackJAX adapter):
 
 ```python
 class NumpyroPredictiveOp(Operator):
-    forbid_in_yaml: ClassVar[bool] = True   # carries the model closure
+    forbid_in_yaml: ClassVar[bool] = True  # carries the model closure
     # _apply(x): draw S predictive samples, return the mean of predictive_site.
 ```
 
@@ -337,16 +338,23 @@ from numpyro.infer.autoguide import AutoNormal
 from pipekit_train import TrainingLoop, IterableDataset
 from pipekit_train.adapters.bayes import NumpyroTask
 
+
 def model(x, y=None):
     w = numpyro.sample("w", dist.Normal(0.0, 1.0))
     b = numpyro.sample("b", dist.Normal(0.0, 1.0))
     sigma = numpyro.sample("sigma", dist.HalfNormal(1.0))
     mu = w * x[..., 0] + b
-    numpyro.sample("obs", dist.Normal(mu, sigma), obs=y)   # likelihood site
+    numpyro.sample("obs", dist.Normal(mu, sigma), obs=y)  # likelihood site
+
 
 dataset = IterableDataset(source=pairs, content_hash="linreg-64")
-task = NumpyroTask(model, guide=AutoNormal(model), predictive_site="obs",
-                   num_warmup=1000, num_samples=1000)   # used by either backend
+task = NumpyroTask(
+    model,
+    guide=AutoNormal(model),
+    predictive_site="obs",
+    num_warmup=1000,
+    num_samples=1000,
+)  # used by either backend
 
 # --- numpyro-svi: fast variational posterior (per-step; reuses the loop) --
 # v1 is FULL-BATCH: the model above has no `numpyro.plate(..., subsample_size=)`,
@@ -354,29 +362,29 @@ task = NumpyroTask(model, guide=AutoNormal(model), predictive_site="obs",
 # (batch_size < N) requires wrapping the likelihood in a subsample plate so the
 # ELBO is rescaled — a documented follow-on (build order step 5).
 svi_op, svi_artifact = TrainingLoop(
-    model_op=...,                       # ignored; the task carries the model
+    model_op=...,  # ignored; the task carries the model
     dataset=dataset,
     backend="numpyro-svi",
     task=task,
-    optimizer_config={"name": "adam", "lr": 1e-2},   # → optax → SVI(optim=...)
+    optimizer_config={"name": "adam", "lr": 1e-2},  # → optax → SVI(optim=...)
     max_steps=2000,
     seed=0,
 ).run()
-y_hat = svi_op(x_new)                    # posterior-predictive mean of "obs"
+y_hat = svi_op(x_new)  # posterior-predictive mean of "obs"
 
 # --- numpyro-mcmc: the exact oracle (single mcmc.run; full dataset) -------
 oracle_op, oracle_artifact = TrainingLoop(
     model_op=...,
     dataset=dataset,
     backend="numpyro-mcmc",
-    task=task,                           # same task; SVI fields are ignored here
+    task=task,  # same task; SVI fields are ignored here
     seed=0,
 ).run()
-oracle_artifact.backend_info["num_divergences"]   # MCMC diagnostics
+oracle_artifact.backend_info["num_divergences"]  # MCMC diagnostics
 y_hat_oracle = oracle_op(x_new)
 ```
 
-Both `svi_op` and `oracle_op` are ordinary `pipekit.Operator`s: they compose
+Both `svi_op` and `oracle_op` are ordinary `pipekit_ops.Operator`s: they compose
 into inference pipelines and round-trip through the model registry exactly
 like a trained neural net (D7).
 

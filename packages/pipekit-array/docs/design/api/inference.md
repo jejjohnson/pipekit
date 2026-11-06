@@ -29,7 +29,7 @@ Three reasons:
 1. **It closes the train→serve loop for pipekit-train.** The Lightning
    and Keras adapters (v0.2 / v0.3 of pipekit-train, see
    `docs/design/api/adapters.md` in that package) need to return a
-   `pipekit.Operator` from `loop.run()` that wraps the trained
+   `pipekit_ops.Operator` from `loop.run()` that wraps the trained
    `nn.Module` / `keras.Model`. That operator is `ModelOp`.
 
 2. **It's the natural home for sklearn / numpy-ML pipelines.** A lot

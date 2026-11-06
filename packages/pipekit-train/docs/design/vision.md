@@ -35,8 +35,8 @@ Pipekit-train must extend that discipline to the training side.
 ## 2. What pipekit-train is
 
 A thin orchestration layer that wraps existing training tools and
-exposes them as composable `pipekit.Operator`s. Five conceptual
-pieces, all on top of `pipekit` core:
+exposes them as composable `pipekit_ops.Operator`s. Five conceptual
+pieces, all on top of `pipekit-ops` core:
 
 - **Datasets** as `Operator`s. `CatalogDataset`,
   `SimulationDataset`, `CachedDataset`. Each yields `(input, target)`
@@ -52,7 +52,7 @@ pieces, all on top of `pipekit` core:
   training tool, extras-gated. The Equinox adapter is the v0.1
   reference; Keras is scaffolded.
 
-The trained model is itself a `pipekit.Operator`. After training, the
+The trained model is itself a `pipekit_ops.Operator`. After training, the
 output is a `pipekit-array.ModelOp` (PyTorch / Keras) or a
 `pipekit-jax.JaxModelOp` (Equinox) wrapping the trained weights, and
 its content hash flows into the `pipekit-experiment` model registry.
@@ -71,7 +71,7 @@ operator-graph context.
   surface as everything else in pipekit.
 - **The training loop is a StatefulOperator.** Optimizer state, step
   count, epoch count, metrics are the carry-state. Built on
-  `pipekit.state.StatefulOperator` from Group M.
+  `pipekit_ops.state.StatefulOperator` from Group M.
 - **Adapter pattern, extras-gated.** Each backend is one module
   under `pipekit_train.adapters.*`. Backend extras pin only the
   libraries that backend needs. No backend is required to import the
@@ -82,7 +82,7 @@ operator-graph context.
   and registry URI. `TrainingLoop.run()` returns exactly this
   artifact. No new reproducibility primitive is invented here.
 - **Trained models are inference operators.** The output of
-  `loop.run()` is a `pipekit.Operator` that composes into any
+  `loop.run()` is a `pipekit_ops.Operator` that composes into any
   `Sequential` / `Graph` / `Cycle`. Train→serve is one operator
   swap, not a rewrite.
 

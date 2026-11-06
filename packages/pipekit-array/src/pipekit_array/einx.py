@@ -20,7 +20,7 @@ group standing for one dim that is split. A merged output group
 ``(a b)`` becomes one dim named ``a_b``.
 
 dask is not an einx backend: a dask-backed input raises
-`pipekit.BackendError` naming ``.compute()`` rather than computing it
+`pipekit_ops.BackendError` naming ``.compute()`` rather than computing it
 silently. einx is imported lazily: install the ``[einx]`` extra.
 """
 
@@ -31,8 +31,8 @@ import re
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
-from pipekit import Operator, backend_of
-from pipekit.adapters import BackendError
+from pipekit_ops import Operator, backend_of
+from pipekit_ops.adapters import BackendError
 
 from pipekit_array.dims import adapter_of, transpose
 

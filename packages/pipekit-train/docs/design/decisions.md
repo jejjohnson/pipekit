@@ -36,7 +36,7 @@ in the docs.
 
 ---
 
-## D2: TrainingDataset is a `pipekit.Operator`
+## D2: TrainingDataset is a `pipekit_ops.Operator`
 
 **Status:** accepted
 
@@ -45,7 +45,7 @@ operator. Generator and iterator forms lose YAML round-trip, content
 hashing, and composability with the rest of pipekit. Master plan
 proposes the Operator form.
 
-**Decision:** `TrainingDataset` extends `pipekit.Operator`. It
+**Decision:** `TrainingDataset` extends `pipekit_ops.Operator`. It
 defines `__iter__` returning `(x, y)` pairs and a `content_hash()`
 returning a stable identifier. Subclasses (`CatalogDataset`,
 `SimulationDataset`, `CachedDataset`) inherit operator semantics:
@@ -70,9 +70,9 @@ processes. The training loop's natural shape is exactly
 "(carrier_in, state_in) → (carrier_out, state_out)" with state
 being `(model, optimizer_state, step, epoch, metrics, rng)`.
 
-**Decision:** `TrainingLoop` extends `pipekit.StatefulOperator`. Its
+**Decision:** `TrainingLoop` extends `pipekit_ops.StatefulOperator`. Its
 carry-state is a `TrainerCarryState` (subclass of
-`pipekit.CarryState`) carrying the six fields above.
+`pipekit_ops.CarryState`) carrying the six fields above.
 `TrainingLoop._apply(carrier, state)` delegates to the configured
 adapter and returns `(trained_model_op, new_state)`.
 
@@ -164,7 +164,7 @@ pipelines without rewrite. `pipekit-array.ModelOp` and (planned)
 `pipekit-jax.JaxModelOp` already exist as the operator wrappers.
 
 **Decision:** The Layer 4 adapter's `run()` returns a
-`pipekit.Operator`. For Equinox, this is the wrapper the user passed in:
+`pipekit_ops.Operator`. For Equinox, this is the wrapper the user passed in:
 a `JaxModelOp` stays a `JaxModelOp`, which keeps pipekit-train independent
 of pipekit-jax, and an `EquinoxModelOp` stays one. For Lightning / Keras,
 it's a `ModelOp`.
@@ -272,7 +272,7 @@ in the examples.
 
 **Context:** `eqx_trainer` (D5) ships a `TrainerConfig` dataclass and
 explicitly avoids YAML / ml_collections. The pipekit world already
-has a YAML round-trip via `pipekit.serial.dumps`. A separate config
+has a YAML round-trip via `pipekit_ops.serial.dumps`. A separate config
 dataclass would duplicate machinery.
 
 **Decision:** `TrainingLoop` is constructed with the same flat-config

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-array/logo-dark.svg">
+    <img alt="pipekit-array" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-array/logo-light.svg" width="386">
+  </picture>
+</p>
+
 # pipekit-array
 
 > **Status — v0.0 / design locked, implementation pending.** The

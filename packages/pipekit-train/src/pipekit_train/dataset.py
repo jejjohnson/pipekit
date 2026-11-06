@@ -25,8 +25,8 @@ import warnings
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
-from pipekit import CarryState, Operator
-from pipekit.hashing import sha256_hex, stable_json, stable_repr
+from pipekit_ops import CarryState, Operator
+from pipekit_ops.hashing import sha256_hex, stable_json, stable_repr
 
 from pipekit_train._signatures import accepts_keyword
 
@@ -102,7 +102,7 @@ class TrainingDataset(Operator):
     Subclasses implement ``__iter__`` and ``content_hash``. The base
     provides:
 
-    - `pipekit.Operator` semantics — get_config / dumps / loads.
+    - `pipekit_ops.Operator` semantics — get_config / dumps / loads.
     - `with_split` for deterministic train/val/test split derivation.
     - A default ``content_hash`` over ``(type, get_config())`` that
       subclasses can extend or override.
@@ -324,7 +324,7 @@ class SimulationDataset(TrainingDataset):
                 )
         if not isinstance(prior, Operator):
             raise TypeError(
-                "SimulationDataset.prior must be a pipekit.Operator; got "
+                "SimulationDataset.prior must be a pipekit_ops.Operator; got "
                 f"{type(prior).__name__}."
             )
         if n_samples <= 0:

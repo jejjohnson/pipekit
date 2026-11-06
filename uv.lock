@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -16,6 +16,7 @@ members = [
     "pipekit-experiment",
     "pipekit-jax",
     "pipekit-monorepo",
+    "pipekit-ops",
     "pipekit-train",
 ]
 
@@ -4070,13 +4071,33 @@ wheels = [
 name = "pipekit"
 version = "0.1.5"
 source = { editable = "packages/pipekit" }
+dependencies = [
+    { name = "pipekit-array" },
+    { name = "pipekit-cycle" },
+    { name = "pipekit-evaluate" },
+    { name = "pipekit-experiment" },
+    { name = "pipekit-jax" },
+    { name = "pipekit-ops" },
+    { name = "pipekit-train" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pipekit-array", editable = "packages/pipekit-array" },
+    { name = "pipekit-cycle", editable = "packages/pipekit-cycle" },
+    { name = "pipekit-evaluate", editable = "packages/pipekit-evaluate" },
+    { name = "pipekit-experiment", editable = "packages/pipekit-experiment" },
+    { name = "pipekit-jax", editable = "packages/pipekit-jax" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
+    { name = "pipekit-train", editable = "packages/pipekit-train" },
+]
 
 [[package]]
 name = "pipekit-array"
 version = "0.0.9"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
 ]
 
 [package.optional-dependencies]
@@ -4116,7 +4137,7 @@ requires-dist = [
     { name = "einx", marker = "extra == 'einx'", specifier = ">=0.4" },
     { name = "jax", marker = "extra == 'jax'", specifier = ">=0.4.20" },
     { name = "numpy", marker = "extra == 'numpy'", specifier = ">=2.0" },
-    { name = "pipekit", editable = "packages/pipekit" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "scikit-learn", marker = "extra == 'sklearn'", specifier = ">=1.4" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2024.6" },
@@ -4128,7 +4149,7 @@ name = "pipekit-cycle"
 version = "0.0.4"
 source = { editable = "packages/pipekit-cycle" }
 dependencies = [
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
 ]
 
 [package.optional-dependencies]
@@ -4138,8 +4159,8 @@ array = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pipekit", editable = "packages/pipekit" },
     { name = "pipekit-array", marker = "extra == 'array'", editable = "packages/pipekit-array" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
 ]
 provides-extras = ["array"]
 
@@ -4149,7 +4170,7 @@ version = "0.1.1"
 source = { editable = "packages/pipekit-evaluate" }
 dependencies = [
     { name = "numpy" },
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
     { name = "scipy" },
 ]
 
@@ -4167,8 +4188,8 @@ xskill = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pipekit", editable = "packages/pipekit" },
     { name = "pipekit-cycle", marker = "extra == 'cycle'", editable = "packages/pipekit-cycle" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "properscoring", marker = "extra == 'proper'", specifier = ">=0.1" },
     { name = "scipy", specifier = ">=1.10" },
     { name = "xskillscore", marker = "extra == 'xskill'", specifier = ">=0.0.26" },
@@ -4180,7 +4201,7 @@ name = "pipekit-experiment"
 version = "0.0.5"
 source = { editable = "packages/pipekit-experiment" }
 dependencies = [
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
 ]
 
 [package.optional-dependencies]
@@ -4213,7 +4234,7 @@ requires-dist = [
     { name = "hydra-zen", marker = "extra == 'hydra'", specifier = ">=0.13" },
     { name = "metaflow", marker = "extra == 'metaflow'", specifier = ">=2.10" },
     { name = "mlflow", marker = "extra == 'mlflow'", specifier = ">=2.10" },
-    { name = "pipekit", editable = "packages/pipekit" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "s3fs", marker = "extra == 's3'", specifier = ">=2024.0" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.16" },
 ]
@@ -4227,8 +4248,8 @@ dependencies = [
     { name = "equinox" },
     { name = "jax" },
     { name = "jaxtyping" },
-    { name = "pipekit" },
     { name = "pipekit-cycle" },
+    { name = "pipekit-ops" },
 ]
 
 [package.optional-dependencies]
@@ -4245,9 +4266,9 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.11" },
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxtyping", specifier = ">=0.2" },
-    { name = "pipekit", editable = "packages/pipekit" },
     { name = "pipekit-array", marker = "extra == 'array'", editable = "packages/pipekit-array" },
     { name = "pipekit-cycle", editable = "packages/pipekit-cycle" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
 ]
 provides-extras = ["diffrax", "array"]
 
@@ -4268,6 +4289,7 @@ dev = [
     { name = "pipekit-evaluate" },
     { name = "pipekit-experiment" },
     { name = "pipekit-jax" },
+    { name = "pipekit-ops" },
     { name = "pipekit-train" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -4310,6 +4332,7 @@ dev = [
     { name = "pipekit-evaluate", editable = "packages/pipekit-evaluate" },
     { name = "pipekit-experiment", editable = "packages/pipekit-experiment" },
     { name = "pipekit-jax", editable = "packages/pipekit-jax" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "pipekit-train", editable = "packages/pipekit-train" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.3" },
@@ -4333,11 +4356,16 @@ train-extras = [{ name = "pipekit-train", extras = ["equinox", "numpyro", "black
 typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
+name = "pipekit-ops"
+version = "0.1.5"
+source = { editable = "packages/pipekit-ops" }
+
+[[package]]
 name = "pipekit-train"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/pipekit-train" }
 dependencies = [
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
 ]
 
 [package.optional-dependencies]
@@ -4398,9 +4426,9 @@ requires-dist = [
     { name = "optax", marker = "extra == 'equinox'", specifier = ">=0.2" },
     { name = "optax", marker = "extra == 'numpyro'", specifier = ">=0.2" },
     { name = "orbax-checkpoint", marker = "extra == 'equinox'", specifier = ">=0.6" },
-    { name = "pipekit", editable = "packages/pipekit" },
     { name = "pipekit-cycle", marker = "extra == 'cycle'", editable = "packages/pipekit-cycle" },
     { name = "pipekit-experiment", marker = "extra == 'experiment'", editable = "packages/pipekit-experiment" },
+    { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "s3fs", marker = "extra == 's3'", specifier = ">=2024.0" },
     { name = "zarr", marker = "extra == 'cache'", specifier = ">=2.18" },
     { name = "zarr", marker = "extra == 'gcs'", specifier = ">=2.18" },

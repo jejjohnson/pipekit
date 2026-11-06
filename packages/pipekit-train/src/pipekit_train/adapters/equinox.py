@@ -18,7 +18,7 @@ Module surface:
 - `train_step` — pure function, ``@eqx.filter_jit`` wrapped.
 - `save_state` / `restore_state` — Orbax bridge via ``eqx.partition``.
 - `EquinoxModelOp(Operator)` — wraps a trained ``eqx.Module`` as a
-  `pipekit.Operator`. Deliberate in-package twin of
+  `pipekit_ops.Operator`. Deliberate in-package twin of
   `pipekit_jax.JaxModelOp` (kept separate so pipekit-train depends only
   on pipekit core). It can write its weights with `serialize_weights`, but
   it can't reload them; pass a `JaxModelOp` to `TrainingLoop` for that, and
@@ -42,7 +42,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_train.adapters import _common
 from pipekit_train.loss import call_loss
@@ -62,12 +62,12 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------
-# EquinoxModelOp — pipekit.Operator wrapper around an eqx.Module
+# EquinoxModelOp — pipekit_ops.Operator wrapper around an eqx.Module
 # ---------------------------------------------------------------------
 
 
 class EquinoxModelOp(Operator):
-    """Wrap an `eqx.Module` as a `pipekit.Operator`.
+    """Wrap an `eqx.Module` as a `pipekit_ops.Operator`.
 
     Public surface used in notebooks and downstream packages. Same
     constructor signature and ``_apply`` shape as

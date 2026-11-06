@@ -79,7 +79,8 @@ class CatalogDataset(TrainingDataset):
             True iff the row belongs to `split`. None uses the
             default row-hash splitter.
     """
-    catalog: str                              # URI; loaded lazily
+
+    catalog: str  # URI; loaded lazily
     preprocess: Operator
     target_op: Operator
     sampler: Operator | None = None
@@ -131,7 +132,8 @@ class SimulationDataset(TrainingDataset):
             partitioning the seed space (e.g. train uses seeds in
             [0, 0.8 * 2^32); val uses [0.8 * 2^32, 0.9 * 2^32); …).
     """
-    forward_model: Operator                   # also satisfies ForwardModel
+
+    forward_model: Operator  # also satisfies ForwardModel
     prior: Operator
     n_samples: int
     cycle: Operator | None = None
@@ -168,6 +170,7 @@ class CachedDataset(TrainingDataset):
         in_memory: Load the cache into NumPy arrays on first read. Use it
             when the cache fits in memory and is read item by item.
     """
+
     source: TrainingDataset
     cache_dir: str
     format: Literal["zarr", "parquet", "tfrecord"] = "zarr"

@@ -8,8 +8,8 @@ ImportError at method invocation. Functional tests are gated with
 from __future__ import annotations
 
 import pytest
-from pipekit import Const, Identity, Operator
 from pipekit_experiment.adapters.hydra import HydraConfigLoader
+from pipekit_ops import Const, Identity, Operator
 
 
 def test_import_error_when_hydra_missing(monkeypatch):
@@ -80,7 +80,7 @@ def test_to_yaml_writes_a_flat_operator_as_one_mapping():
     pytest.importorskip("yaml")
     assert (
         HydraConfigLoader.to_yaml(Const(7))
-        == "_target_: pipekit.blocks.Const\nvalue: 7\n"
+        == "_target_: pipekit_ops.blocks.Const\nvalue: 7\n"
     )
 
 
@@ -104,7 +104,7 @@ HALVE = f"{__name__}.Halve"
 @pytest.fixture
 def allow():
     """Register classes for one test, and always unregister them."""
-    from pipekit import register, unregister
+    from pipekit_ops import register, unregister
 
     registered: list[type[Operator]] = []
 
@@ -120,11 +120,11 @@ def allow():
 
 def test_sandboxed_yaml_builds_a_registered_pipeline(allow):
     pytest.importorskip("yaml")
-    from pipekit import Sequential
+    from pipekit_ops import Sequential
 
     allow(Sequential, Halve)
     text = f"""
-_target_: pipekit.Sequential
+_target_: pipekit_ops.Sequential
 operators:
   - _target_: {HALVE}
   - _target_: {HALVE}
@@ -137,12 +137,12 @@ operators:
 
 def test_sandboxed_yaml_refuses_an_unregistered_step_and_builds_nothing(allow):
     pytest.importorskip("yaml")
-    from pipekit import Sequential
+    from pipekit_ops import Sequential
 
     allow(Sequential)
     Halve.built = 0
     text = f"""
-_target_: pipekit.Sequential
+_target_: pipekit_ops.Sequential
 operators:
   - _target_: {HALVE}
 """
@@ -177,11 +177,11 @@ def test_sandboxed_yaml_refuses_positional_args_and_partials(allow):
 
 def test_sandboxed_yaml_refuses_a_closure_even_if_registered(allow):
     pytest.importorskip("yaml")
-    from pipekit import Lambda
+    from pipekit_ops import Lambda
 
     allow(Lambda)
     with pytest.raises(RuntimeError, match="forbid_in_yaml"):
-        HydraConfigLoader.from_yaml_sandboxed("_target_: pipekit.Lambda\nfn: abs\n")
+        HydraConfigLoader.from_yaml_sandboxed("_target_: pipekit_ops.Lambda\nfn: abs\n")
 
 
 def test_sandboxed_yaml_does_not_resolve_interpolations(allow):
@@ -189,20 +189,20 @@ def test_sandboxed_yaml_does_not_resolve_interpolations(allow):
     pytest.importorskip("yaml")
     allow(Const)
     op = HydraConfigLoader.from_yaml_sandboxed(
-        "_target_: pipekit.Const\nvalue: ${oc.env:HOME}\n"
+        "_target_: pipekit_ops.Const\nvalue: ${oc.env:HOME}\n"
     )
     assert op() == "${oc.env:HOME}"
 
 
 def test_sandboxed_yaml_reads_exception_classes(allow):
     pytest.importorskip("yaml")
-    from pipekit import Try
+    from pipekit_ops import Try
 
     allow(Try, Identity, Halve)
     text = f"""
-_target_: pipekit.Try
+_target_: pipekit_ops.Try
 primary: {{_target_: {HALVE}}}
-fallback: {{_target_: pipekit.Identity}}
+fallback: {{_target_: pipekit_ops.Identity}}
 on:
   - {{_target_: hydra.utils.get_class, path: builtins.ZeroDivisionError}}
 """
@@ -212,11 +212,11 @@ on:
 
 def test_sandboxed_yaml_builds_a_graph_through_from_config(allow):
     pytest.importorskip("yaml")
-    from pipekit import Graph
+    from pipekit_ops import Graph
 
     allow(Graph, Halve)
     text = f"""
-_target_: pipekit.Graph.from_config
+_target_: pipekit_ops.Graph.from_config
 config:
   inputs: [x]
   operators:
@@ -234,7 +234,7 @@ config:
 
 # ── to_yaml for nested pipelines ─────────────────────────────────────────────
 def _nested_pipelines() -> dict[str, Operator]:
-    from pipekit import Cache, Fanout, Graph, Input, Retry, Sequential, ThreadMap
+    from pipekit_ops import Cache, Fanout, Graph, Input, Retry, Sequential, ThreadMap
 
     x = Input("x")
     shared = Halve(2.0)
@@ -251,7 +251,7 @@ def _nested_pipelines() -> dict[str, Operator]:
 @pytest.mark.parametrize("name", list(_nested_pipelines()))
 def test_to_yaml_round_trips_through_the_sandbox(name, allow):
     pytest.importorskip("yaml")
-    from pipekit import Cache, Fanout, Graph, Retry, Sequential, ThreadMap
+    from pipekit_ops import Cache, Fanout, Graph, Retry, Sequential, ThreadMap
 
     allow(Cache, Fanout, Graph, Identity, Retry, Sequential, ThreadMap, Halve)
     op = _nested_pipelines()[name]
@@ -269,7 +269,7 @@ def test_to_yaml_round_trips_through_hydra(name):
 
 def test_to_yaml_refuses_a_closure_anywhere():
     pytest.importorskip("yaml")
-    from pipekit import Cache, Lambda
+    from pipekit_ops import Cache, Lambda
 
     with pytest.raises(ValueError, match="Lambda"):
         HydraConfigLoader.to_yaml(Cache(Identity() | Lambda(abs)))

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from pipekit import Const
+from pipekit_ops import Const
 from pipekit_train import Checkpoint, EarlyStopping, LogToExperiment
 
 

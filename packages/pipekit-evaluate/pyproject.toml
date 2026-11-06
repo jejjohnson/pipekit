@@ -11,7 +11,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 2 - Pre-Alpha"]
 dependencies = [
-    "pipekit>=0.0.2",
+    "pipekit-ops>=0.1.5",
     "numpy>=2.0",
     "scipy>=1.10",
 ]

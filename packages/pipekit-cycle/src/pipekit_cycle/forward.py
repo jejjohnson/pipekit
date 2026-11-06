@@ -1,6 +1,6 @@
 """Generic `ForwardModel` adapters.
 
-Each class is a `pipekit.Operator` *and* satisfies the
+Each class is a `pipekit_ops.Operator` *and* satisfies the
 `ForwardModel` Protocol so it can be passed wherever a protocol-typed
 slot accepts forward models (e.g. `DACycle.forward_model`).
 
@@ -18,8 +18,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit import Operator
-from pipekit._base.operator import nested_config
+from pipekit_ops import Operator
+from pipekit_ops._base.operator import nested_config
 
 from pipekit_cycle.da import _component_config
 from pipekit_cycle.protocols import ForwardModel
@@ -31,7 +31,7 @@ class CallableForward(Operator):
     Args:
         fn: Callable ``(state, dt) → new_state``.
         dt: Default integration step in user units (seconds, hours, …).
-        state_signature: Optional `pipekit.Signature` describing the
+        state_signature: Optional `pipekit_ops.Signature` describing the
             state carrier. ``None`` by default.
         name: Optional name for ``__repr__``.
 
@@ -132,7 +132,7 @@ class CompositeForward(Operator):
 class NeuralForward(Operator):
     """Wrap a neural-emulator operator (e.g. `ModelOp`) as a `ForwardModel`.
 
-    The wrapped ``model_op`` should be a `pipekit.Operator` that accepts
+    The wrapped ``model_op`` should be a `pipekit_ops.Operator` that accepts
     the state carrier and returns the advanced state. ``dt`` is
     declared explicitly — neural emulators have a fixed training
     cadence that callers must respect.
@@ -141,7 +141,7 @@ class NeuralForward(Operator):
         model_op: The neural emulator `Operator`. Loaded by
             content-hash from a model registry in typical use.
         dt: The (fixed) integration step the emulator was trained for.
-        state_signature: Optional `pipekit.Signature` for the state.
+        state_signature: Optional `pipekit_ops.Signature` for the state.
 
     Raises:
         TypeError: if ``model_op`` isn't an `Operator`.

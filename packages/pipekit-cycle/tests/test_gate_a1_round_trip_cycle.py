@@ -18,8 +18,6 @@ from typing import Any
 
 import pipekit_cycle
 import pytest
-from pipekit import Operator, StatefulOperator
-from pipekit.testing import assert_round_trip, public_operators
 from pipekit_cycle import (
     CompositeForward,
     CompositeObs,
@@ -35,6 +33,8 @@ from pipekit_cycle import (
     SmootherCycle,
     WindowedCycle,
 )
+from pipekit_ops import Operator, StatefulOperator
+from pipekit_ops.testing import assert_round_trip, public_operators
 
 
 class _Grow(StatefulOperator):

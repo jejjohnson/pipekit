@@ -1,7 +1,7 @@
 # A tour of the core
 
-*Everything in `pipekit`, group by group: what it is, when to reach for it,
-and what it does today.*
+*Everything in `pipekit-ops` (import `pipekit_ops`), group by group: what it is,
+when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
 fifty names in thirteen modules, one module per job, so you can learn it a
@@ -38,7 +38,7 @@ in `pipekit-cycle`, training in `pipekit-train`, the model registry in
 The examples share one small operator:
 
 ```python
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 class Scale(Operator):
@@ -76,11 +76,11 @@ supplies the rest:
   between backends silently.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 
 Scale(2.0).state
 # → {'module': '__main__', 'class': 'Scale', 'config': {'factor': 2.0}}
-pk.loads(pk.dumps(Scale(2.0)))   # → Scale(factor=2.0)
+pk.loads(pk.dumps(Scale(2.0)))  # → Scale(factor=2.0)
 ```
 
 ### `Sequential`
@@ -92,12 +92,12 @@ indexing and slicing, a Keras-style `summary(signature)` and a `describe()`
 tree, and the empty `Sequential` is the identity.
 
 ```python
-from pipekit import Sequential, Signature
+from pipekit_ops import Sequential, Signature
 
 pipe = Scale(0.5) | Scale(2.0) | Scale(3.0)
-pipe(10.0)         # → 30.0
-len(pipe)          # → 3
-pipe[1:]           # → Sequential([Scale(factor=2.0), Scale(factor=3.0)])
+pipe(10.0)  # → 30.0
+len(pipe)  # → 3
+pipe[1:]  # → Sequential([Scale(factor=2.0), Scale(factor=3.0)])
 Sequential([])(7)  # → 7
 
 print(pipe.summary(Signature(dims=(("y", 4), ("x", 4)), dtype="float32")))
@@ -117,15 +117,15 @@ in topological order. Inputs bind by keyword or by position; outputs come
 back as a dict.
 
 ```python
-from pipekit import Graph, Input, Lambda
+from pipekit_ops import Graph, Input, Lambda
 
 a, b = Input("a"), Input("b")
-s = Scale(2.0)(a)                                     # s = 2a
+s = Scale(2.0)(a)  # s = 2a
 total = Lambda(lambda u, v: u + v, name="add")(s, b)  # s + b
 
 g = Graph(inputs={"a": a, "b": b}, outputs={"s": s, "sum": total})
-g(a=1.0, b=10.0)   # → {'s': 2.0, 'sum': 12.0}
-g(1.0, 10.0)       # → the same; positional arguments bind in declaration order
+g(a=1.0, b=10.0)  # → {'s': 2.0, 'sum': 12.0}
+g(1.0, 10.0)  # → the same; positional arguments bind in declaration order
 ```
 
 A single-input graph composes into a `Sequential`
@@ -175,19 +175,19 @@ Decisions and failures as steps inside the pipeline, rather than `if` and
 | `Retry(op, attempts, base_delay, on)` | retry on `on`; attempt *i* waits `base_delay · 2^(i−1)` |
 
 ```python
-from pipekit import Coalesce, Const, Lambda, Retry, Try
+from pipekit_ops import Coalesce, Const, Lambda, Retry, Try
 
 
 def down(_):
     raise IOError("down")
 
 
-Try(Lambda(down), Const(0.0), on=(IOError,))(1.0)    # → 0.0
+Try(Lambda(down), Const(0.0), on=(IOError,))(1.0)  # → 0.0
 Coalesce(
     [Lambda(down), Const(-1), Const(5)],
-    is_ok=lambda r: r > 0,                            # -1 fails the check
-    on=(IOError,),                                    # down() falls through
-)(0)                                                  # → 5
+    is_ok=lambda r: r > 0,  # -1 fails the check
+    on=(IOError,),  # down() falls through
+)(0)  # → 5
 Retry(flaky, attempts=5, base_delay=0.0, on=(ConnectionError,))(42)
 # → 42, where flaky is an operator that raises ConnectionError twice, then succeeds
 ```
@@ -213,12 +213,12 @@ operators you place in the pipeline come from `.at()` and `.wrap()`, and the
 data they collect lives on the controller.
 
 ```python
-from pipekit import Histogram, Lambda, Profile, Snapshot
+from pipekit_ops import Histogram, Lambda, Profile, Snapshot
 
 snap, prof, hist = Snapshot(), Profile(), Histogram(bins=2)
 pipe = Lambda(lambda v: [v, 2 * v], name="pair") | snap.at("mid") | hist.at("out")
-pipe(1.0)                   # → [1.0, 2.0]
-snap.captures               # → {'mid': [1.0, 2.0]}
+pipe(1.0)  # → [1.0, 2.0]
+snap.captures  # → {'mid': [1.0, 2.0]}
 prof.wrap(Scale(3.0))(2.0)  # → 6.0;  prof.report() → {'Scale': {'calls': 1.0, ...}}
 ```
 
@@ -228,9 +228,9 @@ prof.wrap(Scale(3.0))(2.0)  # → 6.0;  prof.report() → {'Scale': {'calls': 1.
 their outputs:
 
 ```python
-from pipekit import Fanout, Lambda
+from pipekit_ops import Fanout, Lambda
 
-Fanout({"n": Lambda(len), "u": Lambda(str.upper)})("ab")   # → {'n': 2, 'u': 'AB'}
+Fanout({"n": Lambda(len), "u": Lambda(str.upper)})("ab")  # → {'n': 2, 'u': 'AB'}
 ```
 
 ## Caching
@@ -242,12 +242,14 @@ bookkeeping is thread-safe, so one `Cache` can be shared by `ThreadMap`
 workers.
 
 ```python
-from pipekit import Cache, Memoize
+from pipekit_ops import Cache, Memoize
 
 c = Cache(Scale(2.0))
-c(1.0); c(1.0); c(2.0)
-c.hits, c.misses    # → (1, 2)
-Memoize is Cache    # → True
+c(1.0)
+c(1.0)
+c(2.0)
+c.hits, c.misses  # → (1, 2)
+Memoize is Cache  # → True
 ```
 
 ## Quality control
@@ -264,7 +266,7 @@ becomes a permanent guard.
 | `AssertCallable(predicate, message=…)` | raise `QCError` if a predicate fails | yes |
 
 ```python
-AssertShape((2, 4))(x)   # x.shape == (2, 3)
+AssertShape((2, 4))(x)  # x.shape == (2, 3)
 # QCError: AssertShape: axis 1 expected 4, got 3 (expected=(2, 4), actual=(2, 3)).
 ```
 
@@ -283,11 +285,11 @@ signature by overriding `compute_output_signature`; returning `None` means
 it.
 
 ```python
-from pipekit import Signature
+from pipekit_ops import Signature
 
 sig = Signature(dims=(("time", 12), ("y", 256), ("x", 256)), dtype="float32")
-sig.format()                  # → '(time=12, y=256, x=256) float32'
-sig.drop_dims(("time",))      # → Signature((y=256, x=256) float32)
+sig.format()  # → '(time=12, y=256, x=256) float32'
+sig.drop_dims(("time",))  # → Signature((y=256, x=256) float32)
 sig.replace_dims({"x": 128})  # → Signature((time=12, y=256, x=128) float32)
 ```
 
@@ -304,7 +306,7 @@ gets its operator's signature only when the inputs agree; otherwise it shows
 `?`:
 
 ```python
-from pipekit import Graph, Input, Operator
+from pipekit_ops import Graph, Input, Operator
 
 
 class MeanOver(Operator):
@@ -345,12 +347,12 @@ list in input order.
 | Batches | GPU inference, vectorised code | the inner operator takes a *list* of items | `BatchedMap(op, batch_size=8, flatten=True)` |
 
 ```python
-from pipekit import AsyncMap, BatchedMap, Lambda, ThreadMap
+from pipekit_ops import AsyncMap, BatchedMap, Lambda, ThreadMap
 
-ThreadMap(Scale(2.0), n_workers=2)([1, 2, 3])             # → [2.0, 4.0, 6.0]
+ThreadMap(Scale(2.0), n_workers=2)([1, 2, 3])  # → [2.0, 4.0, 6.0]
 add_up = Lambda(lambda b: [sum(b)], name="sum")
-BatchedMap(add_up, batch_size=2)([1, 2, 3, 4, 5])         # → [3, 7, 5]
-AsyncMap(Scale(2.0), semaphore=2)([1, 2])                 # → [2.0, 4.0]
+BatchedMap(add_up, batch_size=2)([1, 2, 3, 4, 5])  # → [3, 7, 5]
+AsyncMap(Scale(2.0), semaphore=2)([1, 2])  # → [2.0, 4.0]
 ```
 
 **Pickling.** Process pools need every operator to pickle, and closures
@@ -360,10 +362,10 @@ random generators do not. Operators that hold a closure carry
 however deeply nested, and returns the flagged operators before you fan out:
 
 ```python
-from pipekit import Branch, Cache, Identity, Tap, ThreadMap, check_pickleable
+from pipekit_ops import Branch, Cache, Identity, Tap, ThreadMap, check_pickleable
 
 pipe = ThreadMap(Cache(Scale(2.0) | Tap(print) | Branch(bool, Identity())))
-[type(op).__name__ for op in check_pickleable(pipe)]   # → ['Tap', 'Branch']
+[type(op).__name__ for op in check_pickleable(pipe)]  # → ['Tap', 'Branch']
 ```
 
 **Async.** `AsyncMap(...)(items)` drives its own event loop, so it works in
@@ -372,7 +374,7 @@ scripts. Inside a running loop (a FastAPI or LitServe handler) it raises a
 
 ```python
 async def handler(items):
-    return await AsyncMap(Scale(2.0)).run(items)   # → [2.0, 4.0] for [1, 2]
+    return await AsyncMap(Scale(2.0)).run(items)  # → [2.0, 4.0] for [1, 2]
 ```
 
 **Deliberately left out.** No automatic parallelism (`Sequential` is
@@ -399,15 +401,15 @@ and every class is checked before anything is constructed. Nothing is
 allowed by default, pipekit's own containers included.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 
 pk.dumps(pk.Const(3))
-# → '{"class": "Const", "config": {"value": 3}, "module": "pipekit.blocks"}'
-pk.loads(pk.dumps(Scale(2.0)))             # → Scale(factor=2.0)
-pk.loads_sandboxed(pk.dumps(Scale(2.0)))   # PermissionError: not registered
+# → '{"class": "Const", "config": {"value": 3}, "module": "pipekit_ops.blocks"}'
+pk.loads(pk.dumps(Scale(2.0)))  # → Scale(factor=2.0)
+pk.loads_sandboxed(pk.dumps(Scale(2.0)))  # PermissionError: not registered
 pk.register(Scale)
-pk.loads_sandboxed(pk.dumps(Scale(2.0)))   # → Scale(factor=2.0)
-pk.loads(pk.dumps(pk.Lambda(abs)))         # RuntimeError: marked forbid_in_yaml
+pk.loads_sandboxed(pk.dumps(Scale(2.0)))  # → Scale(factor=2.0)
+pk.loads(pk.dumps(pk.Lambda(abs)))  # RuntimeError: marked forbid_in_yaml
 ```
 
 Nested pipelines round-trip too. A child operator appears in its parent's
@@ -418,12 +420,12 @@ record, so two pipelines share a hash exactly when they are configured the
 same:
 
 ```python
-from pipekit import Cache, Retry, Sequential, ThreadMap, pipeline_hash
+from pipekit_ops import Cache, Retry, Sequential, ThreadMap, pipeline_hash
 
 pipe = ThreadMap(Cache(Retry(Scale(2.0), attempts=3, base_delay=0.5, on=(OSError,))))
 back = pk.loads(pk.dumps(pipe))
-back.state == pipe.state                      # → True
-pipeline_hash(back) == pipeline_hash(pipe)    # → True
+back.state == pipe.state  # → True
+pipeline_hash(back) == pipeline_hash(pipe)  # → True
 
 pk.register(Sequential)
 pk.loads_sandboxed(pk.dumps(Sequential([Scale(2.0), pk.Identity()])))
@@ -450,27 +452,27 @@ A streaming mean: after values x₁, …, xₙ the state is the running sum
 Sₙ = ∑ᵢ xᵢ = Sₙ₋₁ + xₙ and the count n, and the step emits x̄ₙ = Sₙ / n.
 
 ```python
-from pipekit import CarryState, StatefulOperator
+from pipekit_ops import CarryState, StatefulOperator
 
 
 class MeanState(CarryState):
     def __init__(self, total: float, n: int) -> None:
         self.total = total  # Sₙ = ∑ᵢ xᵢ
-        self.n = n          # n
+        self.n = n  # n
 
 
 class StreamMean(StatefulOperator):
     def _apply(self, x, state):
         st = MeanState(state.total + x, state.n + 1)  # Sₙ = Sₙ₋₁ + xₙ;  n ← n + 1
-        return st.total / st.n, st                    # x̄ₙ = Sₙ / n
+        return st.total / st.n, st  # x̄ₙ = Sₙ / n
 
 
-pipe = Scale(1.0) | StreamMean()                    # a stateless step, then a stateful one
-x_bar, st = pipe(4.0, state=MeanState(0.0, 0))      # x̄₁ = 4.0
-x_bar, st = pipe(8.0, state=st)                     # x̄₂ = 6.0
-st                                                  # → MeanState(total=12.0, n=2)
-MeanState.from_dict(st.to_dict()) == st             # → True
-pipe(4.0)   # TypeError: ... called without a `state` argument
+pipe = Scale(1.0) | StreamMean()  # a stateless step, then a stateful one
+x_bar, st = pipe(4.0, state=MeanState(0.0, 0))  # x̄₁ = 4.0
+x_bar, st = pipe(8.0, state=st)  # x̄₂ = 6.0
+st  # → MeanState(total=12.0, n=2)
+MeanState.from_dict(st.to_dict()) == st  # → True
+pipe(4.0)  # TypeError: ... called without a `state` argument
 ```
 
 A `Graph` threads state the same way. Call it with `state=` and it returns
@@ -478,12 +480,12 @@ A `Graph` threads state the same way. Call it with `state=` and it returns
 topological order (the order `describe()` lists):
 
 ```python
-from pipekit import Graph, Input
+from pipekit_ops import Graph, Input
 
 x = Input("x")
 g = Graph(inputs={"x": x}, outputs={"mean": StreamMean()(Scale(1.0)(x))})
-out, st = g(x=4.0, state=MeanState(0.0, 0))   # out == {"mean": 4.0}
-out, st = g(x=8.0, state=st)                  # out == {"mean": 6.0}
+out, st = g(x=4.0, state=MeanState(0.0, 0))  # out == {"mean": 4.0}
+out, st = g(x=8.0, state=st)  # out == {"mean": 6.0}
 ```
 
 `pipekit-cycle`'s `Cycle`, `DACycle` and `EnsembleDACycle` and

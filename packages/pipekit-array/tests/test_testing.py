@@ -9,9 +9,9 @@ from typing import Any
 import numpy as np
 import pipekit_array as pa
 import pytest
-from pipekit import Sequential, Signature, register_adapter, unregister_adapter
 from pipekit_array import DimArray, DimArrayAdapter, ISel, KernelOp, KernelSpec, Reduce
 from pipekit_array.testing import check_adapter, check_kernel_op
+from pipekit_ops import Sequential, Signature, register_adapter, unregister_adapter
 
 
 def normalized_difference(a: Any, b: Any, eps: float) -> Any:

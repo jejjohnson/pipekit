@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pipekit import Operator, Sequential, StatefulOperator
-from pipekit._base.operator import nested_config
+from pipekit_ops import Operator, Sequential, StatefulOperator
+from pipekit_ops._base.operator import nested_config
 
 from pipekit_cycle.protocols import ForwardModel
 

@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any
 
-from pipekit.hashing import sha256_hex, stable_json
+from pipekit_ops.hashing import sha256_hex, stable_json
 
 from pipekit_evaluate.benchmark.protocols import Scorer
 from pipekit_evaluate.benchmark.reference import ReferenceSource

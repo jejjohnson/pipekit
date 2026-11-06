@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 pytest.importorskip("equinox")

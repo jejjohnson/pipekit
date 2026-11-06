@@ -10,8 +10,8 @@ from typing import Any
 import numpy as np
 import pipekit_array as pa
 import pytest
-from pipekit import NamedArrayAdapter, get_adapter
 from pipekit_array import BackendError, DimArray, KernelOp, KernelSpec
+from pipekit_ops import NamedArrayAdapter, get_adapter
 
 
 xr = pytest.importorskip("xarray")

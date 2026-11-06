@@ -55,13 +55,13 @@ import jax.numpy as jnp
 import pipekit_jax  # registers Sequential / Graph as pytrees
 from jax.flatten_util import ravel_pytree
 from jax.scipy.optimize import minimize
-from pipekit import Graph, Input, Operator, Sequential, StatefulOperator
+from pipekit_ops import Graph, Input, Operator, Sequential, StatefulOperator
 from pipekit_jax import EnsembleScanCycle, JaxOperator, Rollout, ScanCycle
 from pipekit_jax.testing import check_jax_operator
 
 N = 64
-DX, DT = 1.0 / N, 2e-4          # explicit-diffusion limit: κ·Δt/Δx² ≤ ½
-x = jnp.arange(N) * DX           # [N]
+DX, DT = 1.0 / N, 2e-4  # explicit-diffusion limit: κ·Δt/Δx² ≤ ½
+x = jnp.arange(N) * DX  # [N]
 
 
 class Laplacian(JaxOperator):
@@ -134,7 +134,7 @@ def make_step(kappa, lam):
     u = Input("u")
     tendency = LinComb(coeffs=[kappa, -lam])(Laplacian(dx=DX)(u), u)
     graph = Graph(inputs={"u": u}, outputs={"u": Euler(dt=DT)(u, tendency)})
-    return Sequential([graph, Pick("u")])        # u[N] → u[N]
+    return Sequential([graph, Pick("u")])  # u[N] → u[N]
 ```
 
 Because `pipekit_jax` registers `Sequential` and `Graph` as pytrees,
@@ -149,9 +149,9 @@ and returns the trajectory every `save_every` steps. Compile time does
 not grow with `n_steps`.
 
 ```python
-u0 = jnp.exp(-((x - 0.5) ** 2) / 0.005)                      # [N]
+u0 = jnp.exp(-((x - 0.5) ** 2) / 0.005)  # [N]
 truth = Rollout(step=make_step(0.05, 2.0), n_steps=500, save_every=50)
-obs = eqx.filter_jit(truth)(u0)                               # [11, N]
+obs = eqx.filter_jit(truth)(u0)  # [11, N]
 assert obs.shape == (11, N)
 ```
 
@@ -176,7 +176,7 @@ the trajectory itself holds every step.
 ```python
 model = Rollout(step=make_step(0.02, 0.5), n_steps=500, save_every=50, checkpoint=True)
 params, static = eqx.partition(model, eqx.is_inexact_array)
-theta0, unravel = ravel_pytree(params)                         # [κ, −λ]
+theta0, unravel = ravel_pytree(params)  # [κ, −λ]
 
 
 def misfit(theta):
@@ -186,7 +186,7 @@ def misfit(theta):
 
 result = minimize(misfit, theta0, method="BFGS")
 kappa, minus_lam = result.x
-print(f"κ = {kappa:.4f}, λ = {-minus_lam:.4f}")              # κ = 0.0500, λ = 2.0000
+print(f"κ = {kappa:.4f}, λ = {-minus_lam:.4f}")  # κ = 0.0500, λ = 2.0000
 assert abs(kappa - 0.05) < 1e-3 and abs(-minus_lam - 2.0) < 1e-2
 ```
 
@@ -230,9 +230,9 @@ fitted = eqx.combine(unravel(result.x), static)
 cycle = ScanCycle(step_op=Advance(step=fitted.step), n_steps=500)
 ensemble = EnsembleScanCycle(cycle=cycle)
 
-centres = jnp.linspace(0.3, 0.7, 32)                                    # [M]
-members = jnp.exp(-((x[None, :] - centres[:, None]) ** 2) / 0.005)      # [M, N]
-forecast, _ = eqx.filter_jit(ensemble)(members, None)                   # [M, N]
+centres = jnp.linspace(0.3, 0.7, 32)  # [M]
+members = jnp.exp(-((x[None, :] - centres[:, None]) ** 2) / 0.005)  # [M, N]
+forecast, _ = eqx.filter_jit(ensemble)(members, None)  # [M, N]
 assert forecast.shape == (32, N)
 ```
 
@@ -242,7 +242,7 @@ assert forecast.shape == (32, N)
 |---|---|
 | `Graph` topology, `Sequential` dispatch, `Operator.__call__` | traced away — zero runtime cost |
 | operator fields (`JaxOperator`) | leaves (arrays) or static config |
-| plain `pipekit.Operator` instances | opaque leaves — static under `eqx.filter_*` |
+| plain `pipekit_ops.Operator` instances | opaque leaves — static under `eqx.filter_*` |
 | `pipekit_cycle.Cycle` loop | **unrolled** — use `ScanCycle` / `Rollout` |
 | `Cycle.history` list | side effect in traced code — use `ScanCycle.run` |
 | `Fanout`, `Branch`, `Switch`, `Cache`, parallel maps | not registered as pytrees yet |

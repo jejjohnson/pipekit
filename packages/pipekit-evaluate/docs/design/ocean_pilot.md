@@ -158,7 +158,7 @@ The two arrows that the ladder scores hardest:
 | Rung | Ocean realisation | Package / symbol |
 |------|-------------------|------------------|
 | (1) simple model | QG / SWM forward run = the truth GCM-lite (`.integrate()` / `.step()`); built and run from a scenario | `somax.models.BarotropicQG` (state `q`, `.diagnose()→psi,u,v`); `somax-sim run` with a scenario (`double_gyre`, `gulf_stream`, …) |
-| forward bridge | the `somax` model as a `pipekit_cycle.ForwardModel` / `pipekit.Operator` | `somax.da.SomaxForwardModel`, `somax.operators.SomaxModelOp` |
+| forward bridge | the `somax` model as a `pipekit_cycle.ForwardModel` / `pipekit_ops.Operator` | `somax.da.SomaxForwardModel`, `somax.operators.SomaxModelOp` |
 | obs operator | ψ→SSH (`η=f0/g·ψ`), advected SST/SSS/OC, geostrophic (u,v); sparse sampling + gaps + noise | `xrtoolz.ocn` ops + `somax.da.SubsampleObs` as `ObservationOperator`s |
 | (2) model-based inference (**oracle**) | Strong-4DVar with the `somax` model as the dynamical constraint; or exact GP for the static-prior analysis sub-task | `vardax` `Strong4DVar` via `pipekit_cycle.AnalysisStep` (fed by `somax.da.SomaxForwardModel`); `gaussx`/`pyrox` exact GP |
 | (3) emulator | resolution-invariant neural surrogate of the `somax` forward | `geonnax.FNO` / `geonnax.SFNO`, trained via `pipekit-train` + `pipekit-jax` (`JaxModelOp`); wrap as `pipekit_cycle.NeuralForward` |

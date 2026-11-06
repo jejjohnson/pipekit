@@ -27,7 +27,7 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
-from pipekit import CarryState, Operator, StatefulOperator
+from pipekit_ops import CarryState, Operator, StatefulOperator
 
 from pipekit_train.loop import TrainingLoop
 
@@ -109,7 +109,7 @@ class SweepResult:
 
     Attributes:
         params: The parameter dict that produced this trial.
-        trained_model_op: The trained `pipekit.Operator` returned by
+        trained_model_op: The trained `pipekit_ops.Operator` returned by
             the trial's `TrainingLoop.run`.
         artifact: The trial's `TrainingArtifact` (or `_LocalArtifact`
             fallback when `pipekit-experiment` is absent).

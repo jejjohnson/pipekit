@@ -159,39 +159,50 @@ protocols, so a benchmark task is assembled from the same parts a
 @runtime_checkable
 class Task(Protocol):
     """One scenario: prior + simulator + obs operator + reference data."""
+
     name: str
-    domain: str                      # "plume" | "ocean" | "land" | "fusion" | ...
+    domain: str  # "plume" | "ocean" | "land" | "fusion" | ...
 
     def prior(self) -> Distribution: ...
-    def simulator(self) -> ForwardModel: ...        # rung 1 (pipekit-cycle)
+    def simulator(self) -> ForwardModel: ...  # rung 1 (pipekit-cycle)
     def observation_operator(self) -> ObservationOperator: ...
-    def datasets(self) -> Mapping[str, Any]: ...     # L0..L4 products by key
+    def datasets(self) -> Mapping[str, Any]: ...  # L0..L4 products by key
+
 
 @runtime_checkable
 class Estimator(Protocol):
     """Any rung that maps observations -> estimate/posterior."""
-    rung: int                        # 2 | 4 | 5
-    def fit(self, task: Task) -> "Estimator": ...    # no-op for rung 2
+
+    rung: int  # 2 | 4 | 5
+
+    def fit(self, task: Task) -> "Estimator": ...  # no-op for rung 2
     def __call__(self, obs: Any) -> "Estimate": ...
+
 
 class Estimate(Protocol):
     """A point and/or a posterior. Scorers branch on what's present."""
+
     def point(self) -> Any: ...
-    def sample(self, n: int, *, key=None) -> Any: ...     # None if point-only
-    def log_prob(self, theta: Any) -> Any: ...            # optional
+    def sample(self, n: int, *, key=None) -> Any: ...  # None if point-only
+    def log_prob(self, theta: Any) -> Any: ...  # optional
+
 
 @runtime_checkable
 class Oracle(Protocol):
     """The designated reference Estimator for a task (usually rung 2)."""
+
     def reference_for(self, task: Task) -> Estimator: ...
+
 
 @dataclass
 class Benchmark:
     """Runs the level × rung × complexity cube and scores each cell vs its reference."""
+
     task: Task
     estimators: Sequence[Estimator]
-    scorers: Sequence["Scorer"]      # from the Unit × Lens taxonomy
-    reference: Estimator             # default: task oracle
+    scorers: Sequence["Scorer"]  # from the Unit × Lens taxonomy
+    reference: Estimator  # default: task oracle
+
     # -> writes a pipekit_experiment.Run per cell
     def run(self) -> "BenchmarkReport": ...
 ```

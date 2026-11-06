@@ -6,8 +6,8 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import NamedArrayAdapter, Signature, get_adapter
 from pipekit_array import DimArray, DimArrayAdapter
+from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
 
 BANDS = ("B11", "B12")

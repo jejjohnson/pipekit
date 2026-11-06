@@ -56,12 +56,12 @@ negligible at the operator granularity pipekit-array works at.
 
 **Decision:** `pipekit-array.observe.Histogram` ships its own
 controller with `to_array=lambda x: xp.reshape(x, (-1,))` as the
-default. `pipekit.observe.Histogram` keeps its `to_array: Callable`
+default. `pipekit_ops.observe.Histogram` keeps its `to_array: Callable`
 constructor argument for the generic case.
 
 **Alternatives considered:**
 
-- **Add Array API logic to `pipekit.observe.Histogram`** — rejected:
+- **Add Array API logic to `pipekit_ops.observe.Histogram`** — rejected:
   pipekit core has no third-party deps, by rule. The Array API import
   would couple core to a sister library's domain.
 - **Make `pipekit-array.Histogram` a subclass.** Rejected: the two
@@ -101,14 +101,14 @@ operator can't be generic, it doesn't belong here.
 **Decision:** `pipekit-array.parallel.BatchedMap(op, batch_size=8,
 axis=0)` splits the input array along `axis`, applies `op` to each
 chunk, and concatenates the results back along `axis`. It is
-**distinct from** `pipekit.parallel.BatchedMap`, which takes an
+**distinct from** `pipekit_ops.parallel.BatchedMap`, which takes an
 iterable and applies `op` to each item.
 
 The two coexist; users pick by carrier shape:
 
 | `op` input type      | Use                              |
 | -------------------- | -------------------------------- |
-| iterable of carriers | `pipekit.parallel.BatchedMap`    |
+| iterable of carriers | `pipekit_ops.parallel.BatchedMap`    |
 | single large array   | `pipekit_array.parallel.BatchedMap` |
 
 **Rationale:** Same name, different problem. The iterable version is
@@ -186,7 +186,7 @@ pipekit-array's dep cone.
 `pipekit-array.ModelOp` from `loop.run()`; the Equinox adapter
 returns `EquinoxModelOp` (in-package, no round-trip) or
 `pipekit-jax.JaxModelOp` (full round-trip) per user choice. The
-contract is "the returned op is a `pipekit.Operator`"; the specific
+contract is "the returned op is a `pipekit_ops.Operator`"; the specific
 class differs by backend.
 
 ## A9. Named carriers: `DimArray`, through pipekit's adapter registry
@@ -196,7 +196,7 @@ class differs by backend.
 It is what a geo carrier becomes when a kernel consumes one of its
 spatial dims (per-column statistics consume `row` and keep `col`), and
 the carrier for tests and for libraries with none of their own. Its
-adapter, `DimArrayAdapter`, is registered with `pipekit.register_adapter`
+adapter, `DimArrayAdapter`, is registered with `pipekit_ops.register_adapter`
 on import and is the reference adapter every other one is tested
 against.
 

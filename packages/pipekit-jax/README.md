@@ -1,8 +1,15 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-jax/logo-dark.svg">
+    <img alt="pipekit-jax" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-jax/logo-light.svg" width="339">
+  </picture>
+</p>
+
 # pipekit-jax
 
 JAX / Equinox carrier integration for `pipekit`:
 
-- **`JaxModelOp`** — wraps an `eqx.Module` as a `pipekit.Operator`,
+- **`JaxModelOp`** — wraps an `eqx.Module` as a `pipekit_ops.Operator`,
   with `serialize_weights` / `with_weights` / `from_registry` methods
   so trained weights round-trip byte-identically through any
   `pipekit_experiment.ModelRegistry` via the registry's `weights` blob.
@@ -11,7 +18,7 @@ JAX / Equinox carrier integration for `pipekit`:
 - **`to_diffrax_adjoint` / `truncated_scan`** — JAX-side interpreters
   for the carrier-agnostic adjoint specs in `pipekit_cycle.adjoints`.
 - **`JaxOperator`** — base class for operators that are both a
-  `pipekit.Operator` and an `eqx.Module` (JSON config, pytree leaves,
+  `pipekit_ops.Operator` and an `eqx.Module` (JSON config, pytree leaves,
   weight round trip); `pipekit_jax.testing.check_jax_operator` asserts
   the contract in downstream test suites.
 - **`ScanCycle` / `EnsembleScanCycle` / `Rollout`** — `jax.lax.scan`-based time stepping:
@@ -22,7 +29,7 @@ JAX / Equinox carrier integration for `pipekit`:
   O(n / save_every + save_every). The ensemble form `vmap`s a cycle
   over members. Walkthrough: `docs/tutorials/pipekit-under-jit.md`.
 - **Pytree containers** — importing `pipekit_jax` registers
-  `pipekit.Sequential`, `pipekit.Graph` and `JaxModelOp` as JAX pytrees,
+  `pipekit_ops.Sequential`, `pipekit_ops.Graph` and `JaxModelOp` as JAX pytrees,
   so gradients reach learnable leaves on operators inside a pipeline.
 
 `JaxModelOp` is the public successor to the in-package
@@ -44,10 +51,12 @@ mlp = eqx.nn.MLP(in_size=2, out_size=2, width_size=32, depth=2, key=jax.random.k
 op = JaxModelOp(mlp)
 
 # Serialise weights for storage:
-weights = op.serialize_weights()       # bytes — eqx.tree_serialise_leaves
+weights = op.serialize_weights()  # bytes — eqx.tree_serialise_leaves
 
 # Reload weights into a fresh skeleton:
-fresh = JaxModelOp(eqx.nn.MLP(in_size=2, out_size=2, width_size=32, depth=2, key=jax.random.key(1)))
+fresh = JaxModelOp(
+    eqx.nn.MLP(in_size=2, out_size=2, width_size=32, depth=2, key=jax.random.key(1))
+)
 restored = fresh.with_weights(weights)
 # `restored.module` carries the original weights, byte-identical.
 ```

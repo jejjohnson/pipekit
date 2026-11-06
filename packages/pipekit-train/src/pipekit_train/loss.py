@@ -24,7 +24,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Protocol, runtime_checkable
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_train._signatures import accepts_keyword
 

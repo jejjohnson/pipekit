@@ -17,7 +17,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 def _assert_tree_allclose(actual: Any, expected: Any, what: str) -> None:

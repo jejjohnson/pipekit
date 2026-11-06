@@ -1,6 +1,6 @@
 """Generic observation operators.
 
-Each is a `pipekit.Operator` that also satisfies the
+Each is a `pipekit_ops.Operator` that also satisfies the
 `ObservationOperator` Protocol so it can be passed wherever a
 protocol-typed slot is expected (e.g. into `DACycle.obs_op`).
 
@@ -19,8 +19,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit import Operator
-from pipekit._base.operator import nested_config
+from pipekit_ops import Operator
+from pipekit_ops._base.operator import nested_config
 
 
 class IdentityObs(Operator):

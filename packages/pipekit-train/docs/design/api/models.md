@@ -6,7 +6,7 @@ version: 0.1.0
 # Layer 3 — Models (The Training Loop)
 
 `TrainingLoop` is the headline composable. It is a
-`pipekit.StatefulOperator` carrying `(model, opt_state, step, epoch,
+`pipekit_ops.StatefulOperator` carrying `(model, opt_state, step, epoch,
 metrics, rng)`. Running it produces `(trained_model_op,
 TrainingArtifact)`.
 
@@ -14,7 +14,7 @@ TrainingArtifact)`.
 
 ## `TrainerCarryState`
 
-The state threaded through the loop, subclass of `pipekit.CarryState`.
+The state threaded through the loop, subclass of `pipekit_ops.CarryState`.
 
 ```python
 class TrainerCarryState(CarryState):
@@ -112,13 +112,18 @@ class TrainingLoop(StatefulOperator):
     val_dataset: TrainingDataset | None = None
     loss: Loss | None = None
     task: Any | None = None
-    optimizer_config: dict[str, Any] = field(default_factory=lambda: {"name": "adamw", "lr": 3e-4})
+    optimizer_config: dict[str, Any] = field(
+        default_factory=lambda: {"name": "adamw", "lr": 3e-4}
+    )
     max_steps: int = 10_000
     steps_per_epoch: int | None = None
     batch_size: int = 32
     backend: Literal[
-        "equinox", "keras",
-        "numpyro-svi", "numpyro-mcmc", "blackjax",   # planned (Bayesian)
+        "equinox",
+        "keras",
+        "numpyro-svi",
+        "numpyro-mcmc",
+        "blackjax",  # planned (Bayesian)
     ] = "equinox"
     callbacks: tuple[Callback, ...] = ()
     metric_writer: MetricWriter | None = None
@@ -127,7 +132,9 @@ class TrainingLoop(StatefulOperator):
     checkpoint_dir: str | None = None
     seed: int = 0
 
-    def _apply(self, carrier: Any, state: TrainerCarryState | None) -> tuple[Any, TrainerCarryState]:
+    def _apply(
+        self, carrier: Any, state: TrainerCarryState | None
+    ) -> tuple[Any, TrainerCarryState]:
         """StatefulOperator hook — delegates to adapter.run + advances state."""
         ...
 
@@ -155,6 +162,7 @@ _BACKEND_MODULES = {
     "blackjax": "pipekit_train.adapters.blackjax",
 }
 
+
 def run(self):
     adapter = import_module(_BACKEND_MODULES[self.backend])
     trained_model_op, backend_info = adapter.run(self)
@@ -176,7 +184,7 @@ The adapter receives the full `TrainingLoop` and is responsible for:
 
 `TrainingLoop` itself fills these fields:
 
-- `training_pipeline_yaml` ← `pipekit.dumps(self)`
+- `training_pipeline_yaml` ← `pipekit_ops.dumps(self)`
 - `dataset_hash` ← `self.dataset.content_hash()`
 - `backend_info` ← `backend_info` from adapter
 - `deps_lock` ← best-effort capture of `uv.lock` or `pip freeze`
@@ -203,7 +211,7 @@ pretrain = TrainingLoop(model_op=base_model, dataset=large_unlabeled, ...)
 finetune = TrainingLoop(model_op=..., dataset=labeled, ...)
 
 # Sequential threads carry-state (including model) through both stages
-full = pipekit.Sequential([pretrain, finetune])
+full = pipekit_ops.Sequential([pretrain, finetune])
 trained_model_op, artifact = full.run()
 ```
 

@@ -12,8 +12,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import StatefulOperator
 from pipekit_jax import EnsembleScanCycle, JaxOperator, ScanCycle
+from pipekit_ops import StatefulOperator
 
 
 class Forced(StatefulOperator, JaxOperator):

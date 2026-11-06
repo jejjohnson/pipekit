@@ -42,7 +42,7 @@ Python with no dependencies and nothing in it is about geoscience.
 ## Quick start
 
 ```bash
-uv add "pipekit @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit"
+uv add "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops"
 uv add numpy jaxtyping
 ```
 
@@ -50,7 +50,7 @@ uv add numpy jaxtyping
 import numpy as np
 from jaxtyping import Float
 
-from pipekit import Graph, Input, Operator, Sequential, Tap, dumps, loads
+from pipekit_ops import Graph, Input, Operator, Sequential, Tap, dumps, loads
 
 # ── shapes ──
 # N  samples
@@ -260,17 +260,18 @@ script that runs as printed:
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/packages-dark.svg">
-    <img alt="The pipekit workspace: six sister packages (cycle, train, experiment, evaluate, array, jax) on the dependency-free pipekit core" src="docs/assets/packages-light.svg" width="100%">
+    <img alt="The pipekit workspace: six sister packages (cycle, train, experiment, evaluate, array, jax) on the dependency-free pipekit-ops core" src="docs/assets/packages-light.svg" width="100%">
   </picture>
 </p>
 
-A uv workspace of seven packages. Install only what you need: each one
-builds on the core and on none of the others, except `pipekit-jax` on
+A uv workspace of seven packages, plus the code-free `pipekit` umbrella
+that installs them all. Install only what you need: each one builds on
+the core (`pipekit-ops`) and on none of the others, except `pipekit-jax` on
 `pipekit-cycle`; tool integrations are opt-in extras.
 
 | Package | Status | What it gives you |
 |---|---|---|
-| `pipekit` | implemented | The core: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`), observers (`Tap`, `Snapshot`, `Profile`), `Cache`, QC asserts, parallel maps, JSON `dumps` / `loads`, `StatefulOperator` |
+| `pipekit-ops` | implemented | The core, imported as `pipekit_ops`: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`), observers (`Tap`, `Snapshot`, `Profile`), `Cache`, QC asserts, parallel maps, JSON `dumps` / `loads`, `StatefulOperator` |
 | `pipekit-cycle` | implemented | Time stepping and data assimilation: `Cycle`, `DACycle`, `EnsembleDACycle`, `SmootherCycle`, and the `ForwardModel`, `ObservationOperator` and `AnalysisStep` protocols |
 | `pipekit-train` | implemented | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends behind extras |
 | `pipekit-experiment` | implemented | A content-addressed model registry (`LocalModelRegistry`, `S3ModelRegistry`, keyed by a hash of config and weights) and tracker protocols, with DVC, Hydra, Metaflow and MLflow adapters |

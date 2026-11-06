@@ -5,7 +5,7 @@ combinators. The full v0.1 catalogue (12 operators) lands across
 phases A-D per `docs/design/boundaries.md` §4.
 
 Named arrays: `DimArray` (data, dims, labels) and its reference
-adapter `DimArrayAdapter`, registered with `pipekit.register_adapter`
+adapter `DimArrayAdapter`, registered with `pipekit_ops.register_adapter`
 on import.
 
 Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
@@ -33,13 +33,13 @@ Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
 carrier; `BackendError` for mixed or unsupported backends.
 
 xarray (``[xarray]``): the ``xr.DataArray`` adapter, `pipekit_array.xarray`,
-loads lazily the first time a DataArray reaches `pipekit.get_adapter`, so
+loads lazily the first time a DataArray reaches `pipekit_ops.get_adapter`, so
 importing pipekit-array never imports xarray.
 """
 
 from __future__ import annotations
 
-from pipekit import register_adapter, register_lazy_adapter
+from pipekit_ops import register_adapter, register_lazy_adapter
 
 from pipekit_array._namespace import array_namespace
 from pipekit_array.batching import Padded, batch

@@ -16,7 +16,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pipekit_jax  # noqa: F401  (registers the containers)
-from pipekit import Graph, Input, Operator, Sequential
+from pipekit_ops import Graph, Input, Operator, Sequential
 
 
 class Scale(Operator, eqx.Module):
@@ -218,7 +218,7 @@ def test_vmap_over_a_leaf_of_the_pipeline():
 def test_pipekit_core_does_not_import_jax():
     code = (
         "import sys, pipekit\n"
-        "from pipekit import Sequential, Identity\n"
+        "from pipekit_ops import Sequential, Identity\n"
         "Sequential([Identity()])(1)\n"
         "assert 'jax' not in sys.modules, 'pipekit core imported jax'\n"
     )

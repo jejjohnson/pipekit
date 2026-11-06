@@ -9,7 +9,7 @@ carrier like the input with `pipekit_array.from_rows`:
                                          feature_dim="component") ──>
         (time, component, y, x)
 
-It satisfies `pipekit.FittableTransformer`: ``fit`` returns the operator
+It satisfies `pipekit_ops.FittableTransformer`: ``fit`` returns the operator
 with ``estimator_`` and ``layout_`` set, and ``transform`` (and
 ``predict``, ``predict_proba``, ``inverse_transform``) only read them. Fitting
 and applying run on the host: scikit-learn computes on NumPy, so a dask
@@ -37,7 +37,7 @@ import dataclasses
 from typing import Any, ClassVar, Literal, Self
 
 import numpy as np
-from pipekit import Operator, backend_of
+from pipekit_ops import Operator, backend_of
 
 from pipekit_array.dims import adapter_of
 from pipekit_array.rows import RowLayout, from_rows, to_rows

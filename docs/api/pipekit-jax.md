@@ -10,8 +10,8 @@ adjoint interpreters `to_diffrax_adjoint` / `truncated_scan`.
 
 ## Pytree containers
 
-Importing `pipekit_jax` registers `pipekit.Sequential`,
-`pipekit.Graph` and `JaxModelOp` as JAX pytrees, so `jax.grad` / `eqx.filter_grad` /
+Importing `pipekit_jax` registers `pipekit_ops.Sequential`,
+`pipekit_ops.Graph` and `JaxModelOp` as JAX pytrees, so `jax.grad` / `eqx.filter_grad` /
 `jax.vmap` see through a pipeline to the leaves of the operators it
 holds.
 
@@ -19,7 +19,7 @@ holds.
 
 ## JaxOperator
 
-Base class for operators that are both a `pipekit.Operator` and an
+Base class for operators that are both a `pipekit_ops.Operator` and an
 `eqx.Module`: JSON-safe config, pytree leaves, and the weight-blob
 round trip. Use `check_jax_operator` in a library's test suite to
 assert the contract (eager ≡ jit, batching, visible leaves, a config

@@ -45,8 +45,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pipekit import Operator
-from pipekit.hashing import pipeline_hash, sha256_hex, stable_json
+from pipekit_ops import Operator
+from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_json
 
 
 class HashMismatchError(ValueError):

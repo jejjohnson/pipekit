@@ -27,11 +27,11 @@ operator picks its backend from the input.
 
 [array-api]: https://data-apis.org/array-api/
 
-What's *missing* from pipekit core is a place for these operators to
-live. `pipekit.qc` deliberately stays carrier-agnostic — its
+What's *missing* from pipekit-ops is a place for these operators to
+live. `pipekit_ops.qc` deliberately stays carrier-agnostic — its
 docstring is explicit that numeric checks (`AssertValueRange`,
 `AssertNoNaN`) "live in sister libraries (Report 3,
-`pipekit-array`)". `pipekit.observe.Histogram` ships a generic
+`pipekit-array`)". `pipekit_ops.observe.Histogram` ships a generic
 controller with a user-supplied `to_array` adapter; `pipekit-array`
 ships the carrier-aware version where `to_array` defaults to the
 Array API's flatten path. The boundary is already drawn; this package
@@ -49,14 +49,14 @@ installed for the input's type). Operators themselves construct
 without needing any backend — that's the whole point of dispatching
 on the input.
 
-Three conceptual layers, all on top of `pipekit.Operator`:
+Three conceptual layers, all on top of `pipekit_ops.Operator`:
 
 - **Data-flow operators** — `ApplyToBands`, `StackAlong`,
   `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchedMap`
   (array-shaped), `Histogram` (carrier-aware controller). The
   combinators and reducers that show up in every array pipeline.
 - **Numeric QC** — `Diff`, `AssertValueRange`, `AssertNoNaN`,
-  `AssertValidFraction`. The numeric-content checks `pipekit.qc`
+  `AssertValidFraction`. The numeric-content checks `pipekit_ops.qc`
   refused to write because they need to look inside the array.
 - **Inference** — `ModelOp(model, method="__call__", batch_size=None)`.
   Framework-agnostic inference; the trained-model wrapper that the
@@ -82,7 +82,7 @@ array-carrier setting:
   immutability is the strict constraint that drives the design. No
   in-place mutation, ever.
 - **Carrier-aware controllers over carrier-agnostic ones.** Where
-  `pipekit.observe.Histogram` takes a `to_array` callable for
+  `pipekit_ops.observe.Histogram` takes a `to_array` callable for
   flexibility, `pipekit-array.Histogram` defaults `to_array` to
   `xp.reshape(x, (-1,))` — the right thing for arrays. The carrier
   layer can make assumptions the core can't.
@@ -118,9 +118,9 @@ array-carrier setting:
 └────────────────────────────────────────────────────┘
 ```
 
-- **Below**: `pipekit` core. No internal deps; no third-party
+- **Below**: `pipekit-ops` core. No internal deps; no third-party
   imports. pipekit-array adds no new framework primitives — its
-  operators are vanilla `pipekit.Operator` subclasses.
+  operators are vanilla `pipekit_ops.Operator` subclasses.
 - **Above**: domain libraries (`geotoolz`, `xr_toolz`, future
   `xr_toolz`-style remote-sensing or ocean libraries). They re-export
   pipekit-array operators with carrier-specific defaults; they don't
@@ -167,7 +167,7 @@ These are explicitly considered and rejected for the v0.1 scope.
   cleanly. Live with it; if a user needs JAX-traceable pipelines they
   reach for `pipekit-jax` (a separate package).
 - **A new framework primitive.** pipekit-array adds zero new base
-  classes. Every operator is `class Foo(pipekit.Operator)` with an
+  classes. Every operator is `class Foo(pipekit_ops.Operator)` with an
   `_apply` method.
 - **DataFrame / pandas operators.** Not array-shaped; doesn't fit
   the Array API. Defer indefinitely.

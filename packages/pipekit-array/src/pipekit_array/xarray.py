@@ -1,8 +1,8 @@
 """The ``xr.DataArray`` adapter (``pipekit-array[xarray]``).
 
 Registered lazily: importing pipekit-array never imports xarray; the
-adapter loads the first time a DataArray reaches `pipekit.get_adapter`
-(`pipekit.register_lazy_adapter`). This module is the only place
+adapter loads the first time a DataArray reaches `pipekit_ops.get_adapter`
+(`pipekit_ops.register_lazy_adapter`). This module is the only place
 pipekit-array imports xarray.
 
 - **Exact coordinates.** `XarrayAdapter.check_compatible` aligns with
@@ -27,7 +27,7 @@ from typing import Any
 
 import numpy as np
 import xarray as xr
-from pipekit import Signature, get_adapter, register_adapter
+from pipekit_ops import Signature, get_adapter, register_adapter
 
 from pipekit_array.dimarray import DimArray
 from pipekit_array.dims import check_index_labels
@@ -38,7 +38,7 @@ __all__ = ["XarrayAdapter", "from_xarray", "register"]
 
 
 class XarrayAdapter:
-    """The `pipekit.NamedArrayAdapter` for ``xr.DataArray``, with native fast paths."""
+    """The `pipekit_ops.NamedArrayAdapter` for ``xr.DataArray``, with fast paths."""
 
     # -- the protocol ----------------------------------------------------
 

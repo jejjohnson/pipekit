@@ -29,7 +29,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
-from pipekit import NamedArrayAdapter, Signature, get_adapter
+from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
 from pipekit_array import dims as _dims
 from pipekit_array.dimarray import DimArray

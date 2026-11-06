@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from pipekit_train.adapters import bayes
 

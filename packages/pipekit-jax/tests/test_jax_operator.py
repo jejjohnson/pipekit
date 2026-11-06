@@ -15,10 +15,10 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Graph, Input, Operator, Sequential
 from pipekit_jax import JaxOperator
 from pipekit_jax.operator import jsonable
 from pipekit_jax.testing import check_jax_operator
+from pipekit_ops import Graph, Input, Operator, Sequential
 
 
 class Diffuse(JaxOperator):
@@ -271,7 +271,7 @@ class Holds(JaxOperator):
     inner: JaxOperator
 
     def get_config(self):
-        from pipekit._base.operator import nested_config
+        from pipekit_ops._base.operator import nested_config
 
         return {"inner": nested_config(self.inner)}
 
@@ -396,7 +396,7 @@ class Branches(JaxOperator):
     right: JaxOperator
 
     def get_config(self):
-        from pipekit._base.operator import nested_config
+        from pipekit_ops._base.operator import nested_config
 
         return {
             "branches": {
@@ -467,7 +467,7 @@ class HoldsWithBias(JaxOperator):
     bias: jax.Array
 
     def get_config(self):
-        from pipekit._base.operator import nested_config
+        from pipekit_ops._base.operator import nested_config
 
         return {"inner": nested_config(self.inner), "bias": jsonable(self.bias)}
 
@@ -541,7 +541,7 @@ class GraphHolder(JaxOperator):
 
 
 def _scale_graph(chain: bool):
-    from pipekit import Graph, Input
+    from pipekit_ops import Graph, Input
 
     # Same nodes, outputs, leaf count and shapes; only the wiring differs.
     x = Input("x")

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from pipekit import Lambda, Sequential, StatefulOperator
 from pipekit_cycle import (
     Cycle,
     EnsembleCycle,
     Recurrence,
     WindowedCycle,
 )
+from pipekit_ops import Lambda, Sequential, StatefulOperator
 
 
 def test_cycle_advances_n_steps(AddOneStateful_cls, SimpleState_cls):
@@ -94,7 +94,7 @@ def test_windowed_cycle_stride_skip(AddOneStateful_cls, SimpleState_cls):
 
 
 def test_recurrence_stops_on_condition(AddOneStateful_cls, SimpleState_cls):
-    from pipekit import Lambda
+    from pipekit_ops import Lambda
 
     # Stop once state.count >= 5.
     stop_cond = Lambda(lambda s: s.count >= 5)
@@ -106,7 +106,7 @@ def test_recurrence_stops_on_condition(AddOneStateful_cls, SimpleState_cls):
 
 
 def test_recurrence_hits_max_iters(AddOneStateful_cls, SimpleState_cls):
-    from pipekit import Lambda
+    from pipekit_ops import Lambda
 
     never_stop = Lambda(lambda s: False)
     rec = Recurrence(AddOneStateful_cls(), condition_op=never_stop, max_iters=3)

@@ -27,8 +27,8 @@ pytest.importorskip("orbax.checkpoint")
 
 import equinox as eqx
 import jax
-from pipekit import Operator
 from pipekit_cycle import Cycle, NeuralForward
+from pipekit_ops import Operator
 from pipekit_train import MSE, SimulationDataset, TrainingLoop
 from pipekit_train.adapters.equinox import EquinoxModelOp
 
@@ -118,7 +118,7 @@ def test_simulation_dataset_train_emulator_handoff_into_cycle():
     )
     trained_op, artifact = loop.run()
 
-    # 5. The trained model is a pipekit.Operator that satisfies the
+    # 5. The trained model is a pipekit_ops.Operator that satisfies the
     #    contract `NeuralForward` expects.
     assert isinstance(trained_op, Operator)
 

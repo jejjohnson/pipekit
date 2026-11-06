@@ -78,7 +78,7 @@ def test_stack_items_is_stack_without_a_fast_path() -> None:
 
 
 def test_stack_items_uses_the_adapter_fast_path() -> None:
-    from pipekit import get_adapter, register_adapter, unregister_adapter
+    from pipekit_ops import get_adapter, register_adapter, unregister_adapter
 
     class Tagged(DimArray):
         pass

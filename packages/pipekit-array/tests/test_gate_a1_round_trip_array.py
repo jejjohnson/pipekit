@@ -14,8 +14,6 @@ from typing import Any
 
 import pipekit_array
 import pytest
-from pipekit import Operator
-from pipekit.testing import assert_round_trip, public_operators
 from pipekit_array import (
     ArgReduce,
     ConcatenateAlong,
@@ -28,6 +26,8 @@ from pipekit_array import (
     TakeAlong,
     Transpose,
 )
+from pipekit_ops import Operator
+from pipekit_ops.testing import assert_round_trip, public_operators
 
 
 np = pytest.importorskip("numpy")

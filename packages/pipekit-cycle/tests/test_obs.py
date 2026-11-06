@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Operator
 from pipekit_cycle import (
     CallableObs,
     CompositeObs,
@@ -11,6 +10,7 @@ from pipekit_cycle import (
     LinearObs,
     ObservationOperator,
 )
+from pipekit_ops import Operator
 
 
 def test_identity_obs_returns_input():

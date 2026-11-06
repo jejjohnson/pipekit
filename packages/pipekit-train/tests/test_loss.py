@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pipekit import Lambda
+from pipekit_ops import Lambda
 from pipekit_train import KL, MSE, NLL, Composite, Loss
 from pipekit_train.loss import call_loss
 
@@ -181,7 +181,7 @@ def test_composite_get_config_surfaces_components():
 
 
 def test_losses_are_operators():
-    from pipekit import Operator
+    from pipekit_ops import Operator
 
     assert isinstance(MSE(), Operator)
     assert isinstance(NLL(), Operator)

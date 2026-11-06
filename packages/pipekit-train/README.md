@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-train/logo-dark.svg">
+    <img alt="pipekit-train" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-train/logo-light.svg" width="373">
+  </picture>
+</p>
+
 # pipekit-train
 
 > **Status — v0.0 / planning only.** This package is scaffolded for
@@ -7,7 +14,7 @@
 Planned: training pipelines for emulators and amortized inference. A
 thin orchestration layer over existing training tools (Equinox+Optax,
 Keras 3), not a fourth training-loop
-implementation. Trained models are first-class `pipekit.Operator`s
+implementation. Trained models are first-class `pipekit_ops.Operator`s
 that drop into inference pipelines.
 
 Three training shapes, one framework:

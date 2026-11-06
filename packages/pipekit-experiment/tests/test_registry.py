@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pipekit import Const, Identity, Operator
 from pipekit_experiment import LocalModelRegistry, ModelRegistry
+from pipekit_ops import Const, Identity, Operator
 
 
 def test_local_registry_creates_root(tmp_path):
@@ -213,8 +213,8 @@ def test_hash_framing_unchanged():
     """`pipeline_hash` reproduces the registry's original framing exactly."""
     import hashlib
 
-    from pipekit import Identity
-    from pipekit.hashing import pipeline_hash, stable_json
+    from pipekit_ops import Identity
+    from pipekit_ops.hashing import pipeline_hash, stable_json
 
     op = Identity()
     h = hashlib.sha256()
@@ -231,8 +231,8 @@ def test_hash_framing_unchanged():
 
 def test_store_returns_pipeline_hash(tmp_path):
     """What the registry stores under is what `pipeline_hash` computes."""
-    from pipekit import Identity
-    from pipekit.hashing import pipeline_hash
+    from pipekit_ops import Identity
+    from pipekit_ops.hashing import pipeline_hash
 
     registry = LocalModelRegistry(tmp_path)
     op = Identity() | Identity()
@@ -273,9 +273,9 @@ def registry_and_writer(request, tmp_path):
 def _sequential() -> Operator:
     pytest.importorskip("numpy")
     pytest.importorskip("pipekit_array")
-    from pipekit import Cache, Fanout
-    from pipekit.qc import AssertShape
     from pipekit_array import MeanScalar
+    from pipekit_ops import Cache, Fanout
+    from pipekit_ops.qc import AssertShape
 
     return (
         Identity()
@@ -288,9 +288,9 @@ def _sequential() -> Operator:
 def _graph() -> Operator:
     pytest.importorskip("numpy")
     pytest.importorskip("pipekit_array")
-    from pipekit import Graph, Input
-    from pipekit.qc import AssertShape
     from pipekit_array import MeanScalar
+    from pipekit_ops import Graph, Input
+    from pipekit_ops.qc import AssertShape
 
     x = Input("x")
     checked = AssertShape((4, 3))(x)
@@ -315,7 +315,7 @@ def test_registry_round_trip_keeps_hash_and_outputs(
     registry_and_writer, build, weights
 ):
     import numpy as np
-    from pipekit.hashing import pipeline_hash
+    from pipekit_ops.hashing import pipeline_hash
 
     reg, _ = registry_and_writer
     op = build()
@@ -338,7 +338,7 @@ def test_registry_load_rejects_tampered_content(registry_and_writer, target):
         # A valid state for a different pipeline: it would load silently.
         tampered = _sequential()
         tampered.operators[1] = type(tampered.operators[1])((5, 3))
-        from pipekit.hashing import stable_json
+        from pipekit_ops.hashing import stable_json
 
         write_raw(stable_json(tampered.state).encode(), h, target)
     else:

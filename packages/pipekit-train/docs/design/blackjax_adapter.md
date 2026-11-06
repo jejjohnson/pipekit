@@ -58,7 +58,7 @@ model once, switch the MCMC engine by flipping `backend="numpyro-mcmc"` ↔
 > minibatch SG-MCMC) through the same `TrainingLoop` I use for everything
 > else: per-step diagnostics (acceptance, energy, divergences) streamed to
 > my writer, checkpointable sampler state, early stopping, and a
-> `pipekit.Operator` + `TrainingArtifact` at the end.*
+> `pipekit_ops.Operator` + `TrainingArtifact` at the end.*
 
 Two personas:
 
@@ -213,28 +213,29 @@ as in the Equinox and NumPyro adapters.
 @dataclass
 class BlackjaxTask:
     """A BlackJAX inference target (loop.task for backend='blackjax')."""
+
     # Either supply a raw target + initial position …
-    logdensity_fn: Callable | None = None    # position -> log p(position)  (full-batch)
+    logdensity_fn: Callable | None = None  # position -> log p(position)  (full-batch)
     init_position: Any = None
-    predict_fn: Callable | None = None       # (params, x) -> prediction (raw path)
+    predict_fn: Callable | None = None  # (params, x) -> prediction (raw path)
     # … or derive everything from a NumPyro model (the shared bridge):
     # logdensity_fn, init_position, the constrain map, a grad estimator,
     # and the Predictive op are all built from the model.
     numpyro_task: NumpyroTask | None = None
 
     sampler: Literal["nuts", "mclmc", "hmc", "sgld", "sghmc"] = "nuts"
-    num_warmup: int = 1000                    # full-batch: window_adaptation steps;
-                                              # SG-MCMC: burn-in transitions to discard
-    num_chains: int = 1                       # vmapped chains
+    num_warmup: int = 1000  # full-batch: window_adaptation steps;
+    # SG-MCMC: burn-in transitions to discard
+    num_chains: int = 1  # vmapped chains
     num_integration_steps: int | None = None  # required for hmc + sghmc
     # SG-MCMC (sgld / sghmc): the gradient is a *minibatch* estimate, not a
     # full logdensity_fn. Supply a grad estimator + a step size (BlackJAX's
     # sgld/sghmc are built from the estimator; the step takes the minibatch
     # and the step size per transition).
-    grad_estimator: Callable | None = None    # (position, (x, y)) -> grad logpost
-    step_size: float | Callable[[int], float] = 1e-3   # constant or schedule
-    predictive_site: str = "obs"              # for the NumPyro-model path
-    predictive_samples: int = 200             # thinned posterior draws used
+    grad_estimator: Callable | None = None  # (position, (x, y)) -> grad logpost
+    step_size: float | Callable[[int], float] = 1e-3  # constant or schedule
+    predictive_site: str = "obs"  # for the NumPyro-model path
+    predictive_samples: int = 200  # thinned posterior draws used
 ```
 
 Exactly one task **source** must be set: `numpyro_task` (which derives all of
@@ -337,47 +338,60 @@ from pipekit_train import TrainingLoop, IterableDataset
 from pipekit_train.adapters.bayes import NumpyroTask
 from pipekit_train.adapters.blackjax import BlackjaxTask
 
+
 def model(x, y=None):
     w = numpyro.sample("w", dist.Normal(0.0, 1.0))
     b = numpyro.sample("b", dist.Normal(0.0, 1.0))
     sigma = numpyro.sample("sigma", dist.HalfNormal(1.0))
     numpyro.sample("obs", dist.Normal(w * x[..., 0] + b, sigma), obs=y)
 
+
 dataset = IterableDataset(source=pairs, content_hash="linreg-64")
 
 # --- BlackJAX NUTS on a NumPyro model (same model, different engine) ------
 loop = TrainingLoop(
-    model_op=...,                       # ignored; the task carries the model
+    model_op=...,  # ignored; the task carries the model
     dataset=dataset,
     backend="blackjax",
-    task=BlackjaxTask(numpyro_task=NumpyroTask(model), sampler="nuts",
-                      num_warmup=1000, predictive_site="obs"),
-    max_steps=1000,                     # = posterior draws
+    task=BlackjaxTask(
+        numpyro_task=NumpyroTask(model),
+        sampler="nuts",
+        num_warmup=1000,
+        predictive_site="obs",
+    ),
+    max_steps=1000,  # = posterior draws
     seed=0,
 )
 predictive_op, artifact = loop.run()
 artifact.backend_info["mean_acceptance"], artifact.backend_info["num_divergences"]
-y_hat = predictive_op(x_new)            # posterior-predictive mean of "obs"
+y_hat = predictive_op(x_new)  # posterior-predictive mean of "obs"
+
 
 # --- BlackJAX SGLD on a raw target (minibatch MCMC) -----------------------
-def grad_estimator(theta, batch):       # minibatch grad of the log-posterior
+def grad_estimator(theta, batch):  # minibatch grad of the log-posterior
     x, y = batch
     ...
+
+
 loop_sgld = TrainingLoop(
-    model_op=...,                       # ignored; the task carries the target
+    model_op=...,  # ignored; the task carries the target
     dataset=dataset,
     backend="blackjax",
-    task=BlackjaxTask(grad_estimator=grad_estimator, init_position=theta0,
-                      sampler="sgld", step_size=1e-4,
-                      predict_fn=lambda th, x: th["w"] * x[..., 0] + th["b"]),
+    task=BlackjaxTask(
+        grad_estimator=grad_estimator,
+        init_position=theta0,
+        sampler="sgld",
+        step_size=1e-4,
+        predict_fn=lambda th, x: th["w"] * x[..., 0] + th["b"],
+    ),
     max_steps=5000,
-    batch_size=128,                     # _BatchSource feeds the minibatch grad
+    batch_size=128,  # _BatchSource feeds the minibatch grad
     seed=0,
 )
 samples_op, _ = loop_sgld.run()
 ```
 
-Both ops are ordinary `pipekit.Operator`s — they compose into inference
+Both ops are ordinary `pipekit_ops.Operator`s — they compose into inference
 pipelines and round-trip through the model registry like any trained model
 (D7), identically to the NumPyro adapters' outputs.
 

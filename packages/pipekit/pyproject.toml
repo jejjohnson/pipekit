@@ -1,7 +1,7 @@
 [project]
 name = "pipekit"
 version = "0.1.5"
-description = "Carrier-agnostic operator-graph framework for composable scientific pipelines."
+description = "The pipekit workspace in one install: pipekit-ops, -array, -cycle, -experiment, -evaluate, -train and -jax."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
@@ -19,7 +19,20 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-dependencies = []
+# The umbrella holds no code: it installs the seven packages, each imported
+# under its own name (pipekit_ops, pipekit_array, pipekit_cycle, …).
+# Libraries should depend on the package they import, not on this one:
+# pipekit-ops alone has no third-party dependencies.
+# Lower bounds only: workspace siblings released in lockstep.
+dependencies = [
+    "pipekit-ops>=0.1.5",
+    "pipekit-array>=0.0.9",
+    "pipekit-cycle>=0.0.4",
+    "pipekit-experiment>=0.0.5",
+    "pipekit-evaluate>=0.1.1",
+    "pipekit-train>=0.1.5",
+    "pipekit-jax>=0.0.6",
+]
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/pipekit"

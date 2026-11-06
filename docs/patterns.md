@@ -42,7 +42,7 @@ workaround), **missing** (needs code that does not exist yet).
 The snippets share one small operator, a detector with a threshold:
 
 ```python
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 class Threshold(Operator):
@@ -70,16 +70,19 @@ times a step, `Snapshot` keeps a copy of an intermediate, and `Tap` calls any
 function on it. The object you explored with is the object you batch.
 
 ```python
-from pipekit import Profile, ShapeTrace, Snapshot, Tap
+from pipekit_ops import Profile, ShapeTrace, Snapshot, Tap
 
 snap, prof = Snapshot(), Profile()
 explore = (
-    clean | ShapeTrace() | snap.at("clean")   # log shape and dtype, keep a copy
-    | features | Tap(plot)                    # look at the features
-    | prof.wrap(model)                        # time the model
+    clean
+    | ShapeTrace()
+    | snap.at("clean")  # log shape and dtype, keep a copy
+    | features
+    | Tap(plot)  # look at the features
+    | prof.wrap(model)  # time the model
 )
-batch = clean | features | model             # the same steps, no observers
-snap.captures["clean"], prof.report()        # what the exploration saw
+batch = clean | features | model  # the same steps, no observers
+snap.captures["clean"], prof.report()  # what the exploration saw
 ```
 
 **Today.** All of it. `ShapeTrace(extra=...)` adds a line for whatever else a
@@ -98,7 +101,7 @@ Run `check_pickleable(pipeline)` before fanning out: closures do not cross
 process boundaries.
 
 **Today.** All of it. `log_and_continue` reports each failure as a warning,
-with its traceback, on the `pipekit.parallel` logger, so the run's logging
+with its traceback, on the `pipekit_ops.parallel` logger, so the run's logging
 setup decides where failures go.
 
 ### 3. Validation as operators
@@ -127,7 +130,7 @@ the nodes it needs, and the outputs are named. Steps that take two carriers
 (`_apply(self, a, b)`) are ordinary operators.
 
 ```python
-from pipekit import Graph, Input
+from pipekit_ops import Graph, Input
 
 a, b = Input("a"), Input("b")
 fused = Align()(a, b)
@@ -214,11 +217,11 @@ registry = LocalModelRegistry(tempfile.mkdtemp())
 v1 = registry.store(Threshold(k=3.0), name="detector-candidate")
 v2 = registry.store(Threshold(k=2.5), name="detector-candidate")
 
-registry.tag(v1, "detector", force=True)   # v1 in service
-registry.tag(v2, "detector", force=True)   # promote v2
-registry.load("detector")                  # → Threshold(k=2.5)
-registry.tag(v1, "detector", force=True)   # roll back
-registry.store(Threshold(k=3.0)) == v1     # → True: same config, same hash
+registry.tag(v1, "detector", force=True)  # v1 in service
+registry.tag(v2, "detector", force=True)  # promote v2
+registry.load("detector")  # → Threshold(k=2.5)
+registry.tag(v1, "detector", force=True)  # roll back
+registry.store(Threshold(k=3.0)) == v1  # → True: same config, same hash
 ```
 
 **Today.** All of it.
@@ -236,14 +239,14 @@ tree is checked before anything is built, and anything unregistered raises
 deserialise, registered or not.
 
 ```python
-import pipekit as pk
+import pipekit_ops as pk
 from pipekit_experiment.adapters.hydra import HydraConfigLoader
 
 pk.register(pk.Sequential)
 pk.register(Threshold)
 
 text = """
-_target_: pipekit.Sequential
+_target_: pipekit_ops.Sequential
 operators:
   - _target_: __main__.Threshold
     k: 2.0
@@ -292,7 +295,7 @@ with the same pipeline and input finds its output and skips; a change to
 either gives a new key.
 
 ```python
-from pipekit import pipeline_hash
+from pipekit_ops import pipeline_hash
 
 
 def task_key(op: Operator, input_id: str) -> str:
@@ -321,10 +324,10 @@ the *distribution* of the differences, not only their mean: two versions can
 agree on average and disagree badly on the inputs that matter.
 
 ```python
-from pipekit import Fanout
+from pipekit_ops import Fanout
 
 ab = Fanout({"a": Threshold(k=3.0), "b": Threshold(k=2.5)})
-ab(2.8)   # → {'a': False, 'b': True}
+ab(2.8)  # → {'a': False, 'b': True}
 ```
 
 **Partly.** The side-by-side run ships; a diff of two pipelines'
@@ -366,7 +369,7 @@ sister packages, each in one place.
 | Concern | Lives in |
 |---|---|
 | Operators, composition, parallel maps, nested JSON, the sandbox allowlist | `pipekit` |
-| `pipeline_hash` and the hashing primitives | `pipekit.hashing` |
+| `pipeline_hash` and the hashing primitives | `pipekit_ops.hashing` |
 | Content-addressed storage, tags, artifacts, YAML loading | `pipekit-experiment` |
 | Training loops and backends | `pipekit-train` |
 | Time stepping and assimilation | `pipekit-cycle` |

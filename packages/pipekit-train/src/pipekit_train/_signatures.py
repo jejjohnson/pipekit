@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from pipekit import Lambda, Operator
+from pipekit_ops import Lambda, Operator
 
 
 def accepts_keyword(target: Any, name: str) -> bool:

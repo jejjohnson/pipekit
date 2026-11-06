@@ -11,7 +11,7 @@ checks, a branch, a second input, an observer and a summary).
 **Prerequisites:**
 
 ```bash
-uv add pipekit pipekit-array numpy jaxtyping
+uv add pipekit-ops pipekit-array numpy jaxtyping
 ```
 
 ![The anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs](../assets/graph-light.svg#only-light){ width="640" }
@@ -32,7 +32,7 @@ from typing import Any
 
 import numpy as np
 from jaxtyping import Bool, Float
-from pipekit import (
+from pipekit_ops import (
     AssertShape,
     Branch,
     Cache,
@@ -370,8 +370,8 @@ the graph.
 - **Change a setting, not the code.** Every operator keeps its
   configuration (`Threshold(k=3.0)`, `Composite(how="median")`), so a
   different threshold or composite is a constructor argument.
-- **Save an operator's configuration.** `pipekit.dumps(op)` writes any
-  operator's configuration as JSON; `pipekit.loads` rebuilds single
+- **Save an operator's configuration.** `pipekit_ops.dumps(op)` writes any
+  operator's configuration as JSON; `pipekit_ops.loads` rebuilds single
   operators (nested ones need a YAML or Hydra loader).
 
 ## Where next

@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 def _require_metaflow() -> Any:

@@ -1,7 +1,7 @@
 # pipekit-cycle
 
 Time-stepping, data assimilation, observation operators. Built on
-`pipekit.state` (the `StatefulOperator` + `CarryState` primitives in
+`pipekit_ops.state` (the `StatefulOperator` + `CarryState` primitives in
 pipekit core). Master plan reference: Report 10.
 
 ## Cycle wrappers

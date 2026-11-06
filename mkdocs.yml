@@ -32,7 +32,7 @@ plugins:
       handlers:
         python:
           paths:
-            - packages/pipekit/src
+            - packages/pipekit-ops/src
             - packages/pipekit-array/src
             - packages/pipekit-cycle/src
             - packages/pipekit-experiment/src
@@ -66,7 +66,7 @@ nav:
       - ETL over many regions: tutorials/etl-regions.md
       - Run pipelines under jit: tutorials/pipekit-under-jit.md
   - API Reference:
-      - pipekit: api/pipekit.md
+      - pipekit-ops: api/pipekit-ops.md
       - pipekit-array: api/pipekit-array.md
       - pipekit-cycle: api/pipekit-cycle.md
       - pipekit-experiment: api/pipekit-experiment.md

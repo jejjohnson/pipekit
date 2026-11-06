@@ -16,7 +16,7 @@ named carrier for tests and for libraries with none of their own
   attrs, and **does not do** alignment, arithmetic or selection by value;
   `DimArray.to_xarray` crosses to xarray when an analysis needs those.
 
-`DimArrayAdapter` is the reference `pipekit.NamedArrayAdapter`: the test
+`DimArrayAdapter` is the reference `pipekit_ops.NamedArrayAdapter`: the test
 kit (``pipekit_array.testing``) compares every other adapter against it.
 """
 
@@ -27,7 +27,7 @@ import numbers
 from collections.abc import Mapping
 from typing import Any
 
-from pipekit import Signature, on_import
+from pipekit_ops import Signature, on_import
 
 
 __all__ = ["DimArray", "DimArrayAdapter"]
@@ -194,7 +194,7 @@ def _index_labels(values: tuple[Any, ...], index: Any) -> tuple[Any, ...] | None
 
 
 class DimArrayAdapter:
-    """The reference `pipekit.NamedArrayAdapter`, for `DimArray`."""
+    """The reference `pipekit_ops.NamedArrayAdapter`, for `DimArray`."""
 
     def dims(self, x: DimArray) -> tuple[str, ...]:
         """``x.dims``."""

@@ -3,14 +3,14 @@
 Public surface:
 
 - `JaxOperator` — base class for operators that are both a
-  ``pipekit.Operator`` and an ``eqx.Module`` (JSON config, pytree
+  ``pipekit_ops.Operator`` and an ``eqx.Module`` (JSON config, pytree
   leaves, weight round trip). Contract checks live in
   `pipekit_jax.testing.check_jax_operator`.
 - `ScanCycle` / `EnsembleScanCycle` / `Rollout` — ``jax.lax.scan``-based
   time stepping: the jit-native counterpart of ``pipekit_cycle.Cycle``
   (history returned by ``ScanCycle.run``), its ``vmap``-ed ensemble form,
   and a carrier-only trajectory rollout.
-- `JaxModelOp` — wraps an ``eqx.Module`` as a ``pipekit.Operator``,
+- `JaxModelOp` — wraps an ``eqx.Module`` as a ``pipekit_ops.Operator``,
   with ``serialize_weights`` / ``with_weights`` / ``from_registry``
   methods so trained weights round-trip byte-identically through any
   ``pipekit_experiment.ModelRegistry`` via the registry's ``weights``
@@ -24,8 +24,8 @@ Public surface:
   `JaxOperator` whose array parameters are leaves (behind the
   ``[array]`` extra; imported lazily).
 
-Importing this package also registers ``pipekit.Sequential``,
-``pipekit.Graph`` and `JaxModelOp` as JAX pytrees (`pipekit_jax.pytree`),
+Importing this package also registers ``pipekit_ops.Sequential``,
+``pipekit_ops.Graph`` and `JaxModelOp` as JAX pytrees (`pipekit_jax.pytree`),
 so ``jax.grad`` / ``eqx.filter_grad`` reach the leaves of operators
 inside a pipeline.
 

@@ -16,6 +16,7 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 pipekit = { workspace = true }
+pipekit-ops = { workspace = true }
 pipekit-array = { workspace = true }
 pipekit-cycle = { workspace = true }
 pipekit-experiment = { workspace = true }
@@ -51,6 +52,7 @@ dev = [
     "fsspec>=2024.0",
     # Workspace members are dev-installed so tests can import them.
     "pipekit",
+    "pipekit-ops",
     "pipekit-array",
     "pipekit-cycle",
     "pipekit-experiment",
@@ -98,7 +100,7 @@ lines-after-imports = 2
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-testpaths = ["packages/pipekit/tests", "packages/pipekit-array/tests", "packages/pipekit-cycle/tests", "packages/pipekit-experiment/tests", "packages/pipekit-evaluate/tests", "packages/pipekit-train/tests", "packages/pipekit-jax/tests"]
+testpaths = ["packages/pipekit/tests", "packages/pipekit-ops/tests", "packages/pipekit-array/tests", "packages/pipekit-cycle/tests", "packages/pipekit-experiment/tests", "packages/pipekit-evaluate/tests", "packages/pipekit-train/tests", "packages/pipekit-jax/tests"]
 # Deselect slow / integration tests by default so the CI run is the fast
 # subset. Run the heavy ones explicitly: `pytest -m slow` / `-m integration`
 # (or override entirely with `-o addopts=`).
@@ -110,7 +112,7 @@ markers = [
 
 [tool.coverage.run]
 source = [
-    "packages/pipekit/src",
+    "packages/pipekit-ops/src",
     "packages/pipekit-array/src",
     "packages/pipekit-cycle/src",
     "packages/pipekit-experiment/src",

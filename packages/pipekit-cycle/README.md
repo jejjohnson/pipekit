@@ -1,10 +1,17 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-dark.svg">
+    <img alt="pipekit-cycle" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-light.svg" width="389">
+  </picture>
+</p>
+
 # pipekit-cycle
 
 Time-stepping, data-assimilation cycles, and the three structural
 protocols (`ForwardModel`, `ObservationOperator`, `AnalysisStep`) that
 algorithm libraries satisfy without importing pipekit-cycle itself.
 
-Built on `pipekit.state` (`StatefulOperator` + `CarryState` from
+Built on `pipekit_ops.state` (`StatefulOperator` + `CarryState` from
 pipekit core).
 
 ## Install
@@ -41,7 +48,7 @@ trajectory = forecast.history  # list of (carrier, state) per saved step
 ## Quickstart — DA cycle
 
 ```python
-from filterx.adapters.pipekit import EnKFAnalysis  # algorithm library
+from filterx.adapters.pipekit_ops import EnKFAnalysis  # algorithm library
 
 da = pc.EnsembleDACycle(
     forward_model=my_forward_model,

@@ -4,7 +4,7 @@ Training pipelines for emulators and amortized inference. A thin
 orchestration layer over existing training tools (Equinox+Optax
 ships as the v0.1 reference; a Keras adapter module is
 scaffolded for v0.3). Trained models are first-class
-`pipekit.Operator`s — they drop into inference pipelines (e.g.
+`pipekit_ops.Operator`s — they drop into inference pipelines (e.g.
 `pipekit_cycle.NeuralForward` for emulator handoff). Master plan
 reference: Report 11.
 

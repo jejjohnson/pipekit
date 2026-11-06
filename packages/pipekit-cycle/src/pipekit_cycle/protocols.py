@@ -44,7 +44,7 @@ class ForwardModel(Protocol):
     Members:
         step(state, dt): Return the state advanced by ``dt``.
         dt: Default integration step.
-        state_signature: Optional `pipekit.Signature` describing the
+        state_signature: Optional `pipekit_ops.Signature` describing the
             shape / dtype of the state carrier. ``None`` if the model
             doesn't track named dimensions.
     """
