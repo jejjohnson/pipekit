@@ -80,6 +80,15 @@ nav:
       - Bayesian — NumPyro NUTS: notebooks/pipekit_train_numpyro_mcmc.ipynb
       - Bayesian — BlackJAX NUTS: notebooks/pipekit_train_blackjax.ipynb
   - Design:
+      - pipekit-ops:
+          - Overview: design-ops/README.md
+          - Vision: design-ops/vision.md
+          - Operator catalogue: design-ops/api/README.md
+          - Execution: design-ops/api/execution.md
+          - Operators: design-ops/api/operators.md
+          - toolz parity: design-ops/toolz.md
+          - Decisions: design-ops/decisions.md
+          - Roadmap and gates: design-ops/roadmap.md
       - pipekit-train:
           - Overview: design-train/README.md
           - Vision: design-train/vision.md
