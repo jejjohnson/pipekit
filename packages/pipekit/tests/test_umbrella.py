@@ -45,3 +45,40 @@ def test_from_import_of_a_moved_name_raises_the_same_message() -> None:
 def test_an_unknown_name_is_still_an_attribute_error() -> None:
     with pytest.raises(AttributeError, match="no attribute 'NotAThing'"):
         pipekit.NotAThing  # noqa: B018
+
+
+#: the last release of each package that still imported `pipekit`
+LAST_BEFORE_PIPEKIT_OPS = {
+    "pipekit-array": (0, 0, 9),
+    "pipekit-cycle": (0, 0, 4),
+    "pipekit-experiment": (0, 0, 5),
+    "pipekit-evaluate": (0, 1, 1),
+    "pipekit-train": (0, 1, 5),
+    "pipekit-jax": (0, 0, 6),
+}
+
+
+def _workspace_requirements() -> list[tuple[str, str]]:
+    """``(owner, requirement)`` for every requirement on another workspace package."""
+    found = []
+    for path in sorted((ROOT / "packages").glob("*/pyproject.toml")):
+        project = tomllib.loads(path.read_text())["project"]
+        groups = [project.get("dependencies", [])]
+        groups += project.get("optional-dependencies", {}).values()
+        for requirements in groups:
+            for req in requirements:
+                if req.startswith("pipekit") and not req.startswith(project["name"]):
+                    found.append((project["name"], req))
+    return found
+
+
+@pytest.mark.parametrize(("owner", "requirement"), _workspace_requirements())
+def test_requirements_exclude_releases_that_import_pipekit(
+    owner: str, requirement: str
+) -> None:
+    name = requirement.split(">=")[0].split("[")[0]
+    assert ">=" in requirement, f"{owner}: {requirement} needs a lower bound"
+    bound = tuple(int(part) for part in requirement.split(">=")[1].split("."))
+    # pipekit-ops never shipped a release that imported `pipekit`
+    last = LAST_BEFORE_PIPEKIT_OPS.get(name, (0, 1, 5))
+    assert bound > last, f"{owner}: {requirement} still accepts {last}"

@@ -23,15 +23,16 @@ classifiers = [
 # under its own name (pipekit_ops, pipekit_array, pipekit_cycle, …).
 # Libraries should depend on the package they import, not on this one:
 # pipekit-ops alone has no third-party dependencies.
-# Lower bounds only: workspace siblings released in lockstep.
+# Lower bounds are each package's first release that imports pipekit_ops:
+# an older release still imports `pipekit` and breaks against this umbrella.
 dependencies = [
-    "pipekit-ops>=0.1.5",
-    "pipekit-array>=0.0.9",
-    "pipekit-cycle>=0.0.4",
-    "pipekit-experiment>=0.0.5",
-    "pipekit-evaluate>=0.1.1",
-    "pipekit-train>=0.1.5",
-    "pipekit-jax>=0.0.6",
+    "pipekit-ops>=0.2.0",
+    "pipekit-array>=0.1.0",
+    "pipekit-cycle>=0.1.0",
+    "pipekit-experiment>=0.1.0",
+    "pipekit-evaluate>=0.2.0",
+    "pipekit-train>=0.2.0",
+    "pipekit-jax>=0.1.0",
 ]
 
 [project.urls]

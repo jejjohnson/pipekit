@@ -10,7 +10,7 @@ license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 1 - Planning"]
-dependencies = ["pipekit-ops>=0.1.5"]
+dependencies = ["pipekit-ops>=0.2.0"]
 
 [project.optional-dependencies]
 # Backend training tools — pick one per training run.
@@ -35,8 +35,8 @@ blackjax  = ["blackjax>=1.2", "numpyro>=0.15", "optax>=0.2"]
 # Workspace-internal data sources / reproducibility integration.
 # `catalog` extra (geocatalog) lands once geocatalog publishes to PyPI;
 # see docs/design/api/datasets.md.
-cycle     = ["pipekit-cycle"]
-experiment = ["pipekit-experiment"]
+cycle     = ["pipekit-cycle>=0.1.0"]
+experiment = ["pipekit-experiment>=0.1.0"]
 
 # Disk-cache storage. All cache backends need `zarr` (lazy-imported
 # on first hit). The cloud-cache extras also pull in `fsspec` + the
