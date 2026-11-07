@@ -1,8 +1,9 @@
 """pipekit-array — Array API operators on top of pipekit.
 
-Phase A surface: namespace dispatch + reductions + stack/concat
-combinators. The full v0.1 catalogue (12 operators) lands across
-phases A-D per `docs/design/boundaries.md` §4.
+Operators: namespace dispatch, `MeanScalar`, `StackAlong` and
+`ConcatenateAlong` (phase A of `docs/design/boundaries.md` §4), plus
+`ApplyAlong` and `BatchAlong` below. The numeric QC asserts, the array
+`Histogram` and `ModelOp` of the v0.1 catalogue are not built yet.
 
 Named arrays: `DimArray` (data, dims, labels) and its reference
 adapter `DimArrayAdapter`, registered with `pipekit_ops.register_adapter`

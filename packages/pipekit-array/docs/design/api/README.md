@@ -3,36 +3,36 @@ status: draft
 version: 0.1.0
 ---
 
-# API — Operator Catalog
+# API: operator catalogue
 
-The v0.1 surface is 12 operators across 7 modules. The grouping
-mirrors `pipekit-ops` core where it makes sense
-(`combinators` ↔ `pipekit_ops.combine`, `qc` ↔ `pipekit_ops.qc`,
-`observe` ↔ `pipekit_ops.observe`, `parallel` ↔ `pipekit_ops.parallel`).
+The v0.1 plan is 12 operators across 7 modules.
+The grouping mirrors `pipekit-ops` core where it makes sense (`combinators` with `pipekit_ops.combine`, `qc` with `pipekit_ops.qc`, `observe` with `pipekit_ops.observe`, `batching` with `pipekit_ops.parallel`).
+Six of the 12 are built or replaced today; the QC family, `Histogram` and `ModelOp` are not built yet.
 
 ## At a glance
 
-| Module             | Operator                | One-liner                                                     |
-| ------------------ | ----------------------- | ------------------------------------------------------------- |
-| `dim_operators`    | `ApplyAlong`            | `inner` per item along a dim, stacked back; serialises (A15). |
-| `combinators`      | `StackAlong`            | `xp.stack` list-of-arrays along a new axis.                   |
-| `combinators`      | `ConcatenateAlong`      | `xp.concatenate` along an existing axis.                      |
-| `geom`             | `Subsample`             | Stride-decimate along given axes.                             |
-| `observe`          | `Histogram`             | Controller; `.at(key)` captures per-tap distributions.        |
-| `reductions`       | `MeanScalar`            | `xp.mean` reduction; optional `axis`.                         |
-| `batching`         | `BatchAlong`            | Split along a dim into chunks, apply `inner`, concatenate (A19). |
-| `qc`               | `AssertClose`           | Compare to a stored reference; raise on numeric drift (A21).  |
-| `qc`               | `AssertValueRange`      | Pass-through; raise/warn on out-of-range.                     |
-| `qc`               | `AssertNoNaN`           | Pass-through; raise on any NaN.                               |
-| `qc`               | `AssertValidFraction`   | Pass-through; raise if `< min_valid` non-NaN fraction.        |
-| `inference`        | `ModelOp`               | Framework-agnostic inference wrapper.                          |
+| Module | Operator | One-liner | Status |
+| --- | --- | --- | --- |
+| `dim_operators` | `ApplyAlong` | `inner` per item along a dim, stacked back; serialises (A15). | today |
+| `combinators` | `StackAlong` | `xp.stack` of a list along a new axis (`axis=`), or `stack` of named carriers (`dim=`). | today |
+| `combinators` | `ConcatenateAlong` | `xp.concat` along an existing axis (`axis=`), or `concat` of named carriers (`dim=`). | today |
+| `geom` | `Subsample` | Stride-decimate along given axes. | retired: `isel` with a stepped slice (A15) |
+| `observe` | `Histogram` | Controller; `.at(key)` captures per-tap distributions. | not built |
+| `reductions` | `MeanScalar` | `xp.mean` reduction; optional `axis`, `keepdims`. | today |
+| `batching` | `BatchAlong` | Split along a dim into chunks, apply `inner`, concatenate (A19). | today |
+| `qc` | `AssertClose` | Compare to a stored reference; raise on numeric drift (A21). | not built |
+| `qc` | `AssertValueRange` | Pass-through; raise or warn on out-of-range values. | not built |
+| `qc` | `AssertNoNaN` | Pass-through; raise on any NaN. | not built |
+| `qc` | `AssertValidFraction` | Pass-through; raise if the non-NaN fraction is `< min_valid`. | not built |
+| `inference` | `ModelOp` | Framework-agnostic inference wrapper. | not built |
+
+Beyond the catalogue, the package ships `batch` and `Padded` (A10), `to_rows` / `from_rows` and `Estimator` (OP-O3), the einx bridge `pipekit_array.einx` (OP-O2), `KernelSpec` / `KernelOp`, the xarray adapter and the test kit `pipekit_array.testing`.
 
 ## Named carriers: dim-level functions
 
-On any carrier with a registered `pipekit_ops.NamedArrayAdapter` (a `DimArray`,
-an `xr.DataArray`, a geoarray carrier), by dim name rather than axis.
-Each is a function in `dims` and, where it serialises, an operator in
-`dim_operators` (GA-Q3; geostack `docs/design/pipekit_kernels.md`).
+These run on any carrier with a registered `pipekit_ops.NamedArrayAdapter` (a `DimArray`, an `xr.DataArray`, a geoarray carrier), by dim name rather than axis.
+Each is a function in `dims` or one of the phase modules below, and, where it serialises, an operator in `dim_operators` (GA-Q3; geostack `docs/design/pipekit_kernels.md`).
+Every row ships today.
 
 | Function     | Operator    | Does                                                    |
 | ------------ | ----------- | ------------------------------------------------------- |
@@ -64,24 +64,19 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `quantile`   | `Quantile`  | quantiles over named dims; a list `q` adds a `quantile` dim (`dim_algebra`) |
 | `dot`        | `Dot`       | sum of a product over named dims; shared dims not summed are batch dims |
 
-All sixteen functions of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`, phase 3 in `dim_windows`, phase 4 in `dim_algebra`); the design page has the xarray parity table.
+All sixteen functions of **[dim_functions.md](dim_functions.md)** ship today: phase 1 in `dim_shapes` (#204), phase 2 in `dim_shifts` (#205), phase 3 in `dim_windows` (#206), phase 4 in `dim_algebra` (#207).
+The design page has the xarray parity table and the as-built notes.
 
-An adapter may override any of them with a method of the same name
-(xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one
-`jax.vmap`); the test kit proves the override equals the generic path.
+An adapter may override any of them with a method of the same name (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one `jax.vmap`).
+The test kit proves the override equals the generic path.
 
 ## Reading order
 
-1. **[operators.md](operators.md)** — the data-flow operators (the
-   combinators, the reducer, the carrier-shaped `BatchAlong`, the
-   `Histogram` controller, `Subsample`). The "what does the
-   pipeline do" surface.
-2. **[qc.md](qc.md)** — the numeric QC family. The "what does the
-   pipeline guard against" surface.
-3. **[inference.md](inference.md)** — `ModelOp`. The trained-model
-   wrapper that closes the train→serve loop for pipekit-train's
-   Lightning and Keras adapters.
+1. **[operators.md](operators.md)**: the data-flow operators (the combinators, the reducer, the carrier-shaped `BatchAlong`, the `Histogram` controller, `Subsample`).
+   This is the "what does the pipeline do" surface.
+2. **[qc.md](qc.md)**: the numeric QC family.
+   This is the "what does the pipeline guard against" surface.
+3. **[inference.md](inference.md)**: `ModelOp`, the trained-model wrapper that closes the train-to-serve loop for pipekit-train's Lightning and Keras adapters.
+4. **[dim_functions.md](dim_functions.md)**: the dim-level functions, their xarray parity and their testing gates.
 
-Each operator spec covers: constructor signature, `_apply` contract,
-`get_config()` shape, `compute_output_signature` behaviour (if
-non-trivial), per-backend caveats, and a one-or-two-line example.
+Each operator spec covers the constructor signature, the `_apply` contract, the `get_config()` shape, the `compute_output_signature` behaviour (if non-trivial), per-backend caveats, and a one- or two-line example.
