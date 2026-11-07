@@ -52,8 +52,14 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `broadcast_like` | `BroadcastLike` | add another carrier's missing dims, in front    |
 | `merge_dims` | `MergeDims` | `y x` into `pixel`, placed last; tuple labels          |
 | `split_dims` | `SplitDims` | `pixel` back into `y x`; tuple labels split back        |
+| `pad`        | `Pad`       | widen named dims; four modes (`dim_shifts`)             |
+| `roll`       | `Roll`      | cyclic shift; labels stay                               |
+| `shift`      | `Shift`     | shift with a fill; labels stay                          |
+| `diff`       | `Diff`      | n-th forward difference along a dim                     |
+| `cumreduce`  | `CumReduce` | cumulative function along a dim (the operator takes a name) |
+| `where`      | `Where`     | keep where a mask is True, aligned by dim name          |
 
-The first six of **[dim_functions.md](dim_functions.md)** ship today (phase 1, in `dim_shapes`); the rest (`pad`, `roll`, `shift`, `diff`, `cumreduce`, `where`, `window`, `coarsen`, `quantile`, `dot`) are proposed there, with an xarray parity table.
+The first twelve of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`); the rest (`window`, `coarsen`, `quantile`, `dot`) are proposed there, with an xarray parity table.
 
 An adapter may override any of them with a method of the same name
 (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one

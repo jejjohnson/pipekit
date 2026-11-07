@@ -76,7 +76,7 @@ mean: DimArray["band y x"] = reduce(cube, "mean", "time")
 Columns: the signature (keyword dims, `x` positional-only as in `isel`); the semantics; what the adapter must provide; JAX behaviour; status.
 "Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`dims.py`](../../../src/pipekit_array/dims.py)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py).
+Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py).
 
 ### 3.0 Labels on new or renamed dims
 
@@ -128,12 +128,12 @@ None reads a label; labels stay on their positions (xarray's default, `roll_coor
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `pad` | `pad(x, /, *, mode: str = "constant", constant_values: float \| None = None, **pad_width: int \| tuple[int, int])` | `xp.pad` on named dims. Modes: `constant`, `edge`, `reflect`, `wrap`. A padded dim loses its labels. | Generic: `xp.pad`, `rewrap` (which drops labels whose size changed). | jit, vmap safe; widths, `mode` static. | proposed |
-| `roll` | `roll(x, /, **shifts: int)` | Cyclic shift; labels stay. | Generic: `xp.roll`. | jit, vmap safe; a traced shift also works. | proposed |
-| `shift` | `shift(x, /, *, fill_value: float \| None = None, **shifts: int)` | Positive shifts move data to higher positions; vacated entries are `fill_value`. | Generic: `isel` slice, `xp.full`, `xp.concat`, `rewrap`. | jit, vmap safe; shifts static. | proposed |
-| `diff` | `diff(x, dim: str, /, n: int = 1, *, label: str = "upper")` | $n$-th forward difference; the result's labels are the minuend's (`"upper"`) or subtrahend's (`"lower"`). | Generic: two `isel` slices, `rewrap` on the labelled slice. | jit, vmap safe; `n` static. | proposed |
-| `cumreduce` | `cumreduce(x, fn: Reduction, dim: str)` | A cumulative function along `dim`: `"cumulative_sum"`, `"cumulative_prod"`, `"nancumsum"`, or a callable taking `axis=` that keeps the length. | Generic: the namespace function, `rewrap`. The dask namespace maps `cumulative_sum` to `cumsum`, as `permute_dims` maps to `transpose` today. | jit, vmap safe. | proposed |
-| `where` | `where(x, cond, /, other: float \| None = None)` | Keep `x` where `cond` is True, `other` elsewhere (default NaN). `cond` aligns by dim name, as `reduce(where=)` does. | Generic: the existing mask alignment (`_aligned_mask`), `xp.where`, `rewrap`. | jit, vmap safe. | proposed |
+| `pad` | `pad(x, /, *, mode: str = "constant", constant_values: float \| None = None, **pad_width: int \| tuple[int, int])` | `xp.pad` on named dims. Modes: `constant`, `edge`, `reflect`, `wrap`. A padded dim loses its labels. | Generic: `xp.pad`, `rewrap` (which drops labels whose size changed). | jit, vmap safe; widths, `mode` static. | today |
+| `roll` | `roll(x, /, **shifts: int)` | Cyclic shift; labels stay. | Generic: `xp.roll`. | jit, vmap safe; a traced shift also works. | today |
+| `shift` | `shift(x, /, *, fill_value: float \| None = None, **shifts: int)` | Positive shifts move data to higher positions; vacated entries are `fill_value`. | Generic: `isel` slice, `xp.full`, `xp.concat`, `rewrap`. | jit, vmap safe; shifts static. | today |
+| `diff` | `diff(x, dim: str, /, n: int = 1, *, label: str = "upper")` | $n$-th forward difference; the result's labels are the minuend's (`"upper"`) or subtrahend's (`"lower"`). | Generic: two `isel` slices, `rewrap` on the labelled slice. | jit, vmap safe; `n` static. | today |
+| `cumreduce` | `cumreduce(x, fn: Reduction, dim: str)` | A cumulative function along `dim`: `"cumulative_sum"`, `"cumulative_prod"`, `"nancumsum"`, or a callable taking `axis=` that keeps the length. | Generic: the namespace function, `rewrap`. The dask namespace maps `cumulative_sum` to `cumsum`, as `permute_dims` maps to `transpose` today. | jit, vmap safe. | today |
+| `where` | `where(x, cond, /, other: float \| None = None)` | Keep `x` where `cond` is True, `other` elsewhere (default NaN). `cond` aligns by dim name, as `reduce(where=)` does. | Generic: the existing mask alignment (`_aligned_mask`), `xp.where`, `rewrap`. | jit, vmap safe. | today |
 
 ### 3.3 Windows
 
@@ -185,12 +185,12 @@ Every twin lives in [`dim_operators.py`](../../../src/pipekit_array/dim_operator
 | `broadcast_like` | `BroadcastLike(exclude=())`, called `op(x, other)` | yes | other's dims added | today |
 | `merge_dims` | `MergeDims(**dims)` | yes | product size | today |
 | `split_dims` | `SplitDims(**dims)` | yes | sizes from config | today |
-| `pad` | `Pad(mode, constant_values, **pad_width)` | yes | sizes grown | proposed |
-| `roll` | `Roll(**shifts)` | yes | unchanged | proposed |
-| `shift` | `Shift(fill_value, **shifts)` | yes | unchanged | proposed |
-| `diff` | `Diff(dim, n=1, label="upper")` | yes | size minus $n$ | proposed |
-| `cumreduce` | `CumReduce(fn: str, dim)` | yes (by name) | unchanged | proposed |
-| `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged | proposed |
+| `pad` | `Pad(mode, constant_values, **pad_width)` | yes | sizes grown | today |
+| `roll` | `Roll(**shifts)` | yes | unchanged | today |
+| `shift` | `Shift(fill_value, **shifts)` | yes | unchanged | today |
+| `diff` | `Diff(dim, n=1, label="upper")` | yes | size minus $n$ | today |
+| `cumreduce` | `CumReduce(fn: str, dim)` | yes (by name) | unchanged | today |
+| `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged | today |
 | `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size | proposed |
 | `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ | proposed |
 | `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not | proposed |
@@ -329,7 +329,7 @@ Status: **exists** (ships today), **proposed** (this page), **compose** (no new 
 | `pad(pad_width, mode, stat_length, constant_values, end_values, reflect_type)` | `pad(x, mode, constant_values, **pad_width)` | proposed | Four modes; labels dropped (xarray pads coordinates with NaN); integers need `constant_values`. |
 | `roll(shifts, roll_coords=False)` | `roll(x, **shifts)` | proposed | Labels never roll (xarray's default). |
 | `shift(shifts, fill_value)` | `shift(x, fill_value, **shifts)` | proposed | Integers need `fill_value`; xarray promotes them to float. |
-| `diff(dim, n, label)` | `diff(x, dim, n, label)` | proposed | Same arguments and labels. |
+| `diff(dim, n, label)` | `diff(x, dim, n, label)` | proposed | Same arguments and labels, except `label="lower"` with $n \ge 2$: xarray applies `label` to the first step only (its recursion drops it); `diff` keeps positions $0, \dots, N - n - 1$. |
 | `cumsum`, `cumprod`, `cumulative(dim).sum()` | `cumreduce(x, fn, dim)` | proposed | No implicit `skipna`: xarray's `cumsum` skips NaN by default; ask for `"nancumsum"`. |
 | `rolling(dim, min_periods, center).construct(window_dim, stride, fill_value)` | `window(x, window_dim, stride, **sizes)` | proposed | Full windows only, no NaN fill, no `center`. Equals `construct(...).isel(time=slice(S - 1, None, s))`. |
 | `rolling(...).mean()` and the other reductions | `window` then `reduce` | compose | `min_periods` is `reduce(where=)` or a nan-reduction. |
@@ -340,7 +340,7 @@ Status: **exists** (ships today), **proposed** (this page), **compose** (no new 
 | `argmax`, `argmin` | `argreduce(x, fn, dim)` | exists | |
 | `idxmax`, `idxmin` | `argreduce`, then labels on the host | out | The result is label values as data. |
 | `isel` with array indexers | `take_along(x, index, dim)` | exists | |
-| `where(cond, other, drop)`, `xr.where` | `where(x, cond, other)` | proposed | Same polarity; no `drop` (a data-dependent size). |
+| `where(cond, other, drop)`, `xr.where` | `where(x, cond, other)` | proposed | Same polarity; no `drop` (a data-dependent size); integers need `other`, as `shift` needs `fill_value`. |
 | `fillna`, `clip`, `isin`, `isnull`, `notnull`, `round`, `astype` | `combine(fn, x)` | compose | Element-wise; no dim. |
 | `dropna(dim, how, thresh)` | `reduce(..., where=)` | out | Output size depends on the data. |
 | `ffill`, `bfill` | `cumreduce` then `take_along` | compose | Last valid index by a running maximum, then a gather. A function if asked for twice. |

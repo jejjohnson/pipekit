@@ -17,7 +17,8 @@ instead of copying tests::
   dims and labels; the protocol methods behave. The functions that make
   new or renamed dims (`pipekit_array.dim_shapes`) must also give the
   same labels; those on the band labels run when the adapter has
-  ``relabel`` (`pipekit_ops.LabelledAdapter`).
+  ``relabel`` (`pipekit_ops.LabelledAdapter`). So must the index-only
+  transforms (`pipekit_array.dim_shifts`).
 - `check_kernel_op(op, calls)` — the same `KernelOp` on each carrier family
   gives equal data, equal dims, and the signature
   ``op.compute_output_signature`` predicts (PK-K1, PK-K4).
@@ -34,7 +35,7 @@ from typing import Any
 import numpy as np
 from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
-from pipekit_array import dim_shapes as _shapes, dims as _dims
+from pipekit_array import dim_shapes as _shapes, dim_shifts as _shifts, dims as _dims
 from pipekit_array.dimarray import DimArray
 from pipekit_array.kernel import KernelOp
 
@@ -175,6 +176,33 @@ def _dim_shape_cases(labelled: bool) -> list[tuple[str, Callable[[Any], Any]]]:
     ]
 
 
+# Phase 2: index-only transforms. Their cases also compare labels.
+
+
+def _dim_shift_cases() -> list[tuple[str, Callable[[Any], Any]]]:
+    """`pipekit_array.dim_shifts` on the `DIMS` layout; ``band`` keeps its labels."""
+    valid = DimArray(np.arange(60).reshape(3, 4, 5) % 3 > 0, ("time", "y", "x"))
+    return [
+        ("pad(x, constant)", lambda c: _shifts.pad(c, x=(1, 2))),
+        ("pad(band, reflect)", lambda c: _shifts.pad(c, mode="reflect", band=1)),
+        ("roll(time, band)", lambda c: _shifts.roll(c, time=1, band=-1)),
+        ("shift(band)", lambda c: _shifts.shift(c, band=1)),
+        ("shift(x, fill)", lambda c: _shifts.shift(c, fill_value=0.0, x=-2)),
+        ("diff(band)", lambda c: _shifts.diff(c, "band")),
+        ("diff(band, 2, lower)", lambda c: _shifts.diff(c, "band", 2, label="lower")),
+        (
+            "cumreduce(sum, time)",
+            lambda c: _shifts.cumreduce(c, "cumulative_sum", "time"),
+        ),
+        (
+            "cumreduce(nancumsum, band)",
+            lambda c: _shifts.cumreduce(c, "nancumsum", "band"),
+        ),
+        ("where(valid)", lambda c: _shifts.where(c, valid)),
+        ("where(valid, 0)", lambda c: _shifts.where(c, valid, 0.0)),
+    ]
+
+
 def _check_labels(actual: Any, expected: Any, label: str, name: str) -> None:
     adapter, reference = get_adapter(actual), get_adapter(expected)
     assert adapter is not None and reference is not None
@@ -223,8 +251,9 @@ def check_adapter(
     lazy = _dims.backend_name(adapter.data(carrier)) == "dask"
     labelled = getattr(adapter, "relabel", None) is not None
     shape_cases = _dim_shape_cases(labelled)
-    shape_labels = {label for label, _ in shape_cases}
-    for label, fn in [*_cases(), *shape_cases]:
+    shift_cases = _dim_shift_cases()
+    shape_labels = {label for label, _ in [*shape_cases, *shift_cases]}
+    for label, fn in [*_cases(), *shape_cases, *shift_cases]:
         if lazy and label.endswith("where)"):
             continue  # dask's reductions take no where= (reduce raises TypeError)
         expected = fn(reference)
@@ -232,7 +261,7 @@ def check_adapter(
         got = _dims_of(actual)
         want = _dims_of(expected)
         assert got == want, f"{label} on {name}: dims {got}, expected {want}"
-        exact = not label.startswith(("reduce", "map_over"))
+        exact = not label.startswith(("reduce", "map_over", "cumreduce"))
         if label in shape_labels:
             _check_labels(actual, expected, label, name)
         a, e = values_of(actual), values_of(expected)
