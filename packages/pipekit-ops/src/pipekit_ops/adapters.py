@@ -8,6 +8,9 @@ carrier type, not through methods on the carrier, so no carrier library
 imports pipekit in its core and ``xr.DataArray`` needs no accessor.
 
 - `NamedArrayAdapter` — the protocol every adapter satisfies.
+- `LabelledAdapter` — one optional method, ``relabel``, for adapters
+  whose carriers hold labels the dim-level functions must set on a new
+  or renamed dim (pipekit-array ADR A22).
 - `register_adapter` / `unregister_adapter` / `get_adapter` — the one
   registry, looked up along the carrier type's MRO. Carrier libraries
   register on import: pipekit-array registers `DimArray`; geoarray
@@ -30,7 +33,7 @@ cycle (PK-P1). pipekit core ships no adapter itself.
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from pipekit_ops.signature import Signature
@@ -38,6 +41,7 @@ from pipekit_ops.signature import Signature
 
 __all__ = [
     "BackendError",
+    "LabelledAdapter",
     "MissingAdapterError",
     "NamedArrayAdapter",
     "backend_name",
@@ -100,6 +104,25 @@ class NamedArrayAdapter(Protocol):
 
     def signature(self, x: Any) -> Signature:
         """The carrier's named dims, sizes and dtype."""
+        ...
+
+
+@runtime_checkable
+class LabelledAdapter(Protocol):
+    """An adapter that can set the labels of named dims (optional).
+
+    ``rewrap`` keeps labels by dim name, so it cannot label a dim whose
+    name or labels are new (``rename``, ``merge_dims``, ``split_dims``,
+    ``broadcast_like``). Code that must set them calls ``relabel`` after
+    ``rewrap``; an adapter without it still serves every other function.
+    """
+
+    def relabel(self, x: Any, labels: Mapping[str, tuple[Any, ...] | None]) -> Any:
+        """``x`` with the labels of the named dims set; None removes a dim's labels.
+
+        Each tuple has one entry per index of its dim; dims left out keep
+        theirs.
+        """
         ...
 
 

@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from pipekit_ops import (
+    LabelledAdapter,
     MissingAdapterError,
     NamedArrayAdapter,
     Operator,
@@ -128,6 +129,17 @@ def test_register_rejects_non_class_and_non_adapter() -> None:
 
 def test_toy_adapter_satisfies_the_protocol() -> None:
     assert isinstance(ToyAdapter(), NamedArrayAdapter)
+
+
+def test_relabel_is_optional() -> None:
+    class RelabellingToyAdapter(ToyAdapter):
+        def relabel(self, x: Toy, labels: Any) -> Toy:
+            return x
+
+    # an adapter without relabel is still a NamedArrayAdapter, not a labelled one
+    assert not isinstance(ToyAdapter(), LabelledAdapter)
+    assert isinstance(RelabellingToyAdapter(), LabelledAdapter)
+    assert isinstance(RelabellingToyAdapter(), NamedArrayAdapter)
     assert not isinstance(object(), NamedArrayAdapter)
 
 
