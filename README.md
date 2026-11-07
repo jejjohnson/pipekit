@@ -19,275 +19,138 @@
   <a href="docs/tutorials/train-emulator.md"><b>Tutorials</b></a>
 </p>
 
-**Composable scientific pipelines: one operator interface, from loading
-data to training, assimilating and deploying.**
+**A family of Python packages for composable scientific pipelines, built on two foundations you can use on their own: pipekit-ops for operators and pipekit-array for named-dim arrays.**
 
-Every step of a scientific workflow becomes an `Operator`: one method, `_apply`, that takes a carrier and returns one.
-The carrier is whatever your science uses (a NumPy array, an xarray Dataset, a DataFrame, an AnnData, a dict of arrays) and pipekit never looks inside it.
-Operators compose with `|`, wire into graphs, wrap in retries, caches and observers, map over many inputs on threads or processes, and carry state through time steps and training loops, and each of those is itself an Operator.
-We built pipekit for the [GeoStack](https://github.com/jejjohnson/geostack), but the core is pure Python with no dependencies and nothing in it is about geoscience.
+Every step of a scientific workflow (reading a scene, a QC check, a composite, a model, a forecast step, a training loop) becomes an `Operator` that takes a carrier and returns one.
+Operators chain with `|`, wire into graphs, wrap in retries, caches and observers, map over many inputs, and save to JSON, and each of those is itself an Operator.
+We built pipekit for the [GeoStack](https://github.com/jejjohnson/geostack), but nothing in the two foundations is about geoscience.
+Install only what you need: each package is its own distribution, and the `pipekit` umbrella is there for when you want all of them.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/operator-dark.svg">
-    <img alt="A pipekit Operator takes a carrier and returns one through a single _apply method; it composes into a Sequential (a | b | c), a Graph with named inputs and outputs, wrappers such as Retry, Cache and Tap, and stateful steps such as Cycle and TrainingLoop, each itself an Operator" src="docs/assets/operator-light.svg" width="100%">
-  </picture>
-</p>
+## The layering
 
-## Quick start
-
-```bash
-uv add "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops"
-uv add numpy jaxtyping
 ```
+              your pipeline
+                    │
+   pipekit-cycle       time steps, DA cycles
+   pipekit-train       training loops
+   pipekit-experiment  registry, trackers
+   pipekit-evaluate    benchmarks, scorers
+   pipekit-jax         JAX / Equinox models
+                    │
+                    ▼  build on
+   ┌─────────────────────────────────┐
+   │ pipekit-array                   │
+   │ named dims, any Array API       │
+   │ backend                         │
+   ├─────────────────────────────────┤
+   │ pipekit-ops                     │
+   │ Operator, Sequential, Graph;    │
+   │ pure Python, no dependencies    │
+   └─────────────────────────────────┘
+     two foundations, each usable
+     on its own
+```
+
+The two foundations are libraries in their own right, not the base layer of an umbrella.
+
+- **[pipekit-ops](packages/pipekit-ops/README.md)** is a zero-dependency operator graph for any carrier: `Operator`, `|` and `Graph`, control flow, caching and stores, parallel `Map`, observers, QC and a JSON round-trip with a content hash.
+- **[pipekit-array](packages/pipekit-array/README.md)** is named-dim array operators on any Array API backend: one operator runs on NumPy, JAX, CuPy, PyTorch or dask, and on a `DimArray`, an `xr.DataArray` or any carrier that registers an adapter.
+
+The rest of the family builds on them.
+The hard dependencies are small: pipekit-ops depends on nothing, and pipekit-array, pipekit-cycle, pipekit-experiment and pipekit-train depend on pipekit-ops only.
+pipekit-evaluate adds NumPy and SciPy, and pipekit-jax adds pipekit-cycle, JAX, Equinox and jaxtyping.
+pipekit-array is opt-in elsewhere, through the `[array]` extras of pipekit-cycle and pipekit-jax.
+
+## The packages
+
+| | Package | What it gives you | Status | Version |
+|---|---|---|---|---|
+| <img src="docs/assets/packages/pipekit-ops/icon.svg" width="28" alt=""> | [pipekit-ops](packages/pipekit-ops/README.md) | **Foundation.** The operator core: `Operator`, `Sequential`, `Graph`, wrappers, `Map`, stores, QC, `dumps` / `loads`, `pipeline_hash` | implemented | 0.2.1 |
+| <img src="docs/assets/packages/pipekit-array/icon.svg" width="28" alt=""> | [pipekit-array](packages/pipekit-array/README.md) | **Foundation.** Array API dispatch, `DimArray`, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `KernelOp`, `Estimator` | partial | 0.1.1 |
+| <img src="docs/assets/packages/pipekit-cycle/icon.svg" width="28" alt=""> | [pipekit-cycle](packages/pipekit-cycle/README.md) | Time stepping and data assimilation: `Cycle`, `DACycle`, `EnsembleDACycle`, `SmootherCycle` and their protocols | implemented | 0.1.0 |
+| <img src="docs/assets/packages/pipekit-train/icon.svg" width="28" alt=""> | [pipekit-train](packages/pipekit-train/README.md) | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends | implemented | 0.2.0 |
+| <img src="docs/assets/packages/pipekit-experiment/icon.svg" width="28" alt=""> | [pipekit-experiment](packages/pipekit-experiment/README.md) | A content-addressed model registry and tracker protocols, with DVC, Hydra and Metaflow adapters | implemented | 0.1.0 |
+| <img src="docs/assets/packages/pipekit-evaluate/icon.svg" width="28" alt=""> | [pipekit-evaluate](packages/pipekit-evaluate/README.md) | A benchmark ladder, the `Unit × Lens × Stage` scorers and `EvaluationReport` | partial | 0.2.0 |
+| <img src="docs/assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](packages/pipekit-jax/README.md) | `JaxOperator`, `JaxModelOp` with registry round-trip, `ScanCycle`, `DiffraxForwardModel`, adjoints | implemented | 0.1.0 |
+| <img src="docs/assets/icon.svg" width="28" alt=""> | [pipekit](packages/pipekit/README.md) | The umbrella: installs all seven, holds no code | n/a | 0.2.0 |
+
+Each README is that package's front door, with its install extras, a quickstart and its design notes.
+
+## Both foundations in one example
+
+A year of Sentinel-2 over one tile: twelve monthly scenes, four bands and 64 by 64 pixels.
+pipekit-array gives the named cube and the steps by dim name; pipekit-ops gives the shape check, the `|`, the summary and the JSON round-trip.
 
 ```python
 import numpy as np
-from jaxtyping import Float
 
-from pipekit_ops import Graph, Input, Operator, Sequential, Tap, dumps, loads
+import pipekit_array as pa
+import pipekit_ops as pk
 
-# Shapes: N samples
-Vector = Float[np.ndarray, " N"]
+# Shapes: T = 12 monthly scenes; B = 4 bands; Y = X = 64 pixels; K = 3 months per season
 
+rng = np.random.default_rng(0)
+reflectance = rng.uniform(0.0, 0.4, size=(12, 4, 64, 64)).astype(np.float32)
 
-class Standardize(Operator):
-    """Centre and scale by a fixed mean μ and spread σ."""
-
-    def __init__(self, *, mean: float, std: float) -> None:
-        # μ
-        self.mean = mean
-        # σ
-        self.std = std
-
-    def _apply(self, x: Vector) -> Vector:
-        # z = (x − μ) / σ
-        return (x - self.mean) / self.std
-
-
-class Clip(Operator):
-    """Clip to the interval [lo, hi]."""
-
-    def __init__(self, *, lo: float, hi: float) -> None:
-        self.lo = lo
-        self.hi = hi
-
-    def _apply(self, z: Vector) -> Vector:
-        # z̃ = min(max(z, lo), hi)
-        return np.clip(z, self.lo, self.hi)
-
-
-class Difference(Operator):
-    """Subtract the second input from the first."""
-
-    def _apply(self, a: Vector, b: Vector) -> Vector:
-        # d = a − b
-        return a - b
-
-
-def show(v: Vector) -> None:
-    print("clean:", v)
-
-
-# 1 · compose with |: a Sequential, itself an Operator
-
-# user
-# z = (x − 10) / 2
-standardize = Standardize(mean=10.0, std=2.0)
-# user
-# z̃ = min(max(z, −3), 3)
-clip = Clip(lo=-3.0, hi=3.0)
-# today (pipekit-ops)
-clean: Sequential = standardize | clip
-
-x: Vector = np.array([4.0, 10.0, 30.0])
-# [-3., 0., 3.]
-z: Vector = clean(x)                                  # (N,) → (N,)
-
-# 2 · wire a Graph: named inputs, shared operators, named outputs
-
-# user
-difference = Difference()
-# today (pipekit-ops)
-a = Input("a")
-b = Input("b")
-a_clean = clean(a)
-b_clean = clean(b)
-anomaly = difference(a_clean, b_clean)
-graph = Graph(inputs={"a": a, "b": b}, outputs={"anomaly": anomaly})
-
-# {"anomaly": d}, one value per sample
-out: dict[str, Vector] = graph(a=x, b=x + 2.0)        # (N,), (N,) → (N,)
-
-# 3 · observe without changing the flow
-
-# today (pipekit-ops)
-traced: Sequential = clean | Tap(show)
-
-# 4 · configuration is data: an operator round-trips through JSON
-
-# today (pipekit-ops)
-text: str = dumps(standardize)
-# Standardize(mean=10.0, std=2.0)
-same: Operator = loads(text)
-```
-
-The same interface steps through time.
-With `pipekit-cycle`, a forward model is an operator and a `Cycle` runs it:
-
-```python
-import numpy as np
-from jaxtyping import Float
-
-import pipekit_cycle as pc
-
-# Shapes: N state variables
-State = Float[np.ndarray, " N"]
-
-
-def decay(x: State, dt: float) -> State:
-    """One explicit Euler step of dx/dt = −k x, with k = 0.1."""
-    # x_{t+1} = x_t − Δt · k · x_t
-    return x - dt * 0.1 * x
-
-
-# today (pipekit-cycle)
-# x_t ↦ x_{t+1}, Δt = 1
-step = pc.CallableForward(decay, dt=1.0)
-# today (pipekit-cycle)
-# x_0 ↦ x_24
-forecast = pc.Cycle(step_op=step, n_steps=24)
-
-# x₂₄ = (1 − 0.1)²⁴ x₀ ≈ 0.080 x₀
-x24, _ = forecast(np.ones(3), None)                   # (N,) → (N,)
-```
-
-Swap `CallableForward` for `NeuralForward` around a trained model from the registry and the same `Cycle` forecasts with an emulator.
-Add an observation operator and an analysis step and it assimilates (`DACycle`, `EnsembleDACycle`).
-
-## A bigger graph
-
-Everything above composes.
-This is an anomaly detector for a stack of multi-channel images; satellite scenes, microscope fields or telescope exposures read the same way.
-Six small domain operators do the science, and pipekit does the rest (reading in parallel with retries and a cache, stacking and checking shapes, choosing a composite by the size of the stack, joining a second input, observing, and summarising) with four named outputs.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/graph-dark.svg">
-    <img alt="An anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs" src="docs/assets/graph-light.svg" width="760">
-  </picture>
-</p>
-
-The wiring, once the six domain operators are written (it runs as printed after the tutorial's definitions):
-
-```python
-# ReadTile … Threshold, CountFlagged and FlaggedFraction are the tutorial's
-# operators; few_exposures and log_flagged are its two named functions.
-
-# Shapes: T exposures; C channels; H × W pixels
-
-# the steps
-
-# today (pipekit-ops); ReadTile is user
-# on OSError, read again: up to 3 attempts
-retried_read = Retry(ReadTile(), attempts=3, base_delay=0.5, on=(OSError,))
-# today (pipekit-ops)
-# keep each source's exposure, so no source is read twice
-cached_read = Cache(retried_read)
-# today (pipekit-ops)
-# [s_1, …, s_T] ↦ [x_1, …, x_T], on 8 threads
-read = ThreadMap(cached_read, n_workers=8)
 # today (pipekit-array)
-# [x_1, …, x_T] ↦ X ∈ ℝ^{T×C×H×W}
-stack_exposures = StackAlong(axis=0)
-# today (pipekit-ops)
-check_shape = AssertShape((None, C, H, W))
-# today (pipekit-ops); Composite is user
-# x̄ = median_t X when T < 5, else mean_t X
-choose_composite = Branch(
-    few_exposures,
-    if_true=Composite(how="median"),
-    if_false=Composite(how="mean"),
+cube = pa.DimArray(
+    reflectance,                                       # (T, B, Y, X)
+    ("time", "band", "y", "x"),
+    {"band": ("B02", "B03", "B04", "B08")},
 )
-# user
-# z = (x̄ − μ_b) / σ_b
-z_score = ZScore(sigma=1.0)
-# user
-# r = (x̄_0 − x̄_1) / (x̄_0 + x̄_1)
-channel_ratio = NormalizedDifference(a=0, b=1)
-# user
-# s = max_c |z_c| + w · |r − r̄|
-score_pixels = Score(weight=10.0)
-# user
-# m = 1[s > k], logged on the way through
-threshold = Threshold(k=3.0)
-# today (pipekit-ops)
-report = Tap(log_flagged)
-# today (pipekit-ops); the two counters are user
-# m ↦ {"flagged": n, "fraction": f}
-summarise = Fanout({"flagged": CountFlagged(), "fraction": FlaggedFraction()})
-
-# the bundles
 
 # today (pipekit-ops)
-load: Sequential = read | stack_exposures | check_shape
-flag: Sequential = threshold | report
+check = pk.AssertSignature("time band y x", dtype="float32")
+# today (pipekit-array)
+# s_{q,b,i,j} = (1/K) ∑ₖ x_{Kq+k,b,i,j}
+seasonal = pa.Coarsen("mean", time=3)
+# today (pipekit-array)
+# m_{q,b} = (1/(Y X)) ∑ᵢ ∑ⱼ s_{q,b,i,j}
+scene_mean = pa.Reduce("mean", ("y", "x"))
+# today (pipekit-ops)
+pipeline = check | seasonal | scene_mean
 
-# wired as a graph
+table = pipeline(cube)                                 # (T, B, Y, X) → (T/K, B)
+# every intermediate shape, before or after running
+print(pipeline.summary(pk.signature_of(cube)))
 
 # today (pipekit-ops)
-sources_in = Input("sources")
-background_in = Input("background")
-stack_node = load(sources_in)
-composite_node = choose_composite(stack_node)
-z_node = z_score(composite_node, background_in)
-ratio_node = channel_ratio(composite_node)
-score_node = score_pixels(z_node, ratio_node)
-mask_node = flag(score_node)
-summary_node = summarise(mask_node)
-
-detector = Graph(
-    inputs={"sources": sources_in, "background": background_in},
-    outputs={
-        "composite": composite_node,
-        "score": score_node,
-        "mask": mask_node,
-        "summary": summary_node,
-    },
-)
+again = pk.loads(pk.dumps(pipeline))
+assert pk.pipeline_hash(again) == pk.pipeline_hash(pipeline)
+# the same pipeline on an xarray carrier: band labels come back as a coordinate
+table_xr = pipeline(cube.to_xarray())                  # (T, B, Y, X) → (T/K, B)
 ```
 
-The full, runnable version, with the six operators and each step explained, is the tutorial [Build a bigger graph](docs/tutorials/anomaly-graph.md).
+The summary prints the signature after each step, `(time=12, band=4, y=64, x=64)`, then `(time=4, band=4, y=64, x=64)`, then `(time=4, band=4)`.
+The same `pipeline` runs on JAX data, under `jax.jit`, as the [pipekit-array README](packages/pipekit-array/README.md) shows.
 
-More end-to-end examples, each with its pre- and post-processing and a script that runs as printed:
+More end-to-end examples, each with a script that runs as printed:
+[build a bigger graph](docs/tutorials/anomaly-graph.md),
 [train, register and forecast](docs/tutorials/train-register-forecast.md),
 [inference](docs/tutorials/inference.md),
 [ensemble data assimilation](docs/tutorials/ensemble-da.md) and
 [ETL over many regions](docs/tutorials/etl-regions.md).
 
-## The packages
+## Install
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/packages-dark.svg">
-    <img alt="The pipekit workspace: six sister packages (cycle, train, experiment, evaluate, array, jax) on the dependency-free pipekit-ops core" src="docs/assets/packages-light.svg" width="100%">
-  </picture>
-</p>
+The packages are not on PyPI yet, so install one straight from the repository:
 
-A uv workspace of seven packages, plus the code-free `pipekit` umbrella that installs them all.
-Install only what you need: each one builds on the core (`pipekit-ops`) and on none of the others, except `pipekit-jax` on `pipekit-cycle`; tool integrations are opt-in extras.
+```bash
+uv add "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops"
+uv add "pipekit-array[numpy] @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-array"
+```
 
-| Package | Status | What it gives you |
-|---|---|---|
-| `pipekit-ops` | implemented | The core, imported as `pipekit_ops`: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`) and flow limits (`Timeout`, `RateLimit`, `Until`); dict and iterable operators (`Get`, `Merge`, `Filter`, `GroupBy`, …); observers (`Tap`, `Log`, `Snapshot`, `Profile`); `Map` over serial, thread, process and async executors, with its presets (`ThreadMap`, `ProcessMap`, …); `Cache` in memory or in a `DirectoryStore`; QC asserts (`AssertShape`, `AssertThat`, `AssertSignature`, …); JSON `dumps` / `loads`; `StatefulOperator` |
-| `pipekit-cycle` | implemented | Time stepping and data assimilation: `Cycle`, `DACycle`, `EnsembleDACycle`, `SmootherCycle`, and the `ForwardModel`, `ObservationOperator` and `AnalysisStep` protocols |
-| `pipekit-train` | implemented | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends behind extras |
-| `pipekit-experiment` | implemented | A content-addressed model registry (`LocalModelRegistry`, `S3ModelRegistry`, keyed by a hash of config and weights) and tracker protocols, with DVC, Hydra and Metaflow adapters |
-| `pipekit-jax` | implemented | `JaxOperator`, `JaxModelOp` (an `eqx.Module` with registry round-trip), `ScanCycle`, `DiffraxForwardModel`, adjoints; builds on `pipekit-cycle` |
-| `pipekit-array` | partial | Array API dispatch, so one operator runs on NumPy, JAX, CuPy, PyTorch or dask (`array_namespace`, `MeanScalar`, `StackAlong`, `ConcatenateAlong`); dim functions by name on any named carrier (`isel`, `reduce`, `window`, `quantile`, …, and their operators `ISel`, `Reduce`, `Window`, …); `ApplyAlong`, `BatchAlong`, `DimArray`, `KernelOp`, `Estimator`, einx and xarray bridges; `StackAlong` and `ConcatenateAlong` take `dim=` on named carriers. The array QC asserts (`AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`), the array `Histogram` and `ModelOp` are still to come |
-| `pipekit-evaluate` | partial | A benchmark ladder: `Benchmark`, `MetricScorer`, `EvaluationReport` |
+Once they publish, you install only the ones you need, or the umbrella for all of them:
 
-Each package has its own README under [`packages/`](packages/) and, for the larger ones, design notes under `packages/<pkg>/docs/design/`.
+```bash
+uv add pipekit-ops                  # the operator core, no dependencies
+uv add "pipekit-array[numpy]"       # named-dim arrays, with the backends you use
+uv add pipekit-cycle                # or any other package on its own
+uv add pipekit                      # all seven, JAX included
+```
+
+A library should depend on the package it imports (usually `pipekit-ops`), never on the umbrella.
+Every extra is listed in [docs/installation.md](docs/installation.md) and in each package's README.
 
 ## Who builds on it
 
@@ -298,48 +161,19 @@ Each package has its own README under [`packages/`](packages/) and, for the larg
   </picture>
 </p>
 
-In the GeoStack, [geotoolz](https://github.com/jejjohnson/geotoolz) and
-[xrtoolz](https://github.com/jejjohnson/xrtoolz) narrow the carrier to a
-`GeoTensor` and an xarray object;
-[vardax](https://github.com/jejjohnson/vardax) and
-[plumax](https://github.com/jejjohnson/plumax) run their assimilation and
-models through `pipekit-cycle`; [radtrax](https://github.com/jejjohnson/radtrax)
-ships its retrievals as operators behind its `[geo]` extra.
+In the GeoStack, [geotoolz](https://github.com/jejjohnson/geotoolz) and [xrtoolz](https://github.com/jejjohnson/xrtoolz) narrow the carrier to a `GeoTensor` and an xarray object.
+[vardax](https://github.com/jejjohnson/vardax) and [plumax](https://github.com/jejjohnson/plumax) run their assimilation and models through `pipekit-cycle`, and [radtrax](https://github.com/jejjohnson/radtrax) ships its retrievals as operators behind its `[geo]` extra.
 
-Nothing there is specific to the Earth. A genomics pipeline on AnnData,
-an astronomy reduction on astropy tables, or a microscopy workflow on
-image arrays gets the same composition, observation, caching and
-serialisation by writing its own operators; the right-hand side of the
-figure is that invitation, not a list of integrations. Libraries can
-also plug in without importing pipekit at all, by satisfying its
-runtime-checkable protocols (`ForwardModel`, `AnalysisStep`,
-`ObservationNoise`, `ModelRegistry`, …; see
-[docs/protocols.md](docs/protocols.md)).
-
-## The six things to know
-
-1. **An `Operator` has one method**, `_apply(self, carrier) -> carrier`.
-   pipekit never inspects the carrier; domain packages narrow it.
-2. **Composition is `|`.** `a | b | c` is a `Sequential`; branching and
-   merging flows are a `Graph` built by calling operators on `Input`s.
-3. **Wrappers are operators too.** `Retry`, `Timeout`, `Try`, `Cache`, `Map` and the QC asserts take an operator and return one, so they nest anywhere.
-4. **State is explicit.** A `StatefulOperator` maps
-   `(carrier, state) → (carrier, state)`; `Cycle`, `DACycle` and
-   `TrainingLoop` are built on it.
-5. **Configuration is data.** An operator's keyword-only constructor
-   arguments are its config; `dumps` writes it as JSON and `loads`
-   rebuilds the operator. The model registry hashes config and weights
-   together, so the same model has the same key.
-6. **Libraries plug in by protocol.** Algorithm libraries satisfy
-   runtime-checkable protocols structurally and never have to import
-   pipekit ([docs/protocols.md](docs/protocols.md)).
-
-The long form is [docs/concepts.md](docs/concepts.md).
+Nothing there is specific to the Earth.
+A genomics pipeline on AnnData, an astronomy reduction on astropy tables, or a microscopy workflow on image arrays gets the same composition, observation, caching and serialisation by writing its own operators; the right-hand side of the figure is that invitation, not a list of integrations.
+Libraries can also plug in without importing pipekit at all, by satisfying its runtime-checkable protocols (`ForwardModel`, `AnalysisStep`, `ObservationNoise`, `ModelRegistry`, …; see [docs/protocols.md](docs/protocols.md)).
 
 ## Where to start
 
 | If you want to… | Read |
 |---|---|
+| Learn the operator core | [packages/pipekit-ops](packages/pipekit-ops/README.md) |
+| Work with named-dim arrays on any backend | [packages/pipekit-array](packages/pipekit-array/README.md) |
 | Understand the model in ten minutes | [docs/concepts.md](docs/concepts.md) |
 | Plug a library in without depending on pipekit | [docs/protocols.md](docs/protocols.md) |
 | Go from `git clone` to a running pipeline | [docs/getting-started.md](docs/getting-started.md) |
@@ -349,11 +183,7 @@ The long form is [docs/concepts.md](docs/concepts.md).
 | Know why operators are classes, not functions | [docs/background/toolz.md](docs/background/toolz.md) |
 | Train an emulator end to end | [docs/tutorials/train-emulator.md](docs/tutorials/train-emulator.md) |
 | Run a data-assimilation cycle | [docs/tutorials/da-cycle.md](docs/tutorials/da-cycle.md) |
-| Build a bigger graph, step by step | [docs/tutorials/anomaly-graph.md](docs/tutorials/anomaly-graph.md) |
-| Clean an archive, train, register and forecast | [docs/tutorials/train-register-forecast.md](docs/tutorials/train-register-forecast.md) |
-| Put a model in a pre- and post-processing chain | [docs/tutorials/inference.md](docs/tutorials/inference.md) |
-| Assimilate observations with an ensemble | [docs/tutorials/ensemble-da.md](docs/tutorials/ensemble-da.md) |
-| Run an ETL batch over many regions | [docs/tutorials/etl-regions.md](docs/tutorials/etl-regions.md) |
+| Run pipelines under `jit` | [docs/tutorials/pipekit-under-jit.md](docs/tutorials/pipekit-under-jit.md) |
 | Browse the API | [jejjohnson.github.io/pipekit](https://jejjohnson.github.io/pipekit/) |
 
 ## Develop
