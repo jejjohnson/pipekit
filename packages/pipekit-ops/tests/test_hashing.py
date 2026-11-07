@@ -37,13 +37,13 @@ def test_sha256_hex_framing_matters() -> None:
     assert sha256_hex("ab", b"\x00", "c") != sha256_hex("a", b"\x00", "bc")
 
 
-def test_cache_key_digest_unchanged() -> None:
-    """The consolidated helpers reproduce the pre-refactor Cache framing."""
-    from pipekit_ops.cache import _make_key
+def test_cache_key_digest_framing() -> None:
+    """Cache keys are ``sha256(repr(x) ‖ 0x00 ‖ pipeline_hash(inner))`` (P4)."""
+    from pipekit_ops import Cache, Identity, pipeline_hash
 
-    value, config = [1, 2], {"k": "v"}
+    value, inner = [1, 2], Identity()
     h = hashlib.sha256()
     h.update(repr(value).encode("utf-8"))
     h.update(b"\x00")
-    h.update(stable_json(config).encode("utf-8"))
-    assert _make_key(value, config) == h.hexdigest()
+    h.update(pipeline_hash(inner).encode("utf-8"))
+    assert Cache(inner)._make_key(value) == h.hexdigest()

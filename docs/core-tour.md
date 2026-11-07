@@ -4,7 +4,7 @@
 when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
-eighty names in seventeen modules, one module per job, so you can learn it a
+eighty names in eighteen modules, one module per job, so you can learn it a
 group at a time. For why it is shaped this way (operators as classes, the
 carrier left open), read the [background](background/toolz.md); for the
 shapes real pipelines take, read [Patterns](patterns.md).
@@ -25,6 +25,7 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Dict plumbing | `dicts` | `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`, `Merge`, `Assoc`, `UpdateIn`, `ValMap` | reshaping the dicts a `Graph`, a `Fanout` or a STAC item carries, without a `Lambda` |
 | Iterables | `seq` | `Not`, `Filter`, `Remove`, `Reduce`, `PartitionAll`, `Concat`, `Zip`, `GroupBy`, `CountBy`, `Count`, `Unique`, `Take`, `SortBy` | filtering, grouping and counting a list of items inside the pipeline |
 | Caching | `cache` | `Cache`, `Memoize` | the same expensive call twice |
+| Stores | `store` | `Store`, `MemoryStore`, `DirectoryStore`, `store_scope` | a cache that survives a restart, or that several processes share |
 | Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
 | Parallelism | `parallel` | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable` | many items, one operator |
@@ -283,6 +284,27 @@ c(2.0)
 c.hits, c.misses  # → (1, 2)
 Memoize is Cache  # → True
 ```
+
+### Stores
+
+`Cache(inner, store="scenes", key=Get("id"))` keeps its entries in a named store instead of a private dict.
+The name is in the config; the store is bound around the call with `store_scope`, so the pipeline hashes the same on a laptop and on a cluster.
+`key` is an operator that picks what to key on, here a STAC item's ID, so two dicts with the same `id` share one entry.
+A `DirectoryStore` writes one pickle file per key, atomically, so a rerun after a crash skips the work already done, and processes on one file system can share it.
+Pickle loads run code, so point a `DirectoryStore` only at a directory you control.
+
+```python
+from pipekit_ops import Cache, DirectoryStore, Get, Identity, store_scope
+
+cached = Cache(Identity(), store="scenes", key=Get("id"))
+with store_scope(scenes=DirectoryStore("/tmp/scenes")):
+    cached({"id": "S2A", "cloud": 3})
+    cached({"id": "S2A", "cloud": 9})  # → {'id': 'S2A', 'cloud': 3}
+cached.hits, cached.misses  # → (1, 1)
+```
+
+`MemoryStore()` is the in-process store; any object with `__contains__`, `load` and `save` is a `Store`.
+An unbound name raises `LookupError`, and `Map` carries the bound stores to its workers: threads see the scope, and process workers get the stores pickled (a `DirectoryStore` pickles as its path).
 
 ## Quality control
 

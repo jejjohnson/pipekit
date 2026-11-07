@@ -28,8 +28,10 @@ The v0.1 public surface, grouped by module:
 - **Execution** (`execution`): `Map`, `executor_scope`, `MapError`,
   `Failed`, `Prefetch`, `Fold` — one engine over serial, thread, process,
   async and any borrowed `concurrent.futures.Executor`.
-- *(Group K is reserved in the master plan for a disk-cache backend;
-  nothing ships under it yet.)*
+- **Group K — stores** (`store`): `Store`, `MemoryStore`,
+  `DirectoryStore`, `store_scope` — where ``Cache(op, store=name)`` keeps
+  its entries, bound around the call; a `DirectoryStore` survives a
+  restart and is shared by processes on one file system.
 - **Group L — serialisation** (`serial`): `dumps`, `loads`,
   `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`,
   `allowed`.
@@ -145,6 +147,7 @@ from pipekit_ops.serial import (
 )
 from pipekit_ops.signature import Signature, compute_output_signature
 from pipekit_ops.state import CarryState, StatefulOperator
+from pipekit_ops.store import DirectoryStore, MemoryStore, Store, store_scope
 
 
 __all__ = [
@@ -166,6 +169,7 @@ __all__ = [
     "Const",
     "Count",
     "CountBy",
+    "DirectoryStore",
     "Dissoc",
     "Failed",
     "Fanout",
@@ -183,6 +187,7 @@ __all__ = [
     "Map",
     "MapError",
     "Memoize",
+    "MemoryStore",
     "Merge",
     "MissingAdapterError",
     "NamedArrayAdapter",
@@ -209,6 +214,7 @@ __all__ = [
     "Snapshot",
     "SortBy",
     "StatefulOperator",
+    "Store",
     "Switch",
     "Take",
     "Tap",
@@ -242,6 +248,7 @@ __all__ = [
     "register_adapter",
     "register_lazy_adapter",
     "signature_of",
+    "store_scope",
     "unregister",
     "unregister_adapter",
     "upgrade_state",

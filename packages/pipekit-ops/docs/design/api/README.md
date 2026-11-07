@@ -93,12 +93,12 @@ Today only `Lambda` reshapes them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Cache(inner, store=None, key=None)` | `Any → Any`; `inner`'s | memoise by input and the inner pipeline's hash; `store` names a `Store` in scope, `None` keeps today's private in-memory dict; `key` is an operator that computes the input key (toolz `memoize(key=…)`) | changed (P4) |
+| `Cache(inner, store=None, key=None)` | `Any → Any`; `inner`'s | memoise by input and the inner pipeline's hash; `store` names a `Store` in scope, `None` keeps today's private in-memory dict; `key` is an operator that computes the input key (toolz `memoize(key=…)`) | today (`cache.py`) |
 | `Memoize` | alias | `Memoize is Cache` | today (`cache.py`) |
-| `Store` | protocol | `__contains__(key)`, `load(key)`, `save(key, value)` | proposed (P4) |
-| `MemoryStore()` | `Store` | dict plus a lock; one process | proposed (P4) |
-| `DirectoryStore(root, codec="pickle")` | `Store` | one file per key, atomic rename, safe across processes on one file system | proposed (P4) |
-| `store_scope(**stores)` | context manager | binds store names to `Store` instances; not stored in any config | proposed (P4) |
+| `Store` | protocol | `__contains__(key)`, `load(key)`, `save(key, value)` | today (`store.py`) |
+| `MemoryStore()` | `Store` | dict plus a lock; one process | today (`store.py`) |
+| `DirectoryStore(root, codec="pickle")` | `Store` | one file per key, atomic rename, safe across processes on one file system | today (`store.py`) |
+| `store_scope(**stores)` | context manager | binds store names to `Store` instances; not stored in any config | today (`store.py`) |
 | `Checkpoint(store)` | none | not added: it is `Cache(op, store=…)`, and `pipekit_train.Checkpoint` already owns the name | dropped |
 
 ## Observe and QC

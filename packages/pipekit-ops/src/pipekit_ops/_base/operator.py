@@ -48,10 +48,22 @@ if TYPE_CHECKING:
 # own signatures (geotoolz → GeoTensor, xr_toolz → xr.Dataset, etc.).
 Carrier = Any
 
+
 # Shared "argument was omitted" sentinel — distinguishes an omitted
 # parameter from an explicit None (used by `Sequential._apply` and
 # `qc.AssertAttr`).
-_MISSING = object()
+class _Missing:
+    """The type of `_MISSING`; a copy unpickles to the same object."""
+
+    def __reduce__(self) -> str:
+        # a pickled `Get("id")` sent to a process keeps `default is _MISSING`
+        return "_MISSING"
+
+    def __repr__(self) -> str:
+        return "<missing>"
+
+
+_MISSING = _Missing()
 
 
 class ConfigMixin:

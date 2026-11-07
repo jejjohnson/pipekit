@@ -229,6 +229,13 @@ def test_two_input_graph_with_a_shared_operator_round_trips():
     assert back._order[0].operator is back._order[1].operator
 
 
+def test_cache_with_a_store_and_a_key_round_trips():
+    """P4: ``store`` and ``key`` survive the round trip; the store is bound."""
+    op = Cache(Get("x") | _Scale(2.0), store="s", key=Get("a"))
+    with pipekit_ops.store_scope(s=pipekit_ops.MemoryStore()):
+        assert_round_trip(op, {"a": 1, "x": 1.5})
+
+
 def test_graph_nested_in_a_pipeline_round_trips():
     x = Input("x")
     inner = Graph(inputs={"x": x}, outputs={"y": _Scale(3.0)(x)})

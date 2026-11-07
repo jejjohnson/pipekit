@@ -37,6 +37,7 @@ from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
+from pipekit_ops.store import Store, bind_stores, bound_stores
 
 
 __all__ = ["Failed", "Fold", "Map", "MapError", "Prefetch", "executor_scope"]
@@ -182,16 +183,35 @@ def _run_chunk(op: Operator, chunk: Chunk, isolate: bool = True) -> list[Outcome
 _WORKER_OP: Operator | None = None
 
 
-def _init_process_worker(op: Operator) -> None:
-    """Process-pool initializer: keep ``op``, pickled once per worker."""
+def _init_process_worker(op: Operator, stores: dict[str, Store] | None = None) -> None:
+    """Process-pool initializer: keep ``op``, pickled once per worker.
+
+    ``stores`` are the caller's `store_scope` bindings, pickled with it,
+    so a ``Cache(store=…)`` inside ``op`` finds its store in the worker.
+    """
     global _WORKER_OP
     _WORKER_OP = op
+    if stores:
+        bind_stores(stores)
 
 
 def _run_chunk_in_process(chunk: Chunk) -> list[Outcome]:
     """Run a chunk with the operator `_init_process_worker` stored."""
     assert _WORKER_OP is not None, "process worker started without an operator"
     return _run_chunk(_WORKER_OP, chunk)
+
+
+def _run_chunk_with_stores(
+    op: Operator, stores: dict[str, Store], chunk: Chunk
+) -> list[Outcome]:
+    """`_run_chunk` under the caller's store bindings (a remote task)."""
+    context = contextvars.copy_context()
+
+    def run() -> list[Outcome]:
+        bind_stores(stores)
+        return _run_chunk(op, chunk)
+
+    return context.run(run)
 
 
 async def _run_chunk_async(op: Operator, chunk: Chunk) -> list[Outcome]:
@@ -519,7 +539,10 @@ class Map(Operator):
                 submit = _thread_submit(borrowed, op)
             else:
                 _require_pickleable(op, "a borrowed executor")
-                submit = functools.partial(borrowed.submit, _run_chunk, op)
+                # the store_scope bindings travel with each task, pickled
+                submit = functools.partial(
+                    borrowed.submit, _run_chunk_with_stores, op, bound_stores()
+                )
             yield submit, window, True
             return
 
@@ -538,7 +561,7 @@ class Map(Operator):
                 max_workers=n_workers,
                 mp_context=context,
                 initializer=_init_process_worker,
-                initargs=(op,),
+                initargs=(op, bound_stores()),
             )
             with _owned(pool):
                 submit = functools.partial(pool.submit, _run_chunk_in_process)
@@ -817,6 +840,16 @@ def _require_pickleable(op: Operator, where: str) -> None:
             f"Map on {where}: {type(op).__name__} does not pickle "
             f"({type(exc).__name__}: {exc})."
         ) from exc
+    # the store_scope bindings go to the workers too
+    for name, store in bound_stores().items():
+        try:
+            pickle.dumps(store)
+        except Exception as exc:
+            raise TypeError(
+                f"Map on {where}: the store bound to {name!r} "
+                f"({type(store).__name__}) does not pickle "
+                f"({type(exc).__name__}: {exc})."
+            ) from exc
 
 
 def _refuse_tracers(chunk: Chunk, executor: str) -> None:
