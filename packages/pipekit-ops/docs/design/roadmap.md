@@ -6,6 +6,20 @@ version: 0.1.0
 # Roadmap and testing gates
 
 Six phases, each a pull request or two.
+P1 to P5 have shipped, in pipekit-ops 0.2.1; P6 is still deferred.
+
+| Phase | Status | Pull requests |
+|---|---|---|
+| P1 | shipped | #209 |
+| P2 | shipped | #210 (`Map`, `execution.py`), #211 (presets rebuilt on `Map`) |
+| P3 | shipped | #215 |
+| P4 | shipped | #216 |
+| P5 | shipped | #217 |
+| P6 | deferred | none yet |
+
+Each phase below keeps its gate table as it was written, then says briefly what was measured when it landed.
+The full numbers are in each pull request's description.
+
 A phase is done when every gate in its table passes in CI, together with the four checks of the repository's pre-commit checklist (tests, `ruff check .`, `ruff format --check .`, `ty check`).
 
 Gates that apply to every phase:
@@ -31,6 +45,15 @@ Adds `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`, `Merge`, `Assoc`, `UpdateIn`, `
 
 **Risk:** the new names crowd the top-level namespace (about 25 names).
 **Fallback:** export them from `pipekit_ops.dicts` and `pipekit_ops.seq` only, and add top-level aliases later if users ask.
+
+**Shipped** in #209, with all 22 operators also exported at top level (the fallback was not needed).
+Measured:
+
+- G1-1: Hypothesis with `max_examples=200` and a fixed seed; the 15 operators with a toolz counterpart agree with it, and the other 7 are checked against plain Python.
+- G1-3: `Zip(strict=False)([1, 2], [1]) == [(1, 1)]`.
+- G1-4: a bare `lambda` is refused by all 12 operators that take a predicate, key or function.
+- G1-5: over 300 STAC-like item dicts the graph gives `n_found == 300`, with `n_kept` and `per_tile` equal to a plain loop, and the graph round-trips.
+- G0-1 to G0-4: all 22 operators are in the round-trip sweep; a fresh interpreter that imports `pipekit_ops` loads only stdlib modules (`tests/test_no_dependencies.py`).
 
 ## P2: Map, executors, presets, Prefetch, Fold
 
@@ -59,6 +82,20 @@ Adds `Map`, `executor_scope`, `Prefetch`, `Fold`, `MapError`, rebuilds the four 
 **Risk:** the backpressure loop is the most intricate code in core.
 **Fallback:** ship `Map` with the presets unchanged first, and move the presets onto `Map` in a second pull request once G2-1 to G2-5 hold for `Map`.
 
+**Shipped** in two pull requests, as the second fallback suggests: #210 adds `Map`, `executor_scope`, `MapError`, `Failed`, `Prefetch` and `Fold`, and #211 rebuilds the four presets on `Map`.
+The first fallback was taken too: `ProcessMap` keeps the platform's start method and raises a `FutureWarning` when that is not spawn, while `Map(executor="process")` uses spawn.
+Measured:
+
+- G2-2: at most 7 items were pulled and not yet collected, with a window of 8.
+- G2-3: threads raised in 0.40 s (bound 0.5 s); `Map` on processes under spawn in 0.77 to 0.87 s, and `ProcessMap` in 0.429 s (bound 1.5 s).
+  The wall-clock tests are marked `slow`, so CI skips them and runs timing-free versions instead (for `ProcessMap`: with 2 workers over 100 items and item 0 failing, at most 10 items start).
+- G2-6: the four preset hashes are pinned in a test and unchanged.
+- G2-8: run with JAX 0.10.1.
+- G2-11: with the head item blocked, at most 4 items were held over the whole run.
+- G2-13: 10 × 10 nested items finish in about 0.002 s.
+- G2-14: at most 4 items held; the run took 1.005 to 1.009 s against the 1 s block, with results in order.
+- G2-1, G2-4, G2-5, G2-7, G2-9, G2-10, G2-12: pass.
+
 ## P3: Timeout, RateLimit, Until
 
 | ID | Gate | Pass condition |
@@ -73,6 +110,19 @@ Adds `Map`, `executor_scope`, `Prefetch`, `Fold`, `MapError`, rebuilds the four 
 
 **Risk:** abandoned threads from `Timeout` pile up when a service hangs for good.
 **Fallback:** the `max_abandoned` warning, and `Timeout(…, isolate="process")` in a later phase.
+
+**Shipped** in #215, in the module `pipekit_ops.flow`.
+The `max_abandoned` warning shipped; `isolate="process"` has not.
+Measured:
+
+- G3-1: `Timeout` fired in 0.1006 s (limit 0.15 s).
+- G3-2: a fast `op` returned in 0.0106 s.
+- G3-3: 3 calls returned in 0.2029 s (limit 0.35 s).
+- G3-4: 50 calls from 8 threads took 4.0021 s, with at most 10 starts in any 1 s window.
+- G3-5 and G3-6: `Until` raises after exactly 5 calls (with `on_max="return"` it returns $x_5$), and calls `op` 0 times when `pred` already holds.
+- G3-7: `Until` refuses async children too, for both `op` and `pred`, as decision O15 asks, so four operators pass the gate rather than three.
+
+The wall-clock tests for G3-1, G3-3 and G3-4 are marked `slow`; each has a deterministic twin, on events or a fake clock, that runs in CI.
 
 ## P4: Store and the disk cache
 
@@ -89,6 +139,16 @@ Adds `Map`, `executor_scope`, `Prefetch`, `Fold`, `MapError`, rebuilds the four 
 **Risk:** moving the config part of the key to `pipeline_hash(inner)` invalidates nothing on disk today (there is no disk backend), but a later change of `pipeline_hash` framing would.
 **Fallback:** a `DirectoryStore` writes a `pipekit-store.json` with a format version, and refuses a directory with another version.
 
+**Shipped** in #216, with the fallback built in from the start: `pipekit-store.json` records version 1.
+Measured:
+
+- G4-1: `pipeline_hash(Cache(Identity()))` is still `24b9f307…0149` (pinned), the config is still `{"inner": …}`, and the core-tour example still gives `(1, 2)`.
+- G4-2: a first spawned process gives hits and misses `(0, 100)`; a second one, with a fresh `Cache`, gives `(100, 0)` and identical outputs.
+- G4-3: 8 spawned writers saving the same 100 keys in shuffled order (20 KB values) leave exactly 100 files and no temporary files, all loadable and correct.
+- G4-6: the `LookupError` names `'missing'` both outside any scope and inside another scope.
+- G4-7: `A()` and `B()` with equal configs give 2 entries in one shared store.
+- G4-4 and G4-5: pass.
+
 ## P5: Log, progress, AssertThat, AssertSignature
 
 | ID | Gate | Pass condition |
@@ -99,10 +159,15 @@ Adds `Map`, `executor_scope`, `Prefetch`, `Fold`, `MapError`, rebuilds the four 
 | G5-4 | AssertSignature | with a registered adapter, a carrier with dims `band y x` passes `"band y x"` and `"... y x"`, and fails `"time band y x"` with `QCError`; an unregistered carrier raises with `missing="raise"` and passes with `missing="skip"` |
 | G5-5 | Build-time check | `Sequential.summary()` of a pipeline whose upstream signature is `time y x` followed by `AssertSignature("band y x")` reports the mismatch without running data |
 
-## P6: async-aware wrappers (later)
+**Shipped** in #217.
+G5-1 to G5-5 pass (`tests/test_observe_qc_p5.py`, 32 tests).
+`progress` is left out of `Map`'s config when it is `None`, and a test pins `pipeline_hash(Map(Identity()))` at `b5098ac5…`, its value before this phase, so every existing `Map` and preset keeps its hash.
+
+## P6: async-aware wrappers (deferred)
 
 `Retry`, `Timeout` and `RateLimit` gain an `_apply_async` used by `Map(executor="async")`, so an async read can be retried and rate-limited on one event loop.
 Its gates are written with its design; the P3 refusal (G3-7) is lifted operator by operator.
+Nothing of P6 has been built yet.
 
 ## Order and dependencies
 
@@ -121,5 +186,6 @@ P4  Store, disk cache ────────► P5  Log, progress, asserts
 
 P1 has no dependencies and unblocks `Fold` and `BatchedMap`'s rebuild.
 P3 needs P2 only for `Timeout`'s shared pool and the async refusal; it can start in parallel once `Map`'s worker helpers exist.
+As built, `Timeout` starts a daemon thread per call instead of using a shared pool (see [decisions.md](decisions.md)), and the five phases landed as a stack of pull requests in the order P1, P2, P3, P4, P5.
 P4 needs `Get` from P1 for `key=` and the pickling rules from P2.
 P5 needs `Map` for `progress`.

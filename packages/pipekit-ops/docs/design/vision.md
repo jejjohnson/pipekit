@@ -8,7 +8,8 @@ version: 0.1.0
 ## 1. The decision
 
 pipekit-ops gains about thirty small operators and one execution engine.
-They fill the gaps that pipelines currently fill with `Lambda`: reshaping the dicts that `Graph` and `Fanout` return, working on lists of items, limiting how fast and how long a step may run, and running one operator over many items on any executor.
+They have shipped, in phases P1 to P5 of [roadmap.md](roadmap.md) (pipekit-ops 0.2.1).
+They fill the gaps that pipelines used to fill with `Lambda`: reshaping the dicts that `Graph` and `Fanout` return, working on lists of items, limiting how fast and how long a step may run, and running one operator over many items on any executor.
 
 Two rules hold for every one of them.
 
@@ -47,7 +48,7 @@ Each item is a plain dict (the STAC JSON): its cloud cover sits at `item["proper
 
 The job has six needs, and each one maps to a group of this design.
 
-| Need | What goes wrong today | Group |
+| Need | What went wrong before this design | Group |
 |---|---|---|
 | Pull fields out of nested item dicts | every access is a `Lambda`, so the pipeline cannot round-trip | dict plumbing |
 | Drop cloudy items, count what is left | a `Lambda` over the list, or Python outside the pipeline | iterables |
@@ -56,7 +57,7 @@ The job has six needs, and each one maps to a group of this design.
 | Do not re-read a scene after a crash | `Cache` is in memory only, and its docstring promises a disk backend for v0.2 | cache and store |
 | Check each scene and log what happened | `AssertCallable` and `Tap` hold closures | observe and QC |
 
-Here is the whole job in the proposed vocabulary.
+Here is the whole job in the vocabulary that now ships.
 $N$ is the number of items the search returns, $K \le N$ the number kept after the cloud screen, and $B = 4$ the bands read per scene.
 `StacSearch`, `MaxCloud`, `ReadBands` and `ValidFraction` are user operators with plain configs; everything else is pipekit-ops.
 
@@ -67,39 +68,39 @@ import pipekit_ops as pk
 
 # user
 search = StacSearch(collection="sentinel-2-l2a", month="2026-10")
-# proposed (P1)
+# today (pipekit-ops)
 cloud_cover = pk.GetIn(("properties", "eo:cloud_cover"))
 # user
 is_clear = MaxCloud(40.0)
-# today
+# today (pipekit-ops)
 clear_enough = cloud_cover | is_clear
-# proposed (P1)
+# today (pipekit-ops)
 # (N items) → (K items)
 keep = pk.Filter(clear_enough)
 
 # user
 read = ReadBands(bands=("B02", "B03", "B04", "B08"))
-# proposed (P3)
+# today (pipekit-ops)
 # give up on one attempt after 60 s
 bounded = pk.Timeout(read, seconds=60.0)
-# proposed (P3)
+# today (pipekit-ops)
 # at most R = 10 attempt starts in any window of T_w = 1 s; retries count too
 limited = pk.RateLimit(bounded, calls=10, period=1.0)
-# today
+# today (pipekit-ops)
 retried = pk.Retry(limited, attempts=4, base_delay=1.0, on=(OSError, TimeoutError))
-# proposed (P4)
+# today (pipekit-ops)
 scene_id = pk.Get("id")
-# proposed (P4)
+# today (pipekit-ops)
 cached = pk.Cache(retried, store="scenes", key=scene_id)
-# proposed (P5)
+# today (pipekit-ops)
 checked = cached | pk.AssertSignature("band y x")
-# proposed (P2)
+# today (pipekit-ops)
 # (K items) → (K scenes), at most W = 16 in flight
 read_all = pk.Map(checked, executor="scope", max_in_flight=16, on_error="collect")
 
-# proposed (P1)
+# today (pipekit-ops)
 tile_id = pk.GetIn(("properties", "s2:mgrs_tile"))
-# proposed (P1)
+# today (pipekit-ops)
 # (K items) → dict of ≤ T counts
 per_tile = pk.CountBy(tile_id)
 ```
@@ -107,21 +108,21 @@ per_tile = pk.CountBy(tile_id)
 The summary is a `Graph`, because it has one input and several named outputs.
 
 ```python
-# today
+# today (pipekit-ops)
 items = pk.Input("items")
 # user
 found = search(items)
-# today
+# today (pipekit-ops)
 kept = keep(found)
-# today
+# today (pipekit-ops)
 scenes = read_all(kept)
-# proposed (P1)
+# today (pipekit-ops)
 n_found = pk.Count()(found)
-# proposed (P1)
+# today (pipekit-ops)
 n_kept = pk.Count()(kept)
-# today
+# today (pipekit-ops)
 tiles = per_tile(kept)
-# today
+# today (pipekit-ops)
 job = pk.Graph(
     inputs={"items": items},
     outputs={"n_found": n_found, "n_kept": n_kept, "per_tile": tiles, "scenes": scenes},
@@ -137,22 +138,26 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Shapes: as above
 
-# proposed (P4)
+# today (pipekit-ops)
 scratch = pk.DirectoryStore("/scratch/s2")
 pool = ThreadPoolExecutor(max_workers=8)
-# proposed (P2)
+# today (pipekit-ops)
 on_threads = pk.executor_scope(pool)
-# proposed (P4)
+# today (pipekit-ops)
 in_scratch = pk.store_scope(scenes=scratch)
 # laptop: eight threads
 with on_threads, in_scratch:
     summary = job(items=query)
 
 # cluster: the same job on dask workers, no change to job
+# not pinned (dask)
 cluster_pool = client.get_executor()
-# proposed (P2)
+# today (pipekit-ops)
 on_cluster = pk.executor_scope(cluster_pool)
-with on_cluster, in_scratch:
+# today (pipekit-ops)
+# a scope is a one-shot context manager, so bind the store again
+in_scratch_again = pk.store_scope(scenes=scratch)
+with on_cluster, in_scratch_again:
     summary = job(items=query)
 ```
 
@@ -169,4 +174,4 @@ with on_cluster, in_scratch:
 | Cache and store | `Store`, `MemoryStore`, `DirectoryStore`, `store_scope` | 200 lines |
 | Observe and QC | 3 plus a `progress` argument on `Map` | 150 lines |
 
-The estimates are for source only; tests roughly double them.
+The estimates were written before the build, for source only; tests roughly double them.
