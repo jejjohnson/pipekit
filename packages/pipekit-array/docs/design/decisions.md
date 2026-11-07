@@ -247,7 +247,7 @@ pad="last" | "none" | "drop")`.
 (geoarray `pad_points`, geopatcher `PatchBatch`, pipekit-train's eval
 batches with no mask), one home for the rule.
 
-## A11–A21. The missing dim-level functions
+## A11–A22. The missing dim-level functions
 
 **Decision (6 Nov 2026):** sixteen dim-level functions join `dims`, each with an operator twin in `dim_operators`.
 The full catalogue, the xarray parity table and the testing gates are in [api/dim_functions.md](api/dim_functions.md); the decisions are summarised here.
@@ -258,11 +258,12 @@ The full catalogue, the xarray parity table and the testing gates are in [api/di
 - **A14. `merge_dims` / `split_dims`**, not `stack` / `unstack`, because `stack` already means a new dim from several carriers; merged labels are tuples, so the round trip is exact.
 - **A15. Windows.** `window` returns full windows only; `coarsen` is `split_dims` then `reduce`; `ApplyAlong(inner, dim)` replaces the planned `ApplyToBands` and the planned `Subsample` is `isel` with a stepped slice.
 - **A16. `where`, not `fill_where`**: True keeps, as in xarray and as `Padded.valid` does (A10).
-- **A17. `dot`, not `contract`**, with `dim` required so a dim shared by accident is never summed.
+- **A17. `dot`, not `contract`**, with `dim` required so a dim shared by accident is never summed; shared dims not in `dim` are batch dims, so the generic path is a named-index `einsum`, not `tensordot`.
 - **A18. `quantile` is a function**, because a list of $q$ adds a dim that `reduce` cannot name.
 - **A19. `BatchAlong` supersedes A5.** The planned array-shaped `BatchedMap` is renamed `BatchAlong(inner, size, dim, pad="none")`, so it no longer shares a name with `pipekit_ops.BatchedMap`.
 - **A20. Label-value operations stay in xarray**: `groupby`, `resample`, `swap_dims`, `reindex`, `interp`, `idxmax`, `polyfit`, `differentiate`, `interpolate_na`, `rolling_exp`.
 - **A21. The planned QC `Diff` becomes `AssertClose`**, so `Diff` is the twin of `diff`.
+- **A22. An optional `relabel` adapter method** sets the labels `rewrap` cannot carry (renamed, merged, split, quantile, broadcast and contracted-in dims); without it those functions raise instead of dropping labels. The seven required methods do not change.
 
 ## Optional extras matrix
 

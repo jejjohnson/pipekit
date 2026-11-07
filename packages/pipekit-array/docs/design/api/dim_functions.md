@@ -28,8 +28,9 @@ This page adds those as free functions in `dims` with operator twins in `dim_ope
 
 - The joining rule (GA-Q3, in the module docstring of [`dims.py`](../../../src/pipekit_array/dims.py)): a function never reads coordinate values or geometry.
   Every new function works on positions; labels only follow the data.
-- `NamedArrayAdapter` keeps its seven methods ([`adapters.py`](../../../../pipekit-ops/src/pipekit_ops/adapters.py)).
+- `NamedArrayAdapter` keeps its seven required methods ([`adapters.py`](../../../../pipekit-ops/src/pipekit_ops/adapters.py)).
   Every new function has a generic path through `data`, `isel` and `rewrap`; an adapter may add a fast path of the same name, as today.
+  One optional method is added, `relabel`, for the six functions that put labels on a dim `rewrap` cannot label (section 3.0, decision A22).
 - `DimArray` gets no methods ([`dimarray.py`](../../../src/pipekit_array/dimarray.py)).
 - Element-wise functions (`fillna`, `clip`, `isin`, `isnull`, `round`, `astype`) stay `combine` calls: they touch no dim.
 - `groupby`, `resample`, `interp`, `reindex` and anything else that selects by label value stay in xarray (and coordax).
@@ -77,16 +78,45 @@ Columns: the signature (keyword dims, `x` positional-only as in `isel`); the sem
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
 Every function in the tables is `proposed` unless marked `today`.
 
+### 3.0 Labels on new or renamed dims
+
+`rewrap(x, data, dims)` keeps labels by dim name: `DimArrayAdapter.rewrap` copies `x.labels[dim]` for each output dim whose size is unchanged ([`dimarray.py`](../../../src/pipekit_array/dimarray.py)), and the xarray adapter keeps a coordinate when all its dims survive with their sizes ([`xarray.py`](../../../src/pipekit_array/xarray.py)).
+So `rewrap` alone cannot label a dim whose name or labels are new, and six functions need exactly that:
+
+| Function | Output dim | Its labels |
+| --- | --- | --- |
+| `rename` | the new name | the old dim's labels, unchanged |
+| `merge_dims` | the merged dim | tuples of the source labels, positions for an unlabelled source |
+| `split_dims` | each source dim | recovered from the tuples, or none |
+| `quantile` | `quantile` (sequence `q` only) | the values of `q` |
+| `broadcast_like` | each dim taken from `other` | `other`'s labels |
+| `dot` | each dim taken from an input after the first | that input's labels |
+
+With `rewrap` only, `rename(cube, band="channel")` on a `DimArray` would drop the band labels, because `rewrap` looks them up under `channel`.
+
+The fix is one optional adapter method, in a runtime-checkable `LabelledAdapter` protocol next to `NamedArrayAdapter` in `pipekit_ops.adapters`:
+
+```python
+# proposed (A22)
+def relabel(self, x: Any, labels: Mapping[str, tuple[Any, ...] | None]) -> Any:
+    """``x`` with the labels of the named dims set; None removes a dim's labels."""
+```
+
+Each of the six generic paths computes the output labels from `adapter.labels(...)` on its inputs, calls `rewrap`, then calls `relabel` with only the dims in the table above.
+`DimArrayAdapter.relabel` rebuilds the `DimArray` with the merged label mapping, and checks each label tuple against its dim's size.
+The xarray adapter's `relabel` is `assign_coords` for a tuple and `drop_vars` for None.
+An adapter without `relabel` still runs the six functions when no output labels would be set; when some would be, the function raises `TypeError` naming the adapter and the dim, so labels are never lost silently.
+
 ### 3.1 Dims
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `rename` | `rename(x, /, **names: str)` | New dim names; data, order and labels unchanged. | Generic: `rewrap` with new names. Fast path needed on carriers whose metadata is keyed by dim (xarray, geoarray), since `rewrap` keeps metadata by name. | jit, vmap safe; names static. | proposed |
+| `rename` | `rename(x, /, **names: str)` | New dim names; data, order and labels unchanged. | Generic: `rewrap` with new names, then `relabel` with the old dims' labels under the new names (section 3.0). A fast path is still needed on carriers with more metadata keyed by dim than labels (xarray's non-index coords and encodings, geoarray's grid). | jit, vmap safe; names static. | proposed |
 | `expand_dims` | `expand_dims(x, dim: str \| Sequence[str], /, *, axis: int = 0)` | Insert length-1 dims at `axis`. | Generic: `xp.expand_dims`, `rewrap`. | jit, vmap safe; `dim`, `axis` static. | proposed |
 | `squeeze` | `squeeze(x, dim: str \| Sequence[str], /)` | Drop named length-1 dims; raise if a size is not 1. `dim` is required. | Generic: `isel(x, dim=0)` after the size check. | jit, vmap safe. | proposed |
-| `broadcast_like` | `broadcast_like(x, other, /, *, exclude: Sequence[str] = ())` | Add `other`'s missing dims to `x`, in front, in `other`'s order; shared dims must agree exactly. | Generic: `check_compatible` on the shared dims, `xp.expand_dims`, `xp.broadcast_to`, `rewrap`. | jit, vmap safe; `other`'s shape static. | proposed |
-| `merge_dims` | `merge_dims(x, /, **dims: Sequence[str])` | `merge_dims(cube, pixel=("y", "x"))`: the listed dims become one, placed last, in C order. Labels become tuples. | Generic: `transpose`, `xp.reshape`, a `DimArray`-style tuple label. | jit, vmap safe; names static. | proposed |
-| `split_dims` | `split_dims(x, /, **dims: Mapping[str, int])` | `split_dims(p, pixel={"y": 256, "x": 256})`: one dim becomes several, in place; the sizes must multiply to its length. Tuple labels are split back. | Generic: `xp.reshape`, `rewrap`. | jit, vmap safe; sizes static. | proposed |
+| `broadcast_like` | `broadcast_like(x, other, /, *, exclude: Sequence[str] = ())` | Add `other`'s missing dims to `x`, in front, in `other`'s order; shared dims must agree exactly. | Generic: `check_compatible` on the shared dims, `xp.expand_dims`, `xp.broadcast_to`, `rewrap`, then `relabel` with `other`'s labels on the added dims. | jit, vmap safe; `other`'s shape static. | proposed |
+| `merge_dims` | `merge_dims(x, /, **dims: Sequence[str])` | `merge_dims(cube, pixel=("y", "x"))`: the listed dims become one, placed last, in C order. Labels become tuples. | Generic: `transpose`, `xp.reshape`, `rewrap`, then `relabel` with the tuple labels. | jit, vmap safe; names static. | proposed |
+| `split_dims` | `split_dims(x, /, **dims: Mapping[str, int])` | `split_dims(p, pixel={"y": 256, "x": 256})`: one dim becomes several, in place; the sizes must multiply to its length. Tuple labels are split back. | Generic: `xp.reshape`, `rewrap`, then `relabel` with the labels split from the tuples. | jit, vmap safe; sizes static. | proposed |
 
 ### 3.2 Index-only transforms
 
@@ -114,8 +144,31 @@ None reads a label; labels stay on their positions (xarray's default, `roll_coor
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `quantile` | `quantile(x, q: float \| Sequence[float], dim: str \| Sequence[str], /, *, method: str = "linear", skipna: bool = False)` | Quantiles over `dim`; a sequence `q` adds a leading dim `quantile` labelled with `q`, a float drops it. | Generic: `xp.quantile` or `xp.nanquantile`, `rewrap`. Dask needs `dim` in one chunk. | jit, vmap safe; `q`, `method` static. JAX supports `linear`, `lower`, `higher`, `midpoint`, `nearest`, `inverted_cdf`. | proposed |
-| `dot` | `dot(*xs, dim: str \| Sequence[str])` | Sum of the product over `dim`; output dims in order of first appearance, `dim` removed. `dim` is required. | Generic: `combine`-style dim matching, `xp.tensordot` after `transpose`, `rewrap` on the first input. | jit, vmap safe. | proposed |
+| `quantile` | `quantile(x, q: float \| Sequence[float], dim: str \| Sequence[str], /, *, method: str = "linear", skipna: bool = False)` | Quantiles over `dim`; a sequence `q` adds a leading dim `quantile` labelled with `q`, a float drops it. | Generic: `xp.quantile` or `xp.nanquantile`, `rewrap`, then `relabel` with `quantile=tuple(q)` for a sequence `q`. Dask needs `dim` in one chunk. | jit, vmap safe; `q`, `method` static. JAX supports `linear`, `lower`, `higher`, `midpoint`, `nearest`, `inverted_cdf`. | proposed |
+| `dot` | `dot(*xs, dim: str \| Sequence[str])` | Sum of the product over `dim`; output dims in order of first appearance, `dim` removed. A dim shared by several inputs and not in `dim` is a batch dim: it appears once in the output, as in `xr.dot`. `dim` is required. | Generic: a named-index `xp.einsum` built from the dim names (below), `check_compatible` on the shared dims, `rewrap` on the first input, then `relabel` with the labels of dims taken from later inputs. | jit, vmap safe. | proposed |
+
+
+`dot` cannot be built on `xp.tensordot`.
+`tensordot` contracts pairs of axes and puts every other axis of each input side by side, so a dim on both inputs that is not contracted appears twice.
+For inputs with dims `(time, band)` and `(time, band, component)`, contracted over `band`, `tensordot` returns `(time, time, component)`, not `(time, component)`; contracting `time` as well would remove the dim `dot` must keep.
+
+The generic path writes one `einsum` subscript from the dim names instead.
+Each distinct dim gets one letter; an input's subscript lists its dims in axis order; the output lists every dim that is not in `dim`, in order of first appearance.
+
+```python
+# Shapes: T = 12 scenes; B = 13 bands; C = 3 components
+
+# proposed (A17): what dot builds for the two inputs above
+# s_{tc} = ∑_b x_{tb} W_{tbc}
+# letters: time → a, band → b, component → c
+subscripts = "ab,abc->ac"
+# (T, B), (T, B, C) → (T, C)
+out_data = xp.einsum(subscripts, x_data, w_data)
+```
+
+`time` is a batch dim here: it is shared, kept, and not summed.
+NumPy, JAX and dask all provide `einsum` on the namespaces `namespace_of` resolves, though it is not in the Array API standard.
+For a namespace without `einsum`, the fallback is to `broadcast_like` every input to the union of their dims, multiply, and `xp.sum` over `dim`; this is exact but holds the full product in memory.
 
 ### 3.5 Operator twins
 
@@ -299,7 +352,7 @@ Status: **exists** (ships today), **proposed** (this page), **compose** (no new 
 
 ## 6. Decisions
 
-ADR IDs continue [decisions.md](../decisions.md); A11 to A21 are appended there.
+ADR IDs continue [decisions.md](../decisions.md); A11 to A22 are appended there.
 
 **A11. Scope: dim-level and index-only.**
 Recommended: add only functions that change dims or move data by position; leave element-wise maths to `combine`.
@@ -340,6 +393,7 @@ Alternative: `combine` with `xp.where`; it works only when `cond` has every dim 
 **A17. `dot`, not `contract`.**
 Recommended: xarray's name, with `dim` required.
 xarray contracts every shared dim when `dim` is `None`; a dim shared by accident (`time` on both) would vanish silently.
+A shared dim not listed in `dim` is a batch dim and appears once in the output, so the generic path is a named-index `einsum`, not `tensordot` (section 3.4).
 `einx.einsum` stays for patterns `dot` cannot write, behind the `[einx]` extra; `dot` needs no extra.
 Alternative: `contract(x, y, over=...)`; rejected, because it adds a second vocabulary for one operation.
 
@@ -363,6 +417,13 @@ Alternative: label-value `sel` ranges; rejected, because it is the step that tur
 Recommended: `Diff` is the operator twin of `diff`, as `Reduce` is of `reduce`; the planned QC operator in [qc.md](qc.md) is renamed `AssertClose`, matching its `Assert*` siblings.
 Alternative: name the twin `Difference`; rejected, because every other twin is the function's name in CamelCase.
 
+**A22. One optional adapter method, `relabel`, for labels `rewrap` cannot carry.**
+Recommended: an optional `relabel(x, labels)` in a runtime-checkable `LabelledAdapter` protocol (section 3.0); the seven required methods do not change.
+`rename`, `merge_dims`, `split_dims`, `quantile`, `broadcast_like` and `dot` call it after `rewrap`; without it they raise `TypeError` when labels would be set, instead of dropping them.
+`DimArrayAdapter` and the xarray adapter implement it; a third-party adapter that skips it keeps working for every other function.
+Alternative: a `labels=` keyword on `rewrap`; rejected, because it changes a required method's signature and breaks every adapter written against the current protocol, while an optional method is additive.
+Alternative: a required fast path for each of the six functions on every labelled carrier; rejected, because it repeats the label logic once per adapter, and the reference `DimArray` would need it too.
+
 ## 7. Testing gates
 
 Fixtures: the test kit's layout ([`testing.py`](../../../src/pipekit_array/testing.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
@@ -379,14 +440,16 @@ Fixtures: the test kit's layout ([`testing.py`](../../../src/pipekit_array/testi
 | G8 dtype | float32 in, float32 out for every function; `shift` and `pad` with `mode="constant"` on integer data and no fill value raise `TypeError`. |
 | G9 operators | Every twin with only names and numbers round-trips through `dumps` / `loads` with a stable content hash; `compute_output_signature` equals `signature_of(op(x))` on the running example. |
 | G10 backends | Each function runs on NumPy, JAX and dask; `cumreduce(x, "cumulative_sum", "time")` on dask equals NumPy exactly. |
+| G11 labels | On `DimArray` and on the xarray adapter: `labels(rename(cube, band="channel"), "channel")` equals the 13 band names; `labels(merge_dims(cube, pb=("band", "y")), "pb")[0] == ("B1", 0)`; `labels(quantile(cube, [0.1, 0.9], "time"), "quantile") == (0.1, 0.9)`; `dot` keeps the `component` labels of its second input. An adapter without `relabel` raises `TypeError` from `rename` on a labelled dim, and returns the same data as `DimArrayAdapter` on an unlabelled one. |
+| G12 batched dot | For `x` with dims `(time, band)` of shape (12, 13) and `w` with dims `(time, band, component)` of shape (12, 13, 3), `dot(x, w, dim="band")` has dims `(time, component)` and equals `xr.dot(x, w, dim="band")` and the loop $s_{tc} = \sum_b x_{tb} w_{tbc}$ within `rtol=1e-12` on float64; on NumPy, JAX and dask. |
 
 ## 8. Phased order
 
 | Phase | Adds | Risk | Fallback |
 | --- | --- | --- | --- |
-| 1. Dims | `rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims` and twins; A19 and A21 renames in the catalogue | `rename` on xarray and geoarray must move metadata keyed by dim name, which `rewrap` cannot. | Make the `rename` fast path required for those adapters; `check_adapter` fails without it. |
+| 1. Dims | `LabelledAdapter.relabel` on `DimArrayAdapter` and the xarray adapter (A22); `rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims` and twins; A19 and A21 renames in the catalogue | `rename` on xarray and geoarray must move more metadata keyed by dim name than labels (non-index coords, the grid), which `relabel` does not cover. | Make the `rename` fast path required for those adapters; `check_adapter` fails without it. |
 | 2. Index-only transforms | `pad`, `roll`, `shift`, `diff`, `cumreduce`, `where` and twins | Backends name things differently: dask has `cumsum`, not `cumulative_sum`; `pad` is resolved per backend, not from the standard. | Extend `_DaskNamespace._NAMES`; restrict `pad` to the four modes all three backends share. |
 | 3. Windows | `window`, `coarsen`, `ApplyAlong`, `BatchAlong` | `window` copies the data $S$ times in the generic path (a 12 × 13 × 256 × 256 float32 cube is 41 MB; $S = 3$ makes 123 MB). | The xarray fast path (a view); for large $S$, `coarsen` or `KernelOp` with a convolution kernel. |
 | 4. Statistics and algebra | `quantile`, `dot` and twins | JAX supports six quantile methods; dask needs the quantile dim in one chunk. | Reject other methods with a `ValueError` naming the six; rechunk as `take_along` does today. |
 
-Each phase is one PR with its tests, gates G1 to G10 for its functions, and the `api/README.md` table updated.
+Each phase is one PR with its tests, gates G1 to G12 for its functions, and the `api/README.md` table updated.
