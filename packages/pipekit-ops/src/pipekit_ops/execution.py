@@ -33,11 +33,10 @@ from concurrent.futures import (
     wait,
 )
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
-from pipekit_ops.parallel import check_pickleable
 
 
 __all__ = ["Failed", "Fold", "Map", "MapError", "Prefetch", "executor_scope"]
@@ -293,6 +292,8 @@ class Map(Operator):
     """
 
     __config_mixin_auto__ = False
+    #: start method when ``start_method`` is ``None``; ``None`` is the platform's
+    _default_start_method: ClassVar[str | None] = "spawn"
 
     def __init__(
         self,
@@ -304,16 +305,18 @@ class Map(Operator):
         chunksize: int = 1,
         start_method: str | None = None,
     ) -> None:
-        require_operator(op, "Map", "op")
-        _require_choice("executor", executor, EXECUTORS)
-        _require_choice("on_error", on_error, ON_ERROR)
+        # a preset's errors name the preset
+        owner = type(self).__name__
+        require_operator(op, owner, "op")
+        _require_choice(f"{owner}.executor", executor, EXECUTORS)
+        _require_choice(f"{owner}.on_error", on_error, ON_ERROR)
         if start_method is not None:
-            _require_choice("start_method", start_method, START_METHODS)
+            _require_choice(f"{owner}.start_method", start_method, START_METHODS)
         for name, value in (("n_workers", n_workers), ("max_in_flight", max_in_flight)):
             if value is not None and value < 1:
-                raise ValueError(f"Map.{name} must be >= 1, got {value}.")
+                raise ValueError(f"{owner}.{name} must be >= 1, got {value}.")
         if chunksize < 1:
-            raise ValueError(f"Map.chunksize must be >= 1, got {chunksize}.")
+            raise ValueError(f"{owner}.chunksize must be >= 1, got {chunksize}.")
         self.op = op
         self.executor = executor
         self.n_workers = n_workers
@@ -418,7 +421,8 @@ class Map(Operator):
             raise value
         if self.on_error == "log_and_continue":
             log.warning(
-                "Map: item %d failed with %s: %s",
+                "%s: item %d failed with %s: %s",
+                type(self).__name__,
                 index,
                 type(value).__name__,
                 value,
@@ -527,7 +531,8 @@ class Map(Operator):
                 yield _thread_submit(pool, op), window, True
         elif executor == "process":
             _require_pickleable(op, 'executor="process"')
-            context = multiprocessing.get_context(self.start_method or "spawn")
+            method = self.start_method or self._default_start_method
+            context = multiprocessing.get_context(method)
             # op is pickled once per worker, through the initializer
             pool = ProcessPoolExecutor(
                 max_workers=n_workers,
@@ -795,6 +800,9 @@ def _default_workers(executor: str) -> int:
 
 def _require_pickleable(op: Operator, where: str) -> None:
     """Raise `TypeError` unless ``op`` can travel to another process."""
+    # imported here: the presets in `parallel` subclass `Map`
+    from pipekit_ops.parallel import check_pickleable
+
     flagged = check_pickleable(op)
     if flagged:
         names = ", ".join(type(found).__name__ for found in flagged)
@@ -852,4 +860,4 @@ def _map_error(
 
 def _require_choice(name: str, value: str, choices: tuple[str, ...]) -> None:
     if value not in choices:
-        raise ValueError(f"Map.{name} must be one of {choices}, got {value!r}.")
+        raise ValueError(f"{name} must be one of {choices}, got {value!r}.")

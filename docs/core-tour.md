@@ -340,7 +340,10 @@ theirs.
 ## Parallelism
 
 Four shapes, one wrapper each. Every wrapper takes an iterable and returns a
-list in input order.
+list in input order. Each is a preset of [`Map`](#map), so it pulls its input
+lazily and, on `on_error="raise"`, cancels what has not started.
+`ProcessMap` keeps the platform's start method for one more minor release and
+warns (`FutureWarning`) where that is not spawn.
 
 | Shape | When | Constraint | Operator |
 |---|---|---|---|
@@ -382,7 +385,7 @@ async def handler(items):
 
 ### `Map`
 
-`Map(op, executor=...)` is the one engine behind the four wrappers' shapes:
+`Map(op, executor=...)` is the one engine the four wrappers are built on:
 `executor` is `"serial"`, `"thread"`, `"process"` (spawn by default),
 `"async"`, or `"scope"`, which borrows whatever `concurrent.futures.Executor`
 an `executor_scope` binds (a dask or Ray executor included) and never shuts it
