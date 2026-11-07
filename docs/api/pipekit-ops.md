@@ -32,6 +32,14 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.combine
 
+## Dict plumbing
+
+::: pipekit_ops.dicts
+
+## Iterables
+
+::: pipekit_ops.seq
+
 ## Caching
 
 ::: pipekit_ops.cache

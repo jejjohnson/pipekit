@@ -50,6 +50,10 @@ dev = [
     # fsspec backs the pipekit-experiment [s3] extra; dev-installed so the
     # S3ModelRegistry tests run (on the in-memory filesystem) in CI.
     "fsspec>=2024.0",
+    # Test-only references for the pipekit-ops P1 gates (G1-1): property tests
+    # with hypothesis, compared against toolz. pipekit-ops never imports them.
+    "hypothesis>=6.100",
+    "toolz>=1.0",
     # Workspace members are dev-installed so tests can import them.
     "pipekit",
     "pipekit-ops",
