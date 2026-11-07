@@ -76,7 +76,7 @@ mean: DimArray["band y x"] = reduce(cube, "mean", "time")
 Columns: the signature (keyword dims, `x` positional-only as in `isel`); the semantics; what the adapter must provide; JAX behaviour; status.
 "Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`dims.py`](../../../src/pipekit_array/dims.py)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables is `proposed` unless marked `today`.
+Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py).
 
 ### 3.0 Labels on new or renamed dims
 
@@ -107,16 +107,19 @@ Each of the six generic paths computes the output labels from `adapter.labels(..
 The xarray adapter's `relabel` is `assign_coords` for a tuple and `drop_vars` for None.
 An adapter without `relabel` still runs the six functions when no output labels would be set; when some would be, the function raises `TypeError` naming the adapter and the dim, so labels are never lost silently.
 
+As built in phase 1: `merge_dims` gives the merged dim no labels when none of its sources has any (positions alone carry nothing, and an adapter without `relabel` can then merge unlabelled dims), and `split_dims` returns a part unlabelled when its recovered labels are exactly its positions $0, \dots, n-1$, so both round trips are exact.
+`relabel` is detected by name (`getattr(adapter, "relabel", None)`, as `_fast_path` does): pipekit-array never imports `LabelledAdapter` at runtime, so it still runs on a pipekit-ops without it.
+
 ### 3.1 Dims
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `rename` | `rename(x, /, **names: str)` | New dim names; data, order and labels unchanged. | Generic: `rewrap` with new names, then `relabel` with the old dims' labels under the new names (section 3.0). A fast path is still needed on carriers with more metadata keyed by dim than labels (xarray's non-index coords and encodings, geoarray's grid). | jit, vmap safe; names static. | proposed |
-| `expand_dims` | `expand_dims(x, dim: str \| Sequence[str], /, *, axis: int = 0)` | Insert length-1 dims at `axis`. | Generic: `xp.expand_dims`, `rewrap`. | jit, vmap safe; `dim`, `axis` static. | proposed |
-| `squeeze` | `squeeze(x, dim: str \| Sequence[str], /)` | Drop named length-1 dims; raise if a size is not 1. `dim` is required. | Generic: `isel(x, dim=0)` after the size check. | jit, vmap safe. | proposed |
-| `broadcast_like` | `broadcast_like(x, other, /, *, exclude: Sequence[str] = ())` | Add `other`'s missing dims to `x`, in front, in `other`'s order; shared dims must agree exactly. | Generic: `check_compatible` on the shared dims, `xp.expand_dims`, `xp.broadcast_to`, `rewrap`, then `relabel` with `other`'s labels on the added dims. | jit, vmap safe; `other`'s shape static. | proposed |
-| `merge_dims` | `merge_dims(x, /, **dims: Sequence[str])` | `merge_dims(cube, pixel=("y", "x"))`: the listed dims become one, placed last, in C order. Labels become tuples. | Generic: `transpose`, `xp.reshape`, `rewrap`, then `relabel` with the tuple labels. | jit, vmap safe; names static. | proposed |
-| `split_dims` | `split_dims(x, /, **dims: Mapping[str, int])` | `split_dims(p, pixel={"y": 256, "x": 256})`: one dim becomes several, in place; the sizes must multiply to its length. Tuple labels are split back. | Generic: `xp.reshape`, `rewrap`, then `relabel` with the labels split from the tuples. | jit, vmap safe; sizes static. | proposed |
+| `rename` | `rename(x, /, **names: str)` | New dim names; data, order and labels unchanged. | Generic: `rewrap` with new names, then `relabel` with the old dims' labels under the new names (section 3.0). A fast path is still needed on carriers with more metadata keyed by dim than labels (xarray's non-index coords and encodings, geoarray's grid). | jit, vmap safe; names static. | today |
+| `expand_dims` | `expand_dims(x, dim: str \| Sequence[str], /, *, axis: int = 0)` | Insert length-1 dims at `axis`. | Generic: `xp.expand_dims`, `rewrap`. | jit, vmap safe; `dim`, `axis` static. | today |
+| `squeeze` | `squeeze(x, dim: str \| Sequence[str], /)` | Drop named length-1 dims; raise if a size is not 1. `dim` is required. | Generic: `isel(x, dim=0)` after the size check. | jit, vmap safe. | today |
+| `broadcast_like` | `broadcast_like(x, other, /, *, exclude: Sequence[str] = ())` | Add `other`'s missing dims to `x`, in front, in `other`'s order; shared dims must agree exactly. | Generic: `check_compatible` on the shared dims, `xp.expand_dims`, `xp.broadcast_to`, `rewrap`, then `relabel` with `other`'s labels on the added dims. | jit, vmap safe; `other`'s shape static. | today |
+| `merge_dims` | `merge_dims(x, /, **dims: Sequence[str])` | `merge_dims(cube, pixel=("y", "x"))`: the listed dims become one, placed last, in C order. Labels become tuples. | Generic: `transpose`, `xp.reshape`, `rewrap`, then `relabel` with the tuple labels. | jit, vmap safe; names static. | today |
+| `split_dims` | `split_dims(x, /, **dims: Mapping[str, int])` | `split_dims(p, pixel={"y": 256, "x": 256})`: one dim becomes several, in place; the sizes must multiply to its length. Tuple labels are split back. | Generic: `xp.reshape`, `rewrap`, then `relabel` with the labels split from the tuples. | jit, vmap safe; sizes static. | today |
 
 ### 3.2 Index-only transforms
 
@@ -174,25 +177,27 @@ For a namespace without `einsum`, the fallback is to `broadcast_like` every inpu
 
 Every twin lives in [`dim_operators.py`](../../../src/pipekit_array/dim_operators.py), takes only names and numbers, round-trips through `dumps` / `loads`, and implements `compute_output_signature` from `Signature.drop_dims` and `Signature.replace_dims`.
 
-| Function | Operator | Serialises | Output signature |
-| --- | --- | --- | --- |
-| `rename` | `Rename(**names)` | yes | names replaced |
-| `expand_dims` | `ExpandDims(dim, axis=0)` | yes | size-1 dims added |
-| `squeeze` | `Squeeze(dim)` | yes | dims dropped |
-| `broadcast_like` | `BroadcastLike(exclude=())`, called `op(x, other)` | yes | other's dims added |
-| `merge_dims` | `MergeDims(**dims)` | yes | product size |
-| `split_dims` | `SplitDims(**dims)` | yes | sizes from config |
-| `pad` | `Pad(mode, constant_values, **pad_width)` | yes | sizes grown |
-| `roll` | `Roll(**shifts)` | yes | unchanged |
-| `shift` | `Shift(fill_value, **shifts)` | yes | unchanged |
-| `diff` | `Diff(dim, n=1, label="upper")` | yes | size minus $n$ |
-| `cumreduce` | `CumReduce(fn: str, dim)` | yes (by name) | unchanged |
-| `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged |
-| `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size |
-| `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ |
-| `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not |
-| `dot` | `Dot(dim)`, called `op(*xs)` | yes | contracted dims removed |
-| `map_over` | `ApplyAlong(inner: Operator, dim)` | yes, if `inner` does | from `inner` |
+| Function | Operator | Serialises | Output signature | Status |
+| --- | --- | --- | --- | --- |
+| `rename` | `Rename(**names)` | yes | names replaced | today |
+| `expand_dims` | `ExpandDims(dim, axis=0)` | yes | size-1 dims added | today |
+| `squeeze` | `Squeeze(dim)` | yes | dims dropped | today |
+| `broadcast_like` | `BroadcastLike(exclude=())`, called `op(x, other)` | yes | other's dims added | today |
+| `merge_dims` | `MergeDims(**dims)` | yes | product size | today |
+| `split_dims` | `SplitDims(**dims)` | yes | sizes from config | today |
+| `pad` | `Pad(mode, constant_values, **pad_width)` | yes | sizes grown | proposed |
+| `roll` | `Roll(**shifts)` | yes | unchanged | proposed |
+| `shift` | `Shift(fill_value, **shifts)` | yes | unchanged | proposed |
+| `diff` | `Diff(dim, n=1, label="upper")` | yes | size minus $n$ | proposed |
+| `cumreduce` | `CumReduce(fn: str, dim)` | yes (by name) | unchanged | proposed |
+| `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged | proposed |
+| `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size | proposed |
+| `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ | proposed |
+| `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not | proposed |
+| `dot` | `Dot(dim)`, called `op(*xs)` | yes | contracted dims removed | proposed |
+| `map_over` | `ApplyAlong(inner: Operator, dim)` | yes, if `inner` does | from `inner` | proposed |
+
+`compute_output_signature` takes one input signature, so `BroadcastLike`'s takes the pair `(x's, other's)` and returns None for `x`'s alone; `MergeDims` and `SplitDims` store their merges and parts as ordered lists in config, since JSON objects sort their keys and the order sets the output dims.
 
 `Diff` here clashes with the planned QC operator `Diff(reference, atol, rtol)` in [`qc.md`](qc.md).
 Neither ships yet; decision A21 names the QC one `AssertClose`.

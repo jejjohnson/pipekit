@@ -29,6 +29,7 @@ The v0.1 public surface, grouped by module:
 - **Group N — structural protocols** (`protocols`): `Predictor`,
   `FittableTransformer`.
 - **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
+  `LabelledAdapter` (the optional ``relabel``),
   `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
   `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
@@ -55,6 +56,7 @@ from pipekit_ops._base.operator import Carrier, ConfigMixin, Operator
 from pipekit_ops._base.sequential import Sequential
 from pipekit_ops.adapters import (
     BackendError,
+    LabelledAdapter,
     MissingAdapterError,
     NamedArrayAdapter,
     backend_name,
@@ -124,6 +126,7 @@ __all__ = [
     "Histogram",
     "Identity",
     "Input",
+    "LabelledAdapter",
     "Lambda",
     "Memoize",
     "MissingAdapterError",

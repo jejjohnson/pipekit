@@ -11,8 +11,8 @@ pipekit-array imports xarray.
 - **Lazy on dask.** `KernelOp` runs as one ``xr.apply_ufunc`` call,
   ``dask="parallelized"``, one task per chunk; the dim-level fast paths
   (``reduce``, ``argreduce``, ``take_along``, ``stack``, ``concat``,
-  ``combine``, ``transpose``) are native xarray calls, so nothing computes
-  until ``.compute()``.
+  ``combine``, ``transpose``, ``rename``) are native xarray calls, so
+  nothing computes until ``.compute()``.
 - **``DataArray`` only** (PK-P5): ``Dataset`` and ``DataTree`` dispatch
   stays in xrops.
 
@@ -22,7 +22,7 @@ dims that have a 1-D index coordinate.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -67,13 +67,16 @@ class XarrayAdapter:
     def rewrap(self, x: xr.DataArray, data: Any, dims: tuple[str, ...]) -> xr.DataArray:
         """A DataArray around new data, keeping coords and attrs of surviving dims.
 
-        A coordinate is kept when all its dims survive with their sizes.
+        A coordinate is kept when all its dims survive with their sizes; a
+        scalar one named after a new dim (left by ``isel``) is dropped, since
+        xarray refuses a scalar variable named after a dim.
         """
         sizes = dict(zip(dims, data.shape, strict=True))
         coords = {
             name: coord
             for name, coord in x.coords.items()
             if all(sizes.get(d) == x.sizes[d] for d in coord.dims)
+            and (name not in sizes or name in coord.dims)
         }
         out = xr.DataArray(data, dims=dims, coords=coords, attrs=x.attrs, name=x.name)
         # name=None lets xarray take a dask array's graph name; keep x's instead
@@ -98,7 +101,44 @@ class XarrayAdapter:
         dims = tuple((str(d), int(n)) for d, n in x.sizes.items())
         return Signature(dims=dims, dtype=str(x.dtype))
 
+    def relabel(
+        self, x: xr.DataArray, labels: Mapping[str, tuple[Any, ...] | None]
+    ) -> xr.DataArray:
+        """``assign_coords`` for a tuple, ``drop_vars`` for None (ADR A22).
+
+        Tuple-valued labels (`pipekit_array.merge_dims`) become a 1-D object
+        coordinate, one tuple per entry.
+
+        Raises:
+            ValueError: A dim is not in ``x.dims``, or a label tuple's
+                length differs from its dim's size.
+        """
+        dims = self.dims(x)
+        unknown = sorted(set(labels) - set(dims))
+        if unknown:
+            raise ValueError(f"relabel: unknown dim(s) {unknown}; dims are {dims}.")
+        out = x.drop_vars([d for d in labels if d in x.coords])
+        coords: dict[str, Any] = {}
+        for dim, values in labels.items():
+            if values is None:
+                continue
+            size = int(x.sizes[dim])
+            if len(values) != size:
+                raise ValueError(
+                    f"{len(values)} labels for dim {dim!r} of size {size}."
+                )
+            coords[dim] = (dim, _label_array(values))
+        return out.assign_coords(coords) if coords else out
+
     # -- dim-level fast paths --------------------------------------------
+
+    def rename(self, x: xr.DataArray, names: dict[str, str]) -> xr.DataArray:
+        """``x.rename``, which also renames the dim in non-index coordinates.
+
+        The generic path (``rewrap`` then ``relabel``) would drop a
+        coordinate such as ``quality(time, x)`` on a renamed dim (A22).
+        """
+        return x.rename(names)
 
     def transpose(self, x: xr.DataArray, order: tuple[str, ...]) -> xr.DataArray:
         """``x.transpose``."""
@@ -245,6 +285,15 @@ class XarrayAdapter:
         if len(out_dims) > 1:
             return tuple(r.transpose(*t) for r, t in zip(result, targets, strict=True))
         return result.transpose(*targets[0])
+
+
+def _label_array(values: tuple[Any, ...]) -> Any:
+    """Labels as a 1-D array; tuples stay whole in an object array."""
+    if any(isinstance(v, tuple) for v in values):
+        out = np.empty(len(values), dtype=object)
+        out[:] = list(values)
+        return out
+    return np.asarray(values)
 
 
 def _gather(values: xr.DataArray, idx: xr.DataArray, dim: str) -> xr.DataArray:

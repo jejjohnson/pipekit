@@ -14,7 +14,10 @@ instead of copying tests::
 - `check_adapter(adapter, make_carrier)` — every dim-level function (and
   the adapter's fast paths, which are what the functions call) on the
   carrier equals the generic path on a `DimArray` with the same data,
-  dims and labels; the protocol methods behave.
+  dims and labels; the protocol methods behave. The functions that make
+  new or renamed dims (`pipekit_array.dim_shapes`) must also give the
+  same labels; those on the band labels run when the adapter has
+  ``relabel`` (`pipekit_ops.LabelledAdapter`).
 - `check_kernel_op(op, calls)` — the same `KernelOp` on each carrier family
   gives equal data, equal dims, and the signature
   ``op.compute_output_signature`` predicts (PK-K1, PK-K4).
@@ -31,7 +34,7 @@ from typing import Any
 import numpy as np
 from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
-from pipekit_array import dims as _dims
+from pipekit_array import dim_shapes as _shapes, dims as _dims
 from pipekit_array.dimarray import DimArray
 from pipekit_array.kernel import KernelOp
 
@@ -125,6 +128,63 @@ def _cases() -> list[tuple[str, Callable[[Any], Any]]]:
     ]
 
 
+# Phase 1: dims. Their cases also compare labels (`_check_labels`).
+
+
+def _dim_shape_cases(labelled: bool) -> list[tuple[str, Callable[[Any], Any]]]:
+    """`pipekit_array.dim_shapes` on the `DIMS` layout.
+
+    The first block touches only unlabelled dims, so an adapter without
+    ``relabel`` passes it; ``labelled`` adds the cases that set labels.
+    """
+    cases: list[tuple[str, Callable[[Any], Any]]] = [
+        ("rename(time, x)", lambda c: _shapes.rename(c, time="t", x="col")),
+        ("expand_dims(member)", lambda c: _shapes.expand_dims(c, "member", axis=2)),
+        (
+            "squeeze(time)",
+            lambda c: _shapes.squeeze(_dims.isel(c, time=slice(0, 1)), "time"),
+        ),
+        (
+            "broadcast_like(time)",
+            lambda c: _shapes.broadcast_like(_dims.isel(c, time=0), c),
+        ),
+        ("merge_dims(pixel)", lambda c: _shapes.merge_dims(c, pixel=("y", "x"))),
+        (
+            "split_dims(pixel)",
+            lambda c: _shapes.split_dims(
+                _shapes.merge_dims(c, pixel=("y", "x")), pixel={"y": 4, "x": 5}
+            ),
+        ),
+    ]
+    if not labelled:
+        return cases
+    return [
+        *cases,
+        ("rename(band)", lambda c: _shapes.rename(c, band="channel")),
+        (
+            "broadcast_like(band)",
+            lambda c: _shapes.broadcast_like(_dims.isel(c, band=0), c),
+        ),
+        ("merge_dims(band, y)", lambda c: _shapes.merge_dims(c, pb=("band", "y"))),
+        (
+            "split_dims(band, y)",
+            lambda c: _shapes.split_dims(
+                _shapes.merge_dims(c, pb=("band", "y")), pb={"band": 3, "y": 4}
+            ),
+        ),
+    ]
+
+
+def _check_labels(actual: Any, expected: Any, label: str, name: str) -> None:
+    adapter, reference = get_adapter(actual), get_adapter(expected)
+    assert adapter is not None and reference is not None
+    for dim in reference.dims(expected):
+        got, want = adapter.labels(actual, dim), reference.labels(expected, dim)
+        got = None if got is None else tuple(got)
+        want = None if want is None else tuple(want)
+        assert got == want, f"{label} on {name}: {dim!r} labels {got}, expected {want}"
+
+
 def check_adapter(
     adapter: NamedArrayAdapter,
     make_carrier: MakeCarrier,
@@ -161,7 +221,10 @@ def check_adapter(
     )
     _check_protocol(adapter, carrier, data, name)
     lazy = _dims.backend_name(adapter.data(carrier)) == "dask"
-    for label, fn in _cases():
+    labelled = getattr(adapter, "relabel", None) is not None
+    shape_cases = _dim_shape_cases(labelled)
+    shape_labels = {label for label, _ in shape_cases}
+    for label, fn in [*_cases(), *shape_cases]:
         if lazy and label.endswith("where)"):
             continue  # dask's reductions take no where= (reduce raises TypeError)
         expected = fn(reference)
@@ -170,6 +233,8 @@ def check_adapter(
         want = _dims_of(expected)
         assert got == want, f"{label} on {name}: dims {got}, expected {want}"
         exact = not label.startswith(("reduce", "map_over"))
+        if label in shape_labels:
+            _check_labels(actual, expected, label, name)
         a, e = values_of(actual), values_of(expected)
         if exact:
             np.testing.assert_array_equal(a, e, err_msg=f"{label} on {name}")
