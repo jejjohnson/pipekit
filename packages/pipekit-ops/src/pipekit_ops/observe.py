@@ -18,6 +18,8 @@ notebook exploration and debug, useful in production logging.
   returns an operator that captures a distribution; ``to_array`` is a
   user-supplied callable adapting the carrier to a flat sequence of
   numbers (default: ``list``).
+- `Log(message, level, logger)` — write one ``logging`` record per call.
+  Holds only strings, so unlike `Tap` it round-trips.
 
 `Snapshot`, `Profile`, and `Histogram` use the controller-not-operator
 pattern: the class itself isn't an `Operator`, but its ``.at()`` /
@@ -28,14 +30,17 @@ collected data lives on a single object the user can inspect.
 Under a JAX transformation these run at trace time. `Snapshot.at` raises,
 because a stored tracer is invalid once the trace ends. `Tap` and `Profile.wrap`
 warn once per instance, because a trace-time callback can be deliberate but a
-trace-time timing never measures the compiled function. `ShapeTrace` is meant
-to run at trace time, so it stays silent.
+trace-time timing never measures the compiled function; `Log` warns once too.
+`ShapeTrace` is meant to run at trace time, so it stays silent.
 
 See master plan Report 2, Group E.
 """
 
 from __future__ import annotations
 
+import logging
+import string
+import threading
 import time
 import warnings
 from collections.abc import Callable, Iterable
@@ -43,6 +48,13 @@ from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
+from pipekit_ops.adapters import MissingAdapterError, get_adapter
+
+
+#: the fields a `Log` message may name
+LOG_FIELDS = ("n", "type", "signature")
+#: guards every `Log`'s call count; module-level so a `Log` still pickles
+_LOG_COUNT_LOCK = threading.Lock()
 
 
 class Tap(Operator):
@@ -91,6 +103,110 @@ class Tap(Operator):
 
     def __repr__(self) -> str:
         return f"Tap(name={self.name!r})"
+
+
+class Log(Operator):
+    """Pass the carrier through and write one ``logging`` record per call.
+
+    The message is formatted with ``{n}`` (calls of this `Log` so far in
+    this process, from 1), ``{type}`` (the input's class name) and
+    ``{signature}`` (the input's `Signature` through its registered
+    adapter, else ``?``). Handlers, filters and formatters are left to
+    ``logging``. Unlike `Tap`, `Log` holds only strings, so it round-trips.
+
+    Args:
+        message: A ``str.format`` template naming only ``n``, ``type`` and
+            ``signature``.
+        level: A ``logging`` level name: ``"DEBUG"``, ``"INFO"``, ….
+        logger: The name of the logger the record goes to.
+
+    Raises:
+        ValueError: If ``message`` names another field or ``level`` is not
+            a ``logging`` level name.
+
+    Examples:
+        The input comes back as the same object, and the record goes to
+        ``logging``:
+
+        >>> import logging
+        >>> records = []
+        >>> handler = logging.Handler()
+        >>> handler.emit = records.append
+        >>> logging.getLogger("demo").addHandler(handler)
+        >>> note = Log("call {n}: {type} {signature}", level="WARNING", logger="demo")
+        >>> x = [1.0, 2.0]
+        >>> note(x) is x
+        True
+        >>> records[-1].getMessage()
+        'call 1: list ?'
+
+        It composes like any step, and its config is plain strings:
+
+        >>> from pipekit_ops import Identity
+        >>> (Identity() | note)(3.0)
+        3.0
+        >>> records[-1].getMessage()
+        'call 2: float ?'
+        >>> note.get_config()["level"], note.get_config()["logger"]
+        ('WARNING', 'demo')
+
+        An unknown field is rejected at construction:
+
+        >>> Log("{shape}")  # doctest: +IGNORE_EXCEPTION_DETAIL
+        Traceback (most recent call last):
+        ...
+        ValueError: Log.message may name only n, type, signature; got 'shape'.
+    """
+
+    def __init__(
+        self,
+        message: str = "call {n}: {type} {signature}",
+        level: str = "INFO",
+        logger: str = "pipekit_ops",
+    ) -> None:
+        for _, field, _, _ in string.Formatter().parse(message):
+            if field is not None and field not in LOG_FIELDS:
+                raise ValueError(
+                    f"Log.message may name only {', '.join(LOG_FIELDS)}; got {field!r}."
+                )
+        if level not in logging.getLevelNamesMapping():
+            raise ValueError(f"Log.level must be a logging level name, got {level!r}.")
+        self.message = message
+        self.level = level
+        self.logger = logger
+        self._calls = 0
+        self._warned_traced = False
+
+    def _apply(self, x: Any) -> Any:
+        if not self._warned_traced and is_traced(x):
+            self._warned_traced = True
+            warnings.warn(
+                "Log is running at trace time, so it writes once per "
+                "compilation. Use jax.debug.print to log values on every call.",
+                UserWarning,
+                stacklevel=2,
+            )
+        with _LOG_COUNT_LOCK:
+            self._calls += 1
+            n = self._calls
+        log = logging.getLogger(self.logger)
+        level = logging.getLevelNamesMapping()[self.level]
+        if log.isEnabledFor(level):
+            text = self.message.format(n=n, type=type(x).__name__, signature=_sig(x))
+            log.log(level, text)
+        return x
+
+
+def _sig(x: Any) -> str:
+    """``x``'s formatted `Signature`, or ``?`` without an adapter."""
+    try:
+        adapter = get_adapter(x)
+    except MissingAdapterError:
+        # a log line never fails the pipeline it observes
+        return "?"
+    if adapter is None:
+        return "?"
+    return adapter.signature(x).format()
 
 
 class _SnapshotAt(Operator):

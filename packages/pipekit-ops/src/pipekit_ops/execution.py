@@ -23,7 +23,8 @@ import multiprocessing
 import os
 import pickle
 import threading
-from collections.abc import Callable, Generator, Iterable, Iterator
+import time
+from collections.abc import Callable, Generator, Iterable, Iterator, Sized
 from concurrent.futures import (
     FIRST_COMPLETED,
     Executor,
@@ -279,6 +280,10 @@ class Map(Operator):
         chunksize: Items per task c. A chunk is pulled whole, so up to
             W + c - 1 items can be held.
         start_method: Process start method; default ``"spawn"``.
+        progress: If set, every ``progress`` released items log one INFO
+            record on ``pipekit_ops.parallel`` whose ``done``, ``failed``,
+            ``in_flight``, ``n`` (``None`` without ``len``) and ``rate``
+            (items per second) attributes hold the counts so far.
 
     Raises:
         TypeError: ``op`` is flagged by `check_pickleable` or does not
@@ -309,6 +314,20 @@ class Map(Operator):
 
         >>> sorted(Map(Identity(), executor="thread").iter("ab", ordered=False))
         [(0, 'a'), (1, 'b')]
+
+        Log progress every 2 items:
+
+        >>> records = []
+        >>> handler = logging.Handler()
+        >>> handler.emit = records.append
+        >>> log.addHandler(handler)
+        >>> log.setLevel(logging.INFO)
+        >>> Map(Identity(), progress=2)(range(5))
+        [0, 1, 2, 3, 4]
+        >>> log.removeHandler(handler)
+        >>> log.setLevel(logging.NOTSET)
+        >>> [record.done for record in records]
+        [2, 4]
     """
 
     __config_mixin_auto__ = False
@@ -324,6 +343,7 @@ class Map(Operator):
         on_error: str = "raise",
         chunksize: int = 1,
         start_method: str | None = None,
+        progress: int | None = None,
     ) -> None:
         # a preset's errors name the preset
         owner = type(self).__name__
@@ -332,7 +352,11 @@ class Map(Operator):
         _require_choice(f"{owner}.on_error", on_error, ON_ERROR)
         if start_method is not None:
             _require_choice(f"{owner}.start_method", start_method, START_METHODS)
-        for name, value in (("n_workers", n_workers), ("max_in_flight", max_in_flight)):
+        for name, value in (
+            ("n_workers", n_workers),
+            ("max_in_flight", max_in_flight),
+            ("progress", progress),
+        ):
             if value is not None and value < 1:
                 raise ValueError(f"{owner}.{name} must be >= 1, got {value}.")
         if chunksize < 1:
@@ -344,6 +368,7 @@ class Map(Operator):
         self.on_error = on_error
         self.chunksize = chunksize
         self.start_method = start_method
+        self.progress = progress
 
     # --- entry points ---
 
@@ -402,7 +427,7 @@ class Map(Operator):
         return None
 
     def get_config(self) -> dict[str, Any]:
-        return {
+        config = {
             "op": nested_config(self.op),
             "executor": self.executor,
             "n_workers": self.n_workers,
@@ -411,6 +436,10 @@ class Map(Operator):
             "chunksize": self.chunksize,
             "start_method": self.start_method,
         }
+        # left out when unset, so a Map without progress keeps its hash
+        if self.progress is not None:
+            config["progress"] = self.progress
+        return config
 
     # --- the error policy ---
 
@@ -466,6 +495,7 @@ class Map(Operator):
         queued tasks plus results buffered behind a slower item. At most
         W are held; an item is released when it is yielded.
         """
+        n_items = len(items) if isinstance(items, Sized) else None
         with self._open_executor(loop) as (submit, window, refuse_tracers):
             numbered = enumerate(items)
             # each pending task -> the indices of its chunk
@@ -475,6 +505,9 @@ class Map(Operator):
             held = 0
             next_to_yield = 0
             exhausted = False
+            released = 0
+            failed = 0
+            started = time.perf_counter()
             try:
                 while True:
                     # top up the window: pull only while fewer than W items are held
@@ -499,6 +532,11 @@ class Map(Operator):
                         succeeded, value = buffered.pop(index)
                         held -= 1
                         next_to_yield = index + 1
+                        released += 1
+                        failed += not succeeded
+                        if self.progress and released % self.progress == 0:
+                            elapsed = time.perf_counter() - started
+                            _log_progress(released, failed, held, n_items, elapsed)
                         # each released item frees one slot of the window
                         yield index, succeeded, value
                     if pending:
@@ -733,6 +771,30 @@ def _left_fold(op: Operator, initial: Any, items: Iterable[Any]) -> Any:
     for item in items:
         accumulated = op((accumulated, item))
     return accumulated
+
+
+def _log_progress(
+    done: int, failed: int, in_flight: int, n_items: int | None, elapsed: float
+) -> None:
+    """One progress record; the counts are also record attributes."""
+    rate = done / elapsed if elapsed > 0 else float("inf")
+    total = "?" if n_items is None else n_items
+    counts = {
+        "done": done,
+        "failed": failed,
+        "in_flight": in_flight,
+        "n": n_items,
+        "rate": rate,
+    }
+    log.info(
+        "Map: %d/%s done, %d failed, %d in flight, %.1f items/s",
+        done,
+        total,
+        failed,
+        in_flight,
+        rate,
+        extra=counts,
+    )
 
 
 def _task_outcomes(future: Future, indices: list[int]) -> list[Outcome]:

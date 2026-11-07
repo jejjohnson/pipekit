@@ -4,7 +4,7 @@
 when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
-eighty names in eighteen modules, one module per job, so you can learn it a
+eighty-five names in eighteen modules, one module per job, so you can learn it a
 group at a time. For why it is shaped this way (operators as classes, the
 carrier left open), read the [background](background/toolz.md); for the
 shapes real pipelines take, read [Patterns](patterns.md).
@@ -20,13 +20,13 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Building blocks | `blocks` | `Identity`, `Const`, `Lambda`, `Sink` | a no-op, a constant, a quick function, a write |
 | Control flow | `control` | `Branch`, `Switch`, `Try`, `Coalesce`, `Retry` | a decision or a failure inside the pipeline |
 | Flow limits | `flow` | `Timeout`, `RateLimit`, `Until` | a call that may hang, a service with a quota, a step repeated until done |
-| Observers | `observe` | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` | looking without changing the flow |
+| Observers | `observe` | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`, `Log` | looking without changing the flow |
 | Combination | `combine` | `Fanout` | one input, several named outputs |
 | Dict plumbing | `dicts` | `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`, `Merge`, `Assoc`, `UpdateIn`, `ValMap` | reshaping the dicts a `Graph`, a `Fanout` or a STAC item carries, without a `Lambda` |
 | Iterables | `seq` | `Not`, `Filter`, `Remove`, `Reduce`, `PartitionAll`, `Concat`, `Zip`, `GroupBy`, `CountBy`, `Count`, `Unique`, `Take`, `SortBy` | filtering, grouping and counting a list of items inside the pipeline |
 | Caching | `cache` | `Cache`, `Memoize` | the same expensive call twice |
 | Stores | `store` | `Store`, `MemoryStore`, `DirectoryStore`, `store_scope` | a cache that survives a restart, or that several processes share |
-| Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
+| Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `AssertThat`, `AssertSignature`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
 | Parallelism | `parallel` | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable` | many items, one operator |
 | Execution | `execution` | `Map`, `executor_scope`, `MapError`, `Failed`, `Prefetch`, `Fold` | many items, one operator, on any executor, with a bounded window |
@@ -240,6 +240,7 @@ The carrier flows through unchanged; something useful happens on the side.
 | `ShapeTrace(printer=print, mode="every" \| "diff_only", label=None, extra=None)` | log `shape` and `dtype` at each step; `extra(carrier)` adds a line (a coordinate system, units) |
 | `Profile()` + `.wrap(op)` | time each call; `profile.report()` gives calls, total and mean per operator |
 | `Histogram(bins=10, to_array=list)` + `.at(key)` | capture distributions; `to_array` turns the carrier into numbers |
+| `Log(message=…, level="INFO", logger="pipekit_ops")` | write one `logging` record per call, with the call count `{n}`, `{type}` and `{signature}`; holds only strings, so it round-trips |
 
 `Snapshot`, `Profile` and `Histogram` are *controllers*, not operators: the
 operators you place in the pipeline come from `.at()` and `.wrap()`, and the
@@ -318,6 +319,8 @@ becomes a permanent guard.
 | `AssertDType(expected_dtype)` | raise `QCError` on a dtype mismatch | no |
 | `AssertHasAttribute(name, value=…)` | raise `QCError` if an attribute is missing or wrong | no |
 | `AssertCallable(predicate, message=…)` | raise `QCError` if a predicate fails | yes |
+| `AssertThat(pred, message=…)` | raise `QCError` if the operator `pred` returns a falsy value | no |
+| `AssertSignature(pattern, dtype=None, missing="raise")` | raise `QCError` unless the adapter's dims fit `pattern` (`"band y x"`, `"... y x"`); also checked by `Sequential.summary` | no |
 
 ```python
 AssertShape((2, 4))(x)  # x.shape == (2, 3)

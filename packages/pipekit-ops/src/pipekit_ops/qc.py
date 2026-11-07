@@ -15,6 +15,11 @@ contents live in sister libraries (Report 3, `pipekit-array`).
   attribute presence (and value, if supplied).
 - `AssertCallable(predicate, message=...)` — pass-through; user-supplied
   predicate; raise on failure.
+- `AssertThat(pred, message=...)` — `AssertCallable` with an operator
+  as the predicate, so it round-trips.
+- `AssertSignature(pattern, dtype=None, missing="raise")` — pass-through;
+  check the named dims (and dtype) read through the carrier's registered
+  adapter. Also checked at build time, by `Sequential.summary`.
 
 See master plan Report 2, Group H.
 """
@@ -24,7 +29,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import _MISSING, Operator, callable_name
+from pipekit_ops._base.operator import (
+    _MISSING,
+    Operator,
+    callable_name,
+    nested_config,
+    require_operator,
+)
+from pipekit_ops.adapters import get_adapter
+from pipekit_ops.signature import Signature, _parse_pattern
+
+
+#: what `AssertSignature` does with a carrier that has no adapter
+MISSING_POLICIES = ("raise", "skip")
 
 
 class QCError(AssertionError):
@@ -219,6 +236,155 @@ class AssertCallable(Operator):
             "predicate": callable_name(self.predicate),
             "message": self.message,
         }
+
+
+class AssertThat(Operator):
+    """Pass-through; raise `QCError` if ``pred(x)`` is falsy.
+
+    `AssertCallable` with an operator instead of a closure, so the check
+    is part of the pipeline's config and hash.
+
+    Args:
+        pred: The operator run on the carrier; a truthy result means OK.
+        message: Error message attached to the raised `QCError`.
+
+    Raises:
+        QCError: If ``pred(x)`` is falsy.
+
+    Examples:
+        A passing check returns the input object itself:
+
+        >>> from pipekit_ops import Const
+        >>> x = [1.0, 2.0]
+        >>> AssertThat(Const(True))(x) is x
+        True
+
+        A failing one raises:
+
+        >>> AssertThat(Const(False), "too cloudy")(x)
+        Traceback (most recent call last):
+        ...
+        pipekit_ops.qc.QCError: AssertThat(Const): too cloudy
+
+        The predicate composes like any operator:
+
+        >>> from pipekit_ops import Lambda
+        >>> is_short = Lambda(len) | Lambda(lambda n: n < 3)
+        >>> AssertThat(is_short)(x)
+        [1.0, 2.0]
+    """
+
+    def __init__(
+        self, pred: Operator, message: str = "predicate returned False"
+    ) -> None:
+        require_operator(pred, "AssertThat", "pred")
+        self.pred = pred
+        self.message = message
+
+    def _apply(self, x: Any) -> Any:
+        if not self.pred(x):
+            name = type(self.pred).__name__
+            raise QCError(f"AssertThat({name}): {self.message}")
+        return x
+
+    def get_config(self) -> dict[str, Any]:
+        return {"pred": nested_config(self.pred), "message": self.message}
+
+
+class AssertSignature(Operator):
+    """Pass-through; raise `QCError` unless the carrier's dims fit ``pattern``.
+
+    The dims are read through the carrier's registered adapter
+    (`pipekit_ops.adapters.get_adapter`), never from the carrier itself.
+    The same check runs at build time in `compute_output_signature`, so
+    `Sequential.summary` reports a mismatch before any data runs.
+
+    Args:
+        pattern: Dim names with at most one ``...`` (any dims at that
+            position): ``"band y x"`` or ``"... y x"``.
+        dtype: If set, the dtype label the signature must carry.
+        missing: What to do with a carrier that has no adapter:
+            ``"raise"`` raises `QCError`, ``"skip"`` passes it through.
+
+    Raises:
+        QCError: If the dims do not fit ``pattern``, the dtype differs, or
+            (with ``missing="raise"``) the carrier has no adapter.
+        ValueError: If ``pattern`` has more than one ``...`` or
+            ``missing`` is not ``"raise"`` or ``"skip"``.
+
+    Examples:
+        At build time, against a `Signature`:
+
+        >>> from pipekit_ops import Signature
+        >>> cube = Signature(dims=(("time", 3), ("y", 4), ("x", 4)), dtype="f4")
+        >>> AssertSignature("... y x").compute_output_signature(cube) == cube
+        True
+        >>> check = AssertSignature("band y x")
+        >>> check.compute_output_signature(cube)  # doctest: +IGNORE_EXCEPTION_DETAIL
+        Traceback (most recent call last):
+        ...
+        QCError: AssertSignature: dims (time, y, x) do not fit 'band y x'.
+
+        A value with no adapter passes only with ``missing="skip"``:
+
+        >>> AssertSignature("y x", missing="skip")([1.0])
+        [1.0]
+        >>> AssertSignature("y x")([1.0])  # doctest: +IGNORE_EXCEPTION_DETAIL
+        Traceback (most recent call last):
+        ...
+        QCError: AssertSignature: no named-array adapter for list.
+    """
+
+    def __init__(
+        self, pattern: str, dtype: str | None = None, missing: str = "raise"
+    ) -> None:
+        # validates the pattern now rather than on the first call
+        _parse_pattern(pattern)
+        if missing not in MISSING_POLICIES:
+            raise ValueError(
+                f"AssertSignature.missing must be 'raise' or 'skip', got {missing!r}."
+            )
+        self.pattern = pattern
+        self.dtype = dtype
+        self.missing = missing
+
+    def _apply(self, x: Any) -> Any:
+        adapter = get_adapter(x)
+        if adapter is None:
+            if self.missing == "skip":
+                return x
+            raise QCError(
+                f"AssertSignature: no named-array adapter for {type(x).__name__}."
+            )
+        self._check(adapter.signature(x), runtime=True)
+        return x
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        """The input signature, after checking it against ``pattern``.
+
+        An unknown (``None``) or foreign signature passes unchecked.
+
+        Raises:
+            QCError: If a known `Signature` does not fit.
+        """
+        if isinstance(input_signature, Signature):
+            self._check(input_signature, runtime=False)
+        return input_signature
+
+    def _check(self, signature: Signature, runtime: bool) -> None:
+        if not signature.matches(self.pattern):
+            names = ", ".join(name for name, _ in signature.dims)
+            raise QCError(
+                f"AssertSignature: dims ({names}) do not fit {self.pattern!r}."
+            )
+        # at build time an unknown dtype is not a mismatch; at run time it is
+        dtype_known = runtime or signature.dtype is not None
+        dtype_differs = str(signature.dtype) != str(self.dtype)
+        if self.dtype is not None and dtype_known and dtype_differs:
+            raise QCError(
+                f"AssertSignature: expected dtype {self.dtype!r}, "
+                f"got {signature.dtype!r}."
+            )
 
 
 def _safe_repr(value: Any) -> Any:

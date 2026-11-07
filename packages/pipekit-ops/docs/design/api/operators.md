@@ -229,7 +229,7 @@ They are right for notebooks and they block a production pipeline from round-tri
 
 ### Log
 
-`Log(message="{op}", level="INFO", logger="pipekit_ops")` passes its input through and writes one `logging` record per call.
+`Log(message="call {n}: {type} {signature}", level="INFO", logger="pipekit_ops")` passes its input through and writes one `logging` record per call.
 The record's message is formatted with three fields: `{n}` (calls so far in this process), `{type}` (the input's class name) and `{signature}` (`signature_of(x).format()` when an adapter is registered, else `?`).
 Everything else is left to `logging`: handlers, levels, JSON formatters.
 `Log` is serialisable because it holds only strings.
@@ -261,11 +261,11 @@ valid = ValidFraction()
 at_least_half = AtLeast(0.5)
 # today
 mostly_valid = valid | at_least_half
-# proposed (P5)
+# today
 check_valid = pk.AssertThat(mostly_valid, message="under 50 % valid pixels")
-# proposed (P5)
+# today
 check_dims = pk.AssertSignature("band y x", dtype="uint16")
-# proposed (P5)
+# today
 note = pk.Log("read {n}: {signature}", level="DEBUG")
 # today
 screen = check_dims | check_valid | note
