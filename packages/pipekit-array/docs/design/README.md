@@ -20,8 +20,9 @@ docs/design/
 ├── vision.md             # Motivation, scope, the Array API bet.
 ├── architecture.md       # The dispatch pattern + how operators
 │                         # delegate to array_namespace(x).
-├── decisions.md          # ADRs A1–A8 (dispatch, scope vs core,
-│                         # backend extras, mixed-backend behaviour).
+├── decisions.md          # ADRs A1–A21 (dispatch, scope vs core,
+│                         # backend extras, named carriers, the
+│                         # missing dim-level functions).
 ├── boundaries.md         # Non-goals, open questions, v0.1 DoD.
 └── api/
     ├── README.md         # Operator catalog — at-a-glance table.
@@ -31,8 +32,11 @@ docs/design/
     ├── qc.md             # Layer 2 — numeric QC (Diff,
     │                     # AssertValueRange, AssertNoNaN,
     │                     # AssertValidFraction).
-    └── inference.md      # Layer 3 — ModelOp (framework-agnostic
-                          # inference; numpy / JAX / torch / Keras).
+    ├── inference.md      # Layer 3 — ModelOp (framework-agnostic
+    │                     # inference; numpy / JAX / torch / Keras).
+    └── dim_functions.md  # The missing dim-level functions (rename,
+                          # merge_dims, shift, window, quantile, dot, …)
+                          # and their xarray parity table.
 ```
 
 ## Reading Order
@@ -46,7 +50,8 @@ docs/design/
 3. **[decisions.md](decisions.md)** — the ADRs that lock the shape in.
 4. **[api/README.md](api/README.md)** → drill into
    **[operators](api/operators.md)** → **[qc](api/qc.md)** →
-   **[inference](api/inference.md)**.
+   **[inference](api/inference.md)** →
+   **[dim_functions](api/dim_functions.md)**.
 5. **[boundaries.md](boundaries.md)** — what's deferred and why.
 
 ## Sources
