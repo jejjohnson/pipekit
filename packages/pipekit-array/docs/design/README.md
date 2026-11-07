@@ -26,10 +26,10 @@ docs/design/
 ├── boundaries.md         # Non-goals, open questions, v0.1 DoD.
 └── api/
     ├── README.md         # Operator catalog — at-a-glance table.
-    ├── operators.md      # Layer 1 — data-flow ops (ApplyToBands,
+    ├── operators.md      # Layer 1 — data-flow ops (ApplyAlong,
     │                     # StackAlong, ConcatenateAlong, Subsample,
-    │                     # MeanScalar, BatchedMap, Histogram).
-    ├── qc.md             # Layer 2 — numeric QC (Diff,
+    │                     # MeanScalar, BatchAlong, Histogram).
+    ├── qc.md             # Layer 2 — numeric QC (AssertClose,
     │                     # AssertValueRange, AssertNoNaN,
     │                     # AssertValidFraction).
     ├── inference.md      # Layer 3 — ModelOp (framework-agnostic
@@ -69,8 +69,8 @@ The design synthesises two upstream sources:
   [`pipekit_ops.observe.Histogram`][pipekit-observe] (the controller
   pattern this design extends with a carrier-aware `to_array=...`
   default), and [`pipekit_ops.parallel.BatchedMap`][pipekit-parallel]
-  (the iterable-shaped variant that pipekit-array's array-shaped
-  `BatchedMap` deliberately does *not* shadow — see ADR A5).
+  (the iterable-shaped variant; pipekit-array's array-shaped operator
+  is named `BatchAlong` so it does *not* shadow it — see ADR A19).
 
 [report-3]: https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_3_pipekit_array.md
 [pipekit-qc]: ../../../pipekit/src/pipekit/qc.py

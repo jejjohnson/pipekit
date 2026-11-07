@@ -21,7 +21,7 @@ which returns a module-like object with `mean`, `sum`, `reshape`,
 `where`, … exposed as functions. Five major libraries — numpy 2.0+,
 JAX, CuPy, PyTorch 2.0+, dask — all conform (fully or substantially).
 `pipekit-array` is the package that **wraps the ~12 array-shaped
-operators we keep rewriting** (`ApplyToBands`, `Subsample`, `Diff`,
+operators we keep rewriting** (`ApplyAlong`, `Subsample`, `AssertClose`,
 `AssertValueRange`, `ModelOp`, …) against `array_namespace(x)` so the
 operator picks its backend from the input.
 
@@ -51,11 +51,11 @@ on the input.
 
 Three conceptual layers, all on top of `pipekit_ops.Operator`:
 
-- **Data-flow operators** — `ApplyToBands`, `StackAlong`,
-  `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchedMap`
+- **Data-flow operators** — `ApplyAlong`, `StackAlong`,
+  `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchAlong`
   (array-shaped), `Histogram` (carrier-aware controller). The
   combinators and reducers that show up in every array pipeline.
-- **Numeric QC** — `Diff`, `AssertValueRange`, `AssertNoNaN`,
+- **Numeric QC** — `AssertClose`, `AssertValueRange`, `AssertNoNaN`,
   `AssertValidFraction`. The numeric-content checks `pipekit_ops.qc`
   refused to write because they need to look inside the array.
 - **Inference** — `ModelOp(model, method="__call__", batch_size=None)`.
@@ -177,8 +177,8 @@ These are explicitly considered and rejected for the v0.1 scope.
 - **Backend conversion.** No `to_numpy()`, no auto-`device=`. If you
   want a numpy result, hand the operator a numpy input.
 - **Dataset loaders, batching for training.** That's
-  `pipekit-train`'s `TrainingDataset`. pipekit-array's `BatchedMap`
-  is for splitting one large array along axis 0 for inference, *not*
+  `pipekit-train`'s `TrainingDataset`. pipekit-array's `BatchAlong`
+  is for splitting one large array along a named dim for inference, *not*
   for serving training batches.
 
 Boundary cases are catalogued in [boundaries.md](boundaries.md).

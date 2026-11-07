@@ -117,12 +117,13 @@ src/pipekit_array/
 ├── _namespace.py        # array_namespace() shim — wraps
 │                        # array-api-compat if installed, falls back
 │                        # to x.__array_namespace__() otherwise.
-├── combinators.py       # ApplyToBands, StackAlong, ConcatenateAlong
+├── combinators.py       # StackAlong, ConcatenateAlong
+├── dim_operators.py     # ApplyAlong and the dim-function twins
 ├── geom.py              # Subsample
 ├── observe.py           # Histogram (carrier-aware controller)
 ├── reduce.py            # MeanScalar
-├── parallel.py          # BatchedMap (array-shaped)
-├── qc.py                # Diff, AssertValueRange, AssertNoNaN,
+├── batching.py          # batch, Padded, BatchAlong (array-shaped)
+├── qc.py                # AssertClose, AssertValueRange, AssertNoNaN,
 │                        # AssertValidFraction
 └── inference.py         # ModelOp
 ```
@@ -133,27 +134,28 @@ discovery is consistent. Re-exports through `__init__.py`:
 
 ```python
 # pipekit_array/__init__.py
-from pipekit_array.combinators import ApplyToBands, ConcatenateAlong, StackAlong
+from pipekit_array.batching import BatchAlong
+from pipekit_array.combinators import ConcatenateAlong, StackAlong
+from pipekit_array.dim_operators import ApplyAlong
 from pipekit_array.geom import Subsample
 from pipekit_array.inference import ModelOp
 from pipekit_array.observe import Histogram
-from pipekit_array.parallel import BatchedMap
 from pipekit_array.qc import (
+    AssertClose,
     AssertNoNaN,
     AssertValidFraction,
     AssertValueRange,
-    Diff,
 )
 from pipekit_array.reductions import MeanScalar
 
 __all__ = [
-    "ApplyToBands",
+    "ApplyAlong",
+    "AssertClose",
     "AssertNoNaN",
     "AssertValidFraction",
     "AssertValueRange",
-    "BatchedMap",
+    "BatchAlong",
     "ConcatenateAlong",
-    "Diff",
     "Histogram",
     "MeanScalar",
     "ModelOp",
@@ -238,16 +240,16 @@ They inherit:
     close over the controller instance, which is interactive state.
     The captures dict is the artifact, not the config.
 
-  All other v0.1 operators (`ApplyToBands`, `StackAlong`,
-  `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchedMap`, and
-  the QC family) round-trip cleanly. `ApplyToBands` and `BatchedMap`
+  All other v0.1 operators (`ApplyAlong`, `StackAlong`,
+  `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchAlong`, and
+  the QC family) round-trip cleanly. `ApplyAlong` and `BatchAlong`
   take an `inner: Operator` which is itself round-trippable, so the
   recursion bottoms out cleanly unless `inner` is a flagged
   operator.
 - **Signatures** — operators may override
   `compute_output_signature(input_sig: Signature) -> Signature | None`
   for `Sequential.summary` to print shape info. Operators that
-  reshape (`ApplyToBands`, `Subsample`, `BatchedMap`) override;
+  reshape (`ApplyAlong`, `Subsample`, `BatchAlong`) override;
   operators that pass through (the `Assert*` family) inherit the
   default passthrough. Operators that reduce to a scalar (`MeanScalar`
   with `axis=None`) return a `Signature` with empty `dims`.
