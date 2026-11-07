@@ -3,53 +3,56 @@
 ## Project Overview
 
 - **Python**: 3.12+
-- **Package Manager**: uv
-- **CLI Framework**: cyclopts
-- **Layout**: `src/` layout (`src/mypackage/`)
+- **Package Manager**: uv, as a workspace of eight packages
+- **Layout**: `packages/<pkg>/src/<pkg_module>/` per package (for example `packages/pipekit-ops/src/pipekit_ops/`)
 - **Testing**: pytest
 - **Docs**: MkDocs + Material + mkdocstrings + mkdocs-jupyter
+
+The packages are the core `pipekit-ops`, its six sister packages (`pipekit-array`, `pipekit-cycle`, `pipekit-experiment`, `pipekit-evaluate`, `pipekit-train`, `pipekit-jax`) and the code-free `pipekit` umbrella.
+`CLAUDE.md` has the module layout and the dependency rules.
 
 ## Build & Test Commands
 
 ```bash
-make install     # Install all dependencies (uv sync --all-groups)
+make install     # uv sync --all-groups except train-extras, then pre-commit hooks
 make test        # Run tests (uv run pytest -v)
-make lint        # Lint code (ruff check)
+make lint        # Lint code (ruff check .)
 make format      # Format code (ruff format + ruff check --fix)
-make typecheck   # Type check (ty check)
+make typecheck   # Type check (ty check on every package's src dir)
 make precommit   # Run pre-commit on all files
 make docs-serve  # Serve docs locally
 ```
 
-## Before Every Commit — Mandatory Checklist
+## Before Every Commit: Mandatory Checklist
 
-**All four checks must pass before any commit.** CI runs them on the entire repo (`ruff check .`), not just `src/mypackage/`, so always run the commands below from the repo root.
+**All four checks must pass before any commit.** CI runs them on the entire repo (`ruff check .`), not just one package's `src/`, so always run the commands below from the repo root.
 
 ```bash
-# 1. Tests — zero failures required
+# 1. Tests: zero failures required
 uv run pytest -v
 
-# 2. Lint — run on the ENTIRE repo (includes tests/ and scripts/)
+# 2. Lint: run on the ENTIRE repo (includes tests/ and scripts/)
 uv run --group lint ruff check .
 
-# 3. Format check — run on the ENTIRE repo
+# 3. Format check: run on the ENTIRE repo
 uv run --group lint ruff format --check .
 
-# 4. Type check — on the package only
-uv run --group typecheck ty check src/mypackage
+# 4. Type check: every package's src dir
+make typecheck
 ```
 
-> **Common pitfall**: Running `ruff check src/mypackage/` instead of `ruff check .` misses import-sorting errors in `tests/` and `scripts/`. The CI workflow runs `ruff check .`. Always use `.` (repo root), not a subdirectory.
+> **Common pitfall**: Running `ruff check packages/pipekit-ops/src/` instead of `ruff check .` misses import-sorting errors in `tests/` and `scripts/`. The CI workflow runs `ruff check .`. Always use `.` (repo root), not a subdirectory.
 
 ## Key Directories
 
 | Path | Purpose |
 |------|---------|
-| `src/mypackage/` | Main package source code |
-| `tests/` | Test suite |
+| `packages/<pkg>/src/<pkg_module>/` | Source code of one package |
+| `packages/<pkg>/tests/` | That package's test suite |
+| `packages/<pkg>/docs/design/` | Design notes, for the larger packages |
 | `docs/` | Documentation (MkDocs) |
 | `notebooks/` | Jupyter notebooks |
-| `scripts/` | Example scripts |
+| `scripts/` | Repo scripts (for example the README figures) |
 
 ## Behavioral Guidelines
 

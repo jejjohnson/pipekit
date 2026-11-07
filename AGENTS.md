@@ -6,7 +6,7 @@ This file contains standing instructions for **all** coding agents working on th
 
 ## Karpathy Coding Principles
 
-Four behavioral principles to reduce the most common LLM coding mistakes. These bias toward caution over speed — for trivial tasks, use judgment.
+Four behavioral principles to reduce the most common LLM coding mistakes. These bias toward caution over speed; for trivial tasks, use judgment.
 
 ### 1. Think Before Coding
 
@@ -15,7 +15,7 @@ Four behavioral principles to reduce the most common LLM coding mistakes. These 
 Before implementing:
 
 - State assumptions explicitly. If uncertain, ask before writing code.
-- If multiple interpretations exist, present them — don't pick silently.
+- If multiple interpretations exist, present them; don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
@@ -40,7 +40,7 @@ When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it — don't delete it.
+- If you notice unrelated dead code, mention it; don't delete it.
 
 When your changes create orphans:
 
@@ -75,12 +75,12 @@ For multi-step tasks, state a brief plan:
 
 **All agents must** verify that every one of the following passes before creating a commit or reporting progress. No exceptions.
 
-1. **Tests** – `uv run pytest -q` (or `make test`) must have 0 failures.
-2. **Lint** – `uv run --group lint ruff check .` (or `make lint`) must report no issues.
-3. **Format** – `uv run --group lint ruff format --check .` must report no files to reformat.
-4. **Type checks** – `make typecheck` (or `uv run --group typecheck ty check packages/<pkg>/src/<pkg>` per package) must report no errors in changed files.
+1. **Tests**: `uv run pytest -q` (or `make test`) must have 0 failures.
+2. **Lint**: `uv run --group lint ruff check .` (or `make lint`) must report no issues.
+3. **Format**: `uv run --group lint ruff format --check .` must report no files to reformat.
+4. **Type checks**: `make typecheck` (or `uv run --group typecheck ty check packages/<pkg>/src/<pkg>` per package) must report no errors in changed files.
 
-> **Common pitfall**: Running `ruff check packages/<pkg>/src/` instead of `ruff check .` misses lint errors in `tests/` and `scripts/`. CI runs `ruff check .` on the entire repo — always use `.` (repo root), not a subdirectory. The monorepo has five packages under `packages/`; per-package lint/format is never sufficient.
+> **Common pitfall**: Running `ruff check packages/<pkg>/src/` instead of `ruff check .` misses lint errors in `tests/` and `scripts/`. CI runs `ruff check .` on the entire repo, so always use `.` (repo root), not a subdirectory. The monorepo has eight packages under `packages/` (seven plus the code-free `pipekit` umbrella); per-package lint/format is never sufficient.
 
 ## Development Environment
 
@@ -142,7 +142,7 @@ Plans and design documents go in `.plans/` (gitignored, never committed). If a p
 - **NEVER** push to `main` or merge into `main` unless the user explicitly says "push to main" or "merge to main".
 - **NEVER** push to any remote branch or run `git push` unless the user explicitly asks you to push. Only commit locally.
 - Always work on feature branches.
-- When the user says "merge the changes" or "merge the branch", they mean push the local branch to the remote — NOT merge into main.
+- When the user says "merge the changes" or "merge the branch", they mean push the local branch to the remote, NOT merge into main.
 - Always confirm before any action that affects shared branches (main, production, etc.).
 
 ## Documentation

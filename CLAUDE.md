@@ -13,13 +13,13 @@ The packages, in dependency order:
 
 | Package              | Status        | Purpose                                                                       |
 |----------------------|---------------|-------------------------------------------------------------------------------|
-| `pipekit-ops`        | implemented   | Carrier-agnostic core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, observe, … |
-| `pipekit-array`      | partial       | Array-API operators (Phase A: namespace dispatch + MeanScalar + Stack/Concat). Phases B-D pending. |
-| `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, observation/forward protocols.                      |
-| `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow.      |
+| `pipekit-ops`        | implemented   | Carrier-agnostic core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, flow limits, dict and iterable operators, `Map`, stores and `Cache`, observe, QC. |
+| `pipekit-array`      | partial       | Array-API dispatch, `MeanScalar`, `StackAlong` / `ConcatenateAlong`, `DimArray`, the dim functions and their operators, windows, `quantile` / `dot`, `KernelOp`, `Estimator`, `ApplyAlong`, `BatchAlong` (the array-shaped batched map), einx and xarray bridges; `StackAlong` and `ConcatenateAlong` take `dim=`. Pending from the v0.1 catalogue: the array QC asserts (`AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`), the array `Histogram`, `ModelOp`. `Subsample` was retired in favour of `isel` with a stepped slice. |
+| `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, BFN, adjoint specs, observation/forward protocols.  |
+| `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow adapters. |
 | `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule), scorer taxonomy, `MetricScorer`, `EvaluationReport`. |
-| `pipekit-train`      | implemented   | Training pipelines + Equinox adapter. Design at `packages/pipekit-train/docs/design/`. |
-| `pipekit-jax`        | implemented   | `JaxModelOp` — eqx.Module wrapper with weight-blob round-trip through `ModelRegistry`. |
+| `pipekit-train`      | implemented   | Training pipelines + Equinox, NumPyro and BlackJAX adapters. Design at `packages/pipekit-train/docs/design/`. |
+| `pipekit-jax`        | implemented   | `JaxOperator`, `JaxModelOp` (weight round-trip through `ModelRegistry`), `ScanCycle`, `DiffraxForwardModel`, adjoint interpreters. |
 
 The master plan lives in
 [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):
@@ -29,11 +29,11 @@ pipekit-train, 12 covers pipekit-experiment.
 ## Common Commands
 
 ```bash
-make install              # uv sync --all-groups, minus train-extras, + pre-commit hooks
+make install              # uv sync --all-groups except train-extras, then pre-commit hooks
 make test                 # uv run pytest -v (all packages)
 make format               # ruff format . && ruff check --fix .
 make lint                 # ruff check .
-make typecheck            # ty check across all package src dirs
+make typecheck            # ty check on every package's src dir
 make precommit            # pre-commit run --all-files
 make docs-serve           # local MkDocs preview
 ```
@@ -59,11 +59,9 @@ uv run pytest packages/pipekit-ops/tests/test_observe.py::test_tap_passes_throug
 
 ```bash
 uv run pytest -q                                    # Tests
-uv run --group lint ruff check .                    # Lint — ENTIRE repo
-uv run --group lint ruff format --check .           # Format — ENTIRE repo
-uv run --group typecheck ty check packages/pipekit-ops/src/pipekit_ops \
-    packages/pipekit-cycle/src/pipekit_cycle \
-    packages/pipekit-experiment/src/pipekit_experiment   # Typecheck
+uv run --group lint ruff check .                    # Lint, the ENTIRE repo
+uv run --group lint ruff format --check .           # Format, the ENTIRE repo
+make typecheck                                      # ty on all eight src dirs
 ```
 
 **Critical**: Always lint/format with `.` (repo root). CI runs
@@ -78,28 +76,62 @@ packages/
 ├── pipekit/                  # Umbrella: no code, installs every package below
 ├── pipekit-ops/              # Core framework (no internal deps), import pipekit_ops
 │   ├── src/pipekit_ops/
-│   │   ├── _base/            # Operator, Sequential, Graph (the foundations)
+│   │   ├── _base/            # Operator, Sequential, Graph, tracer detection
 │   │   ├── blocks.py         # Identity, Const, Lambda, Sink
-│   │   ├── compose.py        # pipe, compose, juxt, complement
+│   │   ├── compose.py        # pipe, compose, compose_left, juxt, complement
 │   │   ├── control.py        # Branch, Switch, Try, Coalesce, Retry
-│   │   ├── observe.py        # Tap, Snapshot, ShapeTrace, Profile, Histogram
+│   │   ├── flow.py           # Timeout, RateLimit, Until
+│   │   ├── dicts.py          # Get, GetIn, Pick, Dissoc, Rename, Merge, Assoc,
+│   │   │                     # UpdateIn, ValMap
+│   │   ├── seq.py            # Not, Filter, Remove, Reduce, PartitionAll, Concat,
+│   │   │                     # Zip, GroupBy, CountBy, Count, Unique, Take, SortBy
+│   │   ├── observe.py        # Tap, Log, Snapshot, ShapeTrace, Profile, Histogram
 │   │   ├── combine.py        # Fanout
-│   │   ├── cache.py          # Cache, Memoize
-│   │   ├── qc.py             # Quarantine, AssertShape, AssertDType, …
+│   │   ├── execution.py      # Map, executor_scope, MapError, Failed, Prefetch, Fold
+│   │   ├── parallel.py       # ThreadMap, ProcessMap, AsyncMap, BatchedMap (presets
+│   │   │                     # of Map), check_pickleable
+│   │   ├── store.py          # Store, MemoryStore, DirectoryStore, store_scope
+│   │   ├── cache.py          # Cache (in memory or in a named Store), Memoize
+│   │   ├── qc.py             # Quarantine, AssertShape, AssertDType, AssertThat,
+│   │   │                     # AssertSignature, …
 │   │   ├── signature.py      # Signature (shape inference)
-│   │   ├── parallel.py       # ThreadMap, ProcessMap, AsyncMap, BatchedMap
+│   │   ├── adapters.py       # NamedArrayAdapter, register_adapter, backend_of, …
+│   │   ├── imports.py        # on_import
 │   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
 │   │   ├── state.py          # StatefulOperator, CarryState
 │   │   ├── protocols.py      # Predictor, FittableTransformer (structural seams)
-│   │   └── hashing.py        # stable_json, stable_repr, sha256_hex (shared)
+│   │   ├── hashing.py        # pipeline_hash, stable_json, stable_repr, sha256_hex
+│   │   └── testing.py        # assert_round_trip
 │   └── tests/
-├── pipekit-array/            # Array-API operators (Phase A landed; B-D pending)
+├── pipekit-array/            # Array-API operators and dim-level functions
+│   ├── src/pipekit_array/
+│   │   ├── _namespace.py     # array_namespace (backend dispatch)
+│   │   ├── reductions.py     # MeanScalar
+│   │   ├── combinators.py    # StackAlong, ConcatenateAlong
+│   │   ├── dimarray.py       # DimArray, DimArrayAdapter
+│   │   ├── dims.py           # isel, sel, transpose, reduce, stack, concat, …
+│   │   ├── dim_shapes.py     # rename, expand_dims, squeeze, merge_dims, …
+│   │   ├── dim_shifts.py     # pad, roll, shift, diff, cumreduce, where
+│   │   ├── dim_windows.py    # window, coarsen
+│   │   ├── dim_algebra.py    # quantile, dot
+│   │   ├── dim_operators.py  # the dim functions as Operators (ISel, Reduce, …)
+│   │   ├── batching.py       # batch, Padded, BatchAlong
+│   │   ├── rows.py           # to_rows, from_rows
+│   │   ├── estimator.py      # Estimator (scikit-learn on any carrier)
+│   │   ├── kernel.py         # KernelSpec, KernelOp
+│   │   ├── einx.py           # rearrange, reduce, einsum, repeat, Einx ([einx])
+│   │   ├── xarray.py         # the xr.DataArray adapter ([xarray])
+│   │   └── testing.py        # check_adapter, check_kernel_op
+│   └── tests/
 ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit_ops.state
 │   ├── src/pipekit_cycle/
 │   │   ├── cycle.py          # Cycle, EnsembleCycle, WindowedCycle, Recurrence
 │   │   ├── da.py             # DACycle, EnsembleDACycle, SmootherCycle
+│   │   ├── bfn.py            # BFNCycle (back-and-forth nudging)
+│   │   ├── adjoints.py       # DirectAdjoint, TruncatedAdjoint, … (adjoint specs)
 │   │   ├── protocols.py      # ForwardModel, ObservationOperator, AnalysisStep,
-│   │   │                     # + ensemble/inversion seams (ObservationNoise, …)
+│   │   │                     # + ensemble/inversion seams (ObservationNoise, …),
+│   │   │                     # SupportsAdjoint
 │   │   ├── obs.py            # IdentityObs, LinearObs, CallableObs, CompositeObs
 │   │   ├── forward.py        # CallableForward, CompositeForward, NeuralForward
 │   │   └── state.py          # DAState, IterationState, WindowState
@@ -115,13 +147,23 @@ packages/
 ├── pipekit-evaluate/         # Benchmark ladder (cube/protocols/reference/run),
 │                             # taxonomy.py (Unit/Lens/Stage), scorers.py,
 │                             # report.py (EvaluationReport, evaluate)
-├── pipekit-jax/              # JaxModelOp, DiffraxForwardModel, adjoint
-│                             # interpreters (truncated_scan, to_diffrax_adjoint)
+├── pipekit-jax/              # depends on pipekit-ops and pipekit-cycle
+│   └── src/pipekit_jax/
+│       ├── operator.py       # JaxOperator (an Operator that is an eqx.Module)
+│       ├── model_op.py       # JaxModelOp
+│       ├── weights.py        # WeightsMixin (weight-blob round trip)
+│       ├── cycle.py          # ScanCycle, EnsembleScanCycle, Rollout
+│       ├── diffrax_model.py  # DiffraxForwardModel ([diffrax])
+│       ├── adjoints.py       # truncated_scan, to_diffrax_adjoint
+│       ├── kernel.py         # to_jax, JaxKernelOp ([array])
+│       ├── pytree.py         # registers Sequential, Graph, JaxModelOp as pytrees
+│       └── testing.py        # check_jax_operator
 └── pipekit-train/            # Training loop + adapters. Full design at
                               # packages/pipekit-train/docs/design/.
     └── src/pipekit_train/
         ├── loop.py           # TrainingLoop + backend dispatch
-        ├── dataset.py        # TrainingDataset, SimulationDataset, CachedDataset
+        ├── dataset.py        # TrainingDataset, IterableDataset, SimulationDataset,
+        │                     # CachedDataset
         ├── sweep.py          # HyperSweep + ParameterGrid
         ├── loss.py           # Loss Protocol (carrier-agnostic)
         ├── callbacks.py      # Callback Protocol + concrete callbacks
@@ -130,11 +172,11 @@ packages/
             ├── equinox.py    # reference backend (Equinox+Optax+Orbax+Grain)
             ├── bayes.py      # shared NumPyro/BlackJAX seam (NumpyroTask, …)
             ├── numpyro_svi.py / numpyro_mcmc.py / blackjax.py
-            └── keras.py      # v0.3 — raises NotImplementedError
+            └── keras.py      # v0.3; raises NotImplementedError
 ```
 
 Each package's public API is re-exported through its
-`src/<pkg>/__init__.py`. The workspace root ships no code — the
+`src/<pkg>/__init__.py`. The workspace root ships no code; the
 top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
 
 ### Dependency rules
@@ -142,15 +184,24 @@ top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
 - `pipekit-ops` has no internal deps; pure Python, no third-party.
 - `pipekit` (the umbrella) depends on every package and holds no code;
   no package may depend on it.
-- `pipekit-cycle` depends on `pipekit-ops` only.
+- `pipekit-array` depends on `pipekit-ops` only; backends and bridges
+  are optional extras (`[numpy]`, `[jax]`, `[torch]`, `[cupy]`,
+  `[dask]`, `[compat]`, `[xarray]`, `[sklearn]`, `[einx]`).
+- `pipekit-cycle` depends on `pipekit-ops` only; `[array]` adds
+  `pipekit-array`.
 - `pipekit-experiment` depends on `pipekit-ops` only; tool integrations
   are gated behind optional extras (`[dvc]`, `[hydra]`, `[metaflow]`,
-  `[s3]`).
+  `[s3]`, plus `[mlflow]` and `[wandb]`, which pin the libraries but
+  ship no adapter yet).
+- `pipekit-evaluate` depends on `pipekit-ops`, NumPy and SciPy;
+  `[cycle]`, `[xskill]` and `[proper]` are optional.
 - `pipekit-train` depends on `pipekit-ops` only; backend tools
-  (Equinox+Optax, Keras 3) and data sources (geocatalog,
-  pipekit-cycle) are gated behind optional extras
-  (`[equinox]`, `[keras]`, `[catalog]`, `[cycle]`,
-  `[experiment]`).
+  (Equinox+Optax, NumPyro, BlackJAX, Keras 3), pipekit-cycle,
+  pipekit-experiment and the zarr caches are gated behind optional
+  extras (`[equinox]`, `[numpyro]`, `[blackjax]`, `[keras]`,
+  `[cycle]`, `[experiment]`, `[cache]`, `[s3]`, `[gcs]`).
+- `pipekit-jax` depends on `pipekit-ops`, `pipekit-cycle`, JAX,
+  Equinox and jaxtyping; `[diffrax]` and `[array]` are optional.
 - Algorithm libraries (filterx, vardax, plumax, …) are *not* internal
   deps; they plug in by satisfying the runtime-checkable Protocols
   defined in `pipekit_cycle.protocols` and `pipekit_experiment.protocols`.
@@ -167,7 +218,7 @@ Example notebooks live in `docs/notebooks/` as `jupytext` percent-format
    truth.
 4. `mkdocs-jupyter` renders pre-executed `.ipynb` with `execute: false`.
 
-Figures render inline via `plt.show()` — do **not** use `savefig` or
+Figures render inline via `plt.show()`; do **not** use `savefig` or
 commit separate PNG files. The `.ipynb` cell outputs are the single
 source of rendered figures.
 
@@ -180,7 +231,7 @@ source of rendered figures.
 - `from __future__ import annotations` in every module; ruff config
   pins `target-version = "py312"`.
 - Pure functions where possible; side effects isolated and explicit.
-- Surgical changes only — don't refactor adjacent code or add
+- Surgical changes only; don't refactor adjacent code or add
   docstrings to unchanged code.
 - Operators carrying user closures (`Lambda`, `Tap`, `Branch`, …)
   set `forbid_in_yaml: ClassVar[bool] = True`; the same flag doubles
