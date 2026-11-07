@@ -85,7 +85,7 @@ final_state, _ = forecast(x0, None)                  # (D,) → (D,)
 | Package              | Status        | Purpose                                                              |
 |----------------------|---------------|----------------------------------------------------------------------|
 | `pipekit-ops`        | ✅ implemented | Core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. |
-| `pipekit-array`      | 🚧 partial    | Array API dispatch, dim functions and their operators, `DimArray`, `KernelOp`, `Estimator`; the array QC asserts, `Subsample` and `ModelOp` are still to come. |
+| `pipekit-array`      | 🚧 partial    | Array API dispatch, dim functions and their operators, `DimArray`, `KernelOp`, `Estimator`; the array QC asserts and `ModelOp` are still to come. |
 | `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
 | `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |
 | `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. |
