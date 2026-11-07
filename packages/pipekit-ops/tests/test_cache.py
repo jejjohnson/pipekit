@@ -140,3 +140,21 @@ def test_cache_is_thread_safe_under_concurrent_access():
         t.join()
     assert op.hits == n_threads * per_thread
     assert op.misses == 1
+
+
+def test_cache_pickles_without_entries_or_lock():
+    """Gate G4-4 / decision O10: a copy for a process pool starts empty."""
+    import pickle
+
+    c = Cache(Counter())
+    c(1.0)
+    c(1.0)
+    copy = pickle.loads(pickle.dumps(c))
+    assert copy._store == {}
+    assert (copy.hits, copy.misses) == (0, 0)
+    assert copy._lock is not c._lock
+    # the original keeps its entries
+    assert (c.hits, c.misses) == (1, 1)
+    assert copy(1.0) == 2.0
+    assert copy(1.0) == 2.0
+    assert (copy.hits, copy.misses) == (1, 1)
