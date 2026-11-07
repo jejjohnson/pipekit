@@ -12,7 +12,7 @@ The v0.1 public surface, grouped by module:
   `Branch`, `Switch`, `Try`, `Coalesce`, `Retry`.
 - **Flow limits** (`flow`): `Timeout`, `RateLimit`, `Until`.
 - **Group E — observers** (`observe`):
-  `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`.
+  `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`, `Log`.
 - **Group F — combination** (`combine`): `Fanout`.
 - **Dict plumbing** (`dicts`): `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`,
   `Merge`, `Assoc`, `UpdateIn`, `ValMap`.
@@ -21,7 +21,8 @@ The v0.1 public surface, grouped by module:
   `Take`, `SortBy`.
 - **Group G — caching** (`cache`): `Cache`, `Memoize`.
 - **Group H — quality control** (`qc`): `Quarantine`, `AssertShape`,
-  `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError`.
+  `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `AssertThat`,
+  `AssertSignature`, `QCError`.
 - **Group I — shape inference** (`signature`): `Signature`.
 - **Group J — parallelism** (`parallel`): `ThreadMap`, `ProcessMap`,
   `AsyncMap`, `BatchedMap`, `check_pickleable`.
@@ -103,7 +104,7 @@ from pipekit_ops.execution import (
 from pipekit_ops.flow import RateLimit, Timeout, Until
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
-from pipekit_ops.observe import Histogram, Profile, ShapeTrace, Snapshot, Tap
+from pipekit_ops.observe import Histogram, Log, Profile, ShapeTrace, Snapshot, Tap
 from pipekit_ops.parallel import (
     AsyncMap,
     BatchedMap,
@@ -117,6 +118,8 @@ from pipekit_ops.qc import (
     AssertDType,
     AssertHasAttribute,
     AssertShape,
+    AssertSignature,
+    AssertThat,
     QCError,
     Quarantine,
 )
@@ -155,6 +158,8 @@ __all__ = [
     "AssertDType",
     "AssertHasAttribute",
     "AssertShape",
+    "AssertSignature",
+    "AssertThat",
     "Assoc",
     "AsyncMap",
     "BackendError",
@@ -184,6 +189,7 @@ __all__ = [
     "Identity",
     "Input",
     "Lambda",
+    "Log",
     "Map",
     "MapError",
     "Memoize",

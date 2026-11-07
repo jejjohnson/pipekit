@@ -79,7 +79,7 @@ Today only `Lambda` reshapes them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Map(op, executor, n_workers, max_in_flight, ordered, on_error, chunksize, start_method, progress)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor`; `progress` is P5 | today (`execution.py`), without `progress` |
+| `Map(op, executor, n_workers, max_in_flight, ordered, on_error, chunksize, start_method, progress)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor`; `progress` logs counts every `every` items | today (`execution.py`) |
 | `Map.iter(items)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points | today (`execution.py`) |
 | `Prefetch(op, depth=2, executor="thread")` | `Iterable → Iterator`; `None` | read `depth` items ahead of the consumer, in input order | today (`execution.py`) |
 | `executor_scope(executor)` | context manager | sets the executor that `Map(executor="scope")` uses (serial when none is set); not stored in any config | today (`execution.py`) |
@@ -106,10 +106,10 @@ Today only `Lambda` reshapes them.
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
 | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` | pass-through | closure-holding observers | today (`observe.py`) |
-| `Log(message="{op}", level="INFO", logger="pipekit_ops")` | `Any → Any`; passthrough | pass-through; logs one line per call with the call count and the input's `Signature` if an adapter is registered | proposed (P5) |
-| `Map(…, progress=every)` | argument | log done / failed / in-flight counts and items per second every `every` items | proposed (P5) |
-| `AssertThat(pred, message="predicate returned False")` | `Any → Any`; passthrough | `QCError` if `pred(x)` is falsy; the serialisable `AssertCallable` | proposed (P5) |
-| `AssertSignature(pattern, dtype=None, missing="raise")` | `Any → Any`; passthrough | `QCError` unless `signature_of(x).matches(pattern)` (and the dtype agrees) | proposed (P5) |
+| `Log(message="call {n}: {type} {signature}", level="INFO", logger="pipekit_ops")` | `Any → Any`; passthrough | pass-through; logs one line per call with the call count and the input's `Signature` if an adapter is registered | today (`observe.py`) |
+| `Map(…, progress=every)` | argument | log done / failed / in-flight counts and items per second every `every` items | today (`execution.py`) |
+| `AssertThat(pred, message="predicate returned False")` | `Any → Any`; passthrough | `QCError` if `pred(x)` is falsy; the serialisable `AssertCallable` | today (`qc.py`) |
+| `AssertSignature(pattern, dtype=None, missing="raise")` | `Any → Any`; passthrough | `QCError` unless `signature_of(x).matches(pattern)` (and the dtype agrees) | today (`qc.py`) |
 | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | pass-through | existing guards | today (`qc.py`) |
 | `Progress`, observer `Count` | none | not added: `Map(progress=…)` and `Log`'s call count cover them, and `Count` keeps toolz's meaning | dropped |
 

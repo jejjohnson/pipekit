@@ -21,6 +21,8 @@ from pipekit_ops import (
     AssertDType,
     AssertHasAttribute,
     AssertShape,
+    AssertSignature,
+    AssertThat,
     Assoc,
     AsyncMap,
     BatchedMap,
@@ -40,6 +42,7 @@ from pipekit_ops import (
     Identity,
     Input,
     Lambda,
+    Log,
     Map,
     Memoize,
     Merge,
@@ -124,6 +127,13 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "AssertHasAttribute": (lambda: AssertHasAttribute("units", "K"), (_Field(),), {}),
     "AssertShape": (lambda: AssertShape((2, None)), (_Field(),), {}),
     "Assoc": (lambda: Assoc("b", Get("a") | _Scale(2.0)), ({"a": 1},), {}),
+    # no adapter is registered for `_Field`, so "skip" passes it through
+    "AssertSignature": (
+        lambda: AssertSignature("... y x", dtype="float32", missing="skip"),
+        (_Field(),),
+        {},
+    ),
+    "AssertThat": (lambda: AssertThat(Const(True), "never"), (_Field(),), {}),
     "AsyncMap": (lambda: AsyncMap(_Scale(2.0), semaphore=2), ([1.0, 2.0],), {}),
     "BatchedMap": (
         lambda: BatchedMap(Identity(), batch_size=2, flatten=True),
@@ -148,8 +158,9 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "Graph": (_two_input_graph, (), {"a": 1.0, "b": 2.0}),
     "GroupBy": (lambda: GroupBy(("t",)), ([{"t": "A"}, {"t": "B"}],), {}),
     "Identity": (Identity, (3.0,), {}),
+    "Log": (lambda: Log("{n}: {type}", level="DEBUG", logger="gate"), (3.0,), {}),
     "Map": (
-        lambda: Map(_Scale(2.0), executor="thread", max_in_flight=2),
+        lambda: Map(_Scale(2.0), executor="thread", max_in_flight=2, progress=2),
         ([1.0, 2.0, 3.0],),
         {},
     ),
