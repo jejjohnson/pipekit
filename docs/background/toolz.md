@@ -1,4 +1,4 @@
-# Background — from toolz to pipekit
+# Background: from toolz to pipekit
 
 *Where pipekit comes from, and why its operators are classes.*
 
@@ -15,7 +15,7 @@ reach for it, read the [tour of the core](../core-tour.md).
     | **Reading time** | about 15 minutes |
     | **Audience** | anyone who wants to know why pipekit is shaped the way it is |
     | **Companions** | [Tour of the core](../core-tour.md) (what ships), [Patterns](../patterns.md) (where it is used), [Concepts](../concepts.md) (the mental model in ten minutes) |
-    | **Checked against** | toolz 1.1 and pipekit 0.0.2; every output below is from a real run |
+    | **Checked against** | toolz 1.1 and pipekit-ops 0.2.1; every output below is from a real run |
     | **History** | First written as Report 1 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/tree/main/docs/reports), which now point here |
 
 ## Why this page exists
@@ -52,9 +52,9 @@ primitives.
 | `thread_first`, `thread_last` | Clojure-style threading macros |
 | `flip(f, a, b)` | call `f(b, a)` |
 
-`toolz` also ships `itertoolz` (about 30 functions on iterables) and
-`dicttoolz` (about 15 on dicts). pipekit only really inherits from
-`functoolz`.
+`toolz` also ships `itertoolz` (about 30 functions on iterables) and `dicttoolz` (about 15 on dicts).
+pipekit inherited from `functoolz` first.
+Since pipekit-ops 0.2.1 it also has operator counterparts of the `dicttoolz` and `itertoolz` functions that pipelines reach for (`pipekit_ops.dicts` and `pipekit_ops.seq`), so reshaping a dict or filtering a list no longer needs a `Lambda`.
 
 ### The mental model
 
@@ -97,11 +97,15 @@ enough that the most accurate one-line description of pipekit is
 | `compose(*funcs)` | `compose(...)` | the same, in mathematical order |
 | `do(f, x)` | `Tap(fn)`, `Sink(write_fn)` | the closure is owned by an operator with a name; marked `forbid_in_yaml` |
 | `juxt(f, g, h)` | `juxt(...)` (tuple) and `Fanout({...})` (dict) | both shapes; named outputs for downstream steps |
-| `memoize` | `Cache`, with `Memoize` as an alias | config-aware hashing |
+| `memoize` | `Cache`, with `Memoize` as an alias | config-aware hashing; a named `Store` (a `DirectoryStore`) keeps entries across restarts and processes |
 | `excepts` | `Try`, `Coalesce` | operator-shaped arms; an explicit exception list |
 | `complement` | `complement` | ships as a plain function |
 | `identity` | `Identity` | an operator, so it composes everywhere |
 | `curry` | implicit in `__init__` | an operator's constructor is its partial application |
+| `map` (Python's, or an `Executor.map`) | `Map(op, executor=...)` | one engine for serial, thread, process and async runs, with a bounded window |
+| `sandbox.fold` | `Fold` | an associative tree fold over chunks, parallel through `Map` |
+| `get`, `get_in`, `merge`, `assoc`, `dissoc`, `update_in`, `valmap` | `Get`, `GetIn`, `Merge`, `Assoc`, `Dissoc`, `UpdateIn`, `ValMap` (plus `Pick`, `Rename`) | they round-trip through `dumps` / `loads`; none mutates its input |
+| `filter`, `remove`, `reduce` (from `functools`), `partition_all`, `concat`, `groupby`, `countby`, `unique`, `take` | `Filter`, `Remove`, `Reduce`, `PartitionAll`, `Concat`, `GroupBy`, `CountBy`, `Unique`, `Take` (plus `Not`, `Zip`, `Count`, `SortBy`) | predicates and keys are operators or plain keys, so the pipeline stays serialisable |
 
 The same pipeline in both libraries shows the difference. Both outputs below
 are from real runs.
@@ -145,7 +149,7 @@ beyond it, and each is why the domain libraries needed more.
 | Gap | What `toolz` gives | Where it lives in pipekit | Status |
 |---|---|---|---|
 | Introspection | a repr of raw function objects | named operators, `Sequential.__getitem__`, `summary()` | ships |
-| Serialisation | nothing | `get_config`, `dumps` / `loads`, `from_state` | flat operators only |
+| Serialisation | nothing | `get_config`, `dumps` / `loads`, `from_state` | ships, nested pipelines included; closure-holding operators excluded |
 | Dual-mode dispatch | eager calls only | `Operator.__call__` switches on `Node` inputs | ships |
 | Control flow | Python `if` / `match` outside the pipeline | `Branch`, `Switch`, `Try`, `Coalesce` | ships |
 | Shape tracking | `Any → Any` | `Signature`, `Sequential.summary()` | ships; needs signatures |
@@ -220,10 +224,9 @@ pipelines that must be audited: a closure cannot be inspected for what it
 captures, serialised, or rebuilt on a worker. pipekit's answer is a class
 flag. Operators whose constructor takes a closure declare
 `forbid_in_yaml = True` (`Tap`, `Lambda`, `Sink`, `Branch`, `Switch`,
-`Coalesce`, `ShapeTrace`, `Quarantine`, `AssertCallable`), and a loader can
-refuse them. Operators that only nest other operators, such as `Try`,
-`Retry` or `Cache`, are not flagged: a walker finds the flagged children
-inside them.
+`Coalesce`, `ShapeTrace`, `Quarantine`, `AssertCallable`), and a loader can refuse them.
+Operators that only nest other operators, such as `Try`, `Retry` or `Cache`, are not flagged: a walker finds the flagged children inside them.
+The dict and iterable operators, `AssertThat` and `Log` take operators or plain values instead of closures, so none of them is flagged, and a bare `lambda` handed to one is refused with a `TypeError` that names `Lambda`.
 
 !!! important "The gaps in one line"
 
@@ -301,7 +304,7 @@ separately.
 
 === "3 · Typed base class"
 
-    Where pipekit landed. A simplified view of `pipekit/_base/operator.py`:
+    Where pipekit landed. A simplified view of `pipekit_ops/_base/operator.py`:
 
     ```python title="The Operator base class, simplified."
     class Operator(ConfigMixin):
@@ -337,7 +340,7 @@ separately.
     **Costs you:**
 
     - Subclassing is more ceremony than a function (`class NDVI(Operator)`).
-    - A third-party function does not adapt for free; `Lambda` is the escape
+    - A third-party function does not adapt on its own; `Lambda` is the escape
       hatch, and `ConfigMixin` keeps the boilerplate small.
     - More framework code to maintain.
 
@@ -402,7 +405,8 @@ The carrier trajectory is different, and not settled.
 |---|---|---|
 | Operators | a typed concrete base class, `pipekit_ops.Operator` | settled |
 | Carriers, pipekit core | `Carrier = Any` | settled: the core stays carrier-agnostic |
-| Carriers, multi-backend | Array API Protocols, in pipekit-array | in progress |
+| Carriers, multi-backend | Array API Protocols, in pipekit-array | dispatch ships; the operator catalogue is in progress |
+| Carriers, named dims | the `NamedArrayAdapter` Protocol in pipekit-ops; `DimArray` and the dim functions in pipekit-array | ships |
 | Carriers, domain libraries | your own: `GeoTensor` in geotoolz, `xr.DataArray` / `xr.Dataset` in xrtoolz, … | in use |
 
 It was never one arc from functions to Protocols to typed entities. It was

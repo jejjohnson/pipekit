@@ -496,7 +496,12 @@ quarantined, and the three timeouts succeeded on their retry.
 - **A real bucket.** Replace `get_bytes` with your object-store client; the
   `Retry` and `Try` around it already handle its failures.
 - **More regions.** `ThreadMap` takes `n_workers`; for CPU-heavy
-  transforms, `ProcessMap` has the same interface.
+  transforms, `Map(read_once, executor="process", n_workers=8)` runs the
+  same steps on spawned processes (they must pickle; `check_pickleable`
+  lists any that do not). `ProcessMap` has the same interface but keeps
+  the platform's start method and raises a `FutureWarning` on Linux.
+  Each process gets its own empty `Cache`; bind a `DirectoryStore` with
+  `Cache(..., store=name)` to share entries between them.
 
 ## Where next
 

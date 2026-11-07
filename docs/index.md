@@ -1,27 +1,37 @@
 # pipekit
 
-**Composable scientific pipelines. Train, register, deploy — one
-operator interface end-to-end.**
+**Composable scientific pipelines: train, register and deploy with one operator interface.**
 
-`pipekit` is a uv workspace of seven Python packages (plus a code-free
-`pipekit` umbrella that installs them all) that together
-turn the pieces of a scientific ML workflow into composable
-`Operator`s: data loading, QC, training, data assimilation, model
-registry, reproducibility. The same operator that returns a trained
-emulator drops into a forecast `Cycle` as a step function. One mental
-model, one composition surface, end to end.
+`pipekit` is a uv workspace of seven Python packages (plus a code-free `pipekit` umbrella that installs them all).
+Together they turn the pieces of a scientific ML workflow into composable `Operator`s: data loading, QC, training, data assimilation, the model registry and reproducibility.
+The same operator that returns a trained emulator drops into a forecast `Cycle` as a step function, so there is one mental model and one composition surface from end to end.
+
+The example below reloads a trained emulator by name and forecasts 24 steps with it as the forward model.
+The weights come back into a skeleton of the same architecture (a model operator's config is not a faithful round-trip, so the registry keeps its weights as the data).
+Here `x0` is the initial state, a vector of length 8.
 
 ```python
+import equinox as eqx
+import jax
 from pipekit_cycle import Cycle, NeuralForward
 from pipekit_experiment import LocalModelRegistry
+from pipekit_jax import JaxModelOp
 
-# Reload a trained model by name and forecast 24 steps with it
-# as the forward model — same Operator interface as inference.
+# Shapes: D = 8 state variables
+
+# today (pipekit-experiment)
 registry = LocalModelRegistry("/models")
-op = registry.load("methane_emulator_v3")
-
-forecast = Cycle(step_op=NeuralForward(op, dt=3600.0), n_steps=24)
-final_state, _ = forecast(x0, None)
+# today (pipekit-jax)
+# a skeleton of the trained architecture, f : ℝ^D → ℝ^D
+template = JaxModelOp(
+    eqx.nn.MLP(in_size=8, out_size=8, width_size=64, depth=2, key=jax.random.key(0))
+)
+# today (pipekit-jax)
+emulator = template.from_registry(registry, "methane_emulator_v3")
+# today (pipekit-cycle)
+# x_t ↦ x_{t+1} = f(x_t), 24 times
+forecast = Cycle(step_op=NeuralForward(emulator, dt=3600.0), n_steps=24)
+final_state, _ = forecast(x0, None)                  # (D,) → (D,)
 ```
 
 ## Three doors
@@ -33,7 +43,7 @@ final_state, _ = forecast(x0, None)
     ---
 
     From `git clone` to your first pipeline, first DA cycle, and
-    first registered model. 5 minutes of copy-paste.
+    first registered model, in five minutes of copy and paste.
 
 -   :material-book-open-page-variant: **[Concepts](concepts.md)**
 
@@ -65,7 +75,7 @@ final_state, _ = forecast(x0, None)
 
     ---
 
-    Executed Jupyter notebooks — MLP quickstart, train → forecast
+    Executed Jupyter notebooks: an MLP quickstart, and the train → forecast
     handoff on a toy oscillator.
 
 </div>
@@ -74,13 +84,13 @@ final_state, _ = forecast(x0, None)
 
 | Package              | Status        | Purpose                                                              |
 |----------------------|---------------|----------------------------------------------------------------------|
-| `pipekit-ops`        | ✅ implemented | Core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, observe, …         |
-| `pipekit-array`      | 🚧 partial    | Array-API operators (Phase A landed; B-D pending).                   |
+| `pipekit-ops`        | ✅ implemented | Core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. |
+| `pipekit-array`      | 🚧 partial    | Array API dispatch, dim functions and their operators, `DimArray`, `KernelOp`, `Estimator`; the array QC asserts, `Subsample` and `ModelOp` are still to come. |
 | `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
 | `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |
 | `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. |
-| `pipekit-train`      | ✅ implemented | Training pipelines — datasets, losses, loop, Equinox adapter.        |
-| `pipekit-jax`        | ✅ implemented | `JaxModelOp` — `eqx.Module` wrapper with registry weight round-trip. |
+| `pipekit-train`      | ✅ implemented | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. |
+| `pipekit-jax`        | ✅ implemented | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. |
 
 ## Links
 

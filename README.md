@@ -22,15 +22,10 @@
 **Composable scientific pipelines: one operator interface, from loading
 data to training, assimilating and deploying.**
 
-Every step of a scientific workflow becomes an `Operator`: one method,
-`_apply`, that takes a carrier and returns one. The carrier is whatever
-your science uses (a NumPy array, an xarray Dataset, a DataFrame, an
-AnnData, a dict of arrays) and pipekit never looks inside it. Operators
-compose with `|`, wire into graphs, wrap in retries, caches and
-observers, and carry state through time steps and training loops, and
-each of those is itself an Operator. pipekit was built for the
-[GeoStack](https://github.com/jejjohnson/geostack), but the core is pure
-Python with no dependencies and nothing in it is about geoscience.
+Every step of a scientific workflow becomes an `Operator`: one method, `_apply`, that takes a carrier and returns one.
+The carrier is whatever your science uses (a NumPy array, an xarray Dataset, a DataFrame, an AnnData, a dict of arrays) and pipekit never looks inside it.
+Operators compose with `|`, wire into graphs, wrap in retries, caches and observers, map over many inputs on threads or processes, and carry state through time steps and training loops, and each of those is itself an Operator.
+We built pipekit for the [GeoStack](https://github.com/jejjohnson/geostack), but the core is pure Python with no dependencies and nothing in it is about geoscience.
 
 <p align="center">
   <picture>
@@ -52,8 +47,7 @@ from jaxtyping import Float
 
 from pipekit_ops import Graph, Input, Operator, Sequential, Tap, dumps, loads
 
-# ── shapes ──
-# N  samples
+# Shapes: N samples
 Vector = Float[np.ndarray, " N"]
 
 
@@ -97,19 +91,24 @@ def show(v: Vector) -> None:
 
 # 1 · compose with |: a Sequential, itself an Operator
 
+# user
 # z = (x − 10) / 2
 standardize = Standardize(mean=10.0, std=2.0)
+# user
 # z̃ = min(max(z, −3), 3)
 clip = Clip(lo=-3.0, hi=3.0)
+# today (pipekit-ops)
 clean: Sequential = standardize | clip
 
 x: Vector = np.array([4.0, 10.0, 30.0])
 # [-3., 0., 3.]
-z: Vector = clean(x)
+z: Vector = clean(x)                                  # (N,) → (N,)
 
 # 2 · wire a Graph: named inputs, shared operators, named outputs
 
+# user
 difference = Difference()
+# today (pipekit-ops)
 a = Input("a")
 b = Input("b")
 a_clean = clean(a)
@@ -118,21 +117,23 @@ anomaly = difference(a_clean, b_clean)
 graph = Graph(inputs={"a": a, "b": b}, outputs={"anomaly": anomaly})
 
 # {"anomaly": d}, one value per sample
-out: dict[str, Vector] = graph(a=x, b=x + 2.0)
+out: dict[str, Vector] = graph(a=x, b=x + 2.0)        # (N,), (N,) → (N,)
 
 # 3 · observe without changing the flow
 
+# today (pipekit-ops)
 traced: Sequential = clean | Tap(show)
 
 # 4 · configuration is data: an operator round-trips through JSON
 
+# today (pipekit-ops)
 text: str = dumps(standardize)
 # Standardize(mean=10.0, std=2.0)
 same: Operator = loads(text)
 ```
 
-The same interface steps through time. With `pipekit-cycle`, a forward
-model is an operator and a `Cycle` runs it:
+The same interface steps through time.
+With `pipekit-cycle`, a forward model is an operator and a `Cycle` runs it:
 
 ```python
 import numpy as np
@@ -140,7 +141,7 @@ from jaxtyping import Float
 
 import pipekit_cycle as pc
 
-# N  state variables
+# Shapes: N state variables
 State = Float[np.ndarray, " N"]
 
 
@@ -150,29 +151,25 @@ def decay(x: State, dt: float) -> State:
     return x - dt * 0.1 * x
 
 
+# today (pipekit-cycle)
 # x_t ↦ x_{t+1}, Δt = 1
 step = pc.CallableForward(decay, dt=1.0)
+# today (pipekit-cycle)
 # x_0 ↦ x_24
 forecast = pc.Cycle(step_op=step, n_steps=24)
 
 # x₂₄ = (1 − 0.1)²⁴ x₀ ≈ 0.080 x₀
-x24, _ = forecast(np.ones(3), None)
+x24, _ = forecast(np.ones(3), None)                   # (N,) → (N,)
 ```
 
-Swap `CallableForward` for `NeuralForward` around a trained model from
-the registry and the same `Cycle` forecasts with an emulator; add an
-observation operator and an analysis step and it assimilates
-(`DACycle`, `EnsembleDACycle`).
+Swap `CallableForward` for `NeuralForward` around a trained model from the registry and the same `Cycle` forecasts with an emulator.
+Add an observation operator and an analysis step and it assimilates (`DACycle`, `EnsembleDACycle`).
 
 ## A bigger graph
 
-Everything above composes. This is an anomaly detector for a stack of
-multi-channel images: satellite scenes, microscope fields or telescope
-exposures read the same way. Six small domain operators do the science;
-pipekit does the rest: reading in parallel with retries and a cache,
-stacking and checking shapes, choosing a composite by the size of the
-stack, joining a second input, observing, and summarising, with four
-named outputs.
+Everything above composes.
+This is an anomaly detector for a stack of multi-channel images; satellite scenes, microscope fields or telescope exposures read the same way.
+Six small domain operators do the science, and pipekit does the rest (reading in parallel with retries and a cache, stacking and checking shapes, choosing a composite by the size of the stack, joining a second input, observing, and summarising) with four named outputs.
 
 <p align="center">
   <picture>
@@ -181,48 +178,64 @@ named outputs.
   </picture>
 </p>
 
-The wiring, once the six domain operators are written:
+The wiring, once the six domain operators are written (it runs as printed after the tutorial's definitions):
 
 ```python
 # ReadTile … Threshold, CountFlagged and FlaggedFraction are the tutorial's
 # operators; few_exposures and log_flagged are its two named functions.
 
+# Shapes: T exposures; C channels; H × W pixels
+
 # the steps
 
+# today (pipekit-ops); ReadTile is user
 # on OSError, read again: up to 3 attempts
 retried_read = Retry(ReadTile(), attempts=3, base_delay=0.5, on=(OSError,))
+# today (pipekit-ops)
 # keep each source's exposure, so no source is read twice
 cached_read = Cache(retried_read)
+# today (pipekit-ops)
 # [s_1, …, s_T] ↦ [x_1, …, x_T], on 8 threads
 read = ThreadMap(cached_read, n_workers=8)
+# today (pipekit-array)
 # [x_1, …, x_T] ↦ X ∈ ℝ^{T×C×H×W}
 stack_exposures = StackAlong(axis=0)
+# today (pipekit-ops)
 check_shape = AssertShape((None, C, H, W))
+# today (pipekit-ops); Composite is user
 # x̄ = median_t X when T < 5, else mean_t X
 choose_composite = Branch(
     few_exposures,
     if_true=Composite(how="median"),
     if_false=Composite(how="mean"),
 )
+# user
 # z = (x̄ − μ_b) / σ_b
 z_score = ZScore(sigma=1.0)
+# user
 # r = (x̄_0 − x̄_1) / (x̄_0 + x̄_1)
 channel_ratio = NormalizedDifference(a=0, b=1)
+# user
 # s = max_c |z_c| + w · |r − r̄|
 score_pixels = Score(weight=10.0)
+# user
 # m = 1[s > k], logged on the way through
 threshold = Threshold(k=3.0)
+# today (pipekit-ops)
 report = Tap(log_flagged)
+# today (pipekit-ops); the two counters are user
 # m ↦ {"flagged": n, "fraction": f}
 summarise = Fanout({"flagged": CountFlagged(), "fraction": FlaggedFraction()})
 
 # the bundles
 
+# today (pipekit-ops)
 load: Sequential = read | stack_exposures | check_shape
 flag: Sequential = threshold | report
 
 # wired as a graph
 
+# today (pipekit-ops)
 sources_in = Input("sources")
 background_in = Input("background")
 stack_node = load(sources_in)
@@ -244,12 +257,9 @@ detector = Graph(
 )
 ```
 
-The full, runnable version, with the six operators and each step
-explained, is the tutorial
-[Build a bigger graph](docs/tutorials/anomaly-graph.md).
+The full, runnable version, with the six operators and each step explained, is the tutorial [Build a bigger graph](docs/tutorials/anomaly-graph.md).
 
-More end-to-end examples, each with its pre- and post-processing and a
-script that runs as printed:
+More end-to-end examples, each with its pre- and post-processing and a script that runs as printed:
 [train, register and forecast](docs/tutorials/train-register-forecast.md),
 [inference](docs/tutorials/inference.md),
 [ensemble data assimilation](docs/tutorials/ensemble-da.md) and
@@ -264,23 +274,20 @@ script that runs as printed:
   </picture>
 </p>
 
-A uv workspace of seven packages, plus the code-free `pipekit` umbrella
-that installs them all. Install only what you need: each one builds on
-the core (`pipekit-ops`) and on none of the others, except `pipekit-jax` on
-`pipekit-cycle`; tool integrations are opt-in extras.
+A uv workspace of seven packages, plus the code-free `pipekit` umbrella that installs them all.
+Install only what you need: each one builds on the core (`pipekit-ops`) and on none of the others, except `pipekit-jax` on `pipekit-cycle`; tool integrations are opt-in extras.
 
 | Package | Status | What it gives you |
 |---|---|---|
-| `pipekit-ops` | implemented | The core, imported as `pipekit_ops`: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`), observers (`Tap`, `Snapshot`, `Profile`), `Cache`, QC asserts, parallel maps, JSON `dumps` / `loads`, `StatefulOperator` |
+| `pipekit-ops` | implemented | The core, imported as `pipekit_ops`: `Operator`, `Sequential`, `Graph`; control flow (`Branch`, `Switch`, `Try`, `Retry`, `Coalesce`) and flow limits (`Timeout`, `RateLimit`, `Until`); dict and iterable operators (`Get`, `Merge`, `Filter`, `GroupBy`, …); observers (`Tap`, `Log`, `Snapshot`, `Profile`); `Map` over serial, thread, process and async executors, with its presets (`ThreadMap`, `ProcessMap`, …); `Cache` in memory or in a `DirectoryStore`; QC asserts (`AssertShape`, `AssertThat`, `AssertSignature`, …); JSON `dumps` / `loads`; `StatefulOperator` |
 | `pipekit-cycle` | implemented | Time stepping and data assimilation: `Cycle`, `DACycle`, `EnsembleDACycle`, `SmootherCycle`, and the `ForwardModel`, `ObservationOperator` and `AnalysisStep` protocols |
 | `pipekit-train` | implemented | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends behind extras |
-| `pipekit-experiment` | implemented | A content-addressed model registry (`LocalModelRegistry`, `S3ModelRegistry`, keyed by a hash of config and weights) and tracker protocols, with DVC, Hydra, Metaflow and MLflow adapters |
-| `pipekit-jax` | implemented | `JaxModelOp` (an `eqx.Module` with registry round-trip), `DiffraxForwardModel`, adjoints; builds on `pipekit-cycle` |
-| `pipekit-array` | partial | Array API dispatch: one operator on NumPy, JAX, CuPy, PyTorch or dask (`array_namespace`, `StackAlong`, `ConcatenateAlong`) |
+| `pipekit-experiment` | implemented | A content-addressed model registry (`LocalModelRegistry`, `S3ModelRegistry`, keyed by a hash of config and weights) and tracker protocols, with DVC, Hydra and Metaflow adapters |
+| `pipekit-jax` | implemented | `JaxOperator`, `JaxModelOp` (an `eqx.Module` with registry round-trip), `ScanCycle`, `DiffraxForwardModel`, adjoints; builds on `pipekit-cycle` |
+| `pipekit-array` | partial | Array API dispatch, so one operator runs on NumPy, JAX, CuPy, PyTorch or dask (`array_namespace`, `MeanScalar`, `StackAlong`, `ConcatenateAlong`); dim functions by name on any named carrier (`isel`, `reduce`, `window`, `quantile`, …, and their operators `ISel`, `Reduce`, `Window`, …); `DimArray`, `KernelOp`, `Estimator`, einx and xarray bridges. The array QC asserts, `Subsample` and `ModelOp` are still to come |
 | `pipekit-evaluate` | partial | A benchmark ladder: `Benchmark`, `MetricScorer`, `EvaluationReport` |
 
-Each package has its own README under [`packages/`](packages/) and,
-for the larger ones, design notes under `packages/<pkg>/docs/design/`.
+Each package has its own README under [`packages/`](packages/) and, for the larger ones, design notes under `packages/<pkg>/docs/design/`.
 
 ## Who builds on it
 
@@ -315,9 +322,7 @@ runtime-checkable protocols (`ForwardModel`, `AnalysisStep`,
    pipekit never inspects the carrier; domain packages narrow it.
 2. **Composition is `|`.** `a | b | c` is a `Sequential`; branching and
    merging flows are a `Graph` built by calling operators on `Input`s.
-3. **Wrappers are operators too.** `Retry`, `Try`, `Cache`, `Tap`,
-   `ThreadMap` and the QC asserts take an operator and return one, so
-   they nest anywhere.
+3. **Wrappers are operators too.** `Retry`, `Timeout`, `Try`, `Cache`, `Map` and the QC asserts take an operator and return one, so they nest anywhere.
 4. **State is explicit.** A `StatefulOperator` maps
    `(carrier, state) → (carrier, state)`; `Cycle`, `DACycle` and
    `TrainingLoop` are built on it.
@@ -356,18 +361,16 @@ The long form is [docs/concepts.md](docs/concepts.md).
 ```bash
 git clone https://github.com/jejjohnson/pipekit.git
 cd pipekit
-make install      # uv sync --all-groups + pre-commit hooks
+make install      # uv sync --all-groups except train-extras, + pre-commit hooks
 make test         # every package's tests
 make lint         # ruff check . (the whole repo)
 make typecheck    # ty on every package
 make docs-serve   # MkDocs preview
 ```
 
-Conventional Commits drive releases (release-please, one version per
-package). The rules for contributors and coding agents are in
-[`AGENTS.md`](AGENTS.md), review follows [`CODE_REVIEW.md`](CODE_REVIEW.md),
-and the local workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md). The
-figures are generated: edit `scripts/make_readme_assets.py` and run it.
+Conventional Commits drive releases (release-please, one version per package).
+The rules for contributors and coding agents are in [`AGENTS.md`](AGENTS.md), review follows [`CODE_REVIEW.md`](CODE_REVIEW.md), and the local workflow is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+The figures are generated: edit `scripts/make_readme_assets.py` and run it.
 
 ## License
 

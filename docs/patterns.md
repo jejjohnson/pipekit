@@ -11,11 +11,8 @@ pieces each one uses, and what is still missing.*
     | **Worked examples** | The [tutorials](tutorials/anomaly-graph.md), linked from each pattern |
     | **History** | Distilled from Report 9 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/blob/main/docs/reports/09_use_cases.md), which walks twenty cases through one domain (a methane plume from a satellite scene) and now points here |
 
-A pipeline is written once and then used in many places: a notebook, a batch
-job, a web service, a scheduled family of runs, an audit. pipekit's bet is
-that these are the *same object* in different harnesses, so the patterns
-below are mostly about which harness to put around an `Operator`, and which
-of its properties (a config, a hash, pickleability) the harness relies on.
+A pipeline is written once and then used in many places: a notebook, a batch job, a web service, a scheduled family of runs, an audit.
+pipekit's bet is that these are the *same object* run by different runners, so the patterns below are mostly about which runner to put around an `Operator`, and which of its properties (a config, a hash, pickleability) the runner relies on.
 
 Each pattern names its pipekit pieces, says what works today and what does
 not, and links the tutorial that runs it end to end. The status column uses
@@ -24,19 +21,19 @@ workaround), **missing** (needs code that does not exist yet).
 
 | # | Pattern | Pieces | Status | Tutorial |
 |---|---|---|---|---|
-| 1 | [Explore, then batch](#1-explore-then-batch) | `Tap`, `ShapeTrace`, `Profile`, `Snapshot` | today | [bigger graph](tutorials/anomaly-graph.md) |
-| 2 | [ETL over many inputs](#2-etl-over-many-inputs) | `ProcessMap`, `Quarantine`, `Sink` | today | [ETL over many regions](tutorials/etl-regions.md) |
-| 3 | [Validation as operators](#3-validation-as-operators) | `Assert*`, `Quarantine`, `QCError` | today | [inference](tutorials/inference.md) |
+| 1 | [Explore, then batch](#1-explore-then-batch) | `Tap`, `Log`, `ShapeTrace`, `Profile`, `Snapshot` | today | [bigger graph](tutorials/anomaly-graph.md) |
+| 2 | [ETL over many inputs](#2-etl-over-many-inputs) | `Map`, `ProcessMap`, `Quarantine`, `Sink` | today | [ETL over many regions](tutorials/etl-regions.md) |
+| 3 | [Validation as operators](#3-validation-as-operators) | `Assert*` (`AssertThat`, `AssertSignature`, …), `Quarantine`, `QCError` | today | [inference](tutorials/inference.md) |
 | 4 | [Fusing several inputs](#4-fusing-several-inputs) | `Graph`, `Input` | today | [bigger graph](tutorials/anomaly-graph.md) |
 | 5 | [One preprocessing object for training and serving](#5-one-preprocessing-object-for-training-and-serving) | `Operator` config, registry | today | [train, register, forecast](tutorials/train-register-forecast.md) |
 | 6 | [Cycles: time stepping and assimilation](#6-cycles-time-stepping-and-assimilation) | `StatefulOperator`, `pipekit-cycle` | today | [DA cycle](tutorials/da-cycle.md), [ensemble DA](tutorials/ensemble-da.md) |
 | 7 | [An inference service](#7-an-inference-service) | `AsyncMap.run`, `BatchedMap`, the config hash | today | [inference](tutorials/inference.md) |
-| 8 | [Promotion by tag](#8-promotion-by-tag) | `LocalModelRegistry.tag` | today | — |
-| 9 | [Pipelines from users](#9-pipelines-from-users) | `register`, `loads_sandboxed`, `from_yaml_sandboxed` | today | — |
-| 10 | [A pinned artifact](#10-a-pinned-artifact) | `InferenceArtifact`, `TrainingArtifact`, `to_yaml` | today | — |
-| 11 | [Orchestrator tasks with deterministic keys](#11-orchestrator-tasks-with-deterministic-keys) | `pipeline_hash` | today | [ETL over many regions](tutorials/etl-regions.md) |
-| 12 | [A/B comparison](#12-ab-comparison) | `Fanout` | partly | — |
-| 13 | [Scheduled families, backfills and what-if reruns](#13-scheduled-families-backfills-and-what-if-reruns) | the config hash | today | — |
+| 8 | [Promotion by tag](#8-promotion-by-tag) | `LocalModelRegistry.tag` | today | none |
+| 9 | [Pipelines from users](#9-pipelines-from-users) | `register`, `loads_sandboxed`, `from_yaml_sandboxed` | today | none |
+| 10 | [A pinned artifact](#10-a-pinned-artifact) | `InferenceArtifact`, `TrainingArtifact`, `to_yaml` | today | none |
+| 11 | [Orchestrator tasks with deterministic keys](#11-orchestrator-tasks-with-deterministic-keys) | `pipeline_hash`, `Cache` in a `DirectoryStore` | today | [ETL over many regions](tutorials/etl-regions.md) |
+| 12 | [A/B comparison](#12-ab-comparison) | `Fanout` | partly | none |
+| 13 | [Scheduled families, backfills and what-if reruns](#13-scheduled-families-backfills-and-what-if-reruns) | the config hash | today | none |
 | 14 | [The feedback loop](#14-the-feedback-loop) | `pipekit-train`, registry | today | [train, register, forecast](tutorials/train-register-forecast.md) |
 
 The snippets share one small operator, a detector with a threshold:
@@ -63,15 +60,15 @@ class Threshold(Operator):
 prints and plots between the steps. Then it has to run on a thousand inputs,
 and the prints and plots have to go.
 
-**The pattern.** Observers pass their input through unchanged, so you can
-leave them in while you explore and drop them, or point them at a logger,
-when you batch. `ShapeTrace` logs each step's shape and dtype, `Profile`
-times a step, `Snapshot` keeps a copy of an intermediate, and `Tap` calls any
-function on it. The object you explored with is the object you batch.
+**The pattern.** Observers pass their input through unchanged, so you can leave them in while you explore and drop them, or point them at a logger, when you batch.
+`ShapeTrace` logs each step's shape and dtype, `Profile` times a step, `Snapshot` keeps a copy of an intermediate, and `Tap` calls any function on it.
+`Log` writes one record per call to a `logging` logger with no closure, so it can stay in the batch pipeline and in its config.
+The object you explored with is the object you batch.
 
 ```python
 from pipekit_ops import Profile, ShapeTrace, Snapshot, Tap
 
+# today (pipekit-ops); clean, features, model and plot are user
 snap, prof = Snapshot(), Profile()
 explore = (
     clean
@@ -85,40 +82,41 @@ batch = clean | features | model  # the same steps, no observers
 snap.captures["clean"], prof.report()  # what the exploration saw
 ```
 
-**Today.** All of it. `ShapeTrace(extra=...)` adds a line for whatever else a
-carrier carries (units, a coordinate system).
+**Today.** All of it.
+`ShapeTrace(extra=...)` adds a line for whatever else a carrier carries (units, a coordinate system).
 
 ### 2. ETL over many inputs
 
 **The problem.** One pipeline, many inputs (regions, files, stations, days),
 some of them broken in ways you only find at scale.
 
-**The pattern.** Extract with a list of keys, transform with
-`ProcessMap(pipeline, on_error="log_and_continue")` so one bad input leaves a
-`None` instead of killing the run, set malformed records aside with
-`Quarantine`, and load with a `Sink` that writes one keyed output per input.
-Run `check_pickleable(pipeline)` before fanning out: closures do not cross
-process boundaries.
+**The pattern.** Extract with a list of keys, and transform with `Map(pipeline, executor="process", on_error="log_and_continue")` so one bad input leaves a `None` instead of killing the run.
+Set malformed records aside with `Quarantine`, and load with a `Sink` that writes one keyed output per input.
+Run `check_pickleable(pipeline)` before fanning out: closures do not cross process boundaries.
 
-**Today.** All of it. `log_and_continue` reports each failure as a warning,
-with its traceback, on the `pipekit_ops.parallel` logger, so the run's logging
-setup decides where failures go.
+**Today.** All of it.
+`log_and_continue` reports each failure as a warning, with its traceback, on the `pipekit_ops.parallel` logger, so the run's logging setup decides where failures go.
+`on_error="collect"` instead leaves a `Failed(index, exception)` in each failed slot and raises one `MapError` at the end, holding every failure and the partial results.
+`Map` reads its input lazily and keeps at most `max_in_flight` items in flight, so a generator over a million keys does not land in memory.
+
+`Map(executor="process")` starts its workers with spawn.
+`ProcessMap(pipeline, on_error=...)` is the same map as a preset, but it keeps the platform's default start method and raises a `FutureWarning` when that is not spawn, as on Linux (fork); the preset adopts spawn in the next minor release.
+The executor can also be chosen at deployment time: `Map(pipeline, executor="scope")` runs on whatever `executor_scope(...)` binds around the call.
 
 ### 3. Validation as operators
 
 **The problem.** Checks scattered through glue code are skipped, duplicated,
 or run in the wrong place.
 
-**The pattern.** A check is a step. `AssertShape`, `AssertDType`,
-`AssertHasAttribute` and `AssertCallable` raise `QCError` when an input is
-wrong; `Quarantine(check, sentinel, on_quarantine)` replaces a bad input with a
-sentinel and hands it to a callback, for streams where one bad record should
-not stop the rest. Put the hard checks at the boundaries (after loading,
-before the model, before writing) and the soft ones on the records.
+**The pattern.** A check is a step.
+`AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `AssertThat` and `AssertSignature` raise `QCError` when an input is wrong.
+`Quarantine(check, sentinel, on_quarantine)` replaces a bad input with a sentinel and hands it to a callback, for streams where one bad record should not stop the rest.
+Put the hard checks at the boundaries (after loading, before the model, before writing) and the soft ones on the records.
 
-**Today.** All of it. Array-aware checks (finite values, value ranges, across
-array libraries) are planned for `pipekit-array`; until then
-`AssertCallable` takes any predicate.
+**Today.** All of it.
+`AssertThat(pred, message)` takes the predicate as an operator, so the check stays in the pipeline's config and hash; `AssertCallable` takes a plain function and is flagged `forbid_in_yaml`.
+`AssertSignature("... y x", dtype=...)` checks named dims and dtype, at build time through `compute_output_signature` as well as at run time.
+Array-aware checks (finite values, value ranges, across array libraries) are planned for `pipekit-array`; until then `AssertThat` or `AssertCallable` takes any predicate.
 
 ### 4. Fusing several inputs
 
@@ -138,9 +136,9 @@ g = Graph(inputs={"a": a, "b": b}, outputs={"product": Model()(fused)})
 g(a=scene_a, b=scene_b)["product"]
 ```
 
-**Today.** All of it, stateful steps included: call the graph with `state=`
-and it returns `(outputs, state)`. Shape inference stops at the graph's
-edge.
+**Today.** All of it, stateful steps included: call the graph with `state=` and it returns `(outputs, state)`.
+Shape inference stops at the graph's edge.
+`Get`, `Pick`, `Merge` and `Rename` reshape the dicts a graph returns without a `Lambda`.
 
 ## Machine learning
 
@@ -177,7 +175,7 @@ and every step needs the previous one.
 or `EnsembleDACycle` alternates forecast and analysis, with observation
 operators and noise models as Protocols, so the filter can come from any
 library. Pre-processing (quality control, thinning, unit conversion of the
-observations) and post-processing (verification, spread–skill) are ordinary
+observations) and post-processing (verification, spread-skill) are ordinary
 operators around the cycle.
 
 **Today.** All of it.
@@ -189,14 +187,14 @@ operators around the cycle.
 **The problem.** A web handler receives a request, runs a pipeline and must
 say exactly what produced its answer.
 
-**The pattern.** Build the pipeline once at start-up. Inside the handler,
-which already runs in an event loop, use `await AsyncMap(op).run(items)` (not
-`AsyncMap(op)(items)`, which starts its own loop). Batch for a GPU with
-`BatchedMap`, or let the model batch. Return the pipeline's content hash with
-every answer, so a response can be traced to a configuration.
+**The pattern.** Build the pipeline once at start-up.
+Inside the handler, which already runs in an event loop, use `await AsyncMap(op).run(items)` (not `AsyncMap(op)(items)`, which starts its own loop).
+Batch for a GPU with `BatchedMap`, or let the model batch.
+Return the pipeline's content hash with every answer, so a response can be traced to a configuration.
 
-**Today.** All of it. pipekit provides no server: LitServe, FastAPI or
-anything else hosts the operator.
+**Today.** All of it.
+`Timeout(op, seconds)` bounds one slow call and `RateLimit(op, calls, period)` bounds how often an upstream service is called.
+pipekit provides no server: LitServe, FastAPI or anything else hosts the operator.
 
 ### 8. Promotion by tag
 
@@ -295,7 +293,7 @@ with the same pipeline and input finds its output and skips; a change to
 either gives a new key.
 
 ```python
-from pipekit_ops import pipeline_hash
+from pipekit_ops import Operator, pipeline_hash
 
 
 def task_key(op: Operator, input_id: str) -> str:
@@ -309,9 +307,29 @@ task_key(Threshold(k=3.0), "2026-10-16") == task_key(Threshold(k=3.0), "2026-10-
 task_key(Threshold(k=3.0), "2026-10-16") != task_key(Threshold(k=2.5), "2026-10-16")
 ```
 
-**Today.** All of it. `pipeline_hash` hashes the whole configuration: every
-nested operator and, in a `Graph`, every node and its wiring. It is the hash
-the registry stores under, so a task key and a registry entry agree.
+**Today.** All of it.
+`pipeline_hash` hashes the whole configuration: every nested operator and, in a `Graph`, every node and its wiring.
+It is the hash the registry stores under, so a task key and a registry entry agree.
+
+Inside one task, `Cache` does the same bookkeeping per input.
+Its key is a hash of the input's key and `pipeline_hash` of the cached operator, and `key=Get("id")` makes the input's key one field of it.
+With a `DirectoryStore` bound by name, the entries survive a restart and are shared by the processes on one file system:
+
+```python
+import tempfile
+
+from pipekit_ops import Cache, DirectoryStore, Get, Map, store_scope
+
+# today (pipekit-ops)
+# item ↦ 1[item["value"] > 3], cached under item["id"]
+detect = Cache(Get("value") | Threshold(k=3.0), store="results", key=Get("id"))
+# today (pipekit-ops)
+results = DirectoryStore(tempfile.mkdtemp())
+items = [{"id": "2026-10-16", "value": 4.0}, {"id": "2026-10-17", "value": 1.0}]
+with store_scope(results=results):
+    # a rerun after a crash finds both entries on disk and skips the work
+    flags = Map(detect)(items)  # → [True, False]
+```
 
 ### 12. A/B comparison
 
@@ -368,8 +386,9 @@ sister packages, each in one place.
 
 | Concern | Lives in |
 |---|---|
-| Operators, composition, parallel maps, nested JSON, the sandbox allowlist | `pipekit` |
+| Operators, composition, parallel maps, flow limits, nested JSON, the sandbox allowlist | `pipekit-ops` |
 | `pipeline_hash` and the hashing primitives | `pipekit_ops.hashing` |
+| Where a `Cache` keeps its entries (`MemoryStore`, `DirectoryStore`) | `pipekit_ops.store` |
 | Content-addressed storage, tags, artifacts, YAML loading | `pipekit-experiment` |
 | Training loops and backends | `pipekit-train` |
 | Time stepping and assimilation | `pipekit-cycle` |
@@ -380,13 +399,15 @@ sister packages, each in one place.
 ### Parallelism is chosen per deployment
 
 Nothing is parallel by default; each deployment picks its primitive.
+All of them are one engine, `Map(op, executor=...)`, and the presets are `Map` with fixed arguments and their own config.
 
 | Deployment | Primitive |
 |---|---|
-| CPU-bound batch over many inputs | `ProcessMap` |
-| I/O-bound reads | `ThreadMap` |
+| CPU-bound batch over many inputs | `Map(op, executor="process")`, or the `ProcessMap` preset |
+| I/O-bound reads | `Map(op, executor="thread")`, or `ThreadMap` |
 | I/O inside a running event loop (a server) | `await AsyncMap(op).run(items)` |
 | GPU inference | `BatchedMap`, or the model batches |
+| Chosen at deployment, not in the pipeline | `Map(op, executor="scope")` under `executor_scope(...)` |
 | Across machines | the orchestrator, calling pickleable operators |
 
 ### YAML is the shared language, both ways
@@ -400,12 +421,10 @@ call away.
 
 ### JAX speeds the model, not the pipeline
 
-`pipekit-jax` wraps an Equinox model as an operator (`JaxModelOp`), with
-byte-identical weight round-trips through the registry, and adds diffrax
-forward models for `pipekit-cycle`. Inside the model, `jit` and `vmap` do
-their work; the pipeline around it stays eager Python. That is a deliberate
-split: pre- and post-processing are I/O and bookkeeping, where tracing buys
-little and costs flexibility.
+`pipekit-jax` wraps an Equinox model as an operator (`JaxModelOp`), with byte-identical weight round-trips through the registry, and adds diffrax forward models for `pipekit-cycle`.
+Inside the model, `jit` and `vmap` do their work; the pipeline around it stays eager Python.
+That is a deliberate split: pre- and post-processing are I/O and bookkeeping, where tracing buys little and costs flexibility.
+When the numerical core is itself a pipeline, importing `pipekit_jax` registers `Sequential` and `Graph` as pytrees, so a pipeline of `JaxOperator`s traces under `jit` as a whole ([pipekit under jit](tutorials/pipekit-under-jit.md)); `Map` refuses JAX tracers on its non-serial executors.
 
 ## One domain, all the patterns
 
