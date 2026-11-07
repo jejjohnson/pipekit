@@ -13,6 +13,11 @@ The v0.1 public surface, grouped by module:
 - **Group E — observers** (`observe`):
   `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`.
 - **Group F — combination** (`combine`): `Fanout`.
+- **Dict plumbing** (`dicts`): `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`,
+  `Merge`, `Assoc`, `UpdateIn`, `ValMap`.
+- **Iterables** (`seq`): `Not`, `Filter`, `Remove`, `Reduce`,
+  `PartitionAll`, `Concat`, `Zip`, `GroupBy`, `CountBy`, `Count`, `Unique`,
+  `Take`, `SortBy`.
 - **Group G — caching** (`cache`): `Cache`, `Memoize`.
 - **Group H — quality control** (`qc`): `Quarantine`, `AssertShape`,
   `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError`.
@@ -72,6 +77,17 @@ from pipekit_ops.cache import Cache, Memoize
 from pipekit_ops.combine import Fanout
 from pipekit_ops.compose import complement, compose, compose_left, juxt, pipe
 from pipekit_ops.control import Branch, Coalesce, Retry, Switch, Try
+from pipekit_ops.dicts import (
+    Assoc,
+    Dissoc,
+    Get,
+    GetIn,
+    Merge,
+    Pick,
+    Rename,
+    UpdateIn,
+    ValMap,
+)
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
 from pipekit_ops.observe import Histogram, Profile, ShapeTrace, Snapshot, Tap
@@ -90,6 +106,21 @@ from pipekit_ops.qc import (
     AssertShape,
     QCError,
     Quarantine,
+)
+from pipekit_ops.seq import (
+    Concat,
+    Count,
+    CountBy,
+    Filter,
+    GroupBy,
+    Not,
+    PartitionAll,
+    Reduce,
+    Remove,
+    SortBy,
+    Take,
+    Unique,
+    Zip,
 )
 from pipekit_ops.serial import (
     allowed,
@@ -110,6 +141,7 @@ __all__ = [
     "AssertDType",
     "AssertHasAttribute",
     "AssertShape",
+    "Assoc",
     "AsyncMap",
     "BackendError",
     "BatchedMap",
@@ -118,37 +150,58 @@ __all__ = [
     "Carrier",
     "CarryState",
     "Coalesce",
+    "Concat",
     "ConfigMixin",
     "Const",
+    "Count",
+    "CountBy",
+    "Dissoc",
     "Fanout",
+    "Filter",
     "FittableTransformer",
+    "Get",
+    "GetIn",
     "Graph",
+    "GroupBy",
     "Histogram",
     "Identity",
     "Input",
     "LabelledAdapter",
     "Lambda",
     "Memoize",
+    "Merge",
     "MissingAdapterError",
     "NamedArrayAdapter",
     "Node",
+    "Not",
     "Operator",
+    "PartitionAll",
+    "Pick",
     "Predictor",
     "ProcessMap",
     "Profile",
     "QCError",
     "Quarantine",
+    "Reduce",
+    "Remove",
+    "Rename",
     "Retry",
     "Sequential",
     "ShapeTrace",
     "Signature",
     "Sink",
     "Snapshot",
+    "SortBy",
     "StatefulOperator",
     "Switch",
+    "Take",
     "Tap",
     "ThreadMap",
     "Try",
+    "Unique",
+    "UpdateIn",
+    "ValMap",
+    "Zip",
     "allowed",
     "backend_name",
     "backend_of",

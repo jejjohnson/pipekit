@@ -21,22 +21,44 @@ from pipekit_ops import (
     AssertDType,
     AssertHasAttribute,
     AssertShape,
+    Assoc,
     AsyncMap,
     BatchedMap,
     Cache,
+    Concat,
     Const,
+    Count,
+    CountBy,
+    Dissoc,
     Fanout,
+    Filter,
+    Get,
+    GetIn,
     Graph,
+    GroupBy,
     Identity,
     Input,
     Lambda,
     Memoize,
+    Merge,
+    Not,
     Operator,
+    PartitionAll,
+    Pick,
     ProcessMap,
+    Reduce,
+    Remove,
+    Rename,
     Retry,
     Sequential,
+    SortBy,
+    Take,
     ThreadMap,
     Try,
+    Unique,
+    UpdateIn,
+    ValMap,
+    Zip,
 )
 from pipekit_ops.testing import _assert_same, assert_round_trip, public_operators
 
@@ -49,6 +71,14 @@ class _Scale(Operator):
 
     def _apply(self, x: float) -> float:
         return x * self.factor
+
+
+class _AddPair(Operator):
+    """Sum an ``(acc, item)`` pair: the fold for `Reduce`."""
+
+    def _apply(self, pair: tuple[float, float]) -> float:
+        acc, item = pair
+        return acc + item
 
 
 class _Add(Operator):
@@ -87,6 +117,7 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "AssertDType": (lambda: AssertDType("float32"), (_Field(),), {}),
     "AssertHasAttribute": (lambda: AssertHasAttribute("units", "K"), (_Field(),), {}),
     "AssertShape": (lambda: AssertShape((2, None)), (_Field(),), {}),
+    "Assoc": (lambda: Assoc("b", Get("a") | _Scale(2.0)), ({"a": 1},), {}),
     "AsyncMap": (lambda: AsyncMap(_Scale(2.0), semaphore=2), ([1.0, 2.0],), {}),
     "BatchedMap": (
         lambda: BatchedMap(Identity(), batch_size=2, flatten=True),
@@ -94,25 +125,50 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
         {},
     ),
     "Cache": (lambda: Cache(_Scale(2.0)), (3.0,), {}),
+    "Concat": (Concat, ([[1, 2], [3]],), {}),
     "Const": (lambda: Const({"a": [1, 2]}), (0.0,), {}),
+    "Count": (Count, ([1, 2, 3],), {}),
+    "CountBy": (lambda: CountBy("t"), ([{"t": "A"}, {"t": "B"}, {"t": "A"}],), {}),
+    "Dissoc": (lambda: Dissoc(("a",)), ({"a": 1, "b": 2},), {}),
     "Fanout": (lambda: Fanout({"a": _Scale(2.0), "b": Identity()}), (3.0,), {}),
+    "Filter": (lambda: Filter(Get("ok")), ([{"ok": True}, {"ok": False}],), {}),
+    "Get": (lambda: Get(("a", "z"), default=None), ({"a": 1},), {}),
+    "GetIn": (lambda: GetIn(("p", "c")), ({"p": {"c": 3.0}},), {}),
     "Graph": (_two_input_graph, (), {"a": 1.0, "b": 2.0}),
+    "GroupBy": (lambda: GroupBy(("t",)), ([{"t": "A"}, {"t": "B"}],), {}),
     "Identity": (Identity, (3.0,), {}),
     "Memoize": (lambda: Memoize(_Scale(2.0)), (3.0,), {}),
+    "Merge": (Merge, ({"a": 1}, {"a": 2, "b": 3}), {}),
+    "Not": (lambda: Not(Get("ok")), ({"ok": False},), {}),
+    "PartitionAll": (lambda: PartitionAll(2), ([1, 2, 3],), {}),
+    "Pick": (lambda: Pick(("b",)), ({"a": 1, "b": 2},), {}),
     # `Const` is importable in a worker process whatever the start method.
     "ProcessMap": (lambda: ProcessMap(Const(7), n_workers=2), ([1, 2],), {}),
+    "Reduce": (lambda: Reduce(_AddPair(), initial=0.5), ([1.0, 2.0],), {}),
+    "Remove": (lambda: Remove(Get("ok")), ([{"ok": True}, {"ok": False}],), {}),
+    "Rename": (lambda: Rename({"a": "z"}), ({"a": 1, "b": 2},), {}),
     "Retry": (
         lambda: Retry(_Scale(2.0), attempts=2, base_delay=0.0, on=(KeyError,)),
         (3.0,),
         {},
     ),
     "Sequential": (lambda: Sequential([_Scale(2.0), _Scale(0.5)]), (3.0,), {}),
+    "SortBy": (lambda: SortBy(Get(0), reverse=True), ([(1, "a"), (2, "b")],), {}),
+    "Take": (lambda: Take(2), ([1, 2, 3],), {}),
     "ThreadMap": (lambda: ThreadMap(_Scale(2.0), n_workers=2), ([1.0, 2.0],), {}),
     "Try": (
         lambda: Try(primary=_Scale(2.0), fallback=Identity(), on=(KeyError,)),
         (3.0,),
         {},
     ),
+    "Unique": (lambda: Unique(), ([1, 2, 1],), {}),
+    "UpdateIn": (
+        lambda: UpdateIn(("p", "c"), _Scale(2.0), default=1.0),
+        ({"p": {}},),
+        {},
+    ),
+    "ValMap": (lambda: ValMap(_Scale(2.0)), ({"a": 1.0},), {}),
+    "Zip": (lambda: Zip(strict=False), ([1, 2], "ab"), {}),
 }
 
 OPERATORS = public_operators(pipekit_ops)

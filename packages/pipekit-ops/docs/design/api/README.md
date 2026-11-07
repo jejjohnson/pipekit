@@ -35,35 +35,35 @@ Today only `Lambda` reshapes them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Get(key, default=MISSING)` | `Mapping \| Sequence → Any`; `None` | `x[key]`; a tuple of keys returns a tuple; `default` replaces a missing key | proposed (P1) |
-| `GetIn(keys, default=MISSING)` | `Mapping → Any`; `None` | `x[k0][k1]…`; `default` replaces a missing path | proposed (P1) |
-| `Pick(keys)` | `Mapping → dict`; `None` | keep only `keys`, in the order given; a missing key raises `KeyError` | proposed (P1) |
-| `Dissoc(keys)` | `Mapping → dict`; `None` | drop `keys`; missing keys are ignored | proposed (P1) |
-| `Rename(mapping)` | `Mapping → dict`; `None` | rename keys by `mapping`; unlisted keys pass through; a rename onto an existing key raises `ValueError` | proposed (P1) |
-| `Merge()` | `*Mapping → dict`; `None` | union, later inputs win (toolz `merge`) | proposed (P1) |
-| `Assoc(key, op)` | `Mapping → dict`; `None` | add `key: op(x)` computed from the whole dict | proposed (P1) |
-| `UpdateIn(keys, op)` | `Mapping → dict`; `None` | replace the value at a key path by `op(value)`; replaces the planned `OnKey` | proposed (P1) |
-| `ValMap(op)` | `Mapping → dict`; `None` | `op` on every value, keys kept (toolz `valmap`) | proposed (P1) |
+| `Get(key, default=MISSING)` | `Mapping \| Sequence → Any`; `None` | `x[key]`; a tuple of keys returns a tuple; `default` replaces a missing key | today (`dicts.py`) |
+| `GetIn(keys, default=MISSING)` | `Mapping → Any`; `None` | `x[k0][k1]…`; `default` replaces a missing path | today (`dicts.py`) |
+| `Pick(keys)` | `Mapping → dict`; `None` | keep only `keys`, in the order given; a missing key raises `KeyError` | today (`dicts.py`) |
+| `Dissoc(keys)` | `Mapping → dict`; `None` | drop `keys`; missing keys are ignored | today (`dicts.py`) |
+| `Rename(mapping)` | `Mapping → dict`; `None` | rename keys by `mapping`; unlisted keys pass through; a rename onto an existing key raises `ValueError` | today (`dicts.py`) |
+| `Merge()` | `*Mapping → dict`; `None` | union, later inputs win (toolz `merge`) | today (`dicts.py`) |
+| `Assoc(key, op)` | `Mapping → dict`; `None` | add `key: op(x)` computed from the whole dict | today (`dicts.py`) |
+| `UpdateIn(keys, op, default=MISSING)` | `Mapping → dict`; `None` | replace the value at a key path by `op(value)`; replaces the planned `OnKey` | today (`dicts.py`) |
+| `ValMap(op)` | `Mapping → dict`; `None` | `op` on every value, keys kept (toolz `valmap`) | today (`dicts.py`) |
 
 ## Iterables
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
 | `Map(op, executor="serial", …)` | `Iterable → list`; `None` | `op` on every item; the execution engine, see [execution.md](execution.md) | proposed (P2) |
-| `Filter(pred)` | `Iterable → list`; `None` | keep items where `pred(item)` is truthy | proposed (P1) |
-| `Not(pred)` | `Any → bool`; `None` | `not pred(x)`; the operator form of `complement` | proposed (P1) |
-| `Remove(pred)` | `Iterable → list`; `None` | drop items where `pred(item)` is truthy (toolz `remove`) | proposed (P1) |
-| `Reduce(op, initial=MISSING)` | `Iterable → Any`; `None` | left fold, `op(acc, item)`; empty input with no `initial` raises `TypeError` like `functools.reduce` | proposed (P1) |
+| `Filter(pred)` | `Iterable → list`; `None` | keep items where `pred(item)` is truthy | today (`seq.py`) |
+| `Not(pred)` | `Any → bool`; `None` | `not pred(x)`; the operator form of `complement` | today (`seq.py`) |
+| `Remove(pred)` | `Iterable → list`; `None` | drop items where `pred(item)` is truthy (toolz `remove`) | today (`seq.py`) |
+| `Reduce(op, initial=MISSING)` | `Iterable → Any`; `None` | left fold, `op(acc, item)`; empty input with no `initial` raises `TypeError` like `functools.reduce` | today (`seq.py`) |
 | `Fold(op, initial, chunksize=128, combine=None, executor="scope")` | `Iterable → Any`; `None` | associative tree fold over chunks, parallel through `Map` (toolz `sandbox.fold`) | proposed (P2) |
-| `PartitionAll(n)` | `Iterable → list[tuple]`; `None` | consecutive tuples of length `n`, the last may be shorter; replaces the planned `Chunk` | proposed (P1) |
-| `Concat()` | `Iterable[Iterable] → list`; `None` | flatten one level (toolz `concat`); replaces the planned `Flatten` | proposed (P1) |
-| `Zip(strict=True)` | `*Iterable → list[tuple]`; `None` | builtin `zip`, strict by default | proposed (P1) |
-| `GroupBy(key)` | `Iterable → dict[Any, list]`; `None` | group items by `key`, first-seen key order (toolz `groupby`) | proposed (P1) |
-| `CountBy(key)` | `Iterable → dict[Any, int]`; `None` | count items per `key` (toolz `countby`; `CountBy(Identity())` is toolz `frequencies`) | proposed (P1) |
-| `Count()` | `Iterable → int`; `None` | number of items, lazy iterables included (toolz `count`) | proposed (P1) |
-| `Unique(key=None)` | `Iterable → list`; `None` | first occurrence of each item, or of each `key(item)` (toolz `unique`) | proposed (P1) |
-| `Take(n)` | `Iterable → list`; `None` | the first `n` items (toolz `take`), for dry runs | proposed (P1) |
-| `SortBy(key, reverse=False)` | `Iterable → list`; `None` | stable sort by `key` | proposed (P1) |
+| `PartitionAll(n)` | `Iterable → list[tuple]`; `None` | consecutive tuples of length `n`, the last may be shorter; replaces the planned `Chunk` | today (`seq.py`) |
+| `Concat()` | `Iterable[Iterable] → list`; `None` | flatten one level (toolz `concat`); replaces the planned `Flatten` | today (`seq.py`) |
+| `Zip(strict=True)` | `*Iterable → list[tuple]`; `None` | builtin `zip`, strict by default | today (`seq.py`) |
+| `GroupBy(key)` | `Iterable → dict[Any, list]`; `None` | group items by `key`, first-seen key order (toolz `groupby`) | today (`seq.py`) |
+| `CountBy(key)` | `Iterable → dict[Any, int]`; `None` | count items per `key` (toolz `countby`; `CountBy(Identity())` is toolz `frequencies`) | today (`seq.py`) |
+| `Count()` | `Iterable → int`; `None` | number of items, lazy iterables included (toolz `count`) | today (`seq.py`) |
+| `Unique(key=None)` | `Iterable → list`; `None` | first occurrence of each item, or of each `key(item)` (toolz `unique`) | today (`seq.py`) |
+| `Take(n)` | `Iterable → list`; `None` | the first `n` items (toolz `take`), for dry runs | today (`seq.py`) |
+| `SortBy(key, reverse=False)` | `Iterable → list`; `None` | stable sort by `key` | today (`seq.py`) |
 
 ## Flow
 

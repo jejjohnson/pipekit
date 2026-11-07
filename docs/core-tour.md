@@ -4,7 +4,7 @@
 when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
-fifty names in thirteen modules, one module per job, so you can learn it a
+seventy names in fifteen modules, one module per job, so you can learn it a
 group at a time. For why it is shaped this way (operators as classes, the
 carrier left open), read the [background](background/toolz.md); for the
 shapes real pipelines take, read [Patterns](patterns.md).
@@ -21,6 +21,8 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Control flow | `control` | `Branch`, `Switch`, `Try`, `Coalesce`, `Retry` | a decision or a failure inside the pipeline |
 | Observers | `observe` | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` | looking without changing the flow |
 | Combination | `combine` | `Fanout` | one input, several named outputs |
+| Dict plumbing | `dicts` | `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`, `Merge`, `Assoc`, `UpdateIn`, `ValMap` | reshaping the dicts a `Graph`, a `Fanout` or a STAC item carries, without a `Lambda` |
+| Iterables | `seq` | `Not`, `Filter`, `Remove`, `Reduce`, `PartitionAll`, `Concat`, `Zip`, `GroupBy`, `CountBy`, `Count`, `Unique`, `Take`, `SortBy` | filtering, grouping and counting a list of items inside the pipeline |
 | Caching | `cache` | `Cache`, `Memoize` | the same expensive call twice |
 | Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
