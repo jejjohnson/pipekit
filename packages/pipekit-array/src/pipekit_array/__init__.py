@@ -22,6 +22,8 @@ Windows (`dim_windows`): `window`, `coarsen`, with operators `Window`,
 `Coarsen`; `ApplyAlong` runs an operator per item along a dim (the
 serialisable `MapOver`), and `BatchAlong` (`batching`) runs one on chunks
 of a dim.
+Statistics and algebra (`dim_algebra`): `quantile`, `dot`, as `Quantile`,
+`Dot`.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
 
 Sample tables (`rows`): `to_rows` flattens a carrier to a
@@ -53,6 +55,7 @@ from pipekit_ops import register_adapter, register_lazy_adapter
 from pipekit_array._namespace import array_namespace
 from pipekit_array.batching import BatchAlong, Padded, batch
 from pipekit_array.combinators import ConcatenateAlong, StackAlong
+from pipekit_array.dim_algebra import dot, quantile
 from pipekit_array.dim_operators import (
     ApplyAlong,
     ArgReduce,
@@ -61,11 +64,13 @@ from pipekit_array.dim_operators import (
     Combine,
     CumReduce,
     Diff,
+    Dot,
     ExpandDims,
     ISel,
     MapOver,
     MergeDims,
     Pad,
+    Quantile,
     Reduce,
     Rename,
     Roll,
@@ -135,6 +140,7 @@ __all__ = [
     "Diff",
     "DimArray",
     "DimArrayAdapter",
+    "Dot",
     "Estimator",
     "ExpandDims",
     "ISel",
@@ -145,6 +151,7 @@ __all__ = [
     "MergeDims",
     "Pad",
     "Padded",
+    "Quantile",
     "Reduce",
     "Rename",
     "Roll",
@@ -167,12 +174,14 @@ __all__ = [
     "concat",
     "cumreduce",
     "diff",
+    "dot",
     "expand_dims",
     "from_rows",
     "isel",
     "map_over",
     "merge_dims",
     "pad",
+    "quantile",
     "reduce",
     "rename",
     "roll",

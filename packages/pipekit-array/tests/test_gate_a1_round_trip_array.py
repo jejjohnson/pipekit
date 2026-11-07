@@ -24,11 +24,13 @@ from pipekit_array import (
     CumReduce,
     Diff,
     DimArray,
+    Dot,
     ExpandDims,
     ISel,
     MeanScalar,
     MergeDims,
     Pad,
+    Quantile,
     Reduce,
     Rename,
     Roll,
@@ -100,6 +102,10 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...]]] = {
         lambda: BatchAlong(Reduce("mean", dim="x"), size=2, dim="band", pad="last"),
         (CUBE,),
     ),
+    # Phase 4: statistics and algebra
+    # q comes back from JSON as an ordered list
+    "Quantile": (lambda: Quantile([0.9, 0.1], dim=("time", "x")), (CUBE,)),
+    "Dot": (lambda: Dot(dim="band"), (CUBE, CUBE)),
 }
 
 OPERATORS = public_operators(pipekit_array)

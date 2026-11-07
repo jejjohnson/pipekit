@@ -34,6 +34,8 @@ and the trained-model wrapper `ModelOp`.
 ::: pipekit_array.dim_shifts
 ::: pipekit_array.dim_windows
 
+::: pipekit_array.dim_algebra
+
 ::: pipekit_array.dim_operators
 
 ## Sample tables

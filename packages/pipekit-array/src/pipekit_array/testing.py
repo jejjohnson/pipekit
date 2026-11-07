@@ -19,7 +19,8 @@ instead of copying tests::
   same labels; those on the band labels run when the adapter has
   ``relabel`` (`pipekit_ops.LabelledAdapter`). So must the index-only
   transforms (`pipekit_array.dim_shifts`) and the windows
-  (`pipekit_array.dim_windows`).
+  (`pipekit_array.dim_windows`). So must `quantile` and `dot`
+  (`pipekit_array.dim_algebra`), within ``rtol``.
 - `check_kernel_op(op, calls)` — the same `KernelOp` on each carrier family
   gives equal data, equal dims, and the signature
   ``op.compute_output_signature`` predicts (PK-K1, PK-K4).
@@ -37,6 +38,7 @@ import numpy as np
 from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
 from pipekit_array import (
+    dim_algebra as _algebra,
     dim_shapes as _shapes,
     dim_shifts as _shifts,
     dim_windows as _windows,
@@ -230,6 +232,52 @@ def _dim_window_cases() -> list[tuple[str, Callable[[Any], Any]]]:
     ]
 
 
+# Phase 4: statistics and algebra. Their cases also compare labels.
+
+
+def _dim_algebra_cases(labelled: bool) -> list[tuple[str, Callable[[Any], Any]]]:
+    """`pipekit_array.dim_algebra` on the `DIMS` layout.
+
+    The first block sets no labels, so an adapter without ``relabel``
+    passes it; ``labelled`` adds the cases that set labels (a sequence
+    ``q``, a labelled dim from a later `dot` input).
+    """
+    cases: list[tuple[str, Callable[[Any], Any]]] = [
+        ("quantile(0.5, time)", lambda c: _algebra.quantile(c, 0.5, "time")),
+        (
+            "quantile(0.25, (time, y), nearest)",
+            lambda c: _algebra.quantile(c, 0.25, ("time", "y"), method="nearest"),
+        ),
+        (
+            "dot(x), batch over band y",
+            lambda c: _algebra.dot(c, _dims.isel(c, time=0), dim="x"),
+        ),
+        (
+            "dot(x), time from the second input",
+            lambda c: _algebra.dot(
+                _dims.isel(c, time=0, band=0), _dims.isel(c, band=0), dim="x"
+            ),
+        ),
+    ]
+    if not labelled:
+        return cases
+    return [
+        *cases,
+        (
+            "quantile([0.1, 0.5, 0.9], time)",
+            lambda c: _algebra.quantile(c, [0.1, 0.5, 0.9], "time"),
+        ),
+        (
+            "quantile([0.25, 0.75], time, skipna)",
+            lambda c: _algebra.quantile(c, [0.25, 0.75], "time", skipna=True),
+        ),
+        (
+            "dot(y), band from the second input",
+            lambda c: _algebra.dot(_dims.isel(c, band=0), c, dim="y"),
+        ),
+    ]
+
+
 def _check_labels(actual: Any, expected: Any, label: str, name: str) -> None:
     adapter, reference = get_adapter(actual), get_adapter(expected)
     assert adapter is not None and reference is not None
@@ -279,8 +327,9 @@ def check_adapter(
     labelled = getattr(adapter, "relabel", None) is not None
     shape_cases = _dim_shape_cases(labelled)
     shift_cases = [*_dim_shift_cases(), *_dim_window_cases()]
-    shape_labels = {label for label, _ in [*shape_cases, *shift_cases]}
-    for label, fn in [*_cases(), *shape_cases, *shift_cases]:
+    algebra_cases = _dim_algebra_cases(labelled)
+    shape_labels = {label for label, _ in [*shape_cases, *shift_cases, *algebra_cases]}
+    for label, fn in [*_cases(), *shape_cases, *shift_cases, *algebra_cases]:
         if lazy and label.endswith("where)"):
             continue  # dask's reductions take no where= (reduce raises TypeError)
         expected = fn(reference)
@@ -288,7 +337,9 @@ def check_adapter(
         got = _dims_of(actual)
         want = _dims_of(expected)
         assert got == want, f"{label} on {name}: dims {got}, expected {want}"
-        exact = not label.startswith(("reduce", "map_over", "cumreduce", "coarsen"))
+        exact = not label.startswith(
+            ("reduce", "map_over", "cumreduce", "coarsen", "quantile", "dot")
+        )
         if label in shape_labels:
             _check_labels(actual, expected, label, name)
         a, e = values_of(actual), values_of(expected)

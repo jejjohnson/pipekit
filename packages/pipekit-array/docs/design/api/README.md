@@ -61,8 +61,10 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `window`     | `Window`    | sliding full windows as a new last dim (`dim_windows`)  |
 | `coarsen`    | `Coarsen`   | reduce non-overlapping blocks; the dim loses its labels |
 | `map_over`   | `ApplyAlong`| an operator per item along a dim; serialises            |
+| `quantile`   | `Quantile`  | quantiles over named dims; a list `q` adds a `quantile` dim (`dim_algebra`) |
+| `dot`        | `Dot`       | sum of a product over named dims; shared dims not summed are batch dims |
 
-The first fourteen of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`, phase 3 in `dim_windows`); the rest (`quantile`, `dot`) are proposed there, with an xarray parity table.
+All sixteen functions of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`, phase 3 in `dim_windows`, phase 4 in `dim_algebra`); the design page has the xarray parity table.
 
 An adapter may override any of them with a method of the same name
 (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one

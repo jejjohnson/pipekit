@@ -76,7 +76,7 @@ mean: DimArray["band y x"] = reduce(cube, "mean", "time")
 Columns: the signature (keyword dims, `x` positional-only as in `isel`); the semantics; what the adapter must provide; JAX behaviour; status.
 "Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`dims.py`](../../../src/pipekit_array/dims.py)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py), phase 3 (section 3.3) in [`dim_windows.py`](../../../src/pipekit_array/dim_windows.py).
+Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py), phase 3 (section 3.3) in [`dim_windows.py`](../../../src/pipekit_array/dim_windows.py), phase 4 (section 3.4) in [`dim_algebra.py`](../../../src/pipekit_array/dim_algebra.py).
 
 ### 3.0 Labels on new or renamed dims
 
@@ -147,8 +147,8 @@ None reads a label; labels stay on their positions (xarray's default, `roll_coor
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `quantile` | `quantile(x, q: float \| Sequence[float], dim: str \| Sequence[str], /, *, method: str = "linear", skipna: bool = False)` | Quantiles over `dim`; a sequence `q` adds a leading dim `quantile` labelled with `q`, a float drops it. | Generic: `xp.quantile` or `xp.nanquantile`, `rewrap`, then `relabel` with `quantile=tuple(q)` for a sequence `q`. Dask needs `dim` in one chunk. | jit, vmap safe; `q`, `method` static. JAX supports `linear`, `lower`, `higher`, `midpoint`, `nearest`, `inverted_cdf`. | proposed |
-| `dot` | `dot(*xs, dim: str \| Sequence[str])` | Sum of the product over `dim`; output dims in order of first appearance, `dim` removed. A dim shared by several inputs and not in `dim` is a batch dim: it appears once in the output, as in `xr.dot`. `dim` is required. | Generic: a named-index `xp.einsum` built from the dim names (below), `check_compatible` on the shared dims, `rewrap` on the first input, then `relabel` with the labels of dims taken from later inputs. | jit, vmap safe. | proposed |
+| `quantile` | `quantile(x, q: float \| Sequence[float], dim: str \| Sequence[str], /, *, method: str = "linear", skipna: bool = False)` | Quantiles over `dim`; a sequence `q` adds a leading dim `quantile` labelled with `q`, a float drops it. | Generic: `xp.quantile` or `xp.nanquantile`, `rewrap`, then `relabel` with `quantile=tuple(q)` for a sequence `q`. Dask needs `dim` in one chunk. | jit, vmap safe; `q`, `method` static. JAX supports `linear`, `lower`, `higher`, `midpoint`, `nearest`, `inverted_cdf`. | today |
+| `dot` | `dot(*xs, dim: str \| Sequence[str])` | Sum of the product over `dim`; output dims in order of first appearance, `dim` removed. A dim shared by several inputs and not in `dim` is a batch dim: it appears once in the output, as in `xr.dot`. `dim` is required. | Generic: a named-index `xp.einsum` built from the dim names (below), `check_compatible` on the shared dims, `rewrap` on the first input, then `relabel` with the labels of dims taken from later inputs. | jit, vmap safe. | today |
 
 
 `dot` cannot be built on `xp.tensordot`.
@@ -193,8 +193,8 @@ Every twin lives in [`dim_operators.py`](../../../src/pipekit_array/dim_operator
 | `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged | today |
 | `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size | today |
 | `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ | today |
-| `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not | proposed |
-| `dot` | `Dot(dim)`, called `op(*xs)` | yes | contracted dims removed | proposed |
+| `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not | today |
+| `dot` | `Dot(dim)`, called `op(*xs)` | yes | contracted dims removed | today |
 | `map_over` | `ApplyAlong(inner: Operator, dim)` | yes, if `inner` does | from `inner` | today |
 
 `compute_output_signature` takes one input signature, so `BroadcastLike`'s takes the pair `(x's, other's)` and returns None for `x`'s alone; `MergeDims` and `SplitDims` store their merges and parts as ordered lists in config, since JSON objects sort their keys and the order sets the output dims.
