@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.0...pipekit-ops-v0.2.1) (2026-11-07)
+
+
+### Features
+
+* **pipekit-array:** dim-level functions, phase 1 (dims and relabel) ([#204](https://github.com/jejjohnson/pipekit/issues/204)) ([8f5eb32](https://github.com/jejjohnson/pipekit/commit/8f5eb3205e8185baaf74c3013c79cf6c02f30b15))
+* **pipekit-ops:** dict plumbing and iterable operators (P1) ([#209](https://github.com/jejjohnson/pipekit/issues/209)) ([211cb4e](https://github.com/jejjohnson/pipekit/commit/211cb4e3186e43753f1144e7562af84886f1ac83))
+* **pipekit-ops:** Log, Map progress, AssertThat and AssertSignature (P5) ([#217](https://github.com/jejjohnson/pipekit/issues/217)) ([d5279a4](https://github.com/jejjohnson/pipekit/commit/d5279a45bf9b4d9fa5ada219def5592fc0eb7813))
+* **pipekit-ops:** Map execution engine, executor_scope, Prefetch and Fold (P2, part 1) ([#210](https://github.com/jejjohnson/pipekit/issues/210)) ([b6f4dff](https://github.com/jejjohnson/pipekit/commit/b6f4dff188051d7b79e3fd6ea38660f1a1874f91))
+* **pipekit-ops:** Store, DirectoryStore and a disk-backed Cache (P4) ([#216](https://github.com/jejjohnson/pipekit/issues/216)) ([72a3796](https://github.com/jejjohnson/pipekit/commit/72a3796bd83d6f68c25ae9565c7a027f1169e3f7))
+* **pipekit-ops:** Timeout, RateLimit and Until (P3) ([#215](https://github.com/jejjohnson/pipekit/issues/215)) ([e7f00a4](https://github.com/jejjohnson/pipekit/commit/e7f00a4968879c3a62e372b3edeb6fe72b782ca3))
+
 ## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.1.5...pipekit-ops-v0.2.0) (2026-11-07)
 
 

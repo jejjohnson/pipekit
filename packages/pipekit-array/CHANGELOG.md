@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.0...pipekit-array-v0.1.1) (2026-11-07)
+
+
+### Features
+
+* **pipekit-array:** dim-level functions phase 2, pad, roll, shift, diff, cumreduce, where ([#205](https://github.com/jejjohnson/pipekit/issues/205)) ([e5f6e36](https://github.com/jejjohnson/pipekit/commit/e5f6e36ab61e054961037f68c73ba99b003f9c63))
+* **pipekit-array:** dim-level functions phase 4, quantile and dot ([#207](https://github.com/jejjohnson/pipekit/issues/207)) ([8742e49](https://github.com/jejjohnson/pipekit/commit/8742e4987484a0ac0cb02f5af1a5fe5271b22605))
+* **pipekit-array:** dim-level functions, phase 1 (dims and relabel) ([#204](https://github.com/jejjohnson/pipekit/issues/204)) ([8f5eb32](https://github.com/jejjohnson/pipekit/commit/8f5eb3205e8185baaf74c3013c79cf6c02f30b15))
+* **pipekit-array:** dim-level functions, phase 3 (windows) ([#206](https://github.com/jejjohnson/pipekit/issues/206)) ([18b18f8](https://github.com/jejjohnson/pipekit/commit/18b18f8efb7624743b5668b7ecdce003648bbe94))
+
 ## [0.1.0](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.0.9...pipekit-array-v0.1.0) (2026-11-07)
 
 
