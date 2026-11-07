@@ -82,6 +82,8 @@ class _DaskNamespace:
     _NAMES: ClassVar[dict[str, str]] = {
         "permute_dims": "transpose",
         "concat": "concatenate",
+        "cumulative_sum": "cumsum",
+        "cumulative_prod": "cumprod",
     }
 
     def __init__(self, module: Any) -> None:

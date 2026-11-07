@@ -18,19 +18,25 @@ from pipekit_array import (
     ArgReduce,
     BroadcastLike,
     ConcatenateAlong,
+    CumReduce,
+    Diff,
     DimArray,
     ExpandDims,
     ISel,
     MeanScalar,
     MergeDims,
+    Pad,
     Reduce,
     Rename,
+    Roll,
     Sel,
+    Shift,
     SplitDims,
     Squeeze,
     StackAlong,
     TakeAlong,
     Transpose,
+    Where,
 )
 from pipekit_ops import Operator
 from pipekit_ops.testing import assert_round_trip, public_operators
@@ -46,6 +52,8 @@ BEST = DimArray(np.array([[0, 1, 0, 1]] * 3), ("band", "x"))
 #: CUBE's first scene, keeping a length-1 time dim; a (member,) carrier
 SCENE = DimArray(X[:1], ("time", "band", "x"), {"band": ("B4", "B8", "B11")})
 MEMBERS = DimArray(np.zeros(5, dtype=np.float32), ("member",))
+#: a (time, x) mask for CUBE
+VALID = DimArray(np.array([[True, False, True, True]] * 2), ("time", "x"))
 
 #: Abstract bases: none ship in pipekit-array yet.
 SKIP: dict[str, str] = {}
@@ -71,6 +79,14 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...]]] = {
     "Rename": (lambda: Rename(band="channel", x="col"), (CUBE,)),
     "SplitDims": (lambda: SplitDims(x={"x": 2, "half": 2}), (CUBE,)),
     "Squeeze": (lambda: Squeeze("time"), (SCENE,)),
+    # Phase 2: index-only transforms
+    "CumReduce": (lambda: CumReduce("cumulative_sum", "time"), (CUBE,)),
+    "Diff": (lambda: Diff("band", n=2, label="lower"), (CUBE,)),
+    # a (before, after) pair comes back from JSON as a list
+    "Pad": (lambda: Pad(mode="edge", x=(1, 2), time=1), (CUBE,)),
+    "Roll": (lambda: Roll(time=1, x=-1), (CUBE,)),
+    "Shift": (lambda: Shift(fill_value=0.0, x=2), (CUBE,)),
+    "Where": (lambda: Where(other=-1.0), (CUBE, VALID)),
 }
 
 OPERATORS = public_operators(pipekit_array)

@@ -1,11 +1,12 @@
 """The dim-level functions as `Operator`s, for pipelines and config.
 
-Each wraps one function of `pipekit_array.dims` or
-`pipekit_array.dim_shapes` and computes its output `Signature` without
-running. Operators that take only names and numbers (`ISel`, `Sel`,
-`Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `Rename`, `ExpandDims`,
-`Squeeze`, `BroadcastLike`, `MergeDims`, `SplitDims`) round-trip through
-``dumps`` / ``loads``; those that hold a user function
+Each wraps one function of `pipekit_array.dims`,
+`pipekit_array.dim_shapes` or `pipekit_array.dim_shifts` and computes its
+output `Signature` without running. Operators that take only names and
+numbers (`ISel`, `Sel`, `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`,
+`Rename`, `ExpandDims`, `Squeeze`, `BroadcastLike`, `MergeDims`,
+`SplitDims`, `Pad`, `Roll`, `Shift`, `Diff`, `CumReduce`, `Where`)
+round-trip through ``dumps`` / ``loads``; those that hold a user function
 (`MapOver`, `Combine`) set ``forbid_in_yaml``, like `pipekit_ops.Lambda`.
 
 `Reduce` and `ArgReduce` take the reduction by its array-namespace name
@@ -21,7 +22,11 @@ from typing import Any, ClassVar, Self
 
 from pipekit_ops import Operator, Signature
 
-from pipekit_array import dim_shapes as _dim_shapes, dims as _dims
+from pipekit_array import (
+    dim_shapes as _dim_shapes,
+    dim_shifts as _dim_shifts,
+    dims as _dims,
+)
 from pipekit_array.dimarray import is_mask
 
 
@@ -29,17 +34,23 @@ __all__ = [
     "ArgReduce",
     "BroadcastLike",
     "Combine",
+    "CumReduce",
+    "Diff",
     "ExpandDims",
     "ISel",
     "MapOver",
     "MergeDims",
+    "Pad",
     "Reduce",
     "Rename",
+    "Roll",
     "Sel",
+    "Shift",
     "SplitDims",
     "Squeeze",
     "TakeAlong",
     "Transpose",
+    "Where",
 ]
 
 #: reductions that keep the input's dtype whatever it is
@@ -591,3 +602,225 @@ class SplitDims(Operator):
         for d, n in sig.dims:
             dims.extend(self.dims[d].items() if d in self.dims else [(d, n)])
         return Signature(dims=tuple(dims), dtype=sig.dtype)
+
+
+# Phase 2: index-only transforms
+
+#: cumulative functions that keep a float input's dtype
+_CUMULATIVE_FLOAT_PRESERVING = frozenset(
+    {"cumulative_sum", "cumulative_prod", "nancumsum"}
+)
+
+
+class Pad(Operator):
+    """Widen named dims at either end; a padded dim loses its labels.
+
+    Args:
+        mode: ``"constant"``, ``"edge"``, ``"reflect"`` or ``"wrap"``.
+        constant_values: The fill for ``mode="constant"``; None is NaN.
+        **pad_width: ``dim=`` a width for both ends, or ``(before, after)``.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Pad(time=(2, 0))(DimArray(np.zeros((12, 4)), ("time", "x"))).shape
+        (14, 4)
+    """
+
+    def __init__(
+        self,
+        mode: str = "constant",
+        constant_values: float | None = None,
+        **pad_width: int | Sequence[int],
+    ) -> None:
+        self.mode = mode
+        self.constant_values = constant_values
+        # an int or a pair, as (before, after); JSON gives the pair as a list
+        self.pad_width = {
+            d: (w, w) if isinstance(w, int) else (w[0], w[1])
+            for d, w in pad_width.items()
+        }
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_shifts.pad(
+            x, mode=self.mode, constant_values=self.constant_values, **self.pad_width
+        )
+
+    def get_config(self) -> dict[str, Any]:
+        widths = {d: list(w) for d, w in self.pad_width.items()}
+        return {"mode": self.mode, "constant_values": self.constant_values, **widths}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        sizes = dict(sig.dims)
+        grown: dict[str, int | None] = {}
+        for d, (before, after) in self.pad_width.items():
+            size = sizes[d]
+            grown[d] = None if size is None else size + before + after
+        return sig.replace_dims(grown)
+
+
+class Roll(Operator):
+    """Shift data cyclically along named dims; labels stay.
+
+    Args:
+        **shifts: ``dim=k``; a positive k moves data to higher positions.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Roll(time=1)(DimArray(np.arange(3.0), ("time",))).data
+        array([2., 0., 1.])
+    """
+
+    def __init__(self, **shifts: int) -> None:
+        self.shifts = dict(shifts)
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_shifts.roll(x, **self.shifts)
+
+    def get_config(self) -> dict[str, Any]:
+        return dict(self.shifts)
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        return _signature(input_signature)
+
+
+class Shift(Operator):
+    """Shift data along named dims, filling the vacated entries; labels stay.
+
+    Args:
+        fill_value: The value of the vacated entries; None is NaN.
+        **shifts: ``dim=k``; a positive k moves data to higher positions.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Shift(time=1)(DimArray(np.arange(3.0), ("time",))).data
+        array([nan,  0.,  1.])
+    """
+
+    def __init__(self, fill_value: float | None = None, **shifts: int) -> None:
+        self.fill_value = fill_value
+        self.shifts = dict(shifts)
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_shifts.shift(x, fill_value=self.fill_value, **self.shifts)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"fill_value": self.fill_value, **self.shifts}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        return _signature(input_signature)
+
+
+class Diff(Operator):
+    """The n-th forward difference along ``dim``: N entries become N - n.
+
+    Args:
+        dim: The dim to difference along.
+        n: The order, n ≥ 0.
+        label: The labels kept on ``dim``: ``"upper"`` (the minuend's) or
+            ``"lower"`` (the subtrahend's).
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Diff("time")(DimArray(np.zeros((12, 4)), ("time", "x"))).shape
+        (11, 4)
+    """
+
+    def __init__(self, dim: str, n: int = 1, label: str = "upper") -> None:
+        self.dim = dim
+        self.n = n
+        self.label = label
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_shifts.diff(x, self.dim, self.n, label=self.label)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"dim": self.dim, "n": self.n, "label": self.label}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        size = dict(sig.dims)[self.dim]
+        return sig.replace_dims(
+            {self.dim: None if size is None else max(size - self.n, 0)}
+        )
+
+
+class CumReduce(Operator):
+    """A cumulative function along ``dim``, by its array-namespace name.
+
+    Args:
+        fn: ``"cumulative_sum"``, ``"cumulative_prod"``, ``"nancumsum"``, …
+        dim: The dim to accumulate along.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> CumReduce("cumulative_sum", "time")(DimArray(np.ones(3), ("time",))).data
+        array([1., 2., 3.])
+    """
+
+    def __init__(self, fn: str, dim: str) -> None:
+        if not isinstance(fn, str):
+            raise TypeError(
+                "CumReduce takes the function's name (e.g. 'cumulative_sum') so it "
+                "serialises; for a function, use pipekit_array.cumreduce(x, fn, dim)."
+            )
+        self.fn = fn
+        self.dim = dim
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_shifts.cumreduce(x, self.fn, self.dim)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"fn": self.fn, "dim": self.dim}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        keeps = (
+            self.fn in _CUMULATIVE_FLOAT_PRESERVING
+            and sig.dtype is not None
+            and "float" in sig.dtype
+        )
+        return Signature(dims=sig.dims, dtype=sig.dtype if keeps else None)
+
+
+class Where(Operator):
+    """Keep ``x`` where ``cond`` is True, ``other`` elsewhere: ``op(x, cond)``.
+
+    `compute_output_signature` takes ``x``'s signature, or the pair
+    ``(x's, cond's)``: the output has ``x``'s dims and dtype either way.
+
+    Args:
+        other: The fill where ``cond`` is False; None is NaN.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> valid = DimArray(np.array([True, False]), ("x",))
+        >>> Where()(DimArray(np.ones(2), ("x",)), valid).data
+        array([ 1., nan])
+    """
+
+    def __init__(self, other: float | None = None) -> None:
+        self.other = other
+
+    def _apply(self, x: Any, cond: Any) -> Any:
+        return _dim_shifts.where(x, cond, self.other)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"other": self.other}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        if isinstance(input_signature, tuple) and len(input_signature) == 2:
+            input_signature = input_signature[0]
+        return _signature(input_signature)
