@@ -71,9 +71,9 @@ Today only `Lambda` reshapes them.
 |---|---|---|---|
 | `Retry(op, attempts, base_delay, on)` | `Any → Any`; `op`'s | exponential back-off, `base_delay * 2 ** (i - 1)` before attempt $i+1$ | today (`control.py`) |
 | `Try(primary, fallback, on)` | `Any → Any`; common of both | toolz `excepts` | today (`control.py`) |
-| `Timeout(op, seconds)` | `Any → Any`; `op`'s | raise `TimeoutError` if `op` has not returned after `seconds`; a thread is abandoned, not killed | proposed (P3) |
-| `RateLimit(op, calls, period)` | `Any → Any`; `op`'s | at most `calls` starts of `op` in any window of `period` seconds, per process | proposed (P3) |
-| `Until(op, pred, max_iter, on_max="raise")` | `Any → Any`; `None` | apply `op` until `pred(x)` is truthy; stateless sibling of `pipekit_cycle.Recurrence` | proposed (P3) |
+| `Timeout(op, seconds)` | `Any → Any`; `op`'s | raise `TimeoutError` if `op` has not returned after `seconds`; a thread is abandoned, not killed | today (`flow.py`) |
+| `RateLimit(op, calls, period)` | `Any → Any`; `op`'s | at most `calls` starts of `op` in any window of `period` seconds, per process | today (`flow.py`) |
+| `Until(op, pred, max_iter, on_max="raise")` | `Any → Any`; `None` | apply `op` until `pred(x)` is truthy; stateless sibling of `pipekit_cycle.Recurrence` | today (`flow.py`) |
 
 ## Execution
 

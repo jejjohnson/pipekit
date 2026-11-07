@@ -4,7 +4,7 @@
 when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
-seventy-five names in sixteen modules, one module per job, so you can learn it a
+eighty names in seventeen modules, one module per job, so you can learn it a
 group at a time. For why it is shaped this way (operators as classes, the
 carrier left open), read the [background](background/toolz.md); for the
 shapes real pipelines take, read [Patterns](patterns.md).
@@ -19,6 +19,7 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Composition | `compose` | `pipe`, `compose`, `compose_left`, `juxt`, `complement` | you think in `toolz` |
 | Building blocks | `blocks` | `Identity`, `Const`, `Lambda`, `Sink` | a no-op, a constant, a quick function, a write |
 | Control flow | `control` | `Branch`, `Switch`, `Try`, `Coalesce`, `Retry` | a decision or a failure inside the pipeline |
+| Flow limits | `flow` | `Timeout`, `RateLimit`, `Until` | a call that may hang, a service with a quota, a step repeated until done |
 | Observers | `observe` | `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` | looking without changing the flow |
 | Combination | `combine` | `Fanout` | one input, several named outputs |
 | Dict plumbing | `dicts` | `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`, `Merge`, `Assoc`, `UpdateIn`, `ValMap` | reshaping the dicts a `Graph`, a `Fanout` or a STAC item carries, without a `Lambda` |
@@ -198,6 +199,34 @@ Retry(flaky, attempts=5, base_delay=0.0, on=(ConnectionError,))(42)
 `Try` and `Retry` require their exception list, so neither is ever a silent
 catch-all; when every source fails, `Coalesce` raises `RuntimeError`. The
 [ETL tutorial](tutorials/etl-regions.md) nests all three around a reader.
+
+### Flow limits
+
+| Operator | Purpose |
+|---|---|
+| `Timeout(op, seconds, max_abandoned=8)` | raise `TimeoutError` if `op` has not returned after `seconds` |
+| `RateLimit(op, calls, period)` | at most `calls` starts of `op` in any `period` seconds, shared by every thread in the process |
+| `Until(op, pred, max_iter, on_max="raise")` | apply `op` until `pred` holds, at most `max_iter` times |
+
+```python
+from pipekit_ops import RateLimit, Retry, Timeout, Until
+
+read = Retry(
+    RateLimit(Timeout(fetch, seconds=10.0), calls=10, period=1.0),
+    attempts=3,
+    base_delay=0.5,
+    on=(TimeoutError,),
+)
+Until(NextPage(), IsLastPage(), max_iter=50)(first_page)
+```
+
+`fetch`, `NextPage` and `IsLastPage` are operators. A timed-out call's thread
+is abandoned, not killed, and finishes in the background; `Timeout` logs a
+warning once more than `max_abandoned` of them are still running. The rate
+limit does not cross processes, and placement matters: inside `Retry`, as
+here, every attempt waits for its own slot. `pred` is an operator, like every
+predicate in the core, and none of the three accepts an operator with an
+`async def _apply`.
 
 ## Observers
 

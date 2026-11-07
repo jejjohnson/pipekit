@@ -24,6 +24,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.control
 
+## Flow limits
+
+::: pipekit_ops.flow
+
 ## Observers
 
 ::: pipekit_ops.observe
