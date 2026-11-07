@@ -1,38 +1,88 @@
 # pipekit
 
-**Composable scientific pipelines: train, register and deploy with one operator interface.**
+**A family of Python packages for composable scientific pipelines, built on two foundations you can use on their own: pipekit-ops for operators and pipekit-array for named-dim arrays.**
 
-`pipekit` is a uv workspace of seven Python packages (plus a code-free `pipekit` umbrella that installs them all).
-Together they turn the pieces of a scientific ML workflow into composable `Operator`s: data loading, QC, training, data assimilation, the model registry and reproducibility.
-The same operator that returns a trained emulator drops into a forecast `Cycle` as a step function, so there is one mental model and one composition surface from end to end.
+Every step of a scientific workflow (reading a scene, a QC check, a composite, a model, a forecast step, a training loop) becomes an `Operator` that takes a carrier and returns one.
+Operators chain with `|`, wire into graphs, wrap in retries, caches and observers, map over many inputs, and save to JSON, and each of those is itself an Operator.
+Install only what you need: each package is its own distribution, and the `pipekit` umbrella is there for when you want all of them.
 
-The example below reloads a trained emulator by name and forecasts 24 steps with it as the forward model.
-The weights come back into a skeleton of the same architecture (a model operator's config is not a faithful round-trip, so the registry keeps its weights as the data).
-Here `x0` is the initial state, a vector of length 8.
+## The layering
+
+```
+              your pipeline
+                    │
+   pipekit-cycle       time steps, DA cycles
+   pipekit-train       training loops
+   pipekit-experiment  registry, trackers
+   pipekit-evaluate    benchmarks, scorers
+   pipekit-jax         JAX / Equinox models
+                    │
+                    ▼  build on
+   ┌─────────────────────────────────┐
+   │ pipekit-array                   │
+   │ named dims, any Array API       │
+   │ backend                         │
+   ├─────────────────────────────────┤
+   │ pipekit-ops                     │
+   │ Operator, Sequential, Graph;    │
+   │ pure Python, no dependencies    │
+   └─────────────────────────────────┘
+     two foundations, each usable
+     on its own
+```
+
+- **pipekit-ops** is a zero-dependency operator graph for any carrier: `Operator`, `|` and `Graph`, control flow, caching and stores, parallel `Map`, observers, QC and a JSON round-trip with a content hash. The [tour of the core](core-tour.md) covers every name.
+- **pipekit-array** is named-dim array operators on any Array API backend: one operator runs on NumPy, JAX, CuPy, PyTorch or dask, and on a `DimArray`, an `xr.DataArray` or any carrier that registers an adapter.
+
+The rest of the family builds on them.
+pipekit-ops depends on nothing, and pipekit-array, pipekit-cycle, pipekit-experiment and pipekit-train depend on pipekit-ops only; pipekit-evaluate adds NumPy and SciPy, and pipekit-jax adds pipekit-cycle, JAX, Equinox and jaxtyping.
+
+## Both foundations in one example
+
+A year of Sentinel-2 over one tile: twelve monthly scenes, four bands and 64 by 64 pixels.
+pipekit-array gives the named cube and the steps by dim name; pipekit-ops gives the shape check, the `|`, the summary and the JSON round-trip.
 
 ```python
-import equinox as eqx
-import jax
-from pipekit_cycle import Cycle, NeuralForward
-from pipekit_experiment import LocalModelRegistry
-from pipekit_jax import JaxModelOp
+import numpy as np
 
-# Shapes: D = 8 state variables
+import pipekit_array as pa
+import pipekit_ops as pk
 
-# today (pipekit-experiment)
-registry = LocalModelRegistry("/models")
-# today (pipekit-jax)
-# a skeleton of the trained architecture, f : ℝ^D → ℝ^D
-template = JaxModelOp(
-    eqx.nn.MLP(in_size=8, out_size=8, width_size=64, depth=2, key=jax.random.key(0))
+# Shapes: T = 12 monthly scenes; B = 4 bands; Y = X = 64 pixels; K = 3 months per season
+
+rng = np.random.default_rng(0)
+reflectance = rng.uniform(0.0, 0.4, size=(12, 4, 64, 64)).astype(np.float32)
+
+# today (pipekit-array)
+cube = pa.DimArray(
+    reflectance,                                       # (T, B, Y, X)
+    ("time", "band", "y", "x"),
+    {"band": ("B02", "B03", "B04", "B08")},
 )
-# today (pipekit-jax)
-emulator = template.from_registry(registry, "methane_emulator_v3")
-# today (pipekit-cycle)
-# x_t ↦ x_{t+1} = f(x_t), 24 times
-forecast = Cycle(step_op=NeuralForward(emulator, dt=3600.0), n_steps=24)
-final_state, _ = forecast(x0, None)                  # (D,) → (D,)
+
+# today (pipekit-ops)
+check = pk.AssertSignature("time band y x", dtype="float32")
+# today (pipekit-array)
+# s_{q,b,i,j} = (1/K) ∑ₖ x_{Kq+k,b,i,j}
+seasonal = pa.Coarsen("mean", time=3)
+# today (pipekit-array)
+# m_{q,b} = (1/(Y X)) ∑ᵢ ∑ⱼ s_{q,b,i,j}
+scene_mean = pa.Reduce("mean", ("y", "x"))
+# today (pipekit-ops)
+pipeline = check | seasonal | scene_mean
+
+table = pipeline(cube)                                 # (T, B, Y, X) → (T/K, B)
+# every intermediate shape, before or after running
+print(pipeline.summary(pk.signature_of(cube)))
+
+# today (pipekit-ops)
+again = pk.loads(pk.dumps(pipeline))
+assert pk.pipeline_hash(again) == pk.pipeline_hash(pipeline)
+# the same pipeline on an xarray carrier: band labels come back as a coordinate
+table_xr = pipeline(cube.to_xarray())                  # (T, B, Y, X) → (T/K, B)
 ```
+
+To train an emulator, register it and forecast with it as the forward model, follow [Getting Started](getting-started.md).
 
 ## Three doors
 
@@ -82,15 +132,17 @@ final_state, _ = forecast(x0, None)                  # (D,) → (D,)
 
 ## The packages
 
-| Package              | Status        | Purpose                                                              |
-|----------------------|---------------|----------------------------------------------------------------------|
-| `pipekit-ops`        | ✅ implemented | Core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. |
-| `pipekit-array`      | 🚧 partial    | Array API dispatch, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `DimArray`, `KernelOp`, `Estimator`; the array QC asserts, the array `Histogram` and `ModelOp` are still to come. |
-| `pipekit-cycle`      | ✅ implemented | Time-stepping, DA cycles, observation/forward protocols.             |
-| `pipekit-experiment` | ✅ implemented | Content-addressed model registry, tracker protocols, tool adapters.  |
-| `pipekit-evaluate`   | 🚧 partial    | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. |
-| `pipekit-train`      | ✅ implemented | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. |
-| `pipekit-jax`        | ✅ implemented | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. |
+Each package has its own README on GitHub, which is also its PyPI page.
+
+| | Package | Purpose | Status | Version |
+|---|---|---|---|---|
+| ![](assets/packages/pipekit-ops/icon.svg){ width="28" } | [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) | **Foundation.** The operator core: `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. | ✅ implemented | 0.2.1 |
+| ![](assets/packages/pipekit-array/icon.svg){ width="28" } | [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) | **Foundation.** Array API dispatch, `DimArray`, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `KernelOp`, `Estimator`; the array QC asserts, the array `Histogram` and `ModelOp` are still to come. | 🚧 partial | 0.1.1 |
+| ![](assets/packages/pipekit-cycle/icon.svg){ width="28" } | [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) | Time-stepping, DA cycles, observation/forward protocols. | ✅ implemented | 0.1.0 |
+| ![](assets/packages/pipekit-experiment/icon.svg){ width="28" } | [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) | Content-addressed model registry, tracker protocols, tool adapters. | ✅ implemented | 0.1.0 |
+| ![](assets/packages/pipekit-evaluate/icon.svg){ width="28" } | [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. | 🚧 partial | 0.2.0 |
+| ![](assets/packages/pipekit-train/icon.svg){ width="28" } | [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. | ✅ implemented | 0.2.0 |
+| ![](assets/packages/pipekit-jax/icon.svg){ width="28" } | [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. | ✅ implemented | 0.1.0 |
 
 ## Links
 
