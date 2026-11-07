@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import multiprocessing
 import threading
+import time
+import warnings
+from pathlib import Path
 
 import pytest
 from pipekit_ops import (
@@ -18,7 +22,10 @@ from pipekit_ops import (
     Sequential,
     ThreadMap,
     check_pickleable,
+    pipeline_hash,
 )
+
+from tests._execution_ops import SlowFailFirst
 
 
 class Double(Operator):
@@ -214,3 +221,81 @@ def test_maps_are_not_forbid_in_yaml():
     children structurally, so the wrappers themselves stay unflagged."""
     for cls in (ThreadMap, ProcessMap, AsyncMap, BatchedMap):
         assert cls.forbid_in_yaml is False, cls.__name__
+
+
+# --- presets on Map (roadmap P2) -------------------------------------------
+
+
+def test_g2_6_preset_hashes_are_kept():
+    """Full digests recorded at ``903b0c3``, before the presets moved onto Map."""
+    presets = [
+        ThreadMap(Identity(), n_workers=4),
+        ProcessMap(Identity()),
+        AsyncMap(Identity()),
+        BatchedMap(Identity()),
+    ]
+    assert [pipeline_hash(preset) for preset in presets] == [
+        "be9cbf3c8a67e2dca1aa8571b8945a5627f3e49bce6a1a3ba89582a7cf2420bd",
+        "df4f9dd1232c0a142f62627958e0d0c5e3459a9ea1ef2180c144ce72ad95765b",
+        "2132e0bfb39a71e00728523de07ec9d0dd72cebbe812abf1e56b6265a701b081",
+        "70dec7fb25292cc5a75b625f92ebe1c976d76dd4d8ea91f5596659d7d988bf90",
+    ]
+
+
+class TouchThenFailFirst(Operator):
+    """Leave a file per item started; item 0 raises at once, the rest sleep."""
+
+    def __init__(self, directory: str, seconds: float) -> None:
+        self.directory = directory
+        self.seconds = seconds
+
+    def _apply(self, x):
+        Path(self.directory, str(x)).touch()
+        if x == 0:
+            raise ValueError("item 0 failed")
+        time.sleep(self.seconds)
+        return x
+
+
+def test_processmap_raise_cancels_what_has_not_started(tmp_path):
+    op = ProcessMap(TouchThenFailFirst(str(tmp_path), 0.05), n_workers=2)
+    with pytest.raises(ValueError, match="item 0 failed"):
+        op(range(100))
+    # the window holds 2 n_w = 4 items; before Map every item ran
+    assert len(list(tmp_path.iterdir())) <= 10
+
+
+@pytest.mark.slow
+def test_g2_3_processmap_fails_fast_wall_time():
+    op = ProcessMap(SlowFailFirst(0.2), n_workers=2)
+    start = time.perf_counter()
+    with pytest.raises(ValueError, match="item 0 failed"):
+        op(range(100))
+    elapsed = time.perf_counter() - start
+    print(f"G2-3 ProcessMap: raised after {elapsed:.3f} s")
+    assert elapsed < 1.5
+
+
+def test_processmap_log_keeps_its_prefix(caplog):
+    op = ProcessMap(SometimesFail(), n_workers=2, on_error="log_and_continue")
+    with caplog.at_level("WARNING", logger="pipekit_ops.parallel"):
+        op([-1])
+    (record,) = caplog.records
+    assert record.getMessage().startswith("ProcessMap: item 0 failed")
+
+
+@pytest.mark.parametrize(
+    ("platform_default", "warns"), [("fork", True), ("spawn", False)]
+)
+def test_processmap_keeps_the_platform_start_method(
+    monkeypatch, platform_default, warns
+):
+    monkeypatch.setattr(
+        multiprocessing, "get_start_method", lambda allow_none=False: platform_default
+    )
+    with warnings.catch_warnings(record=True, action="always") as caught:
+        op = ProcessMap(Double())
+    future = [w for w in caught if issubclass(w.category, FutureWarning)]
+    assert bool(future) is warns
+    assert op.start_method is None
+    assert op._default_start_method is None

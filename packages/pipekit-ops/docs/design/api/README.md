@@ -83,10 +83,10 @@ Today only `Lambda` reshapes them.
 | `Map.iter(items)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points | today (`execution.py`) |
 | `Prefetch(op, depth=2, executor="thread")` | `Iterable → Iterator`; `None` | read `depth` items ahead of the consumer, in input order | today (`execution.py`) |
 | `executor_scope(executor)` | context manager | sets the executor that `Map(executor="scope")` uses (serial when none is set); not stored in any config | today (`execution.py`) |
-| `ThreadMap(op, n_workers=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="thread", …)`; config and hash unchanged | changed (P2) |
-| `ProcessMap(op, n_workers=8, on_error="raise")` | `Iterable → list`; `None` | preset: `Map(op, executor="process", …)`; fails fast on `"raise"` | changed (P2) |
-| `AsyncMap(op, semaphore=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="async", max_in_flight=semaphore)` | changed (P2) |
-| `BatchedMap(op, batch_size=8, flatten=True)` | `Iterable → list`; `None` | preset: `PartitionAll` then `Map` then optional `Concat`; gains `executor` | changed (P2) |
+| `ThreadMap(op, n_workers=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="thread", …)`; config and hash unchanged | today (`parallel.py`), rebuilt on `Map` |
+| `ProcessMap(op, n_workers=8, on_error="raise")` | `Iterable → list`; `None` | preset: `Map(op, executor="process", …)`; fails fast on `"raise"`; keeps the platform start method for one minor release, with a `FutureWarning` when it is not spawn | today (`parallel.py`), rebuilt on `Map` |
+| `AsyncMap(op, semaphore=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="async", max_in_flight=semaphore)` | today (`parallel.py`), rebuilt on `Map` |
+| `BatchedMap(op, batch_size=8, flatten=True)` | `Iterable → list`; `None` | preset: serial `Map(op)` over lists of `batch_size` items, then an optional flatten; `PartitionAll` and the `executor` argument are still proposed | today (`parallel.py`), rebuilt on `Map` |
 | `check_pickleable(op)` | `Operator → list[Operator]` | flagged operators in the tree | today (`parallel.py`); `Map` calls it, see [execution.md](execution.md) |
 
 ## Cache and store
