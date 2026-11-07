@@ -16,6 +16,9 @@ round-trip through ``dumps`` / ``loads``; those that hold a user function
 Phase 3 (`pipekit_array.dim_windows`): `Window` and `Coarsen` (by the
 reduction's name) round-trip; `ApplyAlong` holds an `Operator`, not a
 function, so it round-trips whenever that operator does.
+
+Phase 4 (`pipekit_array.dim_algebra`): `Quantile` and `Dot` round-trip;
+``q`` is stored as a float or an ordered list.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from pipekit_ops import Operator, Signature
 from pipekit_ops._base.operator import nested_config, require_operator
 
 from pipekit_array import (
+    dim_algebra as _dim_algebra,
     dim_shapes as _dim_shapes,
     dim_shifts as _dim_shifts,
     dim_windows as _dim_windows,
@@ -44,11 +48,13 @@ __all__ = [
     "Combine",
     "CumReduce",
     "Diff",
+    "Dot",
     "ExpandDims",
     "ISel",
     "MapOver",
     "MergeDims",
     "Pad",
+    "Quantile",
     "Reduce",
     "Rename",
     "Roll",
@@ -973,3 +979,116 @@ class ApplyAlong(Operator):
         return Signature(
             dims=((self.dim, dict(sig.dims)[self.dim]), *item.dims), dtype=item.dtype
         )
+
+
+# Phase 4: statistics and algebra
+
+
+class Quantile(Operator):
+    """Quantiles over named dims; a sequence ``q`` adds a leading ``quantile`` dim.
+
+    ``q`` is stored in config as a float or an ordered list.
+
+    Args:
+        q: A probability in [0, 1], or a sequence of them.
+        dim: A dim name, or several, to reduce over.
+        method: One of `pipekit_array.dim_algebra.METHODS`.
+        skipna: Ignore NaN.
+
+    Raises:
+        ValueError: ``method`` is not supported, or a probability is
+            outside [0, 1].
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> cube = DimArray(np.ones((12, 2, 4)), ("time", "band", "x"))
+        >>> Quantile([0.1, 0.9], dim="time")(cube).dims
+        ('quantile', 'band', 'x')
+    """
+
+    def __init__(
+        self,
+        q: float | Sequence[float],
+        dim: str | Sequence[str],
+        method: str = "linear",
+        skipna: bool = False,
+    ) -> None:
+        _dim_algebra.check_method(method, "Quantile")
+        self.q = _dim_algebra.probabilities(q, "Quantile")
+        self.dim = _names(dim)
+        self.method = method
+        self.skipna = skipna
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_algebra.quantile(
+            x, self.q, self.dim, method=self.method, skipna=self.skipna
+        )
+
+    def get_config(self) -> dict[str, Any]:
+        q = list(self.q) if isinstance(self.q, tuple) else self.q
+        return {
+            "q": q,
+            "dim": _names_config(self.dim),
+            "method": self.method,
+            "skipna": self.skipna,
+        }
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        names = (self.dim,) if isinstance(self.dim, str) else self.dim
+        kept = sig.drop_dims(names).dims
+        # a float input keeps its dtype; an integer one promotes by backend
+        dtype = sig.dtype if sig.dtype is not None and "float" in sig.dtype else None
+        if isinstance(self.q, tuple):
+            dims = (("quantile", len(self.q)), *kept)
+            return Signature(dims=dims, dtype=dtype)
+        return Signature(dims=kept, dtype=dtype)
+
+
+class Dot(Operator):
+    """The sum of the product of carriers over named dims: ``op(*xs)``.
+
+    `compute_output_signature` takes the tuple of the inputs' signatures:
+    from one signature the other inputs' dims are unknown, so it returns
+    None.
+
+    Args:
+        dim: A dim name, or several, to sum over.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> x = DimArray(np.ones((12, 13)), ("time", "band"))
+        >>> w = DimArray(np.ones((13, 3)), ("band", "component"))
+        >>> Dot(dim="band")(x, w).dims
+        ('time', 'component')
+    """
+
+    def __init__(self, dim: str | Sequence[str]) -> None:
+        self.dim = _names(dim)
+
+    def _apply(self, *xs: Any) -> Any:
+        return _dim_algebra.dot(*xs, dim=self.dim)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"dim": _names_config(self.dim)}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        if not isinstance(input_signature, tuple) or not input_signature:
+            return None
+        sigs = [s for s in map(_signature, input_signature) if s is not None]
+        if len(sigs) != len(input_signature):
+            return None
+        names = (self.dim,) if isinstance(self.dim, str) else self.dim
+        sizes: dict[str, int | None] = {}
+        for sig in sigs:
+            for d, n in sig.dims:
+                # the first known size; check_compatible makes them agree
+                if sizes.get(d) is None:
+                    sizes[d] = n
+        dims = tuple((d, n) for d, n in sizes.items() if d not in names)
+        dtypes = {sig.dtype for sig in sigs}
+        return Signature(dims=dims, dtype=dtypes.pop() if len(dtypes) == 1 else None)
