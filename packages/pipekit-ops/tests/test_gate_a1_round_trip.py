@@ -49,6 +49,7 @@ from pipekit_ops import (
     Pick,
     Prefetch,
     ProcessMap,
+    RateLimit,
     Reduce,
     Remove,
     Rename,
@@ -57,8 +58,10 @@ from pipekit_ops import (
     SortBy,
     Take,
     ThreadMap,
+    Timeout,
     Try,
     Unique,
+    Until,
     UpdateIn,
     ValMap,
     Zip,
@@ -162,6 +165,7 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "Reduce": (lambda: Reduce(_AddPair(), initial=0.5), ([1.0, 2.0],), {}),
     "Remove": (lambda: Remove(Get("ok")), ([{"ok": True}, {"ok": False}],), {}),
     "Rename": (lambda: Rename({"a": "z"}), ({"a": 1, "b": 2},), {}),
+    "RateLimit": (lambda: RateLimit(_Scale(2.0), calls=2, period=1.0), (3.0,), {}),
     "Retry": (
         lambda: Retry(_Scale(2.0), attempts=2, base_delay=0.0, on=(KeyError,)),
         (3.0,),
@@ -171,6 +175,7 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "SortBy": (lambda: SortBy(Get(0), reverse=True), ([(1, "a"), (2, "b")],), {}),
     "Take": (lambda: Take(2), ([1, 2, 3],), {}),
     "ThreadMap": (lambda: ThreadMap(_Scale(2.0), n_workers=2), ([1.0, 2.0],), {}),
+    "Timeout": (lambda: Timeout(_Scale(2.0), seconds=5.0), (3.0,), {}),
     "Try": (
         lambda: Try(primary=_Scale(2.0), fallback=Identity(), on=(KeyError,)),
         (3.0,),
@@ -184,6 +189,11 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     ),
     "ValMap": (lambda: ValMap(_Scale(2.0)), ({"a": 1.0},), {}),
     "Zip": (lambda: Zip(strict=False), ([1, 2], "ab"), {}),
+    "Until": (
+        lambda: Until(_Scale(2.0), Const(False), max_iter=3, on_max="return"),
+        (1.0,),
+        {},
+    ),
 }
 
 OPERATORS = public_operators(pipekit_ops)

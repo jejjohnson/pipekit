@@ -37,6 +37,7 @@ from pipekit_ops._base.operator import (
     require_operator,
 )
 from pipekit_ops.blocks import Identity
+from pipekit_ops.flow import require_sync
 from pipekit_ops.signature import common_signature
 
 
@@ -352,6 +353,7 @@ class Retry(Operator):
         on: tuple[type[BaseException], ...],
     ) -> None:
         require_operator(op, "Retry", "op")
+        require_sync(op, "Retry", "op")
         if attempts < 1:
             raise ValueError(f"Retry.attempts must be >= 1, got {attempts}.")
         if base_delay < 0:

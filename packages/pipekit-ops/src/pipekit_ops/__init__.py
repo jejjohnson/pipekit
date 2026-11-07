@@ -10,6 +10,7 @@ The v0.1 public surface, grouped by module:
   `Identity`, `Const`, `Lambda`, `Sink`.
 - **Group D — control flow** (`control`):
   `Branch`, `Switch`, `Try`, `Coalesce`, `Retry`.
+- **Flow limits** (`flow`): `Timeout`, `RateLimit`, `Until`.
 - **Group E — observers** (`observe`):
   `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`.
 - **Group F — combination** (`combine`): `Fanout`.
@@ -97,6 +98,7 @@ from pipekit_ops.execution import (
     Prefetch,
     executor_scope,
 )
+from pipekit_ops.flow import RateLimit, Timeout, Until
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
 from pipekit_ops.observe import Histogram, Profile, ShapeTrace, Snapshot, Tap
@@ -195,6 +197,7 @@ __all__ = [
     "Profile",
     "QCError",
     "Quarantine",
+    "RateLimit",
     "Reduce",
     "Remove",
     "Rename",
@@ -210,8 +213,10 @@ __all__ = [
     "Take",
     "Tap",
     "ThreadMap",
+    "Timeout",
     "Try",
     "Unique",
+    "Until",
     "UpdateIn",
     "ValMap",
     "Zip",
