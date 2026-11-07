@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-ops"
-version = "0.2.0"
+version = "0.2.1"
 description = "The pipekit core: carrier-agnostic operators and operator graphs for composable scientific pipelines."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
