@@ -150,7 +150,7 @@ def test_cache_pickles_without_entries_or_lock():
     c(1.0)
     c(1.0)
     copy = pickle.loads(pickle.dumps(c))
-    assert copy._store == {}
+    assert len(copy._store) == 0
     assert (copy.hits, copy.misses) == (0, 0)
     assert copy._lock is not c._lock
     # the original keeps its entries

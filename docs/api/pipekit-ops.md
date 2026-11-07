@@ -48,6 +48,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.cache
 
+## Store
+
+::: pipekit_ops.store
+
 ## Quality control
 
 ::: pipekit_ops.qc
