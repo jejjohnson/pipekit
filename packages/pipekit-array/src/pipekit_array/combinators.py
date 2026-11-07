@@ -4,7 +4,8 @@ Thin wrappers over `xp.stack` and `xp.concat` (the Array API
 standardised names) so the operations compose into a pipeline. See
 `docs/design/api/operators.md` for the spec.
 
-`ApplyToBands` lands in Phase B alongside `BatchedMap`.
+The planned `ApplyToBands` and array-shaped `BatchedMap` shipped as
+`pipekit_array.ApplyAlong` and `pipekit_array.BatchAlong` (ADRs A15, A19).
 """
 
 from __future__ import annotations
