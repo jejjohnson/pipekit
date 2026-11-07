@@ -37,8 +37,8 @@ Three reasons:
    trained sklearn pipeline. `ModelOp` is the one-line shim that
    makes them compose into a pipekit `Sequential`.
 
-3. **It generalises `pipekit-array.parallel.BatchedMap`'s `inner`
-   argument.** `BatchedMap(ModelOp(big_model), batch_size=32)` is
+3. **It generalises `pipekit_array.BatchAlong`'s `inner`
+   argument.** `BatchAlong(ModelOp(big_model), size=32, dim="sample")` is
    the canonical "stream a large array through a model in chunks"
    idiom.
 
@@ -69,9 +69,9 @@ which is the right shape for raw Keras / PyTorch / equinox modules.
 sklearn estimators use `"predict"` / `"predict_proba"` / `"transform"`.
 
 **`batch_size`**: if set, wraps the actual model call in
-`BatchedMap(self._inner_op, batch_size=batch_size, axis=0)`
+`BatchAlong(self._inner_op, size=batch_size, dim=...)`
 internally. Convenience shorthand; equivalent to
-`BatchedMap(ModelOp(model, method), batch_size=...)`.
+`BatchAlong(ModelOp(model, method), size=..., dim=...)`.
 
 **`method_kwargs`**: passed through on every call. Useful for
 models with `training=False` flags, dropout suppression, etc.
@@ -165,11 +165,11 @@ preds = op(huge_input_array)  # auto-batches internally
 Equivalent to:
 
 ```python
-op = BatchedMap(ModelOp(big_torch_model, method="forward"), batch_size=64)
+op = BatchAlong(ModelOp(big_torch_model, method="forward"), size=64, dim="sample")
 ```
 
 The `batch_size=` constructor shorthand is purely for ergonomics;
-under the hood it's the explicit `BatchedMap` composition.
+under the hood it's the explicit `BatchAlong` composition.
 
 ## Per-backend notes
 

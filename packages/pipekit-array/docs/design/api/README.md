@@ -14,13 +14,13 @@ mirrors `pipekit-ops` core where it makes sense
 
 | Module             | Operator                | One-liner                                                     |
 | ------------------ | ----------------------- | ------------------------------------------------------------- |
-| `combinators`      | `ApplyToBands`          | Split along an axis, apply `inner` per slice, stack back.     |
+| `dim_operators`    | `ApplyAlong`            | `inner` per item along a dim, stacked back; serialises (A15). |
 | `combinators`      | `StackAlong`            | `xp.stack` list-of-arrays along a new axis.                   |
 | `combinators`      | `ConcatenateAlong`      | `xp.concatenate` along an existing axis.                      |
 | `geom`             | `Subsample`             | Stride-decimate along given axes.                             |
 | `observe`          | `Histogram`             | Controller; `.at(key)` captures per-tap distributions.        |
 | `reductions`       | `MeanScalar`            | `xp.mean` reduction; optional `axis`.                         |
-| `parallel`         | `BatchAlong`            | Split along a dim into chunks, apply `inner`, concatenate (A19). |
+| `batching`         | `BatchAlong`            | Split along a dim into chunks, apply `inner`, concatenate (A19). |
 | `qc`               | `AssertClose`           | Compare to a stored reference; raise on numeric drift (A21).  |
 | `qc`               | `AssertValueRange`      | Pass-through; raise/warn on out-of-range.                     |
 | `qc`               | `AssertNoNaN`           | Pass-through; raise on any NaN.                               |
@@ -58,8 +58,11 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `diff`       | `Diff`      | n-th forward difference along a dim                     |
 | `cumreduce`  | `CumReduce` | cumulative function along a dim (the operator takes a name) |
 | `where`      | `Where`     | keep where a mask is True, aligned by dim name          |
+| `window`     | `Window`    | sliding full windows as a new last dim (`dim_windows`)  |
+| `coarsen`    | `Coarsen`   | reduce non-overlapping blocks; the dim loses its labels |
+| `map_over`   | `ApplyAlong`| an operator per item along a dim; serialises            |
 
-The first twelve of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`); the rest (`window`, `coarsen`, `quantile`, `dot`) are proposed there, with an xarray parity table.
+The first fourteen of **[dim_functions.md](dim_functions.md)** ship today (phase 1 in `dim_shapes`, phase 2 in `dim_shifts`, phase 3 in `dim_windows`); the rest (`quantile`, `dot`) are proposed there, with an xarray parity table.
 
 An adapter may override any of them with a method of the same name
 (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one

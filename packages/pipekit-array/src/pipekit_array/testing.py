@@ -18,7 +18,8 @@ instead of copying tests::
   new or renamed dims (`pipekit_array.dim_shapes`) must also give the
   same labels; those on the band labels run when the adapter has
   ``relabel`` (`pipekit_ops.LabelledAdapter`). So must the index-only
-  transforms (`pipekit_array.dim_shifts`).
+  transforms (`pipekit_array.dim_shifts`) and the windows
+  (`pipekit_array.dim_windows`).
 - `check_kernel_op(op, calls)` — the same `KernelOp` on each carrier family
   gives equal data, equal dims, and the signature
   ``op.compute_output_signature`` predicts (PK-K1, PK-K4).
@@ -35,7 +36,12 @@ from typing import Any
 import numpy as np
 from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
 
-from pipekit_array import dim_shapes as _shapes, dim_shifts as _shifts, dims as _dims
+from pipekit_array import (
+    dim_shapes as _shapes,
+    dim_shifts as _shifts,
+    dim_windows as _windows,
+    dims as _dims,
+)
 from pipekit_array.dimarray import DimArray
 from pipekit_array.kernel import KernelOp
 
@@ -203,6 +209,27 @@ def _dim_shift_cases() -> list[tuple[str, Callable[[Any], Any]]]:
     ]
 
 
+# Phase 3: windows. Their cases also compare labels (`_check_labels`).
+
+
+def _dim_window_cases() -> list[tuple[str, Callable[[Any], Any]]]:
+    """`pipekit_array.dim_windows` on the `DIMS` layout.
+
+    None sets labels through ``relabel``: a window keeps its end entries'
+    labels through ``isel``, and a coarsened dim loses its own.
+    """
+    return [
+        ("window(time=2)", lambda c: _windows.window(c, time=2)),
+        ("window(x=3, stride=2)", lambda c: _windows.window(c, x=3, stride=2)),
+        ("window(band=2)", lambda c: _windows.window(c, window_dim="w", band=2)),
+        ("coarsen(mean, y=2)", lambda c: _windows.coarsen(c, "mean", y=2)),
+        (
+            "coarsen(max, time=3, x=2, trim)",
+            lambda c: _windows.coarsen(c, "max", boundary="trim", time=3, x=2),
+        ),
+    ]
+
+
 def _check_labels(actual: Any, expected: Any, label: str, name: str) -> None:
     adapter, reference = get_adapter(actual), get_adapter(expected)
     assert adapter is not None and reference is not None
@@ -251,7 +278,7 @@ def check_adapter(
     lazy = _dims.backend_name(adapter.data(carrier)) == "dask"
     labelled = getattr(adapter, "relabel", None) is not None
     shape_cases = _dim_shape_cases(labelled)
-    shift_cases = _dim_shift_cases()
+    shift_cases = [*_dim_shift_cases(), *_dim_window_cases()]
     shape_labels = {label for label, _ in [*shape_cases, *shift_cases]}
     for label, fn in [*_cases(), *shape_cases, *shift_cases]:
         if lazy and label.endswith("where)"):
@@ -261,7 +288,7 @@ def check_adapter(
         got = _dims_of(actual)
         want = _dims_of(expected)
         assert got == want, f"{label} on {name}: dims {got}, expected {want}"
-        exact = not label.startswith(("reduce", "map_over", "cumreduce"))
+        exact = not label.startswith(("reduce", "map_over", "cumreduce", "coarsen"))
         if label in shape_labels:
             _check_labels(actual, expected, label, name)
         a, e = values_of(actual), values_of(expected)

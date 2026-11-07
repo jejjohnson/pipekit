@@ -15,8 +15,11 @@ from typing import Any
 import pipekit_array
 import pytest
 from pipekit_array import (
+    ApplyAlong,
     ArgReduce,
+    BatchAlong,
     BroadcastLike,
+    Coarsen,
     ConcatenateAlong,
     CumReduce,
     Diff,
@@ -37,6 +40,7 @@ from pipekit_array import (
     TakeAlong,
     Transpose,
     Where,
+    Window,
 )
 from pipekit_ops import Operator
 from pipekit_ops.testing import assert_round_trip, public_operators
@@ -87,6 +91,15 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...]]] = {
     "Roll": (lambda: Roll(time=1, x=-1), (CUBE,)),
     "Shift": (lambda: Shift(fill_value=0.0, x=2), (CUBE,)),
     "Where": (lambda: Where(other=-1.0), (CUBE, VALID)),
+    # Phase 3: windows
+    "Window": (lambda: Window(window_dim="w", stride=2, x=2), (CUBE,)),
+    "Coarsen": (lambda: Coarsen("max", boundary="trim", band=2, x=3), (CUBE,)),
+    # a nested operator round-trips through its own state record
+    "ApplyAlong": (lambda: ApplyAlong(Reduce("sum", dim="x"), dim="band"), (CUBE,)),
+    "BatchAlong": (
+        lambda: BatchAlong(Reduce("mean", dim="x"), size=2, dim="band", pad="last"),
+        (CUBE,),
+    ),
 }
 
 OPERATORS = public_operators(pipekit_array)

@@ -76,7 +76,7 @@ mean: DimArray["band y x"] = reduce(cube, "mean", "time")
 Columns: the signature (keyword dims, `x` positional-only as in `isel`); the semantics; what the adapter must provide; JAX behaviour; status.
 "Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`dims.py`](../../../src/pipekit_array/dims.py)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py).
+Every function in the tables is `proposed` unless marked `today`; phase 1 (section 3.1) ships in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py), phase 3 (section 3.3) in [`dim_windows.py`](../../../src/pipekit_array/dim_windows.py).
 
 ### 3.0 Labels on new or renamed dims
 
@@ -139,8 +139,8 @@ None reads a label; labels stay on their positions (xarray's default, `roll_coor
 
 | Function | Signature | Semantics | Adapter requirement | JAX | Status |
 | --- | --- | --- | --- | --- | --- |
-| `window` | `window(x, /, *, window_dim: str = "window", stride: int = 1, **sizes: int)` | One named dim, windows of length $S$ with step $s$; the window becomes a new last dim. Full windows only. A window carries the label of its last entry. | Generic: $S$ strided slices of the data, `xp.stack` on the last axis, `rewrap` on the end-position slice. Fast path on xarray: `rolling(...).construct(...).isel(...)`. | jit, vmap safe; `sizes`, `stride` static. | proposed |
-| `coarsen` | `coarsen(x, fn: Reduction, /, *, boundary: str = "exact", **windows: int)` | Non-overlapping blocks of $k$, reduced by `fn`: `split_dims` then `reduce`. `boundary="trim"` drops the tail. The coarsened dim loses its labels. | Generic: `isel` (trim), `split_dims`, `reduce`. | jit, vmap safe; `windows` static. | proposed |
+| `window` | `window(x, /, *, window_dim: str = "window", stride: int = 1, **sizes: int)` | One named dim, windows of length $S$ with step $s$; the window becomes a new last dim. Full windows only. A window carries the label of its last entry. | Generic: $S$ strided slices of the data, `xp.stack` on the last axis, `rewrap` on the end-position slice. Fast path on xarray: `rolling(...).construct(...).isel(...)`. | jit, vmap safe; `sizes`, `stride` static. | today |
+| `coarsen` | `coarsen(x, fn: Reduction, /, *, boundary: str = "exact", **windows: int)` | Non-overlapping blocks of $k$, reduced by `fn`: `split_dims` then `reduce`. `boundary="trim"` drops the tail. The coarsened dim loses its labels. | Generic: `isel` (trim), `split_dims`, `reduce`. | jit, vmap safe; `windows` static. | today |
 | `map_over` | `map_over(x, fn, dim)` | `fn` per item along `dim`. | Generic; fast path optional. | Python loop unless an adapter vmaps. | today |
 
 ### 3.4 Statistics and algebra
@@ -191,11 +191,11 @@ Every twin lives in [`dim_operators.py`](../../../src/pipekit_array/dim_operator
 | `diff` | `Diff(dim, n=1, label="upper")` | yes | size minus $n$ | today |
 | `cumreduce` | `CumReduce(fn: str, dim)` | yes (by name) | unchanged | today |
 | `where` | `Where(other=None)`, called `op(x, cond)` | yes | unchanged | today |
-| `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size | proposed |
-| `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ | proposed |
+| `window` | `Window(window_dim, stride, **sizes)` | yes | count and window size | today |
+| `coarsen` | `Coarsen(fn: str, boundary, **windows)` | yes (by name) | size divided by $k$ | today |
 | `quantile` | `Quantile(q, dim, method, skipna)` | yes | `quantile` dim added or not | proposed |
 | `dot` | `Dot(dim)`, called `op(*xs)` | yes | contracted dims removed | proposed |
-| `map_over` | `ApplyAlong(inner: Operator, dim)` | yes, if `inner` does | from `inner` | proposed |
+| `map_over` | `ApplyAlong(inner: Operator, dim)` | yes, if `inner` does | from `inner` | today |
 
 `compute_output_signature` takes one input signature, so `BroadcastLike`'s takes the pair `(x's, other's)` and returns None for `x`'s alone; `MergeDims` and `SplitDims` store their merges and parts as ordered lists in config, since JSON objects sort their keys and the order sets the output dims.
 

@@ -18,6 +18,10 @@ Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 `SplitDims`; phase 2 (`dim_shifts`): `pad`, `roll`, `shift`, `diff`,
 `cumreduce`, `where`, as `Pad`, `Roll`, `Shift`, `Diff`, `CumReduce`,
 `Where`.
+Windows (`dim_windows`): `window`, `coarsen`, with operators `Window`,
+`Coarsen`; `ApplyAlong` runs an operator per item along a dim (the
+serialisable `MapOver`), and `BatchAlong` (`batching`) runs one on chunks
+of a dim.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
 
 Sample tables (`rows`): `to_rows` flattens a carrier to a
@@ -47,11 +51,13 @@ from __future__ import annotations
 from pipekit_ops import register_adapter, register_lazy_adapter
 
 from pipekit_array._namespace import array_namespace
-from pipekit_array.batching import Padded, batch
+from pipekit_array.batching import BatchAlong, Padded, batch
 from pipekit_array.combinators import ConcatenateAlong, StackAlong
 from pipekit_array.dim_operators import (
+    ApplyAlong,
     ArgReduce,
     BroadcastLike,
+    Coarsen,
     Combine,
     CumReduce,
     Diff,
@@ -70,6 +76,7 @@ from pipekit_array.dim_operators import (
     TakeAlong,
     Transpose,
     Where,
+    Window,
 )
 from pipekit_array.dim_shapes import (
     broadcast_like,
@@ -80,6 +87,7 @@ from pipekit_array.dim_shapes import (
     squeeze,
 )
 from pipekit_array.dim_shifts import cumreduce, diff, pad, roll, shift, where
+from pipekit_array.dim_windows import coarsen, window
 from pipekit_array.dimarray import DimArray, DimArrayAdapter
 from pipekit_array.dims import (
     BackendError,
@@ -115,9 +123,12 @@ def _load_xarray_adapter() -> None:
 register_lazy_adapter("xarray.", _load_xarray_adapter)
 
 __all__ = [
+    "ApplyAlong",
     "ArgReduce",
     "BackendError",
+    "BatchAlong",
     "BroadcastLike",
+    "Coarsen",
     "Combine",
     "ConcatenateAlong",
     "CumReduce",
@@ -146,10 +157,12 @@ __all__ = [
     "TakeAlong",
     "Transpose",
     "Where",
+    "Window",
     "argreduce",
     "array_namespace",
     "batch",
     "broadcast_like",
+    "coarsen",
     "combine",
     "concat",
     "cumreduce",
@@ -173,4 +186,5 @@ __all__ = [
     "to_rows",
     "transpose",
     "where",
+    "window",
 ]

@@ -12,6 +12,10 @@ round-trip through ``dumps`` / ``loads``; those that hold a user function
 `Reduce` and `ArgReduce` take the reduction by its array-namespace name
 (``"mean"``, ``"argmax"``) so they serialise; the function forms in
 `pipekit_array.dims` also take a callable.
+
+Phase 3 (`pipekit_array.dim_windows`): `Window` and `Coarsen` (by the
+reduction's name) round-trip; `ApplyAlong` holds an `Operator`, not a
+function, so it round-trips whenever that operator does.
 """
 
 from __future__ import annotations
@@ -21,18 +25,22 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, Self
 
 from pipekit_ops import Operator, Signature
+from pipekit_ops._base.operator import nested_config, require_operator
 
 from pipekit_array import (
     dim_shapes as _dim_shapes,
     dim_shifts as _dim_shifts,
+    dim_windows as _dim_windows,
     dims as _dims,
 )
 from pipekit_array.dimarray import is_mask
 
 
 __all__ = [
+    "ApplyAlong",
     "ArgReduce",
     "BroadcastLike",
+    "Coarsen",
     "Combine",
     "CumReduce",
     "Diff",
@@ -51,6 +59,7 @@ __all__ = [
     "TakeAlong",
     "Transpose",
     "Where",
+    "Window",
 ]
 
 #: reductions that keep the input's dtype whatever it is
@@ -824,3 +833,143 @@ class Where(Operator):
         if isinstance(input_signature, tuple) and len(input_signature) == 2:
             input_signature = input_signature[0]
         return _signature(input_signature)
+
+
+# Phase 3: windows
+
+
+class Window(Operator):
+    """Sliding windows along one dim, as a new last dim; full windows only.
+
+    Args:
+        window_dim: The new last dim.
+        stride: The step between window starts.
+        **sizes: ``dim=S`` for the one dim to window.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Window(stride=2, time=3)(DimArray(np.zeros((12, 4)), ("time", "x"))).shape
+        (5, 4, 3)
+    """
+
+    def __init__(
+        self, window_dim: str = "window", stride: int = 1, **sizes: int
+    ) -> None:
+        if len(sizes) != 1:
+            raise ValueError(f"Window: give one dim=size, got {sizes}.")
+        self.window_dim = window_dim
+        self.stride = stride
+        self.sizes = dict(sizes)
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_windows.window(
+            x, window_dim=self.window_dim, stride=self.stride, **self.sizes
+        )
+
+    def get_config(self) -> dict[str, Any]:
+        return {"window_dim": self.window_dim, "stride": self.stride, **self.sizes}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        ((dim, size),) = self.sizes.items()
+        length = dict(sig.dims)[dim]
+        # n = ⌊(N - S)/s⌋ + 1
+        count = None if length is None else (length - size) // self.stride + 1
+        windowed = sig.replace_dims({dim: count})
+        return Signature(
+            dims=(*windowed.dims, (self.window_dim, size)), dtype=sig.dtype
+        )
+
+
+class Coarsen(Operator):
+    """Reduce non-overlapping blocks along named dims by a named reduction.
+
+    Args:
+        fn: The reduction's name in the array namespace: ``"mean"``,
+            ``"nanmean"``, ``"max"``, …
+        boundary: ``"exact"`` or ``"trim"``.
+        **windows: ``dim=k`` for each dim to coarsen.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> Coarsen("mean", y=2, x=2)(DimArray(np.ones((4, 6)), ("y", "x"))).shape
+        (2, 3)
+    """
+
+    def __init__(self, fn: str, boundary: str = "exact", **windows: int) -> None:
+        if not isinstance(fn, str):
+            raise TypeError(
+                "Coarsen takes the reduction's name (e.g. 'mean') so it serialises; "
+                "for a function, use pipekit_array.coarsen(x, fn, ...)."
+            )
+        self.fn = fn
+        self.boundary = boundary
+        self.windows = dict(windows)
+
+    def _apply(self, x: Any) -> Any:
+        return _dim_windows.coarsen(x, self.fn, boundary=self.boundary, **self.windows)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"fn": self.fn, "boundary": self.boundary, **self.windows}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        sizes = dict(sig.dims)
+        coarse: dict[str, int | None] = {}
+        for d, k in self.windows.items():
+            length = sizes[d]
+            # ⌊N/k⌋ blocks; "exact" raises at run time unless k divides N
+            coarse[d] = None if length is None else length // k
+        dims = sig.replace_dims(coarse).dims
+        return Signature(dims=dims, dtype=_reduced_dtype(self.fn, sig.dtype))
+
+
+class ApplyAlong(Operator):
+    """``inner`` on each item along ``dim``; the results stacked along ``dim``, first.
+
+    `map_over` with an `Operator` instead of a function, so it serialises
+    whenever ``inner`` does: ``inner`` is stored as a nested config, and
+    `ApplyAlong` itself does not set ``forbid_in_yaml`` (a flagged
+    ``inner`` is found by the serialiser's walk). Use `MapOver` for a
+    plain function. Replaces the planned ``ApplyToBands`` (A15).
+
+    Args:
+        inner: The operator applied to each item, ``isel(x, dim=i)``; it
+            returns named carriers with the same dims.
+        dim: The dim to map over.
+
+    Example:
+        >>> import numpy as np
+        >>> from pipekit_array import DimArray
+        >>> cube = DimArray(np.ones((3, 2, 4)), ("time", "band", "x"))
+        >>> ApplyAlong(Reduce("sum", dim="band"), dim="time")(cube).dims
+        ('time', 'x')
+    """
+
+    def __init__(self, inner: Operator, dim: str) -> None:
+        require_operator(inner, "ApplyAlong", "inner")
+        self.inner = inner
+        self.dim = dim
+
+    def _apply(self, x: Any) -> Any:
+        return _dims.map_over(x, self.inner, self.dim)
+
+    def get_config(self) -> dict[str, Any]:
+        return {"inner": nested_config(self.inner), "dim": self.dim}
+
+    def compute_output_signature(self, input_signature: Any) -> Any:
+        sig = _signature(input_signature)
+        if sig is None:
+            return None
+        item = self.inner.compute_output_signature(sig.drop_dims((self.dim,)))
+        if not isinstance(item, Signature):
+            return None
+        return Signature(
+            dims=((self.dim, dict(sig.dims)[self.dim]), *item.dims), dtype=item.dtype
+        )

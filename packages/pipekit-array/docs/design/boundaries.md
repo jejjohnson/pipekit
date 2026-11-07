@@ -35,11 +35,11 @@ A v0.2 `ModelOp.serialise(format=...)` would orchestrate these; v0.1
 expects the user to pickle the whole operator (works for
 sklearn / numpy models) or supply the serialised model out-of-band.
 
-### Q3. Sharding for `BatchedMap`
+### Q3. Sharding for `BatchAlong`
 
-`pipekit_array.parallel.BatchedMap` v0.1 is a single-device sequential
-loop: split axis 0, apply, concatenate. The natural v0.2 extension
-is `BatchedMap(..., devices=jax.devices())` that uses
+`pipekit_array.BatchAlong` v0.1 is a single-device sequential
+loop: split a named dim, apply, concatenate. The natural v0.2 extension
+is `BatchAlong(..., devices=jax.devices())` that uses
 `jax.experimental.shard_map` for JAX inputs and `torch.distributed`
 for torch. Single-backend (no Array API path), so per-backend dispatch
 is needed — likely in a `pipekit-jax` / `pipekit-torch` followup,
@@ -72,8 +72,8 @@ single-purpose, explicit, opt-in. Logged as a v0.2 issue if asked for.
 
 ### Q7. `Signature` integration depth
 
-The v0.1 plan: operators that reshape (`ApplyToBands`, `Subsample`,
-`BatchedMap`) override `compute_output_signature`; operators that
+The v0.1 plan: operators that reshape (`ApplyAlong`, `Subsample`,
+`BatchAlong`) override `compute_output_signature`; operators that
 pass through inherit. The deeper integration — Array API operators
 participating in `Sequential.summary`'s shape inference graph and
 catching shape mismatches at compose time — is a v0.2 polish.
@@ -114,12 +114,12 @@ These were explicitly considered and rejected for the v0.1 scope.
 The v0.1 implementation PR(s) close on:
 
 - [ ] All 12 operators implemented and tested per the api/ files:
-  - [ ] `combinators.py`: `ApplyToBands`, `StackAlong`, `ConcatenateAlong`
+  - [ ] `combinators.py`: `ApplyAlong`, `StackAlong`, `ConcatenateAlong`
   - [ ] `geom.py`: `Subsample`
   - [ ] `observe.py`: `Histogram` (controller)
   - [ ] `reduce.py`: `MeanScalar`
-  - [ ] `parallel.py`: `BatchedMap`
-  - [ ] `qc.py`: `Diff`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`
+  - [ ] `parallel.py`: `BatchAlong`
+  - [ ] `qc.py`: `AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`
   - [ ] `inference.py`: `ModelOp`
 - [ ] `_namespace.array_namespace()` shim implemented and tested.
 - [ ] Per-backend CI fan-out for `numpy`, `jax`, `torch` (via the
@@ -146,9 +146,9 @@ Suggested chunking for the implementation PR(s):
 1. **Phase A — Foundations.** `_namespace.py` + conftest fixture +
    `MeanScalar` + `StackAlong` + `ConcatenateAlong`. ~150 LOC, sets
    the per-backend test pattern. One PR.
-2. **Phase B — Catalog body.** `Subsample`, `ApplyToBands`,
-   `BatchedMap`, `Histogram`. ~200 LOC. One PR.
-3. **Phase C — QC suite.** `Diff`, `AssertValueRange`, `AssertNoNaN`,
+2. **Phase B — Catalog body.** `Subsample`, `ApplyAlong`,
+   `BatchAlong`, `Histogram`. ~200 LOC. One PR.
+3. **Phase C — QC suite.** `AssertClose`, `AssertValueRange`, `AssertNoNaN`,
    `AssertValidFraction`. ~100 LOC. One PR (delegates check logic to
    shared helpers).
 4. **Phase D — `ModelOp` + docs + notebook + DoD close.** ~150 LOC +
@@ -162,7 +162,7 @@ the test surface fan-out across backends.
 
 - **v0.1** — All 12 operators, numpy / JAX / torch CI fan-out, basic
   signature inference for reshaping operators (this design).
-- **v0.2** — Sharding for `BatchedMap` (Q3) — likely lands in a
+- **v0.2** — Sharding for `BatchAlong` (Q3) — likely lands in a
   per-backend sister package; spectral extension operators (Q1);
   streaming `Histogram` (Q4); deeper signature integration (Q7).
 - **v0.3** — Whatever the user feedback drives. Likely candidates:
