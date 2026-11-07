@@ -48,9 +48,10 @@ Adds `Map`, `executor_scope`, `Prefetch`, `Fold`, `MapError`, rebuilds the four 
 | G2-8 | Tracers | under `jax.jit`, `Map(op, executor="thread")` raises `TypeError`, and `Map(op, executor="serial")` returns the same values as the eager call (skipped when JAX is not installed) |
 | G2-9 | Running loop | inside a running event loop, `Map(op, executor="async")(items)` raises `RuntimeError` whose message contains `run`, and `await Map(op, executor="async").run(items)` returns the eager result |
 | G2-10 | Borrowed executor stays open | after `Map(..., executor="scope")` runs under `executor_scope(pool)`, `pool.submit(abs, -1).result() == 1` |
-| G2-11 | Prefetch depth | `Prefetch(op, depth=4)` over 100 items never has more than 4 items started and not yet consumed |
+| G2-11 | Prefetch depth | `Prefetch(op, depth=4)` over 100 items never has more than 4 items pulled and not yet consumed; with item 0 blocked on an event, at most 3 later results finish and at most 4 items are pulled before the event is set |
 | G2-12 | Fold equals reduce | for 10,000 random integers, `Fold(AddPair(), 0, chunksize=128, executor="thread")` equals `sum(items)`, where `AddPair` is a test operator returning `acc + item` |
 | G2-13 | Nested maps | a `Map(executor="scope")` inside a `Map` task under a 2-worker pool completes 10 outer × 10 inner items within 5 s (no deadlock) |
+| G2-14 | Ordered iterator window | `Map(op, executor="thread", n_workers=4, max_in_flight=4).iter(items, ordered=True)` over 100 items, with item 0 blocked on an event for 1 s, holds at most 4 items (running, queued or buffered) at every point, and yields `op(0) … op(99)` in order once the event is set |
 
 **Risk:** spawn changes `ProcessMap` for Linux users whose scripts lack a `__main__` guard.
 **Fallback:** keep `start_method=None` (platform default) on the `ProcessMap` preset for one minor release, with a `FutureWarning` when the default would differ, and use spawn only on `Map(executor="process")`.

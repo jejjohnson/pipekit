@@ -102,13 +102,24 @@ The protocol `Map` relies on is the stdlib one: `submit(fn, *args) -> Future`, p
 - `Map.__call__` and `Map.run` always return a list in input order.
   Results are written into slot $i$ of a list of length $n$ as they complete, where $n$ is the number of items consumed and $i$ the item's position.
 - `Map.iter(items, ordered=True)` yields results lazily in input order; with `ordered=False` it yields `(i, result)` pairs in completion order.
-  The ordered iterator holds at most `max_in_flight` finished results while it waits for a slow item at the head.
+  In the ordered iterator, a finished result that waits behind a slower item still counts against the window of section 2.3, so a slow item at the head stops new items from being pulled.
 
 ### 2.3 Backpressure: a window of in-flight tasks
 
 Let $W$ be `max_in_flight`.
-`Map` pulls items from the input lazily and keeps at most $W$ tasks submitted and not yet collected.
-When a task completes, it is collected and the next item is pulled and submitted.
+`Map` pulls items from the input lazily and keeps at most $W$ items *held*: pulled and not yet released.
+When an item is released, the next item is pulled and submitted.
+What releases an item depends on how results leave `Map`:
+
+| Call | An item is released when | Held items are |
+|---|---|---|
+| `Map.__call__`, `Map.run` | its task completes and its result is written into its slot | running or queued tasks |
+| `Map.iter(ordered=False)` | its `(i, result)` pair is yielded, which happens as soon as it completes | running or queued tasks |
+| `Map.iter(ordered=True)`, `Prefetch` | its result is yielded, which happens only once every earlier item has been yielded | running or queued tasks, plus finished results buffered behind a slower item |
+
+The third row is the one that matters for streams.
+If completion alone released an item, a slow item at the head would let every later item finish and pile up in the buffer: with $W = 4$, 100 inputs and item 0 blocked, 97 results would be buffered before item 0 finished.
+Counting buffered results against $W$ stops that: with item 0 blocked, the iterator holds item 0 and at most $W - 1$ finished results, and pulls nothing more until item 0 finishes and is yielded.
 The default is $W = 2 n_w$ for an owned pool, where $n_w$ is the number of workers, so each worker has one task running and one queued.
 For a borrowed executor the default is $W = 32$, because `Map` cannot see how many workers it has.
 
@@ -131,7 +142,34 @@ while pending:
     done = collect_one(pending, results)
 ```
 
-Peak memory is then bounded by $W$ inputs and $W$ outputs in flight, plus the results already collected; `Map.iter` drops even those.
+The ordered iterator counts its buffer in the same window, and pulls a new item only after it yields one.
+
+```python
+# Shapes: n items; W = max_in_flight; held = pending + buffered ≤ W
+
+# proposed (P2): the core loop of Map.iter(ordered=True), sketched
+pending: dict[Future, int] = {}
+# finished results waiting for an earlier item, by index
+buffered: dict[int, Any] = {}
+source = enumerate(items)
+next_to_yield = 0
+exhausted = False
+while True:
+    # top up the window: pull only while fewer than W items are held
+    while not exhausted and len(pending) + len(buffered) < W:
+        exhausted = submit_next(source, pending, pool, op)
+    if not pending and not buffered:
+        break
+    # yield every result that is next in input order; each one frees a slot
+    while next_to_yield in buffered:
+        yield buffered.pop(next_to_yield)
+        next_to_yield += 1
+    if pending:
+        # completion moves a result from pending to buffered: held stays the same
+        wait_and_buffer(pending, buffered)
+```
+
+Peak memory is then bounded by $W$ inputs and $W$ outputs held, plus, for `__call__` and `run`, the results already written into the output list; `Map.iter` drops results once they are yielded.
 
 ### 2.4 Error policy
 
@@ -222,6 +260,7 @@ The message points to `jax.vmap` or `jax.lax.map`.
 
 `Prefetch(op, depth=2, executor="thread")` returns a lazy iterator that runs `op` on up to `depth` items ahead of the consumer, in input order.
 It is `Map.iter(items, ordered=True)` with $W$ set to `depth`, given its own name because the intent differs: overlap reading with computing, not parallelise the work.
+`depth` therefore bounds items that are running, queued, or finished and not yet consumed (section 2.3): a slow scene at the head cannot make `Prefetch` read further ahead.
 
 ```python
 # Shapes: K kept items; d = 4 read-ahead
@@ -237,7 +276,7 @@ read_and_screen = ahead | screen_each
 summaries = read_and_screen(kept)
 ```
 
-`Map` pulls its input lazily (section 2.3), so at most 4 scenes are read and not yet screened.
+`Map` pulls its input lazily and counts buffered results against the window (section 2.3), so at most 4 scenes are read and not yet screened, even when one scene is slow.
 
 ### 2.11 The presets
 
