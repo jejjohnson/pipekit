@@ -30,14 +30,18 @@ unify them.
 
 ---
 
-## `Diff(reference: Array, atol: float = 1e-6, rtol: float = 0.0, on_fail: str = "raise")`
+## `AssertClose(reference: Array, atol: float = 1e-6, rtol: float = 0.0, on_fail: str = "raise")`
+
+Renamed from `Diff` by ADR A21: `Diff` is the operator twin of the
+dim-level `diff` ([dim_functions.md](dim_functions.md)), and
+`AssertClose` matches its `Assert*` siblings. Neither ships yet.
 
 Compare the input to a stored reference array; raise (or warn) if
 the per-element absolute difference exceeds `atol + rtol * |reference|`.
 
 ```python
 gold = np.load("reference_output.npy")
-checked = Diff(gold, atol=1e-5)
+checked = AssertClose(gold, atol=1e-5)
 out = pipe | checked  # raises if pipe(x) drifts from gold
 ```
 
@@ -221,7 +225,7 @@ QCError: AssertNoNaN: 47 NaN values found (4.6% of 1024).
 QCError: AssertValidFraction: only 0.32 of values are valid;
   required >= 0.50.
 
-QCError: Diff: 3 elements exceed atol=1e-06.
+QCError: AssertClose: 3 elements exceed atol=1e-06.
   Max abs diff: 2.3e-04. Reference: refs/output_v3.npy
 ```
 

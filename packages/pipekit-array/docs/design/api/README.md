@@ -20,8 +20,8 @@ mirrors `pipekit-ops` core where it makes sense
 | `geom`             | `Subsample`             | Stride-decimate along given axes.                             |
 | `observe`          | `Histogram`             | Controller; `.at(key)` captures per-tap distributions.        |
 | `reductions`       | `MeanScalar`            | `xp.mean` reduction; optional `axis`.                         |
-| `parallel`         | `BatchedMap`            | Split along axis 0 into chunks, apply `inner`, concatenate.   |
-| `qc`               | `Diff`                  | Compare to a stored reference; raise on numeric drift.        |
+| `parallel`         | `BatchAlong`            | Split along a dim into chunks, apply `inner`, concatenate (A19). |
+| `qc`               | `AssertClose`           | Compare to a stored reference; raise on numeric drift (A21).  |
 | `qc`               | `AssertValueRange`      | Pass-through; raise/warn on out-of-range.                     |
 | `qc`               | `AssertNoNaN`           | Pass-through; raise on any NaN.                               |
 | `qc`               | `AssertValidFraction`   | Pass-through; raise if `< min_valid` non-NaN fraction.        |
@@ -46,8 +46,14 @@ Each is a function in `dims` and, where it serialises, an operator in
 | `stack`      | `StackAlong(dim=)` | a new leading dim                                |
 | `concat`     | `ConcatenateAlong(dim=)` | join along an existing dim                 |
 | `combine`    | `Combine`   | element-wise function of same-dim carriers (`forbid_in_yaml`) |
+| `rename`     | `Rename`    | new dim names; labels follow (`dim_shapes`)             |
+| `expand_dims`| `ExpandDims`| insert length-1 dims                                    |
+| `squeeze`    | `Squeeze`   | drop named length-1 dims                                |
+| `broadcast_like` | `BroadcastLike` | add another carrier's missing dims, in front    |
+| `merge_dims` | `MergeDims` | `y x` into `pixel`, placed last; tuple labels          |
+| `split_dims` | `SplitDims` | `pixel` back into `y x`; tuple labels split back        |
 
-The missing ones (`rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims`, `pad`, `roll`, `shift`, `diff`, `cumreduce`, `where`, `window`, `coarsen`, `quantile`, `dot`) are proposed in **[dim_functions.md](dim_functions.md)**, with an xarray parity table.
+The first six of **[dim_functions.md](dim_functions.md)** ship today (phase 1, in `dim_shapes`); the rest (`pad`, `roll`, `shift`, `diff`, `cumreduce`, `where`, `window`, `coarsen`, `quantile`, `dot`) are proposed there, with an xarray parity table.
 
 An adapter may override any of them with a method of the same name
 (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one
@@ -56,7 +62,7 @@ An adapter may override any of them with a method of the same name
 ## Reading order
 
 1. **[operators.md](operators.md)** — the data-flow operators (the
-   combinators, the reducer, the array-shaped `BatchedMap`, the
+   combinators, the reducer, the carrier-shaped `BatchAlong`, the
    `Histogram` controller, `Subsample`). The "what does the
    pipeline do" surface.
 2. **[qc.md](qc.md)** — the numeric QC family. The "what does the

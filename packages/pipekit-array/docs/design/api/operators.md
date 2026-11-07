@@ -6,7 +6,7 @@ version: 0.1.0
 # Operators — data flow
 
 The seven operators that move arrays through a pipeline:
-combinators, the reducer, the array-shaped `BatchedMap`, the
+combinators, the reducer, the carrier-shaped `BatchAlong`, the
 `Histogram` controller, and the `Subsample` geometry op.
 
 ## `ApplyToBands(inner: Operator, axis: int = 0)`
@@ -220,43 +220,51 @@ dtype=sig.dtype)`.
 
 ---
 
-## `BatchedMap(inner: Operator, batch_size: int = 8, axis: int = 0)`
+## `BatchAlong(inner: Operator, size: int, dim: str, pad: str = "none")`
 
-Split the input array along `axis` into chunks of `batch_size`,
-apply `inner` to each chunk, concatenate the results along `axis`.
-The array-shaped analogue of `pipekit_ops.parallel.BatchedMap` (which
-takes an iterable). See ADR A5 for the boundary.
+Renamed from the planned array-shaped `BatchedMap(inner, batch_size, axis)`
+by ADR A19, which supersedes A5: `pipekit_ops.parallel.BatchedMap` takes
+an iterable and calls `inner` on lists, so one name for both would fail
+in confusing ways when both are imported. Not shipped yet (phase 3 of
+[dim_functions.md](dim_functions.md)).
+
+Split the input carrier along the named `dim` into chunks of `size`,
+apply `inner` to each chunk, concatenate the results along `dim`.
+The carrier-shaped analogue of `pipekit_ops.parallel.BatchedMap` (which
+takes an iterable).
 
 ```python
-out = BatchedMap(model_op, batch_size=32)(x)  # x.shape = (N, ...)
+out = BatchAlong(model_op, size=32, dim="sample")(x)  # x has N samples
 ```
 
 **Contract:**
 
-- `_apply(x)`: compute `n = x.shape[axis]`; for each chunk
-  `start, end` in `range(0, n, batch_size)`:
-  `chunks.append(inner(xp.take(x, range(start, end), axis=axis)))`.
-  Return `xp.concat(chunks, axis=axis)` (the [Array API standard][api-concat]
-  name; see `ConcatenateAlong` above).
-- `inner` must return arrays of the same shape minus the split-axis
-  size (i.e. `inner` may change axis-0 length per chunk only via
-  the chunk slice; `concatenate` re-aligns).
-- For inputs where `x.shape[axis] <= batch_size`, this is a single
-  `inner(x)` call (no overhead).
+- `_apply(x)`: compute `n`, the length of `dim`; for each chunk
+  `start, end` in `range(0, n, size)`:
+  `chunks.append(inner(isel(x, **{dim: slice(start, end)})))`.
+  Return `concat(chunks, dim)`.
+- `inner` must return carriers with the same dims, `dim` included;
+  `concat` re-aligns the chunks.
+- For inputs where `n <= size`, this is a single `inner(x)` call (no
+  overhead).
+- `pad` takes ADR A10's policy strings: `"none"` leaves the last chunk
+  short; `"last"` pads it with copies of its last item so `jit`
+  compiles once, and drops the padding from the output.
 
 **`get_config()`:**
 
 ```python
 {
     "inner": {"class": type(self.inner).__name__, "config": self.inner.get_config()},
-    "batch_size": self.batch_size,
-    "axis": self.axis,
+    "size": self.size,
+    "dim": self.dim,
+    "pad": self.pad,
 }
 ```
 
 **`compute_output_signature(sig)`** : delegates to `inner` on a
-single-chunk signature; if `inner` preserves the split axis, the
-output signature matches `inner`'s with the original `axis` size.
+single-chunk signature; if `inner` keeps `dim`, the output signature
+matches `inner`'s with the original length of `dim`.
 
 **Use case:** running a GPU-bound `ModelOp` on a large array that
 doesn't fit in device memory. The split / apply / concatenate is the
