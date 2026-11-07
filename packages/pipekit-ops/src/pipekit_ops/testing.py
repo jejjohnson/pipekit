@@ -20,7 +20,7 @@ Example::
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from types import ModuleType
 from typing import Any
 
@@ -48,7 +48,9 @@ def assert_round_trip(op: Operator, *inputs: Any, **kwargs: Any) -> Operator:
        bytes, so ``NaN`` equals ``NaN`` but ``-0.0`` differs from
        ``0.0``; floats compare exactly (``NaN`` equal to ``NaN``);
        dicts (whatever their key order, as with ``==``), lists and
-       tuples are compared item by item; any other value with ``==``.
+       tuples are compared item by item; an iterator, such as `Prefetch`
+       returns, is consumed and compared as a list; any other value with
+       ``==``.
        Array outputs need NumPy installed.
 
     Both operators receive the same input objects: an operator that
@@ -165,6 +167,10 @@ def _assert_same(actual: Any, expected: Any, where: str) -> None:
         )
         for key in expected:
             _assert_same(actual[key], expected[key], f"{where}[{key!r}]")
+        return
+    if isinstance(expected, Iterator):
+        # a lazy output (`Prefetch`, `Map.iter`) is compared by its items
+        _assert_same(list(actual), list(expected), where)
         return
     if isinstance(expected, (list, tuple)):
         _require(

@@ -49,12 +49,12 @@ Today only `Lambda` reshapes them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Map(op, executor="serial", …)` | `Iterable → list`; `None` | `op` on every item; the execution engine, see [execution.md](execution.md) | proposed (P2) |
+| `Map(op, executor="serial", …)` | `Iterable → list`; `None` | `op` on every item; the execution engine, see [execution.md](execution.md) | today (`execution.py`) |
 | `Filter(pred)` | `Iterable → list`; `None` | keep items where `pred(item)` is truthy | today (`seq.py`) |
 | `Not(pred)` | `Any → bool`; `None` | `not pred(x)`; the operator form of `complement` | today (`seq.py`) |
 | `Remove(pred)` | `Iterable → list`; `None` | drop items where `pred(item)` is truthy (toolz `remove`) | today (`seq.py`) |
 | `Reduce(op, initial=MISSING)` | `Iterable → Any`; `None` | left fold, `op(acc, item)`; empty input with no `initial` raises `TypeError` like `functools.reduce` | today (`seq.py`) |
-| `Fold(op, initial, chunksize=128, combine=None, executor="scope")` | `Iterable → Any`; `None` | associative tree fold over chunks, parallel through `Map` (toolz `sandbox.fold`) | proposed (P2) |
+| `Fold(op, initial, chunksize=128, combine=None, executor="scope")` | `Iterable → Any`; `None` | associative tree fold over chunks, parallel through `Map` (toolz `sandbox.fold`) | today (`execution.py`) |
 | `PartitionAll(n)` | `Iterable → list[tuple]`; `None` | consecutive tuples of length `n`, the last may be shorter; replaces the planned `Chunk` | today (`seq.py`) |
 | `Concat()` | `Iterable[Iterable] → list`; `None` | flatten one level (toolz `concat`); replaces the planned `Flatten` | today (`seq.py`) |
 | `Zip(strict=True)` | `*Iterable → list[tuple]`; `None` | builtin `zip`, strict by default | today (`seq.py`) |
@@ -79,10 +79,10 @@ Today only `Lambda` reshapes them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Map(op, executor, n_workers, max_in_flight, ordered, on_error, chunksize, start_method, progress)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor` | proposed (P2) |
-| `Map.iter(items)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points | proposed (P2) |
-| `Prefetch(op, depth=2, executor="thread")` | `Iterable → Iterator`; `None` | read `depth` items ahead of the consumer, in input order | proposed (P2) |
-| `executor_scope(executor)` | context manager | sets the executor that `Map(executor="scope")` uses (serial when none is set); not stored in any config | proposed (P2) |
+| `Map(op, executor, n_workers, max_in_flight, ordered, on_error, chunksize, start_method, progress)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor`; `progress` is P5 | today (`execution.py`), without `progress` |
+| `Map.iter(items)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points | today (`execution.py`) |
+| `Prefetch(op, depth=2, executor="thread")` | `Iterable → Iterator`; `None` | read `depth` items ahead of the consumer, in input order | today (`execution.py`) |
+| `executor_scope(executor)` | context manager | sets the executor that `Map(executor="scope")` uses (serial when none is set); not stored in any config | today (`execution.py`) |
 | `ThreadMap(op, n_workers=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="thread", …)`; config and hash unchanged | changed (P2) |
 | `ProcessMap(op, n_workers=8, on_error="raise")` | `Iterable → list`; `None` | preset: `Map(op, executor="process", …)`; fails fast on `"raise"` | changed (P2) |
 | `AsyncMap(op, semaphore=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="async", max_in_flight=semaphore)` | changed (P2) |

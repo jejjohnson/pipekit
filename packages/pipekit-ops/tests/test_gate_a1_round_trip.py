@@ -32,6 +32,7 @@ from pipekit_ops import (
     Dissoc,
     Fanout,
     Filter,
+    Fold,
     Get,
     GetIn,
     Graph,
@@ -39,12 +40,14 @@ from pipekit_ops import (
     Identity,
     Input,
     Lambda,
+    Map,
     Memoize,
     Merge,
     Not,
     Operator,
     PartitionAll,
     Pick,
+    Prefetch,
     ProcessMap,
     Reduce,
     Remove,
@@ -74,7 +77,7 @@ class _Scale(Operator):
 
 
 class _AddPair(Operator):
-    """Sum an ``(acc, item)`` pair: the fold for `Reduce`."""
+    """``(acc, item) -> acc + item``: the binary step `Reduce` and `Fold` need."""
 
     def _apply(self, pair: tuple[float, float]) -> float:
         acc, item = pair
@@ -134,14 +137,26 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...], dict[str, Any]]]
     "Filter": (lambda: Filter(Get("ok")), ([{"ok": True}, {"ok": False}],), {}),
     "Get": (lambda: Get(("a", "z"), default=None), ({"a": 1},), {}),
     "GetIn": (lambda: GetIn(("p", "c")), ({"p": {"c": 3.0}},), {}),
+    "Fold": (
+        lambda: Fold(_AddPair(), 0.0, chunksize=2, executor="thread"),
+        ([1.0, 2.0, 3.0],),
+        {},
+    ),
     "Graph": (_two_input_graph, (), {"a": 1.0, "b": 2.0}),
     "GroupBy": (lambda: GroupBy(("t",)), ([{"t": "A"}, {"t": "B"}],), {}),
     "Identity": (Identity, (3.0,), {}),
+    "Map": (
+        lambda: Map(_Scale(2.0), executor="thread", max_in_flight=2),
+        ([1.0, 2.0, 3.0],),
+        {},
+    ),
     "Memoize": (lambda: Memoize(_Scale(2.0)), (3.0,), {}),
     "Merge": (Merge, ({"a": 1}, {"a": 2, "b": 3}), {}),
     "Not": (lambda: Not(Get("ok")), ({"ok": False},), {}),
     "PartitionAll": (lambda: PartitionAll(2), ([1, 2, 3],), {}),
     "Pick": (lambda: Pick(("b",)), ({"a": 1, "b": 2},), {}),
+    # the output is a lazy iterator; `assert_round_trip` compares its items
+    "Prefetch": (lambda: Prefetch(_Scale(2.0), depth=2), ([1.0, 2.0],), {}),
     # `Const` is importable in a worker process whatever the start method.
     "ProcessMap": (lambda: ProcessMap(Const(7), n_workers=2), ([1, 2],), {}),
     "Reduce": (lambda: Reduce(_AddPair(), initial=0.5), ([1.0, 2.0],), {}),

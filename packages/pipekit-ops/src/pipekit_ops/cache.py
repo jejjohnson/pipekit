@@ -96,6 +96,20 @@ class Cache(Operator):
         with self._lock:
             self._store.clear()
 
+    def __getstate__(self) -> dict[str, Any]:
+        # A lock does not pickle; a copy sent to a process pool starts empty,
+        # with fresh counters and its own lock (decision O10).
+        state = dict(vars(self))
+        del state["_lock"]
+        state["_store"] = {}
+        state["hits"] = 0
+        state["misses"] = 0
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        vars(self).update(state)
+        self._lock = threading.Lock()
+
     def get_config(self) -> dict[str, Any]:
         return {"inner": nested_config(self.inner)}
 

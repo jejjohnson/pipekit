@@ -24,6 +24,9 @@ The v0.1 public surface, grouped by module:
 - **Group I — shape inference** (`signature`): `Signature`.
 - **Group J — parallelism** (`parallel`): `ThreadMap`, `ProcessMap`,
   `AsyncMap`, `BatchedMap`, `check_pickleable`.
+- **Execution** (`execution`): `Map`, `executor_scope`, `MapError`,
+  `Failed`, `Prefetch`, `Fold` — one engine over serial, thread, process,
+  async and any borrowed `concurrent.futures.Executor`.
 - *(Group K is reserved in the master plan for a disk-cache backend;
   nothing ships under it yet.)*
 - **Group L — serialisation** (`serial`): `dumps`, `loads`,
@@ -87,6 +90,14 @@ from pipekit_ops.dicts import (
     Rename,
     UpdateIn,
     ValMap,
+)
+from pipekit_ops.execution import (
+    Failed,
+    Fold,
+    Map,
+    MapError,
+    Prefetch,
+    executor_scope,
 )
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
@@ -156,9 +167,11 @@ __all__ = [
     "Count",
     "CountBy",
     "Dissoc",
+    "Failed",
     "Fanout",
     "Filter",
     "FittableTransformer",
+    "Fold",
     "Get",
     "GetIn",
     "Graph",
@@ -168,6 +181,8 @@ __all__ = [
     "Input",
     "LabelledAdapter",
     "Lambda",
+    "Map",
+    "MapError",
     "Memoize",
     "Merge",
     "MissingAdapterError",
@@ -178,6 +193,7 @@ __all__ = [
     "PartitionAll",
     "Pick",
     "Predictor",
+    "Prefetch",
     "ProcessMap",
     "Profile",
     "QCError",
@@ -211,6 +227,7 @@ __all__ = [
     "compose_left",
     "compute_output_signature",
     "dumps",
+    "executor_scope",
     "from_state_sandboxed",
     "get_adapter",
     "juxt",

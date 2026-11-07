@@ -4,7 +4,7 @@
 when to reach for it, and what it does today.*
 
 The core is pure Python with no dependencies. Its public surface is about
-seventy names in fifteen modules, one module per job, so you can learn it a
+seventy-five names in sixteen modules, one module per job, so you can learn it a
 group at a time. For why it is shaped this way (operators as classes, the
 carrier left open), read the [background](background/toolz.md); for the
 shapes real pipelines take, read [Patterns](patterns.md).
@@ -27,6 +27,7 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Quality control | `qc` | `Quarantine`, `AssertShape`, `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `QCError` | a guard that fails loudly, or sets bad inputs aside |
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
 | Parallelism | `parallel` | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable` | many items, one operator |
+| Execution | `execution` | `Map`, `executor_scope`, `MapError`, `Failed`, `Prefetch`, `Fold` | many items, one operator, on any executor, with a bounded window |
 | Serialisation | `serial` | `dumps`, `loads`, `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`, `allowed` | configuration as data; untrusted pipelines |
 | Hashing | `hashing` | `pipeline_hash` | one key for "the same pipeline again": a registry, a cache, an orchestrator task |
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
@@ -378,6 +379,41 @@ scripts. Inside a running loop (a FastAPI or LitServe handler) it raises a
 async def handler(items):
     return await AsyncMap(Scale(2.0)).run(items)  # → [2.0, 4.0] for [1, 2]
 ```
+
+### `Map`
+
+`Map(op, executor=...)` is the one engine behind the four wrappers' shapes:
+`executor` is `"serial"`, `"thread"`, `"process"` (spawn by default),
+`"async"`, or `"scope"`, which borrows whatever `concurrent.futures.Executor`
+an `executor_scope` binds (a dask or Ray executor included) and never shuts it
+down. The executor is not in the config, so the pipeline hashes the same
+wherever it runs. Input is pulled lazily and at most `max_in_flight` items are
+held at once; `on_error` is `"raise"` (fail fast, cancel what has not
+started), `"collect"` (raise a `MapError` with the partial results) or
+`"log_and_continue"`. Process pools and borrowed executors check that the
+operator pickles before any worker starts.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+from pipekit_ops import Identity, Map, MapError, Prefetch, executor_scope
+
+Map(Scale(2.0), executor="thread", n_workers=2)([1, 2, 3])  # → [2.0, 4.0, 6.0]
+try:
+    Map(Inverse(), on_error="collect")([1, 0, 2])
+except MapError as error:
+    error.results
+    # → [1.0, Failed(index=1, exception=ZeroDivisionError('division by zero')), 0.5]
+with executor_scope(ThreadPoolExecutor(max_workers=4)):
+    Map(Scale(2.0), executor="scope", max_in_flight=8)([1, 2])  # → [2.0, 4.0]
+list(Map(Scale(2.0), executor="thread").iter([1, 2]))  # → [2.0, 4.0], lazily
+(Prefetch(Scale(2.0), depth=4) | Map(Identity()))([1, 2, 3])  # → [2.0, 4.0, 6.0]
+```
+
+`Inverse` is an operator returning `1 / x`. `Prefetch(op, depth)` reads up
+to `depth` items ahead of the consumer, and `Fold(op, initial, chunksize)`
+folds chunks in parallel through `Map`. The details are in
+[the execution design](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/docs/design/api/execution.md).
 
 **Deliberately left out.** No automatic parallelism (`Sequential` is
 sequential; `Graph` evaluates in one process), no backend abstraction (the

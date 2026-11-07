@@ -60,6 +60,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.parallel
 
+## Execution
+
+::: pipekit_ops.execution
+
 ## Serialisation
 
 ::: pipekit_ops.serial
