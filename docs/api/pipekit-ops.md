@@ -64,6 +64,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.adapters
 
+## Import hooks
+
+::: pipekit_ops.imports
+
 ## Parallelism
 
 ::: pipekit_ops.parallel

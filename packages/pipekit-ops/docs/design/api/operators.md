@@ -6,11 +6,12 @@ version: 0.1.0
 # Operators
 
 The groups other than execution, in the order of [README.md](README.md).
-Each section says what is wrong today, what the operators do, and how the Sentinel-2 job uses them.
+Each section says what was wrong before this design (at `903b0c3`), what the operators do, and how the Sentinel-2 job uses them.
+Every operator on this page has shipped, in phases P1 to P5 of [../roadmap.md](../roadmap.md); where the build departed from the design, an "As built" note says so.
 
 ## 1. Dict plumbing
 
-### Today
+### Before this design
 
 `Graph` returns a dict of its outputs (`packages/pipekit-ops/src/pipekit_ops/_base/graph.py`), `Fanout` returns a dict of its branches (`packages/pipekit-ops/src/pipekit_ops/combine.py`), and STAC items are nested dicts.
 Every reshape is a `Lambda`, which is flagged `forbid_in_yaml` (`packages/pipekit-ops/src/pipekit_ops/blocks.py`), so one `Lambda(lambda d: d["id"])` stops the whole pipeline from round-tripping through `loads(dumps(...))`.
@@ -19,17 +20,18 @@ Every reshape is a `Lambda`, which is flagged `forbid_in_yaml` (`packages/pipeki
 
 | Operator | Input $x$ | Output | Missing key |
 |---|---|---|---|
-| `Get(key)` | mapping or sequence | `x[key]`; with a tuple `(k0, k1)`, the tuple `(x[k0], x[k1])` | `KeyError` / `IndexError`, or `default` if given |
-| `GetIn(keys)` | nested mappings | `x[k0][k1]…` | `KeyError`, or `default` if given |
+| `Get(key)` | mapping or sequence | `x[key]`; with a tuple `(k0, k1)`, the tuple `(x[k0], x[k1])` | `KeyError` / `IndexError`, or `default` if given (as built, `default` also catches `TypeError`, as toolz does) |
+| `GetIn(keys)` | nested mappings | `x[k0][k1]…` | `KeyError`, or `default` if given (as built, also for `IndexError` and `TypeError`) |
 | `Pick(keys)` | mapping | `{k: x[k] for k in keys}` in the order of `keys` | `KeyError` |
 | `Dissoc(keys)` | mapping | $x$ without `keys` | ignored, as toolz `dissoc` |
-| `Rename(mapping)` | mapping | keys renamed, order kept | ignored; a rename that collides with a kept key raises `ValueError` |
-| `Merge()` | $m \ge 1$ mappings, or one sequence of them | union; for a key in several inputs, the last wins | n/a |
+| `Rename(mapping)` | mapping | keys renamed, order kept | ignored; a rename that collides with a kept key raises `ValueError`; as built, old keys must be `str` (they are JSON keys in the config), and mapping two old keys to one new key is refused |
+| `Merge()` | $m \ge 1$ mappings, or one sequence of them | union; for a key in several inputs, the last wins; as built, `Merge()` with no inputs returns `{}`, like toolz | n/a |
 | `Assoc(key, op)` | mapping | a copy with `key: op(x)` | n/a |
-| `UpdateIn(keys, op)` | nested mappings | a copy with the value at the path replaced by `op(value)` | `KeyError` unless `default` is given, in which case `op(default)` is stored (toolz `update_in`) |
+| `UpdateIn(keys, op)` | nested mappings | a copy with the value at the path replaced by `op(value)` | `KeyError` unless `default` is given, in which case `op(default)` is stored and missing dicts along the path are created (toolz `update_in`) |
 | `ValMap(op)` | mapping | `{k: op(v)}` | n/a |
 
 Inputs are never mutated: every output that is a dict is a new dict; the values are not copied.
+`Dissoc` keeps the input's key order, which toolz can lose.
 A `Get` key that is not a `str`, `int` or tuple of them is refused at construction, so the config stays JSON.
 `Get` and `GetIn` take a sequence of keys in different ways on purpose: `Get(("a", "b"))` picks two keys, `GetIn(("a", "b"))` walks a path; this is toolz's split (`get` vs `get_in`).
 
@@ -46,11 +48,11 @@ import pipekit_ops as pk
 
 # Shapes: T ≤ 25 tiles
 
-# proposed (P1)
+# today (pipekit-ops)
 drop_pixels = pk.Dissoc(("scenes",))
-# proposed (P1)
+# today (pipekit-ops)
 shorter = pk.Rename({"n_found": "found", "n_kept": "kept"})
-# today
+# today (pipekit-ops)
 to_report = drop_pixels | shorter
 # dict of 4 → dict of 3
 report = to_report(summary)
@@ -58,10 +60,10 @@ report = to_report(summary)
 
 ## 2. Iterables
 
-### Today
+### Before this design
 
-Only the parallel maps take a list, and they all do the same thing: one operator per item.
-Filtering, grouping and counting are `Lambda`s, or Python outside the pipeline.
+Only the parallel maps took a list, and they all did the same thing: one operator per item.
+Filtering, grouping and counting were `Lambda`s, or Python outside the pipeline.
 
 ### Semantics
 
@@ -91,26 +93,29 @@ An operator written for `Reduce` reads `acc, item = pair`.
 ```python
 # Shapes: N ≈ 300 items; K kept; T ≤ 25 tiles
 
-# proposed (P1)
+# today (pipekit-ops)
 cloud_cover = pk.GetIn(("properties", "eo:cloud_cover"))
 # user
 is_clear = MaxCloud(40.0)
-# today
+# today (pipekit-ops)
 clear_enough = cloud_cover | is_clear
-# proposed (P1)
+# today (pipekit-ops)
 keep = pk.Filter(clear_enough)
 # (N items) → (K items)
 kept = keep(found)
 
-# proposed (P1)
+# today (pipekit-ops)
 tile_id = pk.GetIn(("properties", "s2:mgrs_tile"))
-# proposed (P1)
+# today (pipekit-ops)
 per_tile = pk.CountBy(tile_id)
 # (K items) → dict of ≤ T ints
 counts = per_tile(kept)
 ```
 
 ## 3. Flow
+
+The three operators below shipped in phase P3 (#215), in `packages/pipekit-ops/src/pipekit_ops/flow.py`.
+All three refuse a child whose `_apply` is `async def`, with a `TypeError` at construction (decision O15), and a bare `lambda` child with a `TypeError` that names `Lambda`.
 
 ### Timeout
 
@@ -122,6 +127,10 @@ It keeps running until `op` returns, and its result is dropped.
 That is acceptable for the case this exists for, a network read with no timeout of its own, and it is documented as such.
 To bound the damage, `Timeout` uses one small shared pool per process, and logs a warning when more than its `max_abandoned` (default 8) threads are still running.
 
+**As built**, `Timeout` starts a daemon thread per call instead of a shared pool, and runs it in a copy of the caller's context.
+A pool's workers are joined at interpreter exit, so one call that hangs for good would stop the process from exiting, and a bounded pool full of hung workers would make later calls time out without ever running.
+Abandoned calls are tracked process-wide, and the `max_abandoned` warning goes to the `pipekit_ops.flow` logger.
+
 Alternatives considered: `signal.alarm` works only in the main thread on POSIX, so it fails inside `Map(executor="thread")`; a process per call kills cleanly but costs a process start and pickling per item.
 A process-based timeout is possible later as `Timeout(op, seconds, isolate="process")`.
 
@@ -129,6 +138,8 @@ A process-based timeout is possible later as `Timeout(op, seconds, isolate="proc
 
 `RateLimit(op, calls, period)` allows at most `calls` starts of `op` in any window of `period` seconds.
 It is a sliding-window limiter: it keeps the start times of the last `calls` calls, and a new call waits until the oldest is more than `period` seconds old.
+As built, the window is half-open: a new call is admitted once the oldest start is at least `period` seconds old, because with a strict "more than" a fake clock spins forever on ties.
+A pickled or loaded `RateLimit` starts with fresh state, and a JAX tracer is refused.
 The state is shared by all threads in the process, behind a lock; the sleep happens outside the lock.
 
 The state does not cross processes.
@@ -144,17 +155,18 @@ Let $f$ be `op`.
 `Until(op, pred, max_iter, on_max="raise")` sets $x_0 = x$ and $x_{i+1} = f(x_i)$, and returns the first $x_i$ for which `pred(x_i)` is truthy, checking $x_0$ first.
 If $i$ reaches `max_iter` first, it raises `RuntimeError` (`on_max="raise"`) or returns $x_m$ (`on_max="return"`), where $m$ is `max_iter`.
 `max_iter` is required, so a pipeline cannot loop forever.
+As built, if `pred` holds on $x_m$, `Until` returns it instead of raising, and `max_iter=0` only checks the input.
 
 It is the stateless sibling of `pipekit_cycle.Recurrence(step_op, condition_op, max_iters)` (`packages/pipekit-cycle/src/pipekit_cycle/cycle.py`), which threads a carry state and lives in pipekit-cycle.
 In the running example, `Until(NextPage(), IsLastPage(), max_iter=50)` walks STAC search pages; toolz has no name for it (`iterate` is the infinite version).
 
 ## 4. Cache and store
 
-### Today
+### Before this design
 
-`Cache(inner)` keeps a private dict, keyed by `sha256(input key ‖ 0x00 ‖ stable_json(inner.get_config()))` (`packages/pipekit-ops/src/pipekit_ops/cache.py`).
-The module docstring says a disk backend lands in v0.2, and the master plan reserves Group K for it.
-Three problems besides the missing backend:
+`Cache(inner)` kept a private dict, keyed by `sha256(input key ‖ 0x00 ‖ stable_json(inner.get_config()))` (`packages/pipekit-ops/src/pipekit_ops/cache.py`).
+The module docstring said a disk backend lands in v0.2, and the master plan reserves Group K for it.
+Three problems besides the missing backend (all three fixed in P4, #216):
 
 - The cache holds a `threading.Lock`, so a pipeline with a `Cache` cannot go to a process pool, and `check_pickleable` does not say so.
 - An input without `tobytes` is keyed by `repr`, which for a STAC item dict is long and, for objects with a default `repr`, includes a memory address, so the key changes on every run.
@@ -163,6 +175,7 @@ Three problems besides the missing backend:
 ### Store
 
 ```python
+# today (pipekit-ops): store.py, runtime-checkable
 class Store(Protocol):
     def __contains__(self, key: str) -> bool: ...
     def load(self, key: str) -> Any: ...
@@ -170,6 +183,7 @@ class Store(Protocol):
 ```
 
 Keys are 64-character hex digests, so a store never has to sanitise them.
+As built, `DirectoryStore` refuses any other key, which also blocks path traversal.
 Two stores ship in core:
 
 | Store | Where | Concurrency |
@@ -178,19 +192,24 @@ Two stores ship in core:
 | `DirectoryStore(root, codec="pickle")` | `root/ab/abcdef….pkl`, two-level fan-out | writes go to a temporary file and are renamed into place, so readers never see a partial value; processes on one file system can share it; the last writer wins |
 
 `codec="pickle"` is the only codec in core; pickle loads run code, so a `DirectoryStore` is for directories the user controls, and the docs say so.
+As built, each save is `fsync`ed before the rename, and `DirectoryStore` writes a format marker, `root/pipekit-store.json` with version 1, and refuses a directory of another version (the P4 fallback in [../roadmap.md](../roadmap.md)).
+A `MemoryStore` pickles as a snapshot with a fresh lock.
 Carrier-specific stores (Zarr for xarray, COG for geoarrays, an object store) live in xrops and geoops and only implement the three methods.
 
 ### Cache, extended
 
 `Cache(inner, store=None, key=None)`:
 
-- `store=None` keeps today's behaviour exactly: a private `MemoryStore`, the same config `{"inner": …}` and the same `pipeline_hash`.
+- `store=None` keeps the earlier behaviour exactly: a private `MemoryStore`, the same config `{"inner": …}` and the same `pipeline_hash`.
 - `store="scenes"` names a store that `store_scope(scenes=...)` binds at run time; the name is in the config, the directory is not, for the same reason the executor is not (decision O5).
   An unbound name raises `LookupError` naming the store.
 - `key=op` computes the input key from `op(x)` instead of from `x`, so `Cache(read, key=Get("id"))` keys a scene by its STAC ID.
-- The config part of the key becomes `pipeline_hash(inner)`, which today equals `sha256(stable_json(inner.state))`: it covers nested operators and the inner class's module and name, which `get_config()` alone does not (two different classes with the same config collide today).
+- The config part of the key becomes `pipeline_hash(inner)`, which equals `sha256(stable_json(inner.state))`: it covers nested operators and the inner class's module and name, which `get_config()` alone does not (two different classes with the same config collided before).
   For in-memory caches this only changes keys inside one process, which nobody can observe.
+  As built, the key is `sha256(input key ‖ 0x00 ‖ pipeline_hash(inner))`, with `‖ 0x00 ‖ pipeline_hash(key)` appended when `key` is set, so `key=Get("id")` and `key=Get("name")` never share an entry either.
 - `__getstate__` drops the lock and the private entries, so a `Cache` pickles; `hits` and `misses` stay per process.
+- As built, `Cache.clear()` clears only a private store, never a shared named one, and `store` must be a `str`.
+  `Cache` does not yet refuse an async child (decision O15).
 
 ### Why no `Checkpoint`
 
@@ -204,13 +223,13 @@ A pass-through writer that persists without reading back is a `Sink`.
 ```python
 # Shapes: K kept items
 
-# proposed (P1)
+# today (pipekit-ops)
 scene_id = pk.Get("id")
-# proposed (P4)
+# today (pipekit-ops)
 cached = pk.Cache(retried, store="scenes", key=scene_id)
-# proposed (P4)
+# today (pipekit-ops)
 scratch = pk.DirectoryStore("/scratch/s2")
-# proposed (P4)
+# today (pipekit-ops)
 in_scratch = pk.store_scope(scenes=scratch)
 with in_scratch:
     # 1 item → 1 scene
@@ -221,11 +240,11 @@ After a crash, a rerun loads every scene already in `/scratch/s2` and reads only
 
 ## 5. Observe and QC
 
-### Today
+### Before this design
 
 `Tap`, `ShapeTrace`, `Quarantine` and `AssertCallable` hold closures and set `forbid_in_yaml` (`packages/pipekit-ops/src/pipekit_ops/observe.py`, `packages/pipekit-ops/src/pipekit_ops/qc.py`).
 They are right for notebooks and they block a production pipeline from round-tripping.
-`AssertShape` and `AssertDType` read `.shape` and `.dtype` with `getattr`; no check uses the named-dim `Signature` that the adapter registry already provides.
+`AssertShape` and `AssertDType` read `.shape` and `.dtype` with `getattr`; before P5, no check used the named-dim `Signature` that the adapter registry already provides.
 
 ### Log
 
@@ -233,11 +252,13 @@ They are right for notebooks and they block a production pipeline from round-tri
 The record's message is formatted with three fields: `{n}` (calls so far in this process), `{type}` (the input's class name) and `{signature}` (`signature_of(x).format()` when an adapter is registered, else `?`).
 Everything else is left to `logging`: handlers, levels, JSON formatters.
 `Log` is serialisable because it holds only strings.
+As built, a message that names any other field raises `ValueError` at construction, `Log` counts calls even when its logger is disabled for the level (it then writes nothing), and, like `Tap`, it warns once when it runs at trace time.
 
 ### Progress, through Map
 
 A progress bar needs to know $n$ and the count done so far; both live in `Map`, not in a pass-through step.
 `Map(…, progress=every)` logs `done`, `failed`, `in_flight`, `n` (when the input has a length) and items per second every `every` completed items, at INFO on `pipekit_ops.parallel`.
+As built, the count is of released items, the values are also attributes of the record (`done`, `failed`, `in_flight`, `n`, `rate`), and `progress` is left out of `Map`'s config when it is `None`, so existing hashes do not change.
 A standalone `Progress` operator is not added (decision O11).
 
 ### AssertThat and AssertSignature
@@ -248,6 +269,7 @@ A standalone `Progress` operator is not added (decision O11).
 `AssertSignature(pattern, dtype=None, missing="raise")` reads `signature_of(x)` and raises `QCError` unless `Signature.matches(pattern)` is true (`packages/pipekit-ops/src/pipekit_ops/signature.py`) and, if `dtype` is set, the signature's dtype equals it.
 If no adapter is registered for $x$, `missing="raise"` raises `QCError`, and `missing="skip"` passes $x$ through.
 Its `compute_output_signature` checks the input signature against the pattern at build time, so `Sequential.summary()` reports a mismatch before any data runs.
+As built, the mismatch is raised, which is how `compute_output_signature` errors already surface; an unknown or foreign signature passes through.
 It never reads the carrier itself, only the adapter, so it keeps rule 1 of [../vision.md](../vision.md).
 
 ### Running example
@@ -259,14 +281,14 @@ It never reads the carrier itself, only the adapter, so it keeps rule 1 of [../v
 valid = ValidFraction()
 # user
 at_least_half = AtLeast(0.5)
-# today
+# today (pipekit-ops)
 mostly_valid = valid | at_least_half
-# today
+# today (pipekit-ops)
 check_valid = pk.AssertThat(mostly_valid, message="under 50 % valid pixels")
-# today
+# today (pipekit-ops)
 check_dims = pk.AssertSignature("band y x", dtype="uint16")
-# today
+# today (pipekit-ops)
 note = pk.Log("read {n}: {signature}", level="DEBUG")
-# today
+# today (pipekit-ops)
 screen = check_dims | check_valid | note
 ```

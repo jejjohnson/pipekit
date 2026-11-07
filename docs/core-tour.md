@@ -3,19 +3,17 @@
 *Everything in `pipekit-ops` (import `pipekit_ops`), group by group: what it is,
 when to reach for it, and what it does today.*
 
-The core is pure Python with no dependencies. Its public surface is about
-eighty-five names in eighteen modules, one module per job, so you can learn it a
-group at a time. For why it is shaped this way (operators as classes, the
-carrier left open), read the [background](background/toolz.md); for the
-shapes real pipelines take, read [Patterns](patterns.md).
+The core is pure Python with no dependencies.
+Its public surface is the 105 names of `pipekit_ops.__all__`, from 21 modules, one module per job, so you can learn it a group at a time.
+For why it is shaped this way (operators as classes, the carrier left open), read the [background](background/toolz.md); for the shapes real pipelines take, read [Patterns](patterns.md).
 
-Every output on this page is from a real run of pipekit 0.0.2.
+Every output on this page is from a real run of pipekit-ops 0.2.1.
 
 ## The map
 
 | Group | Module | Names | Reach for it when |
 |---|---|---|---|
-| Foundations | `_base/` | `Operator`, `ConfigMixin`, `Sequential`, `Graph`, `Input`, `Node` | always: writing a step, chaining steps, wiring a graph |
+| Foundations | `_base/` | `Operator`, `ConfigMixin`, `Carrier`, `Sequential`, `Graph`, `Input`, `Node` | always: writing a step, chaining steps, wiring a graph |
 | Composition | `compose` | `pipe`, `compose`, `compose_left`, `juxt`, `complement` | you think in `toolz` |
 | Building blocks | `blocks` | `Identity`, `Const`, `Lambda`, `Sink` | a no-op, a constant, a quick function, a write |
 | Control flow | `control` | `Branch`, `Switch`, `Try`, `Coalesce`, `Retry` | a decision or a failure inside the pipeline |
@@ -30,10 +28,14 @@ Every output on this page is from a real run of pipekit 0.0.2.
 | Shape inference | `signature` | `Signature`, `compute_output_signature` | catching a shape mismatch before running |
 | Parallelism | `parallel` | `ThreadMap`, `ProcessMap`, `AsyncMap`, `BatchedMap`, `check_pickleable` | many items, one operator |
 | Execution | `execution` | `Map`, `executor_scope`, `MapError`, `Failed`, `Prefetch`, `Fold` | many items, one operator, on any executor, with a bounded window |
-| Serialisation | `serial` | `dumps`, `loads`, `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`, `allowed` | configuration as data; untrusted pipelines |
+| Serialisation | `serial` | `dumps`, `loads`, `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`, `allowed`, `upgrade_state` | configuration as data; untrusted pipelines |
 | Hashing | `hashing` | `pipeline_hash` | one key for "the same pipeline again": a registry, a cache, an orchestrator task |
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
+| Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
+| Import hooks | `imports` | `on_import` | running code once a module is imported, without importing it (JAX pytree registration) |
+
+`pipekit_ops.testing` (`assert_round_trip`) is the 22nd module; it is imported on its own and adds nothing to `__all__`.
 
 The sister packages build on this core: time stepping and data assimilation
 in `pipekit-cycle`, training in `pipekit-train`, the model registry in
@@ -269,11 +271,8 @@ Fanout({"n": Lambda(len), "u": Lambda(str.upper)})("ab")  # → {'n': 2, 'u': 'A
 
 ## Caching
 
-`Cache(inner)` (alias `Memoize`) memoises an operator in memory, keyed by a
-SHA-256 of the input and the inner operator's configuration. Arrays are keyed
-by their bytes, dtype and shape, so two large arrays never collide, and the
-bookkeeping is thread-safe, so one `Cache` can be shared by `ThreadMap`
-workers.
+`Cache(inner)` (alias `Memoize`) memoises an operator in memory, keyed by a SHA-256 of the input and the inner operator's `pipeline_hash`, so two operator classes with equal configs never share an entry.
+Arrays are keyed by their bytes, dtype and shape, so two large arrays never collide, and the bookkeeping is thread-safe, so one `Cache` can be shared by `ThreadMap` workers.
 
 ```python
 from pipekit_ops import Cache, Memoize
@@ -472,12 +471,10 @@ to `depth` items ahead of the consumer, and `Fold(op, initial, chunksize)`
 folds chunks in parallel through `Map`. The details are in
 [the execution design](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/docs/design/api/execution.md).
 
-**Deliberately left out.** No automatic parallelism (`Sequential` is
-sequential; `Graph` evaluates in one process), no backend abstraction (the
-wrappers are `concurrent.futures` and `asyncio`), no fault tolerance beyond
-`on_error="log_and_continue"`, and no distributed execution: Dask, Ray, Beam
-and orchestrators schedule pipekit operators; pipekit keeps them pickleable so
-they can.
+**Deliberately left out.**
+There is no automatic parallelism: `Sequential` is sequential, and `Graph` evaluates in one process.
+There is no graph scheduler either.
+`Map(executor="scope")` can send the items of one step to a Dask or Ray executor, but scheduling whole pipelines across machines is left to Dask, Ray, Beam and orchestrators; pipekit keeps operators pickleable so they can.
 
 ## Serialisation
 

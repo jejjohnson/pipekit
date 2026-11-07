@@ -7,11 +7,13 @@ version: 0.1.0
 
 One operator, `Map`, runs another operator over many items.
 Where the work happens is an argument: in the calling thread, on threads, on processes, on an event loop, or on any object that implements the stdlib `concurrent.futures.Executor` protocol.
-The four wrappers that ship today become presets of it.
+The four wrappers that shipped before it are now presets of it.
+`Map`, `executor_scope`, `Prefetch` and `Fold` shipped in #210 (phase P2), the presets were rebuilt on `Map` in #211, and `progress` came with P5 (#217).
+Where the build departed from this page, an "As built" note says what was built and why; [../decisions.md](../decisions.md) collects them.
 
-## 1. Today
+## 1. Before this design
 
-`packages/pipekit-ops/src/pipekit_ops/parallel.py` ships four classes.
+At `903b0c3`, `packages/pipekit-ops/src/pipekit_ops/parallel.py` shipped four classes, described here as they were then.
 Each takes an iterable, calls `list(iterable)` first, and returns a list in input order.
 
 | Class | Engine | Error behaviour, measured on `903b0c3` |
@@ -37,12 +39,14 @@ Five gaps follow from that code.
    A wrapper whose child has an `async def _apply` calls the child and gets a coroutine back.
    `Retry(AsyncFetch(), attempts=3, …)(x)` returns an un-awaited coroutine, so nothing runs and nothing is retried; `AsyncMap` around that `Retry` returns a list of coroutines (checked on `903b0c3`).
 
+P2 closed gaps 1 to 4 (the store half of gap 4 came with P4), and P3 closed gap 5 for `Retry`, `Timeout`, `RateLimit` and `Until` only (section 2.8).
+
 ## 2. The recommended design
 
 ### 2.1 One engine
 
 ```python
-# proposed (P2)
+# today (pipekit-ops): the signature as shipped; bodies elided
 class Map(Operator):
     def __init__(
         self,
@@ -82,9 +86,9 @@ import pipekit_ops as pk
 # Shapes: K kept items
 
 pool = ThreadPoolExecutor(max_workers=8)
-# proposed (P2)
+# today (pipekit-ops)
 reader = pk.Map(checked, executor="scope", max_in_flight=16)
-# proposed (P2)
+# today (pipekit-ops)
 on_threads = pk.executor_scope(pool)
 with on_threads:
     # (K items) → (K scenes)
@@ -102,6 +106,7 @@ The protocol `Map` relies on is the stdlib one: `submit(fn, *args) -> Future`, p
 - `Map.__call__` and `Map.run` always return a list in input order.
   Results are written into slot $i$ of a list of length $n$ as they complete, where $n$ is the number of items consumed and $i$ the item's position.
 - `Map.iter(items, ordered=True)` yields results lazily in input order; with `ordered=False` it yields `(i, result)` pairs in completion order.
+  As built, `ordered` is an argument of `Map.iter`, not of the constructor, so it does not enter the config or the hash.
   In the ordered iterator, a finished result that waits behind a slower item still counts against the window of section 2.3, so a slow item at the head stops new items from being pulled.
 
 ### 2.3 Backpressure: a window of in-flight tasks
@@ -129,7 +134,7 @@ It runs its own loop over `submit` and `wait(FIRST_COMPLETED)`.
 ```python
 # Shapes: n items; W = max_in_flight
 
-# proposed (P2): the core loop of Map._apply, sketched
+# today* (pipekit-ops): the core loop, sketched; as built it is Map._drive
 pending: dict[Future, int] = {}
 for i, item in enumerate(items):
     # block until fewer than W tasks are in flight
@@ -147,7 +152,7 @@ The ordered iterator counts its buffer in the same window, and pulls a new item 
 ```python
 # Shapes: n items; W = max_in_flight; held = pending + buffered ≤ W
 
-# proposed (P2): the core loop of Map.iter(ordered=True), sketched
+# today* (pipekit-ops): the ordered loop, sketched; as built it is Map._drive
 pending: dict[Future, int] = {}
 # finished results waiting for an earlier item, by index
 buffered: dict[int, Any] = {}
@@ -179,11 +184,15 @@ Peak memory is then bounded by $W$ inputs and $W$ outputs held, plus, for `__cal
 |---|---|---|
 | `"raise"` (default) | fail fast: on the first failure, stop pulling items, cancel every pending future, and re-raise | the exception, with a note `"Map: item i failed"` added through `BaseException.add_note` |
 | `"collect"` | run every item, then raise if any failed | `MapError`, a subclass of `ExceptionGroup`, with one exception per failed item (each noted with its index) and the partial results on `MapError.results`, where a failed slot holds a `Failed(index, exception)` record |
-| `"log_and_continue"` | log each failure as a warning on the `pipekit_ops.parallel` logger, with the traceback | a list with `None` in each failed slot, exactly as `ProcessMap` does today |
+| `"log_and_continue"` | log each failure as a warning on the `pipekit_ops.parallel` logger, with the traceback | a list with `None` in each failed slot, exactly as `ProcessMap` did before |
 
-Fail fast changes what `ProcessMap(on_error="raise")` does: today it waits for every queued item; under `Map` it cancels what has not started.
+Fail fast changed what `ProcessMap(on_error="raise")` does: before P2 it waited for every queued item; on `Map` it cancels what has not started.
 Results stay the same; only the wall time drops.
 `"raise"` re-raises the first failure *observed*, which on a pool may not be the first in input order; the note names the index.
+That also changed `ThreadMap`, which used to re-raise the first failure in input order.
+
+As built, the presets keep the note `"Map: item i failed"`, and only the log line names the preset (`ProcessMap: item i failed …`); for `BatchedMap`, `i` is the batch index.
+`ProcessMap` also accepts `on_error="collect"` now, inherited from `Map`.
 
 `KeyboardInterrupt` and `SystemExit` are never collected or logged: they cancel the window and propagate, whatever `on_error` says.
 
@@ -218,6 +227,7 @@ For an owned process pool, `op` is pickled once per worker, through the pool's `
 
 **Start method.**
 `Map(executor="process")` uses `start_method="spawn"` unless told otherwise.
+As built, the `ProcessMap` preset does not: it keeps the platform's start method, as the P2 fallback in [../roadmap.md](../roadmap.md) allows, and raises a `FutureWarning` at construction when that default is not spawn (so on Linux every `ProcessMap` warns).
 `fork` copies the parent's threads' locks in whatever state they hold, which deadlocks after JAX, a BLAS library or a `ThreadPoolExecutor` has started threads.
 The interpreter default differs by platform (fork on Linux up to 3.13, spawn on macOS and Windows), and Python 3.14 moves Linux to forkserver.
 Pinning spawn gives the same behaviour everywhere and makes a pickling bug fail on a Linux laptop the way it would on a Mac.
@@ -227,6 +237,8 @@ It has two costs: the script needs an `if __name__ == "__main__":` guard, and ea
 **Scopes cross into workers.**
 Thread tasks run inside `contextvars.copy_context().run`, so `executor_scope` and `store_scope` (see [operators.md](operators.md)) are visible in worker threads.
 Process and remote tasks carry the resolved stores with them, pickled; a `DirectoryStore` pickles as its path.
+As built (P4), owned process pools receive the stores through the pool's initializer, and borrowed executors that are not thread pools receive them with each task.
+A bound store that does not pickle is refused, by name, with a `TypeError` before any worker starts.
 
 **No nested pools by default.**
 Inside a `Map` task the executor scope is reset to serial.
@@ -235,15 +247,19 @@ An inner `Map` that names its own executor still gets it.
 
 ### 2.8 Async
 
-- `Map(executor="async")` drives an event loop with `asyncio.run` when none is running, and keeps today's `RuntimeError` inside a running loop, which points to `await reader.run(items)`.
+- `Map(executor="async")` drives its own event loop when none is running (the design said with `asyncio.run`; the next point says what was built), and keeps the `RuntimeError` inside a running loop, which points to `await reader.run(items)`.
   Starting a second loop on another thread would block the caller's loop, which is worse than an error.
+- **As built**, the loop that `Map` owns runs on a helper thread, so async goes through the same window loop as every other executor.
+  `Map.run` drives that window loop from `asyncio.to_thread`, with the tasks on the caller's loop; cancelling `run()` does not stop the driver thread.
+  `AsyncMap` keeps its own running-loop error text, which points to `await async_map.run`.
 - A sync `op` runs through `asyncio.to_thread`, which uses the loop's default executor.
-  That pool holds `min(32, os.cpu_count() + 4)` threads, so a `max_in_flight` above that is capped silently today; `Map` installs a default executor of `max_in_flight` threads for the loop it owns.
-- `AsyncMap` detects coroutine `_apply` with `asyncio.iscoroutinefunction`, which Python 3.14 deprecates; `Map` uses `inspect.iscoroutinefunction`.
+  That pool holds `min(32, os.cpu_count() + 4)` threads, so with `asyncio.to_thread` alone a `max_in_flight` above that is capped silently; `Map` installs a default executor of `max_in_flight` threads for the loop it owns.
+- The old `AsyncMap` detected a coroutine `_apply` with `asyncio.iscoroutinefunction`, which Python 3.14 deprecates; `Map`, and so the `AsyncMap` preset, uses `inspect.iscoroutinefunction`.
 - **Wrappers refuse async children.**
   `Retry`, `Try`, `Cache`, `Timeout`, `RateLimit`, `Until` and the iterable operators are sync.
   Wrapping an operator whose `_apply` is a coroutine function raises `TypeError` at construction, instead of returning an un-awaited coroutine at call time (gap 5).
-  Async-aware versions of `Retry`, `Timeout` and `RateLimit`, through an optional `_apply_async`, are phase P6.
+  As built, only `Retry`, `Timeout`, `RateLimit` and `Until` refuse (P3, gate G3-7); `Try`, `Cache` and the iterable operators do not refuse yet (decision O15).
+  Async-aware versions of `Retry`, `Timeout` and `RateLimit`, through an optional `_apply_async`, are phase P6, which is deferred.
 
 ### 2.9 JAX tracers
 
@@ -265,12 +281,12 @@ It is `Map.iter(items, ordered=True)` with $W$ set to `depth`, given its own nam
 ```python
 # Shapes: K kept items; d = 4 read-ahead
 
-# proposed (P2)
+# today (pipekit-ops)
 # read scene i + 1 … i + 4 while scene i is screened
 ahead = pk.Prefetch(cached, depth=4)
-# proposed (P2)
+# today (pipekit-ops)
 screen_each = pk.Map(screen)
-# today
+# today (pipekit-ops)
 read_and_screen = ahead | screen_each
 # (K items) → (K summaries)
 summaries = read_and_screen(kept)
@@ -285,11 +301,11 @@ The four classes stay, as thin subclasses of `Map` with their constructors and `
 | Preset | Is | Changes for users |
 |---|---|---|
 | `ThreadMap(op, n_workers)` | `Map(op, executor="thread", n_workers=n_workers)` | input is pulled lazily with $W = 2 n_w$ |
-| `ProcessMap(op, n_workers, on_error)` | `Map(op, executor="process", n_workers=n_workers, on_error=on_error, start_method="spawn")` | fail fast on `"raise"`; spawn instead of the platform default; pickling checked before submit |
-| `AsyncMap(op, semaphore)` | `Map(op, executor="async", max_in_flight=semaphore)` | `run` is the same; wrappers around async children now refuse at construction |
-| `BatchedMap(op, batch_size, flatten)` | `PartitionAll(batch_size)`, then `Map(op)`, then a flatten step | gains an `executor` argument whose default `"serial"` keeps today's config |
+| `ProcessMap(op, n_workers, on_error)` | `Map(op, executor="process", n_workers=n_workers, on_error=on_error)`, with the platform's start method | fail fast on `"raise"`; pickling checked before submit; a `FutureWarning` when the platform default is not spawn; `on_error="collect"` accepted |
+| `AsyncMap(op, semaphore)` | `Map(op, executor="async", max_in_flight=semaphore)` | `run` is the same; `Retry`, `Timeout`, `RateLimit` and `Until` around async children now refuse at construction |
+| `BatchedMap(op, batch_size, flatten)` | a serial `Map(op)` over `itertools.batched` lists, then a flatten step | as designed: `PartitionAll(batch_size)`, then `Map(op)`, then a flatten step, with an `executor` argument; as built, neither the `executor` argument nor `PartitionAll` is there yet, which keeps the constructor unchanged |
 
-Their `pipeline_hash` does not change: the hashes recorded on `903b0c3` become test fixtures (see [../roadmap.md](../roadmap.md)).
+Their `pipeline_hash` does not change: the hashes recorded on `903b0c3` are pinned in a test (gate G2-6, see [../roadmap.md](../roadmap.md)).
 They are documented as presets and not deprecated (decision O6).
 
 ## 3. Running example
@@ -306,34 +322,34 @@ import pipekit_ops as pk
 
 # user
 read = ReadBands(bands=("B02", "B03", "B04", "B08"))
-# proposed (P3)
+# today (pipekit-ops)
 bounded = pk.Timeout(read, seconds=60.0)
-# proposed (P3)
+# today (pipekit-ops)
 limited = pk.RateLimit(bounded, calls=10, period=1.0)
-# today
+# today (pipekit-ops)
 retried = pk.Retry(limited, attempts=4, base_delay=1.0, on=(OSError, TimeoutError))
-# proposed (P1)
+# today (pipekit-ops)
 scene_id = pk.Get("id")
-# proposed (P4)
+# today (pipekit-ops)
 cached = pk.Cache(retried, store="scenes", key=scene_id)
-# proposed (P5)
+# today (pipekit-ops)
 checked = cached | pk.AssertSignature("band y x")
-# proposed (P2)
+# today (pipekit-ops)
 reader = pk.Map(checked, executor="scope", max_in_flight=16, on_error="collect")
 
 pool = ThreadPoolExecutor(max_workers=8)
-# proposed (P4)
+# today (pipekit-ops)
 scratch = pk.DirectoryStore("/scratch/s2")
-# proposed (P2)
+# today (pipekit-ops)
 on_threads = pk.executor_scope(pool)
-# proposed (P4)
+# today (pipekit-ops)
 in_scratch = pk.store_scope(scenes=scratch)
 with on_threads, in_scratch:
     # (K items) → (K scenes)
     scenes = reader(kept)
 ```
 
-`progress=20` would add a log line every 20 items (phase P5).
+`progress=20` would add an INFO record on `pipekit_ops.parallel` every 20 released items (shipped in P5).
 
 What each failure does:
 

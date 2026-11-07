@@ -11,13 +11,15 @@ The columns are:
 - **Operator**: the constructor, with its configuration arguments.
 - **Signature**: what `__call__` takes and returns, then what `compute_output_signature` reports (`None` means "not tracked", as for `Fanout` and the parallel maps today).
 - **Semantics**: one line; the detail is in [operators.md](operators.md) and [execution.md](execution.md).
-- **Status**: `today` (ships at `903b0c3`, file named), `proposed (Pn)` (the roadmap phase in [../roadmap.md](../roadmap.md) that adds it), or `changed (Pn)` (ships, and this design changes it).
+- **Status**: `today` (ships in pipekit-ops 0.2.1, file named), `proposed (Pn)` (the roadmap phase in [../roadmap.md](../roadmap.md) that adds it), or `dropped` (not added, with the reason).
+  Phases P1 to P5 have shipped, so every row that this design adds is now `today`; a "rebuilt on `Map`" note marks a class that shipped before and was rebuilt in P2.
 
 ## Conventions shared by every new operator
 
 - **Keys are plain values.**
   Where an argument is a key (`key`, `keys`), it is a `str`, an `int` or a tuple of them, and it is used for item lookup (`x[key]`), as in toolz's `getter` (`toolz/itertoolz.py`, `def getter`).
-  Any argument that is a key may instead be an `Operator`, which is called on the item.
+  The per-item key of `GroupBy`, `CountBy`, `Unique` and `SortBy` may instead be an `Operator`, which is called on the item.
+  As built, the dict operators take plain keys only, because `Get(op)` would just be `op`.
   A bare Python callable is refused with a `TypeError` that says to wrap it in `Lambda`.
 - **Predicates and functions are operators.**
   `Filter(pred)`, `Until(op, pred, …)`, `AssertThat(pred)` and the rest take an `Operator`.
@@ -31,7 +33,7 @@ The columns are:
 ## Dict plumbing
 
 `Graph` and `Fanout` return dicts (`packages/pipekit-ops/src/pipekit_ops/_base/graph.py`, `packages/pipekit-ops/src/pipekit_ops/combine.py`), and STAC items are nested dicts.
-Today only `Lambda` reshapes them.
+Before P1, only `Lambda` reshaped them.
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
@@ -53,7 +55,7 @@ Today only `Lambda` reshapes them.
 | `Filter(pred)` | `Iterable → list`; `None` | keep items where `pred(item)` is truthy | today (`seq.py`) |
 | `Not(pred)` | `Any → bool`; `None` | `not pred(x)`; the operator form of `complement` | today (`seq.py`) |
 | `Remove(pred)` | `Iterable → list`; `None` | drop items where `pred(item)` is truthy (toolz `remove`) | today (`seq.py`) |
-| `Reduce(op, initial=MISSING)` | `Iterable → Any`; `None` | left fold, `op(acc, item)`; empty input with no `initial` raises `TypeError` like `functools.reduce` | today (`seq.py`) |
+| `Reduce(op, initial=MISSING)` | `Iterable → Any`; `None` | left fold; `op` is called on the tuple `(acc, item)`; empty input with no `initial` raises `TypeError` like `functools.reduce` | today (`seq.py`) |
 | `Fold(op, initial, chunksize=128, combine=None, executor="scope")` | `Iterable → Any`; `None` | associative tree fold over chunks, parallel through `Map` (toolz `sandbox.fold`) | today (`execution.py`) |
 | `PartitionAll(n)` | `Iterable → list[tuple]`; `None` | consecutive tuples of length `n`, the last may be shorter; replaces the planned `Chunk` | today (`seq.py`) |
 | `Concat()` | `Iterable[Iterable] → list`; `None` | flatten one level (toolz `concat`); replaces the planned `Flatten` | today (`seq.py`) |
@@ -71,16 +73,17 @@ Today only `Lambda` reshapes them.
 |---|---|---|---|
 | `Retry(op, attempts, base_delay, on)` | `Any → Any`; `op`'s | exponential back-off, `base_delay * 2 ** (i - 1)` before attempt $i+1$ | today (`control.py`) |
 | `Try(primary, fallback, on)` | `Any → Any`; common of both | toolz `excepts` | today (`control.py`) |
-| `Timeout(op, seconds)` | `Any → Any`; `op`'s | raise `TimeoutError` if `op` has not returned after `seconds`; a thread is abandoned, not killed | today (`flow.py`) |
-| `RateLimit(op, calls, period)` | `Any → Any`; `op`'s | at most `calls` starts of `op` in any window of `period` seconds, per process | today (`flow.py`) |
+| `Timeout(op, seconds, max_abandoned=8)` | `Any → Any`; `op`'s | raise `TimeoutError` if `op` has not returned after `seconds`; a daemon thread per call, abandoned, not killed; warns when more than `max_abandoned` are still running | today (`flow.py`) |
+| `RateLimit(op, calls, period)` | `Any → Any`; `op`'s | at most `calls` starts of `op` in any half-open window of `period` seconds, per process | today (`flow.py`) |
 | `Until(op, pred, max_iter, on_max="raise")` | `Any → Any`; `None` | apply `op` until `pred(x)` is truthy; stateless sibling of `pipekit_cycle.Recurrence` | today (`flow.py`) |
 
 ## Execution
 
 | Operator | Signature | Semantics | Status |
 |---|---|---|---|
-| `Map(op, executor, n_workers, max_in_flight, ordered, on_error, chunksize, start_method, progress)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor`; `progress` logs counts every `every` items | today (`execution.py`) |
-| `Map.iter(items)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points | today (`execution.py`) |
+| `Map(op, executor="serial", n_workers=None, max_in_flight=None, on_error="raise", chunksize=1, start_method=None, progress=None)` | `Iterable → list`; `None` | one engine over serial, thread, process, async and any `concurrent.futures.Executor`; `progress` logs counts every `progress` items | today (`execution.py`) |
+| `Map.iter(items, ordered=True)`, `await Map.run(items)` | lazy iterator; awaitable list | streaming and running-event-loop entry points; `ordered` lives here, not in the config | today (`execution.py`) |
+| `MapError`, `Failed(index, exception)` | exception; record | the `ExceptionGroup` that `on_error="collect"` raises, and the record in each failed slot of `MapError.results` | today (`execution.py`) |
 | `Prefetch(op, depth=2, executor="thread")` | `Iterable → Iterator`; `None` | read `depth` items ahead of the consumer, in input order | today (`execution.py`) |
 | `executor_scope(executor)` | context manager | sets the executor that `Map(executor="scope")` uses (serial when none is set); not stored in any config | today (`execution.py`) |
 | `ThreadMap(op, n_workers=8)` | `Iterable → list`; `None` | preset: `Map(op, executor="thread", …)`; config and hash unchanged | today (`parallel.py`), rebuilt on `Map` |
@@ -97,7 +100,7 @@ Today only `Lambda` reshapes them.
 | `Memoize` | alias | `Memoize is Cache` | today (`cache.py`) |
 | `Store` | protocol | `__contains__(key)`, `load(key)`, `save(key, value)` | today (`store.py`) |
 | `MemoryStore()` | `Store` | dict plus a lock; one process | today (`store.py`) |
-| `DirectoryStore(root, codec="pickle")` | `Store` | one file per key, atomic rename, safe across processes on one file system | today (`store.py`) |
+| `DirectoryStore(root, codec="pickle")` | `Store` | one file per key, atomic rename, safe across processes on one file system; writes a `pipekit-store.json` format marker | today (`store.py`) |
 | `store_scope(**stores)` | context manager | binds store names to `Store` instances; not stored in any config | today (`store.py`) |
 | `Checkpoint(store)` | none | not added: it is `Cache(op, store=…)`, and `pipekit_train.Checkpoint` already owns the name | dropped |
 
