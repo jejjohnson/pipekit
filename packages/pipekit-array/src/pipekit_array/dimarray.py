@@ -266,6 +266,29 @@ class DimArrayAdapter:
                     labels[dim] = values
         return DimArray(data, tuple(dims), labels)
 
+    def relabel(
+        self, x: DimArray, labels: Mapping[str, tuple[Any, ...] | None]
+    ) -> DimArray:
+        """``x`` with the labels of the named dims set; None removes them.
+
+        The optional `pipekit_ops.LabelledAdapter` method (ADR A22).
+
+        Raises:
+            ValueError: A dim is not in ``x.dims``, or a label tuple's
+                length differs from its dim's size.
+        """
+        unknown = sorted(set(labels) - set(x.dims))
+        if unknown:
+            raise ValueError(f"relabel: unknown dim(s) {unknown}; dims are {x.dims}.")
+        merged = dict(x.labels)
+        for dim, values in labels.items():
+            if values is None:
+                merged.pop(dim, None)
+            else:
+                merged[dim] = tuple(values)
+        # the constructor checks each tuple against its dim's size
+        return DimArray(x.data, x.dims, merged)
+
     def check_compatible(self, *xs: DimArray) -> tuple[DimArray, ...]:
         """The arrays back, if every shared dim has one size and one set of labels.
 

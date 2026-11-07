@@ -93,6 +93,13 @@ class WrongFastPath(DimArrayAdapter):
         return Broken(out.data, out.dims, out.labels)
 
 
+class DropsRelabel(DimArrayAdapter):
+    """A relabel that sets nothing: renamed dims lose their labels."""
+
+    def relabel(self, x: DimArray, labels: Any) -> DimArray:
+        return x
+
+
 def _make_broken(data: np.ndarray, dims: tuple[str, ...], labels: dict) -> Broken:
     return Broken(data, dims, labels)
 
@@ -102,6 +109,7 @@ def _make_broken(data: np.ndarray, dims: tuple[str, ...], labels: dict) -> Broke
     [
         (ForgetsLabels(), r"Broken: isel did not slice"),
         (WrongFastPath(), r"reduce\(mean, time\) on Broken"),
+        (DropsRelabel(), r"rename\(band\) on Broken: 'channel' labels None"),
     ],
 )
 def test_kit_fails_on_a_broken_adapter(adapter: DimArrayAdapter, message: str) -> None:

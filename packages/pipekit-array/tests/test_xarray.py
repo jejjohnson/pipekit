@@ -416,3 +416,37 @@ def test_rewrap_keeps_an_unnamed_dataarray_unnamed_on_dask() -> None:
     da = xr.DataArray(np.zeros((2, 3)), dims=("y", "x")).chunk({"y": 1})
     out = XarrayAdapter().rewrap(da, da.data * 2, ("y", "x"))
     assert out.name is None
+
+
+# -- relabel and rename (dim_functions phase 1) ---------------------------------
+
+
+def test_xarray_rename_moves_non_index_coords() -> None:
+    quality = xr.DataArray(np.ones((3, 4)), dims=("time", "x"))
+    cube = xr.DataArray(
+        np.zeros((3, 4)), dims=("time", "x"), coords={"x": [1, 2, 3, 4]}
+    )
+    cube = cube.assign_coords(quality=quality, crs=0)
+    renamed = pa.rename(cube, x="col")
+    assert renamed.coords["quality"].dims == ("time", "col")
+    assert renamed.coords["col"].values.tolist() == [1, 2, 3, 4]
+    assert "crs" in renamed.coords
+
+
+def test_xarray_relabel_sets_tuples_and_removes() -> None:
+    cube = DimArray(np.zeros((3, 4)), ("time", "band"), {"band": BANDS}).to_xarray()
+    adapter = get_adapter(cube)
+    pairs = tuple((i, i) for i in range(3))
+    out = adapter.relabel(cube, {"time": pairs, "band": None})
+    assert adapter.labels(out, "time") == pairs
+    assert adapter.labels(out, "band") is None
+
+
+def test_rewrap_drops_a_scalar_coord_named_after_a_new_dim() -> None:
+    cube = xr.DataArray(
+        np.zeros((2, 4)), dims=("band", "x"), coords={"band": BANDS[:2]}
+    )
+    first = cube.isel(band=0)
+    # isel leaves a scalar band coordinate; xarray refuses it next to a band dim
+    out = XarrayAdapter().rewrap(first, np.zeros((3, 4)), ("band", "x"))
+    assert "band" not in out.coords

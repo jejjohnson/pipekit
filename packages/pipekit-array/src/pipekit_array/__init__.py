@@ -10,9 +10,12 @@ on import.
 
 Dim-level functions (`dims`), on any registered carrier: `isel`, `sel`,
 `transpose`, `reduce` (``where=`` masks), `argreduce`, `take_along`,
-`map_over`, `stack`, `stack_items`, `concat`, `combine`; as operators
-(`dim_operators`): `ISel`, `Sel`,
-`Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`.
+`map_over`, `stack`, `stack_items`, `concat`, `combine`; and (`dim_shapes`)
+`rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`,
+`split_dims`; as operators (`dim_operators`): `ISel`, `Sel`,
+`Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`,
+`Rename`, `ExpandDims`, `Squeeze`, `BroadcastLike`, `MergeDims`,
+`SplitDims`.
 `StackAlong` and `ConcatenateAlong` take ``dim=`` for named carriers.
 
 Sample tables (`rows`): `to_rows` flattens a carrier to a
@@ -46,13 +49,27 @@ from pipekit_array.batching import Padded, batch
 from pipekit_array.combinators import ConcatenateAlong, StackAlong
 from pipekit_array.dim_operators import (
     ArgReduce,
+    BroadcastLike,
     Combine,
+    ExpandDims,
     ISel,
     MapOver,
+    MergeDims,
     Reduce,
+    Rename,
     Sel,
+    SplitDims,
+    Squeeze,
     TakeAlong,
     Transpose,
+)
+from pipekit_array.dim_shapes import (
+    broadcast_like,
+    expand_dims,
+    merge_dims,
+    rename,
+    split_dims,
+    squeeze,
 )
 from pipekit_array.dimarray import DimArray, DimArrayAdapter
 from pipekit_array.dims import (
@@ -91,33 +108,45 @@ register_lazy_adapter("xarray.", _load_xarray_adapter)
 __all__ = [
     "ArgReduce",
     "BackendError",
+    "BroadcastLike",
     "Combine",
     "ConcatenateAlong",
     "DimArray",
     "DimArrayAdapter",
     "Estimator",
+    "ExpandDims",
     "ISel",
     "KernelOp",
     "KernelSpec",
     "MapOver",
     "MeanScalar",
+    "MergeDims",
     "Padded",
     "Reduce",
+    "Rename",
     "RowLayout",
     "Sel",
+    "SplitDims",
+    "Squeeze",
     "StackAlong",
     "TakeAlong",
     "Transpose",
     "argreduce",
     "array_namespace",
     "batch",
+    "broadcast_like",
     "combine",
     "concat",
+    "expand_dims",
     "from_rows",
     "isel",
     "map_over",
+    "merge_dims",
     "reduce",
+    "rename",
     "sel",
+    "split_dims",
+    "squeeze",
     "stack",
     "stack_items",
     "take_along",

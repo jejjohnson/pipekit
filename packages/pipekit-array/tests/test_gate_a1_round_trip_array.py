@@ -16,12 +16,18 @@ import pipekit_array
 import pytest
 from pipekit_array import (
     ArgReduce,
+    BroadcastLike,
     ConcatenateAlong,
     DimArray,
+    ExpandDims,
     ISel,
     MeanScalar,
+    MergeDims,
     Reduce,
+    Rename,
     Sel,
+    SplitDims,
+    Squeeze,
     StackAlong,
     TakeAlong,
     Transpose,
@@ -37,6 +43,9 @@ PAIR = [X[0], X[1]]
 #: a named cube (time, band, x) with labelled bands, and an index into its time
 CUBE = DimArray(X, ("time", "band", "x"), {"band": ("B4", "B8", "B11")})
 BEST = DimArray(np.array([[0, 1, 0, 1]] * 3), ("band", "x"))
+#: CUBE's first scene, keeping a length-1 time dim; a (member,) carrier
+SCENE = DimArray(X[:1], ("time", "band", "x"), {"band": ("B4", "B8", "B11")})
+MEMBERS = DimArray(np.zeros(5, dtype=np.float32), ("member",))
 
 #: Abstract bases: none ship in pipekit-array yet.
 SKIP: dict[str, str] = {}
@@ -54,6 +63,14 @@ CASES: dict[str, tuple[Callable[[], Operator], tuple[Any, ...]]] = {
     "StackAlong": (lambda: StackAlong(axis=-1), (PAIR,)),
     "TakeAlong": (lambda: TakeAlong(dim="time"), (CUBE, BEST)),
     "Transpose": (lambda: Transpose(order=("x", "time", "band")), (CUBE,)),
+    # Phase 1: dims
+    "BroadcastLike": (lambda: BroadcastLike(exclude=("x",)), (CUBE, MEMBERS)),
+    "ExpandDims": (lambda: ExpandDims(("member", "run"), axis=-1), (CUBE,)),
+    # several merges keep their order through JSON, which sorts object keys
+    "MergeDims": (lambda: MergeDims(tx=("time", "x"), b=("band",)), (CUBE,)),
+    "Rename": (lambda: Rename(band="channel", x="col"), (CUBE,)),
+    "SplitDims": (lambda: SplitDims(x={"x": 2, "half": 2}), (CUBE,)),
+    "Squeeze": (lambda: Squeeze("time"), (SCENE,)),
 }
 
 OPERATORS = public_operators(pipekit_array)
