@@ -1,6 +1,6 @@
 [project]
 name = "pipekit"
-version = "0.1.5"
+version = "0.2.0"
 description = "The pipekit workspace in one install: pipekit-ops, -array, -cycle, -experiment, -evaluate, -train and -jax."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
