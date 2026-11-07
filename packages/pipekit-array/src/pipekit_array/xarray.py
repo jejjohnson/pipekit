@@ -11,7 +11,7 @@ pipekit-array imports xarray.
 - **Lazy on dask.** `KernelOp` runs as one ``xr.apply_ufunc`` call,
   ``dask="parallelized"``, one task per chunk; the dim-level fast paths
   (``reduce``, ``argreduce``, ``take_along``, ``stack``, ``concat``,
-  ``combine``, ``transpose``, ``rename``) are native xarray calls, so
+  ``combine``, ``transpose``, ``rename``, ``window``) are native xarray calls, so
   nothing computes until ``.compute()``.
 - **``DataArray`` only** (PK-P5): ``Dataset`` and ``DataTree`` dispatch
   stays in xrops.
@@ -235,6 +235,19 @@ class XarrayAdapter:
             # dask needs the result dtype up front: read it from a one-element call
             output_dtypes=[_probe_dtype(fn, ordered)] if lazy else None,
         )
+
+    def window(
+        self, x: xr.DataArray, dim: str, size: int, *, window_dim: str, stride: int
+    ) -> xr.DataArray:
+        """``rolling(...).construct(window_dim)`` from the first full window: a view.
+
+        The fill is zero, not NaN, so integers keep their dtype; the
+        ``isel`` drops every filled window.
+        """
+        constructed = x.rolling({dim: size}).construct(
+            window_dim, fill_value=np.zeros((), x.dtype)[()]
+        )
+        return constructed.isel({dim: slice(size - 1, None, stride)})
 
     # -- KernelOp ---------------------------------------------------------
 

@@ -32,6 +32,7 @@ and the trained-model wrapper `ModelOp`.
 ::: pipekit_array.dim_shapes
 
 ::: pipekit_array.dim_shifts
+::: pipekit_array.dim_windows
 
 ::: pipekit_array.dim_operators
 

@@ -11,6 +11,10 @@ combinators, the reducer, the carrier-shaped `BatchAlong`, the
 
 ## `ApplyToBands(inner: Operator, axis: int = 0)`
 
+Superseded by `ApplyAlong(inner, dim)` in `pipekit_array.dim_operators`
+(ADR A15, phase 3 of [dim_functions.md](dim_functions.md)): the same
+split / apply / stack by dim name, serialising whenever `inner` does.
+
 Split the input along `axis`, apply `inner` to each slice, stack the
 results back along `axis`. The canonical "apply a band-wise
 operation" combinator.
@@ -225,8 +229,8 @@ dtype=sig.dtype)`.
 Renamed from the planned array-shaped `BatchedMap(inner, batch_size, axis)`
 by ADR A19, which supersedes A5: `pipekit_ops.parallel.BatchedMap` takes
 an iterable and calls `inner` on lists, so one name for both would fail
-in confusing ways when both are imported. Not shipped yet (phase 3 of
-[dim_functions.md](dim_functions.md)).
+in confusing ways when both are imported. Ships in `pipekit_array.batching`
+(phase 3 of [dim_functions.md](dim_functions.md)).
 
 Split the input carrier along the named `dim` into chunks of `size`,
 apply `inner` to each chunk, concatenate the results along `dim`.
