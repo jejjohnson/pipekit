@@ -71,4 +71,4 @@ __all__ = [
     "truncated_scan",
 ]
 
-__version__ = "0.0.6"  # x-release-please-version
+__version__ = "0.1.0"  # x-release-please-version
