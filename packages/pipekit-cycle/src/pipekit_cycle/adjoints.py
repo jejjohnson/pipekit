@@ -11,7 +11,7 @@ same small set of concepts everywhere.
 The classes here are that vocabulary: plain frozen dataclasses, pure
 Python, serialisable like any other pipekit config knob. They carry no
 behaviour; each execution layer interprets a spec into its native
-mechanism (see ``pipekit_jax.to_diffrax_adjoint`` for the diffrax
+mechanism (see ``integrix.adjoint.to_diffrax_adjoint`` for the diffrax
 mapping, and the algorithm libraries — filterax, vardax — for the
 cycle- and solver-layer interpretations). Names mirror diffrax's
 adjoint classes where the concepts coincide, so the vocabulary is

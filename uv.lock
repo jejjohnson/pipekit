@@ -935,34 +935,34 @@ wheels = [
 
 [package.optional-dependencies]
 cudart = [
-    { name = "nvidia-cuda-runtime" },
+    { name = "nvidia-cuda-runtime", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufft = [
-    { name = "nvidia-cufft" },
+    { name = "nvidia-cufft", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cufile = [
-    { name = "nvidia-cufile" },
+    { name = "nvidia-cufile", marker = "sys_platform == 'linux'" },
 ]
 cupti = [
-    { name = "nvidia-cuda-cupti" },
+    { name = "nvidia-cuda-cupti", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 curand = [
-    { name = "nvidia-curand" },
+    { name = "nvidia-curand", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusolver = [
-    { name = "nvidia-cusolver" },
+    { name = "nvidia-cusolver", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 cusparse = [
-    { name = "nvidia-cusparse" },
+    { name = "nvidia-cusparse", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvjitlink = [
-    { name = "nvidia-nvjitlink" },
+    { name = "nvidia-nvjitlink", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvrtc = [
-    { name = "nvidia-cuda-nvrtc" },
+    { name = "nvidia-cuda-nvrtc", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 nvtx = [
-    { name = "nvidia-nvtx" },
+    { name = "nvidia-nvtx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 
 [[package]]
@@ -1635,12 +1635,44 @@ tqdm = [
 ]
 
 [[package]]
+name = "functax"
+version = "0.0.1"
+source = { git = "https://github.com/jejjohnson/functax?rev=e7eb8f9423666a0f32fcda1aa5ac88611d823fcc#e7eb8f9423666a0f32fcda1aa5ac88611d823fcc" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[package.optional-dependencies]
+jax = [
+    { name = "einx" },
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+]
+
+[[package]]
 name = "funcy"
 version = "2.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/70/b8/c6081521ff70afdff55cd9512b2220bbf4fa88804dae51d1b57b4b58ef32/funcy-2.0.tar.gz", hash = "sha256:3963315d59d41c6f30c04bc910e10ab50a3ac4a225868bfa96feed133df075cb", size = 537931, upload-time = "2023-03-28T06:22:46.764Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/08/c2409cb01d5368dcfedcbaffa7d044cc8957d57a9d0855244a5eb4709d30/funcy-2.0-py2.py3-none-any.whl", hash = "sha256:53df23c8bb1651b12f095df764bfb057935d49537a56de211b098f4c79614bb0", size = 30891, upload-time = "2023-03-28T06:22:42.576Z" },
+]
+
+[[package]]
+name = "gaussx"
+version = "0.6.12"
+source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12#1adbf077f6fdf8b19a3f8484c9dc8781b515ee1d" }
+dependencies = [
+    { name = "einx" },
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "matfree" },
+    { name = "optimistix" },
 ]
 
 [[package]]
@@ -2305,6 +2337,23 @@ wheels = [
 ]
 
 [[package]]
+name = "integrix"
+version = "0.0.3"
+source = { git = "https://github.com/jejjohnson/integrix.git?rev=v0.0.3#4385392b90f70d4ab5c3436239286e32595e5bfe" }
+dependencies = [
+    { name = "diffrax" },
+    { name = "einx" },
+    { name = "equinox" },
+    { name = "functax", extra = ["jax"] },
+    { name = "gaussx" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "optimistix" },
+]
+
+[[package]]
 name = "ipykernel"
 version = "7.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2804,6 +2853,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
+]
+
+[[package]]
+name = "matfree"
+version = "0.6.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/28/b5ea302f983eba5ecb6e1ddf8f827fb625972dd3445e1b3ce021ae879acb/matfree-0.6.3.tar.gz", hash = "sha256:50873d853f169e8c7f77fe1648c524ae73e0171e45b65bf6b792a438a5b624dd", size = 75826, upload-time = "2026-10-13T09:07:40.571Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/10/3544e312442c78a9467e4bc9ea1757727dcc535504588d31d99c6591cf27/matfree-0.6.3-py3-none-any.whl", hash = "sha256:b5768db7971ce8d3cef4b2c945ccc95593080cbf6ec041fac3cbb0d815daf0a2", size = 44073, upload-time = "2026-10-13T09:07:38.944Z" },
 ]
 
 [[package]]
@@ -4175,7 +4233,7 @@ requires-dist = [
 
 [[package]]
 name = "pipekit-array"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4339,12 +4397,14 @@ array = [
 ]
 diffrax = [
     { name = "diffrax" },
+    { name = "integrix" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "diffrax", marker = "extra == 'diffrax'", specifier = ">=0.7" },
     { name = "equinox", specifier = ">=0.11" },
+    { name = "integrix", marker = "extra == 'diffrax'", git = "https://github.com/jejjohnson/integrix.git?rev=v0.0.3" },
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxtyping", specifier = ">=0.2" },
     { name = "pipekit-array", marker = "extra == 'array'", editable = "packages/pipekit-array" },
@@ -4370,7 +4430,7 @@ dev = [
     { name = "pipekit-cycle" },
     { name = "pipekit-evaluate" },
     { name = "pipekit-experiment" },
-    { name = "pipekit-jax" },
+    { name = "pipekit-jax", extra = ["diffrax"] },
     { name = "pipekit-ops" },
     { name = "pipekit-train" },
     { name = "pre-commit" },
@@ -4415,7 +4475,7 @@ dev = [
     { name = "pipekit-cycle", editable = "packages/pipekit-cycle" },
     { name = "pipekit-evaluate", editable = "packages/pipekit-evaluate" },
     { name = "pipekit-experiment", editable = "packages/pipekit-experiment" },
-    { name = "pipekit-jax", editable = "packages/pipekit-jax" },
+    { name = "pipekit-jax", extras = ["diffrax"], editable = "packages/pipekit-jax" },
     { name = "pipekit-ops", editable = "packages/pipekit-ops" },
     { name = "pipekit-train", editable = "packages/pipekit-train" },
     { name = "pre-commit", specifier = ">=4.5.1" },
@@ -4442,7 +4502,7 @@ typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
 name = "pipekit-ops"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/pipekit-ops" }
 
 [[package]]

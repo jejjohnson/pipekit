@@ -5,8 +5,8 @@ JAX / Equinox carrier integration for `pipekit`. Ships `JaxModelOp`
 `pipekit_train.adapters.equinox.EquinoxModelOp`, adding byte-identical
 weight round-trip through `pipekit_experiment.ModelRegistry` via the
 registry's `weights` blob), `DiffraxForwardModel` (a
-`pipekit_cycle.ForwardModel` behind the `[diffrax]` extra), and the
-adjoint interpreters `to_diffrax_adjoint` / `truncated_scan`.
+`pipekit_cycle.ForwardModel` behind the `[diffrax]` extra), and two
+deprecated adjoint forwarders.
 
 ## Pytree containers
 
@@ -73,13 +73,11 @@ them (`pipekit-jax[array]`).
 
 ::: pipekit_jax.model_op
 
-## Adjoint interpreters
+## Adjoint forwarders (deprecated)
 
-JAX realisations of the `pipekit_cycle.adjoints` specs: `truncated_scan`
-implements `TruncatedAdjoint` at the cycle layer (a `jax.lax.scan` whose
-carry is `stop_gradient`-ed outside the trailing-`k` window), and
-`to_diffrax_adjoint` maps specs onto `diffrax.AbstractAdjoint` instances
-for the dynamics layer.
+The adjoint maths for the `pipekit_cycle.adjoints` specs lives in `integrix.adjoint`: `integrix.adjoint.truncated_scan` implements `TruncatedAdjoint` at the cycle layer (a `jax.lax.scan` whose carry is `stop_gradient`-ed outside the trailing-`k` window), and `integrix.adjoint.to_diffrax_adjoint` maps specs onto `diffrax.AbstractAdjoint` instances for the dynamics layer, which is what `DiffraxForwardModel` calls.
+
+`pipekit_jax.truncated_scan` and `pipekit_jax.to_diffrax_adjoint` stay for one release and emit a `DeprecationWarning` that names the integrix function. `truncated_scan` keeps its own copy, so it runs in the base install without integrix; `to_diffrax_adjoint` forwards to integrix, which the `[diffrax]` extra installs.
 
 ::: pipekit_jax.adjoints
 

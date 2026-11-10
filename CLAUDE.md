@@ -19,7 +19,7 @@ The packages, in dependency order:
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow adapters. |
 | `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule), scorer taxonomy, `MetricScorer`, `EvaluationReport`. |
 | `pipekit-train`      | implemented   | Training pipelines + Equinox, NumPyro and BlackJAX adapters. Design at `packages/pipekit-train/docs/design/`. |
-| `pipekit-jax`        | implemented   | `JaxOperator`, `JaxModelOp` (weight round-trip through `ModelRegistry`), `ScanCycle`, `DiffraxForwardModel`, adjoint interpreters. |
+| `pipekit-jax`        | implemented   | `JaxOperator`, `JaxModelOp` (weight round-trip through `ModelRegistry`), `ScanCycle`, `DiffraxForwardModel`, deprecated adjoint forwarders (the maths is in integrix). |
 
 The master plan lives in
 [`research_journal_v2/notes/geotoolz/master_plan/`](https://github.com/jejjohnson/research_journal_v2/tree/main/notes/geotoolz/master_plan):
@@ -154,7 +154,7 @@ packages/
 │       ├── weights.py        # WeightsMixin (weight-blob round trip)
 │       ├── cycle.py          # ScanCycle, EnsembleScanCycle, Rollout
 │       ├── diffrax_model.py  # DiffraxForwardModel ([diffrax])
-│       ├── adjoints.py       # truncated_scan, to_diffrax_adjoint
+│       ├── adjoints.py       # truncated_scan, to_diffrax_adjoint (deprecated, see integrix.adjoint)
 │       ├── kernel.py         # to_jax, JaxKernelOp ([array])
 │       ├── pytree.py         # registers Sequential, Graph, JaxModelOp as pytrees
 │       └── testing.py        # check_jax_operator
@@ -201,7 +201,8 @@ top-level `pyproject.toml` only configures `[tool.uv.workspace]`.
   extras (`[equinox]`, `[numpyro]`, `[blackjax]`, `[keras]`,
   `[cycle]`, `[experiment]`, `[cache]`, `[s3]`, `[gcs]`).
 - `pipekit-jax` depends on `pipekit-ops`, `pipekit-cycle`, JAX,
-  Equinox and jaxtyping; `[diffrax]` and `[array]` are optional.
+  Equinox and jaxtyping; `[diffrax]` (diffrax and integrix) and `[array]`
+  are optional.
 - Algorithm libraries (filterx, vardax, plumax, …) are *not* internal
   deps; they plug in by satisfying the runtime-checkable Protocols
   defined in `pipekit_cycle.protocols` and `pipekit_experiment.protocols`.

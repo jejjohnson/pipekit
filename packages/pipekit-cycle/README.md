@@ -305,7 +305,7 @@ On the model side, `CallableForward(fn, dt)` wraps a function, `CompositeForward
 `BFNCycle` integrates the window forward, then backward, nudging toward the observations on both passes with your gain, and repeats until the back-pass initial states agree within `tol`.
 It needs a model that steps with negative `dt` (or a `backward_model`), and it refuses `CompositeForward` and `NeuralForward` without one, because both ignore the sign of `dt`.
 The specs in `adjoints` (`DirectAdjoint`, `RecursiveCheckpointAdjoint`, `TruncatedAdjoint`, `ImplicitAdjoint`, `BacksolveAdjoint`) are frozen dataclasses with no behaviour.
-A component that satisfies `SupportsAdjoint` carries one, the cycles pass it through untouched, and an execution layer interprets it: `pipekit_jax.to_diffrax_adjoint` for a diffrax solve, `pipekit_jax.truncated_scan` for a truncated rollout.
+A component that satisfies `SupportsAdjoint` carries one, the cycles pass it through untouched, and an execution layer interprets it: `integrix.adjoint.to_diffrax_adjoint` for a diffrax solve, `integrix.adjoint.truncated_scan` for a truncated rollout.
 So choosing how gradients flow is configuration, not code.
 
 ## Learn more

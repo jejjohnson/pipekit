@@ -62,7 +62,8 @@ dev = [
     "pipekit-experiment",
     "pipekit-evaluate",
     "pipekit-train",
-    "pipekit-jax",
+    # [diffrax] also brings integrix, which DiffraxForwardModel calls.
+    "pipekit-jax[diffrax]",
 ]
 # The pipekit-train extras that have test modules behind them. Only the test job
 # installs these: the typecheck job syncs the default `dev` group, and ty reports

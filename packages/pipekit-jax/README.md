@@ -74,8 +74,8 @@ uv add 'pipekit-jax[diffrax,array]'
 
 | Extra | What it adds | When you need it |
 | --- | --- | --- |
-| *(none)* | `pipekit-ops`, `pipekit-cycle`, `jax`, `equinox`, `jaxtyping` | `JaxOperator`, `JaxModelOp`, `ScanCycle`, `Rollout`, `truncated_scan` |
-| `diffrax` | `diffrax` | `DiffraxForwardModel` and `to_diffrax_adjoint` |
+| *(none)* | `pipekit-ops`, `pipekit-cycle`, `jax`, `equinox`, `jaxtyping` | `JaxOperator`, `JaxModelOp`, `ScanCycle`, `Rollout`, and the deprecated `truncated_scan` |
+| `diffrax` | `diffrax`, `integrix` | `DiffraxForwardModel`, `integrix.adjoint`, and the deprecated `to_diffrax_adjoint` |
 | `array` | `pipekit-array` | `to_jax` and `JaxKernelOp` |
 
 `DiffraxForwardModel`, `to_jax` and `JaxKernelOp` are imported lazily, so `import pipekit_jax` works without either extra.
@@ -136,7 +136,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import pipekit_cycle as pc
-from pipekit_jax import DiffraxForwardModel, ScanCycle, to_diffrax_adjoint
+from integrix.adjoint import to_diffrax_adjoint
+from pipekit_jax import DiffraxForwardModel, ScanCycle
 
 # Shapes: N = 3 state variables
 
@@ -170,14 +171,15 @@ def final_sum(x0):
 grad = eqx.filter_jit(jax.grad(final_sum))(jnp.ones(3))   # (N,)
 print(jnp.allclose(grad, jnp.exp(-2.4), rtol=1e-4))       # True
 
-# today (pipekit-jax[diffrax])
+# today (integrix, installed by pipekit-jax[diffrax])
 # swapping the gradient strategy is configuration
 backsolve = model.with_adjoint(pc.BacksolveAdjoint())
 print(type(to_diffrax_adjoint(backsolve.adjoint)).__name__)  # BacksolveAdjoint
 try:
     to_diffrax_adjoint(pc.TruncatedAdjoint(k=1))
 except ValueError:
-    print("truncation belongs to the rollout")            # use truncated_scan there```
+    print("truncation belongs to the rollout")            # use integrix.adjoint.truncated_scan there
+```
 
 ## What ships
 
@@ -190,14 +192,14 @@ Every name below is exported from `pipekit_jax`, except `check_jax_operator`, wh
 | `model_op` | `JaxModelOp` | Wrap any `eqx.Module` as an operator, with `serialize_weights`, `with_weights` and `from_registry` |
 | `cycle` | `ScanCycle`, `EnsembleScanCycle`, `Rollout` | Time stepping in one `jax.lax.scan`: per state, `vmap`-ed over members, or a carrier-only trajectory |
 | `diffrax_model` | `DiffraxForwardModel` | A `ForwardModel` and `SupportsAdjoint` backed by `diffrax.diffeqsolve` (`[diffrax]`) |
-| `adjoints` | `to_diffrax_adjoint`, `truncated_scan` | Interpret pipekit-cycle's adjoint specs: as a diffrax adjoint, or as a scan with gradients cut to the last `k` steps |
+| `adjoints` | `to_diffrax_adjoint`, `truncated_scan` | Deprecated forwarders to `integrix.adjoint`, kept for one release |
 | `kernel` | `to_jax`, `JaxKernelOp` | A pipekit-array `KernelOp` with its array parameters as leaves (`[array]`) |
 | `pytree` | (on import) | Registers `Sequential`, `Graph` and `JaxModelOp` as JAX pytrees |
 | `testing` | `check_jax_operator` | Assert the `JaxOperator` contract in a downstream test suite |
 
 ### Not built yet
 
-- **Interpreters for the inner-solve and cycle layers.** `to_diffrax_adjoint` covers the dynamics layer, and `truncated_scan` and `ScanCycle(truncate=k)` cover truncation; checkpointed and implicit adjoints for a variational solve live in the algorithm libraries (vardax, filterax).
+- **Interpreters for the inner-solve and cycle layers.** `integrix.adjoint.to_diffrax_adjoint` covers the dynamics layer, and `integrix.adjoint.truncated_scan` and `ScanCycle(truncate=k)` cover truncation; checkpointed and implicit adjoints for a variational solve live in the algorithm libraries (vardax, filterax).
 
 ## How it works
 
@@ -232,14 +234,15 @@ Mark config-only fields `eqx.field(static=True)`, and set `forbid_in_yaml = True
 
 `ScanCycle(step_op, n_steps)` returns `(carrier, state)` exactly like `pipekit_cycle.Cycle`, but compiles to one `jax.lax.scan`, so compile time is flat in the number of steps; `run` also returns the history, rather than storing it on the object.
 With `checkpoint=True` the backward pass keeps carries only every $\lceil \sqrt{n} \rceil$ steps and recomputes the rest, so `grad` stores $O(\sqrt{n})$ carries instead of $O(n)$.
-With `truncate=k`, gradients flow through the carry of the last `k` steps only, as in `truncated_scan`.
+With `truncate=k`, gradients flow through the carry of the last `k` steps only, as in `integrix.adjoint.truncated_scan`.
 `EnsembleScanCycle` `vmap`s a cycle over a leading member axis, with one shared read-only state or one state per member; `Rollout` steps a carrier and returns the trajectory, keeping one carry per saved point with `checkpoint=True`.
 The [pipekit under jit](https://jejjohnson.github.io/pipekit/tutorials/pipekit-under-jit/) tutorial walks through all three.
 
-### Adjoint specs, interpreted here
+### Adjoint specs, interpreted by integrix
 
-pipekit-cycle's adjoint specs carry no behaviour.
-`to_diffrax_adjoint` maps `RecursiveCheckpointAdjoint` (the default), `DirectAdjoint`, `BacksolveAdjoint` and `ImplicitAdjoint` onto the diffrax classes of the same name, and refuses `TruncatedAdjoint`, because truncation belongs to an outer rollout, where `truncated_scan` does it.
+pipekit-cycle's adjoint specs carry no behaviour, and the adjoint maths lives in integrix: pipekit-jax composes the rollout and integrix computes the backward sweep.
+`DiffraxForwardModel` hands its spec to `integrix.adjoint.to_diffrax_adjoint`, which maps `RecursiveCheckpointAdjoint` (the default), `DirectAdjoint`, `BacksolveAdjoint` and `ImplicitAdjoint` onto the diffrax classes of the same name, and refuses `TruncatedAdjoint`, because truncation belongs to an outer rollout, where `integrix.adjoint.truncated_scan` does it.
+`pipekit_jax.to_diffrax_adjoint` and `pipekit_jax.truncated_scan` stay for one release and emit a `DeprecationWarning`; `truncated_scan` keeps its own copy, so the base install runs it without integrix.
 Specs are matched by class name and fields, so a structurally identical spec from a library that does not depend on pipekit works too.
 **Note**: `BacksolveAdjoint` (continuous adjoints) diverges for chaotic or stiff dynamics; never use it as a default.
 
