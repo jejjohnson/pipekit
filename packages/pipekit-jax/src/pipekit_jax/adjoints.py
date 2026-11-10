@@ -1,26 +1,35 @@
-"""JAX interpreters for the pipekit adjoint-strategy specs.
+"""Deprecated forwarders for the adjoint maths that moved to integrix.
 
-Two pieces:
+The backward sweeps now live in ``integrix.adjoint``; pipekit-jax keeps
+composition (`ScanCycle`, `Rollout`, `DiffraxForwardModel`) and the specs
+stay in `pipekit_cycle.adjoints`. Both names below emit a
+``DeprecationWarning`` and will be removed in a later release:
 
-- `truncated_scan` — a `jax.lax.scan` whose carry runs under
-  ``stop_gradient`` except within the trailing ``k`` steps. The
-  execution engine for ``TruncatedAdjoint`` at the cycle layer.
-- `to_diffrax_adjoint` — map a spec from `pipekit_cycle.adjoints` onto
-  the corresponding ``diffrax.AbstractAdjoint`` (requires the
-  ``pipekit-jax[diffrax]`` extra).
-
-Specs are matched by class name and fields rather than identity, so
-structurally identical spec objects defined by algorithm libraries
-(which may not depend on pipekit) are accepted interchangeably.
+- `truncated_scan` — use ``integrix.adjoint.truncated_scan``. It keeps
+  its own implementation here, so the base install, which does not
+  depend on integrix, still runs it.
+- `to_diffrax_adjoint` — use ``integrix.adjoint.to_diffrax_adjoint``.
+  It forwards there, so it needs the ``pipekit-jax[diffrax]`` extra,
+  which installs integrix.
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from typing import Any
 
 import jax
 import jax.numpy as jnp
+
+
+def _warn_moved(name: str) -> None:
+    warnings.warn(
+        f"pipekit_jax.{name} is deprecated and will be removed in a later "
+        f"release; use integrix.adjoint.{name} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def truncated_scan[Carry, X, Y](
@@ -31,6 +40,10 @@ def truncated_scan[Carry, X, Y](
     k: int = 1,
 ) -> tuple[Carry, Y]:
     """``jax.lax.scan`` with gradients truncated to the trailing ``k`` steps.
+
+    Deprecated: use ``integrix.adjoint.truncated_scan``, which has the
+    same signature and forward values. This copy stays for one release
+    and emits a ``DeprecationWarning`` on every call.
 
     The carry leaving every step before ``T - k`` is wrapped in
     ``stop_gradient``, so reverse-mode differentiation sees only the
@@ -59,6 +72,7 @@ def truncated_scan[Carry, X, Y](
     Raises:
         ValueError: if ``k < 1`` or ``xs`` has no leading axis.
     """
+    _warn_moved("truncated_scan")
     if k < 1:
         raise ValueError(f"truncated_scan needs k >= 1; got k={k}.")
     leaves = jax.tree.leaves(xs)
@@ -84,20 +98,13 @@ def truncated_scan[Carry, X, Y](
 def to_diffrax_adjoint(spec: Any) -> Any:
     """Map a pipekit adjoint spec onto a ``diffrax.AbstractAdjoint``.
 
-    Mapping (specs matched structurally by class name):
-
-    - ``RecursiveCheckpointAdjoint(checkpoints)`` →
-      ``diffrax.RecursiveCheckpointAdjoint(checkpoints)`` — the
-      recommended default.
-    - ``DirectAdjoint()`` → ``diffrax.DirectAdjoint()``.
-    - ``BacksolveAdjoint()`` → ``diffrax.BacksolveAdjoint()``.
-      **Warning:** continuous adjoints diverge for chaotic or stiff
-      dynamics; never use as a default.
-    - ``ImplicitAdjoint()`` → ``diffrax.ImplicitAdjoint()`` —
-      steady-state solves only.
-    - ``TruncatedAdjoint`` → ``ValueError``: truncation is a property
-      of an outer rollout (cycle or solver iteration), not of a single
-      ODE/SDE solve; use `truncated_scan` at that layer instead.
+    Deprecated: forwards to ``integrix.adjoint.to_diffrax_adjoint`` and
+    emits a ``DeprecationWarning``. The mapping is unchanged. Specs are
+    matched by class name: ``RecursiveCheckpointAdjoint``,
+    ``DirectAdjoint``, ``BacksolveAdjoint`` and ``ImplicitAdjoint`` map
+    onto the diffrax classes of the same name, a ready-made
+    ``diffrax.AbstractAdjoint`` passes through, and ``TruncatedAdjoint``
+    is refused because truncation belongs to an outer rollout.
 
     Args:
         spec: A spec instance from `pipekit_cycle.adjoints` or any
@@ -109,28 +116,17 @@ def to_diffrax_adjoint(spec: Any) -> Any:
 
     Raises:
         ValueError: for ``TruncatedAdjoint`` or an unrecognised spec.
-        ModuleNotFoundError: if diffrax is not installed (install the
+        ImportError: if integrix is not installed (install the
             ``pipekit-jax[diffrax]`` extra).
     """
-    import diffrax  # deferred: optional extra
-
-    if isinstance(spec, diffrax.AbstractAdjoint):
-        return spec
-    name = type(spec).__name__
-    if name == "RecursiveCheckpointAdjoint":
-        return diffrax.RecursiveCheckpointAdjoint(
-            checkpoints=getattr(spec, "checkpoints", None)
-        )
-    if name == "DirectAdjoint":
-        return diffrax.DirectAdjoint()
-    if name == "BacksolveAdjoint":
-        return diffrax.BacksolveAdjoint()
-    if name == "ImplicitAdjoint":
-        return diffrax.ImplicitAdjoint()
-    if name == "TruncatedAdjoint":
-        raise ValueError(
-            "TruncatedAdjoint applies to an outer rollout (assimilation cycle "
-            "or solver iteration), not to a single ODE/SDE solve — use "
-            "pipekit_jax.truncated_scan at that layer."
-        )
-    raise ValueError(f"Unrecognised adjoint spec: {spec!r}")
+    _warn_moved("to_diffrax_adjoint")
+    try:
+        # deferred: integrix comes with the [diffrax] extra
+        from integrix.adjoint import to_diffrax_adjoint as _to_diffrax_adjoint
+    except ImportError as err:
+        raise ImportError(
+            "pipekit_jax.to_diffrax_adjoint forwards to "
+            "integrix.adjoint.to_diffrax_adjoint; install the "
+            "pipekit-jax[diffrax] extra."
+        ) from err
+    return _to_diffrax_adjoint(spec)

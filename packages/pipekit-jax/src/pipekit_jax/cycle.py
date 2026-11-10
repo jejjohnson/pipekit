@@ -181,7 +181,7 @@ class ScanCycle(StatefulOperator, JaxOperator):
         truncate: If set to ``k``, gradients flow through the carry of
             the trailing ``k`` steps only (the carry leaving step ``i``
             is ``stop_gradient``-ed when ``i < n_steps - k``), matching
-            `pipekit_jax.truncated_scan`: history entries recorded by
+            ``integrix.adjoint.truncated_scan``: history entries recorded by
             `run` keep the gradient of their own step, as scan outputs
             do. Forward values are unchanged.
 

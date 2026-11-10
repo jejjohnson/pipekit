@@ -18,7 +18,7 @@ A shared, declarative vocabulary for how gradients flow through the
 three nested rollouts of a differentiable DA system — the dynamics
 integration, the inner variational solve, and the assimilation cycle.
 Each execution layer interprets a spec into its native mechanism
-(diffrax adjoints via `pipekit_jax.to_diffrax_adjoint`, optimistix
+(diffrax adjoints via `integrix.adjoint.to_diffrax_adjoint`, optimistix
 adjoints in vardax, scan transforms in filterax):
 
 | Spec | dynamics (diffrax) | inner solve (optimistix) | cycle (scan) |

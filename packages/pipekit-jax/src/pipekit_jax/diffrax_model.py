@@ -6,7 +6,7 @@ diffusion pair (SDE) becomes a component that satisfies both
 ``state_signature``) and ``pipekit_cycle.SupportsAdjoint``
 structurally. The gradient strategy for the solve is declared with a
 spec from `pipekit_cycle.adjoints` and interpreted by
-`pipekit_jax.to_diffrax_adjoint` — so swapping, say, checkpointed for
+`integrix.adjoint.to_diffrax_adjoint` — so swapping, say, checkpointed for
 backsolve adjoints is configuration, not code.
 
 Requires the ``pipekit-jax[diffrax]`` extra.
@@ -22,9 +22,8 @@ import diffrax
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from integrix.adjoint import to_diffrax_adjoint
 from pipekit_cycle.adjoints import RecursiveCheckpointAdjoint
-
-from pipekit_jax.adjoints import to_diffrax_adjoint
 
 
 class DiffraxForwardModel(eqx.Module):

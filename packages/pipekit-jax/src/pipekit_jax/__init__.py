@@ -18,8 +18,8 @@ Public surface:
 - `DiffraxForwardModel` — a `pipekit_cycle.ForwardModel` backed by a
   diffrax ODE/SDE solve (behind the ``[diffrax]`` extra; imported
   lazily).
-- `to_diffrax_adjoint` / `truncated_scan` — JAX-side interpreters for
-  the carrier-agnostic adjoint specs in ``pipekit_cycle.adjoints``.
+- `to_diffrax_adjoint` / `truncated_scan` — deprecated forwarders; the
+  adjoint maths for ``pipekit_cycle.adjoints`` lives in ``integrix.adjoint``.
 - `to_jax` / `JaxKernelOp` — a ``pipekit_array.KernelOp`` as a
   `JaxOperator` whose array parameters are leaves (behind the
   ``[array]`` extra; imported lazily).
