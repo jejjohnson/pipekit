@@ -1,0 +1,3379 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A carrier-agnostic operator-graph framework for composable scientific pipelines.">
+      
+      
+        <meta name="author" content="J. Emmanuel Johnson">
+      
+      
+      
+        <link rel="prev" href="../execution/">
+      
+      
+        <link rel="next" href="../../toolz/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Operators - pipekit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#operators" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="pipekit" class="md-header__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pipekit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Operators
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../protocols/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Protocols
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../core-tour/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tour of the core
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../patterns/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Patterns
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../background/toolz/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Background
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/train-emulator/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../api/pipekit-ops/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../notebooks/pipekit_train_quickstart/" class="md-tabs__link">
+          
+  
+  
+  Notebooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="pipekit" class="md-nav__button md-logo" aria-label="pipekit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    pipekit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/pipekit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/pipekit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../core-tour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tour of the core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/toolz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/train-emulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train an emulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/da-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a DA cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/anomaly-graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build a bigger graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/train-register-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train, register, forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/ensemble-da/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble data assimilation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/etl-regions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ETL over many regions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/pipekit-under-jit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run pipelines under jit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-array
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-cycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-cycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-evaluate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit-jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-jax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_train_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart (MLP regression)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_train_cycle_handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cycle handoff (emulator → forecast)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_train_numpyro_svi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro SVI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_train_numpyro_mcmc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — NumPyro NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_train_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian — BlackJAX NUTS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_12_1" id="__nav_12_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-ops
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_12_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_12_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-ops
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operator catalogue
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operators
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operators
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-dict-plumbing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dict plumbing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Dict plumbing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Iterables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Iterables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ratelimit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RateLimit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#until" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Until
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cache-and-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cache and store
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Cache and store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-extended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache, extended
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-no-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why no Checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-observe-and-qc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Observe and QC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Observe and QC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#progress-through-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress, through Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assertthat-and-assertsignature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssertThat and AssertSignature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../toolz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    toolz parity
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap and gates
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_12_2" id="__nav_12_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit-train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_12_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit-train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions (ADRs)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundaries & future work
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend adapters
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/numpyro_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NumPyro adapters (SVI + MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-train/blackjax_adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlackJAX adapter (NUTS / SG-MCMC)
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-dict-plumbing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dict plumbing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Dict plumbing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Iterables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Iterables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ratelimit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RateLimit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#until" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Until
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cache-and-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cache and store
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Cache and store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-extended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache, extended
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-no-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why no Checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-observe-and-qc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Observe and QC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Observe and QC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-this-design_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before this design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#progress-through-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress, through Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assertthat-and-assertsignature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssertThat and AssertSignature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-example_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="operators">Operators<a class="headerlink" href="#operators" title="Permanent link">&para;</a></h1>
+<p>The groups other than execution, in the order of <a href="../">README.md</a>.
+Each section says what was wrong before this design (at <code>903b0c3</code>), what the operators do, and how the Sentinel-2 job uses them.
+Every operator on this page has shipped, in phases P1 to P5 of <a href="../../roadmap/">../roadmap.md</a>; where the build departed from the design, an "As built" note says so.</p>
+<h2 id="1-dict-plumbing">1. Dict plumbing<a class="headerlink" href="#1-dict-plumbing" title="Permanent link">&para;</a></h2>
+<h3 id="before-this-design">Before this design<a class="headerlink" href="#before-this-design" title="Permanent link">&para;</a></h3>
+<p><code>Graph</code> returns a dict of its outputs (<code>packages/pipekit-ops/src/pipekit_ops/_base/graph.py</code>), <code>Fanout</code> returns a dict of its branches (<code>packages/pipekit-ops/src/pipekit_ops/combine.py</code>), and STAC items are nested dicts.
+Every reshape is a <code>Lambda</code>, which is flagged <code>forbid_in_yaml</code> (<code>packages/pipekit-ops/src/pipekit_ops/blocks.py</code>), so one <code>Lambda(lambda d: d["id"])</code> stops the whole pipeline from round-tripping through <code>loads(dumps(...))</code>.</p>
+<h3 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Input <span class="arithmatex">\(x\)</span></th>
+<th>Output</th>
+<th>Missing key</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Get(key)</code></td>
+<td>mapping or sequence</td>
+<td><code>x[key]</code>; with a tuple <code>(k0, k1)</code>, the tuple <code>(x[k0], x[k1])</code></td>
+<td><code>KeyError</code> / <code>IndexError</code>, or <code>default</code> if given (as built, <code>default</code> also catches <code>TypeError</code>, as toolz does)</td>
+</tr>
+<tr>
+<td><code>GetIn(keys)</code></td>
+<td>nested mappings</td>
+<td><code>x[k0][k1]…</code></td>
+<td><code>KeyError</code>, or <code>default</code> if given (as built, also for <code>IndexError</code> and <code>TypeError</code>)</td>
+</tr>
+<tr>
+<td><code>Pick(keys)</code></td>
+<td>mapping</td>
+<td><code>{k: x[k] for k in keys}</code> in the order of <code>keys</code></td>
+<td><code>KeyError</code></td>
+</tr>
+<tr>
+<td><code>Dissoc(keys)</code></td>
+<td>mapping</td>
+<td><span class="arithmatex">\(x\)</span> without <code>keys</code></td>
+<td>ignored, as toolz <code>dissoc</code></td>
+</tr>
+<tr>
+<td><code>Rename(mapping)</code></td>
+<td>mapping</td>
+<td>keys renamed, order kept</td>
+<td>ignored; a rename that collides with a kept key raises <code>ValueError</code>; as built, old keys must be <code>str</code> (they are JSON keys in the config), and mapping two old keys to one new key is refused</td>
+</tr>
+<tr>
+<td><code>Merge()</code></td>
+<td><span class="arithmatex">\(m \ge 1\)</span> mappings, or one sequence of them</td>
+<td>union; for a key in several inputs, the last wins; as built, <code>Merge()</code> with no inputs returns <code>{}</code>, like toolz</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td><code>Assoc(key, op)</code></td>
+<td>mapping</td>
+<td>a copy with <code>key: op(x)</code></td>
+<td>n/a</td>
+</tr>
+<tr>
+<td><code>UpdateIn(keys, op)</code></td>
+<td>nested mappings</td>
+<td>a copy with the value at the path replaced by <code>op(value)</code></td>
+<td><code>KeyError</code> unless <code>default</code> is given, in which case <code>op(default)</code> is stored and missing dicts along the path are created (toolz <code>update_in</code>)</td>
+</tr>
+<tr>
+<td><code>ValMap(op)</code></td>
+<td>mapping</td>
+<td><code>{k: op(v)}</code></td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>Inputs are never mutated: every output that is a dict is a new dict; the values are not copied.
+<code>Dissoc</code> keeps the input's key order, which toolz can lose.
+A <code>Get</code> key that is not a <code>str</code>, <code>int</code> or tuple of them is refused at construction, so the config stays JSON.
+<code>Get</code> and <code>GetIn</code> take a sequence of keys in different ways on purpose: <code>Get(("a", "b"))</code> picks two keys, <code>GetIn(("a", "b"))</code> walks a path; this is toolz's split (<code>get</code> vs <code>get_in</code>).</p>
+<p><code>UpdateIn</code> replaces the planned <code>OnKey(key, op)</code>: <code>OnKey("scene", op)</code> is <code>UpdateIn(("scene",), op)</code>, and toolz's name says what it does with nested keys too.
+<code>Assoc</code> covers the case <code>OnKey</code> did not, adding a value computed from the whole dict.</p>
+<h3 id="running-example">Running example<a class="headerlink" href="#running-example" title="Permanent link">&para;</a></h3>
+<p>The summary graph returns <code>{"n_found", "n_kept", "per_tile", "scenes"}</code>.
+The report sent to a dashboard needs everything except the scenes, with shorter key names.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pipekit_ops</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pk</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Shapes: T ≤ 25 tiles</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">drop_pixels</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Dissoc</span><span class="p">((</span><span class="s2">&quot;scenes&quot;</span><span class="p">,))</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">shorter</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Rename</span><span class="p">({</span><span class="s2">&quot;n_found&quot;</span><span class="p">:</span> <span class="s2">&quot;found&quot;</span><span class="p">,</span> <span class="s2">&quot;n_kept&quot;</span><span class="p">:</span> <span class="s2">&quot;kept&quot;</span><span class="p">})</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">to_report</span> <span class="o">=</span> <span class="n">drop_pixels</span> <span class="o">|</span> <span class="n">shorter</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># dict of 4 → dict of 3</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">report</span> <span class="o">=</span> <span class="n">to_report</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="2-iterables">2. Iterables<a class="headerlink" href="#2-iterables" title="Permanent link">&para;</a></h2>
+<h3 id="before-this-design_1">Before this design<a class="headerlink" href="#before-this-design_1" title="Permanent link">&para;</a></h3>
+<p>Only the parallel maps took a list, and they all did the same thing: one operator per item.
+Filtering, grouping and counting were <code>Lambda</code>s, or Python outside the pipeline.</p>
+<h3 id="semantics_1">Semantics<a class="headerlink" href="#semantics_1" title="Permanent link">&para;</a></h3>
+<p>Let <span class="arithmatex">\(n\)</span> be the number of items.</p>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Output</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Filter(pred)</code></td>
+<td>items with <code>pred(item)</code> truthy, in order</td>
+<td><code>pred</code> is an operator, often a <code>Sequential</code> ending in a comparison operator</td>
+</tr>
+<tr>
+<td><code>Remove(pred)</code></td>
+<td>items with <code>pred(item)</code> falsy</td>
+<td>the toolz name; easier to read than <code>Filter(Not(pred))</code></td>
+</tr>
+<tr>
+<td><code>Reduce(op, initial)</code></td>
+<td><span class="arithmatex">\(a_n\)</span>, where <span class="arithmatex">\(a_0\)</span> is <code>initial</code>, <span class="arithmatex">\(a_{i+1} = f(a_i, x_i)\)</span>, <span class="arithmatex">\(x_i\)</span> is item <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(f\)</span> is <code>op</code> called on the tuple <code>(a_i, x_i)</code></td>
+<td><code>op</code> takes one tuple, because an operator takes one carrier; no <code>initial</code> and <span class="arithmatex">\(n = 0\)</span> raises <code>TypeError</code></td>
+</tr>
+<tr>
+<td><code>Fold(op, initial, chunksize, combine, executor)</code></td>
+<td>the same value as <code>Reduce</code> when <code>op</code> is associative and <code>initial</code> is its identity</td>
+<td>chunks of <code>chunksize</code> are reduced in parallel through <code>Map</code>, then the partial results are reduced with <code>combine</code> (default <code>op</code>); toolz <code>sandbox.fold</code></td>
+</tr>
+<tr>
+<td><code>PartitionAll(n)</code></td>
+<td>tuples of <code>n</code> consecutive items, the last shorter</td>
+<td>replaces the planned <code>Chunk</code>, see <a href="../../toolz/">../toolz.md</a></td>
+</tr>
+<tr>
+<td><code>Concat()</code></td>
+<td>one flat list</td>
+<td>flattens exactly one level; replaces the planned <code>Flatten</code></td>
+</tr>
+<tr>
+<td><code>Zip(strict=True)</code></td>
+<td>list of tuples</td>
+<td>unequal lengths raise <code>ValueError</code> unless <code>strict=False</code></td>
+</tr>
+<tr>
+<td><code>GroupBy(key)</code></td>
+<td><code>dict[group, list]</code></td>
+<td>groups in first-seen order; lists keep input order</td>
+</tr>
+<tr>
+<td><code>CountBy(key)</code></td>
+<td><code>dict[group, int]</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Count()</code></td>
+<td><code>int</code></td>
+<td><code>len(x)</code> if defined, else consumes the iterable</td>
+</tr>
+<tr>
+<td><code>Unique(key=None)</code></td>
+<td>first occurrence of each item</td>
+<td>needs hashable items or keys</td>
+</tr>
+<tr>
+<td><code>Take(n)</code></td>
+<td>the first <code>n</code> items</td>
+<td>stops pulling after <code>n</code>, so a lazy input is read no further</td>
+</tr>
+<tr>
+<td><code>SortBy(key, reverse=False)</code></td>
+<td>sorted list</td>
+<td>stable</td>
+</tr>
+</tbody>
+</table>
+<p><code>Reduce</code> takes a tuple instead of two arguments because <code>Operator.__call__</code> maps positional arguments to <code>_apply</code>, and a <code>Sequential</code> passes one carrier between steps (<code>packages/pipekit-ops/src/pipekit_ops/_base/sequential.py</code>).
+An operator written for <code>Reduce</code> reads <code>acc, item = pair</code>.</p>
+<h3 id="running-example_1">Running example<a class="headerlink" href="#running-example_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Shapes: N ≈ 300 items; K kept; T ≤ 25 tiles</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">cloud_cover</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">GetIn</span><span class="p">((</span><span class="s2">&quot;properties&quot;</span><span class="p">,</span> <span class="s2">&quot;eo:cloud_cover&quot;</span><span class="p">))</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># user</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">is_clear</span> <span class="o">=</span> <span class="n">MaxCloud</span><span class="p">(</span><span class="mf">40.0</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">clear_enough</span> <span class="o">=</span> <span class="n">cloud_cover</span> <span class="o">|</span> <span class="n">is_clear</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">keep</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Filter</span><span class="p">(</span><span class="n">clear_enough</span><span class="p">)</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># (N items) → (K items)</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">kept</span> <span class="o">=</span> <span class="n">keep</span><span class="p">(</span><span class="n">found</span><span class="p">)</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">tile_id</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">GetIn</span><span class="p">((</span><span class="s2">&quot;properties&quot;</span><span class="p">,</span> <span class="s2">&quot;s2:mgrs_tile&quot;</span><span class="p">))</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">per_tile</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">CountBy</span><span class="p">(</span><span class="n">tile_id</span><span class="p">)</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="c1"># (K items) → dict of ≤ T ints</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="n">counts</span> <span class="o">=</span> <span class="n">per_tile</span><span class="p">(</span><span class="n">kept</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="3-flow">3. Flow<a class="headerlink" href="#3-flow" title="Permanent link">&para;</a></h2>
+<p>The three operators below shipped in phase P3 (#215), in <code>packages/pipekit-ops/src/pipekit_ops/flow.py</code>.
+All three refuse a child whose <code>_apply</code> is <code>async def</code>, with a <code>TypeError</code> at construction (decision O15), and a bare <code>lambda</code> child with a <code>TypeError</code> that names <code>Lambda</code>.</p>
+<h3 id="timeout">Timeout<a class="headerlink" href="#timeout" title="Permanent link">&para;</a></h3>
+<p><code>Timeout(op, seconds)</code> runs <code>op(x)</code> in a worker thread and waits at most <code>seconds</code> for it.
+If <code>op</code> has not returned, <code>Timeout</code> raises the builtin <code>TimeoutError</code>, which is what <code>Retry(…, on=(TimeoutError,))</code> catches.</p>
+<p>The worker thread is abandoned, not killed: Python cannot stop a thread safely.
+It keeps running until <code>op</code> returns, and its result is dropped.
+That is acceptable for the case this exists for, a network read with no timeout of its own, and it is documented as such.
+To bound the damage, <code>Timeout</code> uses one small shared pool per process, and logs a warning when more than its <code>max_abandoned</code> (default 8) threads are still running.</p>
+<p><strong>As built</strong>, <code>Timeout</code> starts a daemon thread per call instead of a shared pool, and runs it in a copy of the caller's context.
+A pool's workers are joined at interpreter exit, so one call that hangs for good would stop the process from exiting, and a bounded pool full of hung workers would make later calls time out without ever running.
+Abandoned calls are tracked process-wide, and the <code>max_abandoned</code> warning goes to the <code>pipekit_ops.flow</code> logger.</p>
+<p>Alternatives considered: <code>signal.alarm</code> works only in the main thread on POSIX, so it fails inside <code>Map(executor="thread")</code>; a process per call kills cleanly but costs a process start and pickling per item.
+A process-based timeout is possible later as <code>Timeout(op, seconds, isolate="process")</code>.</p>
+<h3 id="ratelimit">RateLimit<a class="headerlink" href="#ratelimit" title="Permanent link">&para;</a></h3>
+<p><code>RateLimit(op, calls, period)</code> allows at most <code>calls</code> starts of <code>op</code> in any window of <code>period</code> seconds.
+It is a sliding-window limiter: it keeps the start times of the last <code>calls</code> calls, and a new call waits until the oldest is more than <code>period</code> seconds old.
+As built, the window is half-open: a new call is admitted once the oldest start is at least <code>period</code> seconds old, because with a strict "more than" a fake clock spins forever on ties.
+A pickled or loaded <code>RateLimit</code> starts with fresh state, and a JAX tracer is refused.
+The state is shared by all threads in the process, behind a lock; the sleep happens outside the lock.</p>
+<p>The state does not cross processes.
+On a pool of <span class="arithmatex">\(p\)</span> processes each worker has its own limiter, so the API sees up to <span class="arithmatex">\(p\)</span> times <code>calls</code> per <code>period</code>.
+Two ways to keep a global limit: divide <code>calls</code> by <span class="arithmatex">\(p\)</span>, or keep the rate-limited read on threads and send only CPU work to processes.
+A cross-process limiter needs shared state (a manager or a file lock) and is out of scope for core.</p>
+<p>Placement matters, and the docs show it: <code>Retry(RateLimit(read))</code> makes every retry wait for a slot, while <code>RateLimit(Retry(read))</code> lets one slot cover several attempts.</p>
+<h3 id="until">Until<a class="headerlink" href="#until" title="Permanent link">&para;</a></h3>
+<p>Let <span class="arithmatex">\(f\)</span> be <code>op</code>.
+<code>Until(op, pred, max_iter, on_max="raise")</code> sets <span class="arithmatex">\(x_0 = x\)</span> and <span class="arithmatex">\(x_{i+1} = f(x_i)\)</span>, and returns the first <span class="arithmatex">\(x_i\)</span> for which <code>pred(x_i)</code> is truthy, checking <span class="arithmatex">\(x_0\)</span> first.
+If <span class="arithmatex">\(i\)</span> reaches <code>max_iter</code> first, it raises <code>RuntimeError</code> (<code>on_max="raise"</code>) or returns <span class="arithmatex">\(x_m\)</span> (<code>on_max="return"</code>), where <span class="arithmatex">\(m\)</span> is <code>max_iter</code>.
+<code>max_iter</code> is required, so a pipeline cannot loop forever.
+As built, if <code>pred</code> holds on <span class="arithmatex">\(x_m\)</span>, <code>Until</code> returns it instead of raising, and <code>max_iter=0</code> only checks the input.</p>
+<p>It is the stateless sibling of <code>pipekit_cycle.Recurrence(step_op, condition_op, max_iters)</code> (<code>packages/pipekit-cycle/src/pipekit_cycle/cycle.py</code>), which threads a carry state and lives in pipekit-cycle.
+In the running example, <code>Until(NextPage(), IsLastPage(), max_iter=50)</code> walks STAC search pages; toolz has no name for it (<code>iterate</code> is the infinite version).</p>
+<h2 id="4-cache-and-store">4. Cache and store<a class="headerlink" href="#4-cache-and-store" title="Permanent link">&para;</a></h2>
+<h3 id="before-this-design_2">Before this design<a class="headerlink" href="#before-this-design_2" title="Permanent link">&para;</a></h3>
+<p><code>Cache(inner)</code> kept a private dict, keyed by <code>sha256(input key ‖ 0x00 ‖ stable_json(inner.get_config()))</code> (<code>packages/pipekit-ops/src/pipekit_ops/cache.py</code>).
+The module docstring said a disk backend lands in v0.2, and the master plan reserves Group K for it.
+Three problems besides the missing backend (all three fixed in P4, #216):</p>
+<ul>
+<li>The cache holds a <code>threading.Lock</code>, so a pipeline with a <code>Cache</code> cannot go to a process pool, and <code>check_pickleable</code> does not say so.</li>
+<li>An input without <code>tobytes</code> is keyed by <code>repr</code>, which for a STAC item dict is long and, for objects with a default <code>repr</code>, includes a memory address, so the key changes on every run.</li>
+<li>There is no way to key by a field, the way toolz <code>memoize(key=…)</code> allows.</li>
+</ul>
+<h3 id="store">Store<a class="headerlink" href="#store" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># today (pipekit-ops): store.py, runtime-checkable</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Store</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p>Keys are 64-character hex digests, so a store never has to sanitise them.
+As built, <code>DirectoryStore</code> refuses any other key, which also blocks path traversal.
+Two stores ship in core:</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Where</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MemoryStore()</code></td>
+<td>a dict</td>
+<td>a lock; threads in one process</td>
+</tr>
+<tr>
+<td><code>DirectoryStore(root, codec="pickle")</code></td>
+<td><code>root/ab/abcdef….pkl</code>, two-level fan-out</td>
+<td>writes go to a temporary file and are renamed into place, so readers never see a partial value; processes on one file system can share it; the last writer wins</td>
+</tr>
+</tbody>
+</table>
+<p><code>codec="pickle"</code> is the only codec in core; pickle loads run code, so a <code>DirectoryStore</code> is for directories the user controls, and the docs say so.
+As built, each save is <code>fsync</code>ed before the rename, and <code>DirectoryStore</code> writes a format marker, <code>root/pipekit-store.json</code> with version 1, and refuses a directory of another version (the P4 fallback in <a href="../../roadmap/">../roadmap.md</a>).
+A <code>MemoryStore</code> pickles as a snapshot with a fresh lock.
+Carrier-specific stores (Zarr for xarray, COG for geoarrays, an object store) live in xrops and geoops and only implement the three methods.</p>
+<h3 id="cache-extended">Cache, extended<a class="headerlink" href="#cache-extended" title="Permanent link">&para;</a></h3>
+<p><code>Cache(inner, store=None, key=None)</code>:</p>
+<ul>
+<li><code>store=None</code> keeps the earlier behaviour exactly: a private <code>MemoryStore</code>, the same config <code>{"inner": …}</code> and the same <code>pipeline_hash</code>.</li>
+<li><code>store="scenes"</code> names a store that <code>store_scope(scenes=...)</code> binds at run time; the name is in the config, the directory is not, for the same reason the executor is not (decision O5).
+  An unbound name raises <code>LookupError</code> naming the store.</li>
+<li><code>key=op</code> computes the input key from <code>op(x)</code> instead of from <code>x</code>, so <code>Cache(read, key=Get("id"))</code> keys a scene by its STAC ID.</li>
+<li>The config part of the key becomes <code>pipeline_hash(inner)</code>, which equals <code>sha256(stable_json(inner.state))</code>: it covers nested operators and the inner class's module and name, which <code>get_config()</code> alone does not (two different classes with the same config collided before).
+  For in-memory caches this only changes keys inside one process, which nobody can observe.
+  As built, the key is <code>sha256(input key ‖ 0x00 ‖ pipeline_hash(inner))</code>, with <code>‖ 0x00 ‖ pipeline_hash(key)</code> appended when <code>key</code> is set, so <code>key=Get("id")</code> and <code>key=Get("name")</code> never share an entry either.</li>
+<li><code>__getstate__</code> drops the lock and the private entries, so a <code>Cache</code> pickles; <code>hits</code> and <code>misses</code> stay per process.</li>
+<li>As built, <code>Cache.clear()</code> clears only a private store, never a shared named one, and <code>store</code> must be a <code>str</code>.
+  <code>Cache</code> does not yet refuse an async child (decision O15).</li>
+</ul>
+<h3 id="why-no-checkpoint">Why no <code>Checkpoint</code><a class="headerlink" href="#why-no-checkpoint" title="Permanent link">&para;</a></h3>
+<p>The gap list proposed <code>Checkpoint(store)</code>.
+With a named store, <code>Cache(op, store="scenes")</code> already is that: it saves each result under a stable key and skips the work on a rerun.
+A second class with the same behaviour would split the docs, and <code>pipekit_train.Checkpoint</code> (<code>packages/pipekit-train/src/pipekit_train/callbacks.py</code>) already means "save model state every <span class="arithmatex">\(N\)</span> steps".
+A pass-through writer that persists without reading back is a <code>Sink</code>.</p>
+<h3 id="running-example_2">Running example<a class="headerlink" href="#running-example_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Shapes: K kept items</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">scene_id</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">cached</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Cache</span><span class="p">(</span><span class="n">retried</span><span class="p">,</span> <span class="n">store</span><span class="o">=</span><span class="s2">&quot;scenes&quot;</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">scene_id</span><span class="p">)</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">scratch</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">DirectoryStore</span><span class="p">(</span><span class="s2">&quot;/scratch/s2&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">in_scratch</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">store_scope</span><span class="p">(</span><span class="n">scenes</span><span class="o">=</span><span class="n">scratch</span><span class="p">)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="k">with</span> <span class="n">in_scratch</span><span class="p">:</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="c1"># 1 item → 1 scene</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">scene</span> <span class="o">=</span> <span class="n">cached</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+</code></pre></div>
+<p>After a crash, a rerun loads every scene already in <code>/scratch/s2</code> and reads only the rest.</p>
+<h2 id="5-observe-and-qc">5. Observe and QC<a class="headerlink" href="#5-observe-and-qc" title="Permanent link">&para;</a></h2>
+<h3 id="before-this-design_3">Before this design<a class="headerlink" href="#before-this-design_3" title="Permanent link">&para;</a></h3>
+<p><code>Tap</code>, <code>ShapeTrace</code>, <code>Quarantine</code> and <code>AssertCallable</code> hold closures and set <code>forbid_in_yaml</code> (<code>packages/pipekit-ops/src/pipekit_ops/observe.py</code>, <code>packages/pipekit-ops/src/pipekit_ops/qc.py</code>).
+They are right for notebooks and they block a production pipeline from round-tripping.
+<code>AssertShape</code> and <code>AssertDType</code> read <code>.shape</code> and <code>.dtype</code> with <code>getattr</code>; before P5, no check used the named-dim <code>Signature</code> that the adapter registry already provides.</p>
+<h3 id="log">Log<a class="headerlink" href="#log" title="Permanent link">&para;</a></h3>
+<p><code>Log(message="call {n}: {type} {signature}", level="INFO", logger="pipekit_ops")</code> passes its input through and writes one <code>logging</code> record per call.
+The record's message is formatted with three fields: <code>{n}</code> (calls so far in this process), <code>{type}</code> (the input's class name) and <code>{signature}</code> (<code>signature_of(x).format()</code> when an adapter is registered, else <code>?</code>).
+Everything else is left to <code>logging</code>: handlers, levels, JSON formatters.
+<code>Log</code> is serialisable because it holds only strings.
+As built, a message that names any other field raises <code>ValueError</code> at construction, <code>Log</code> counts calls even when its logger is disabled for the level (it then writes nothing), and, like <code>Tap</code>, it warns once when it runs at trace time.</p>
+<h3 id="progress-through-map">Progress, through Map<a class="headerlink" href="#progress-through-map" title="Permanent link">&para;</a></h3>
+<p>A progress bar needs to know <span class="arithmatex">\(n\)</span> and the count done so far; both live in <code>Map</code>, not in a pass-through step.
+<code>Map(…, progress=every)</code> logs <code>done</code>, <code>failed</code>, <code>in_flight</code>, <code>n</code> (when the input has a length) and items per second every <code>every</code> completed items, at INFO on <code>pipekit_ops.parallel</code>.
+As built, the count is of released items, the values are also attributes of the record (<code>done</code>, <code>failed</code>, <code>in_flight</code>, <code>n</code>, <code>rate</code>), and <code>progress</code> is left out of <code>Map</code>'s config when it is <code>None</code>, so existing hashes do not change.
+A standalone <code>Progress</code> operator is not added (decision O11).</p>
+<h3 id="assertthat-and-assertsignature">AssertThat and AssertSignature<a class="headerlink" href="#assertthat-and-assertsignature" title="Permanent link">&para;</a></h3>
+<p><code>AssertThat(pred, message)</code> is <code>AssertCallable</code> with an operator instead of a closure: it raises <code>QCError</code> (<code>packages/pipekit-ops/src/pipekit_ops/qc.py</code>) when <code>pred(x)</code> is falsy and passes <span class="arithmatex">\(x\)</span> through otherwise.
+<code>AssertCallable</code> stays for notebooks.</p>
+<p><code>AssertSignature(pattern, dtype=None, missing="raise")</code> reads <code>signature_of(x)</code> and raises <code>QCError</code> unless <code>Signature.matches(pattern)</code> is true (<code>packages/pipekit-ops/src/pipekit_ops/signature.py</code>) and, if <code>dtype</code> is set, the signature's dtype equals it.
+If no adapter is registered for <span class="arithmatex">\(x\)</span>, <code>missing="raise"</code> raises <code>QCError</code>, and <code>missing="skip"</code> passes <span class="arithmatex">\(x\)</span> through.
+Its <code>compute_output_signature</code> checks the input signature against the pattern at build time, so <code>Sequential.summary()</code> reports a mismatch before any data runs.
+As built, the mismatch is raised, which is how <code>compute_output_signature</code> errors already surface; an unknown or foreign signature passes through.
+It never reads the carrier itself, only the adapter, so it keeps rule 1 of <a href="../../vision/">../vision.md</a>.</p>
+<h3 id="running-example_3">Running example<a class="headerlink" href="#running-example_3" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Shapes: B = 4 bands; y, x pixels</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># user</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">valid</span> <span class="o">=</span> <span class="n">ValidFraction</span><span class="p">()</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># user</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">at_least_half</span> <span class="o">=</span> <span class="n">AtLeast</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">mostly_valid</span> <span class="o">=</span> <span class="n">valid</span> <span class="o">|</span> <span class="n">at_least_half</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">check_valid</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">AssertThat</span><span class="p">(</span><span class="n">mostly_valid</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;under 50 % valid pixels&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">check_dims</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">AssertSignature</span><span class="p">(</span><span class="s2">&quot;band y x&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;uint16&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="n">note</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">Log</span><span class="p">(</span><span class="s2">&quot;read </span><span class="si">{n}</span><span class="s2">: </span><span class="si">{signature}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># today (pipekit-ops)</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">screen</span> <span class="o">=</span> <span class="n">check_dims</span> <span class="o">|</span> <span class="n">check_valid</span> <span class="o">|</span> <span class="n">note</span>
+</code></pre></div>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
