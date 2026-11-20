@@ -16,9 +16,9 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-cycle/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/tutorials/da-cycle/"><b>DA tutorial</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/tutorials/ensemble-da/"><b>Ensemble tutorial</b></a>
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/da-cycle/"><b>DA tutorial</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/ensemble-da/"><b>Ensemble tutorial</b></a>
 </p>
 
 ## Why it exists
@@ -310,8 +310,8 @@ So choosing how gradients flow is configuration, not code.
 
 ## Learn more
 
-- API reference: [pipekit-cycle](https://jejjohnson.github.io/pipekit/api/pipekit-cycle/).
-- Tutorials: [Run a DA cycle](https://jejjohnson.github.io/pipekit/tutorials/da-cycle/), [Ensemble data assimilation](https://jejjohnson.github.io/pipekit/tutorials/ensemble-da/), [Run pipelines under jit](https://jejjohnson.github.io/pipekit/tutorials/pipekit-under-jit/).
+- API reference: [pipekit-cycle](https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/).
+- Tutorials: [Run a DA cycle](https://jejjohnson.github.io/pipekit/da-cycle/), [Ensemble data assimilation](https://jejjohnson.github.io/pipekit/ensemble-da/), [Run pipelines under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/).
 - Design: [Latent data assimilation](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/latent.md); master plan [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md).
 - The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
 - Packages built on this one: [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (jit-native cycles, diffrax models), [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (emulators trained on simulations), [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) (benchmark tasks).

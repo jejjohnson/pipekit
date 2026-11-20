@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/core-tour/"><b>Core tour</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-ops/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-ops/"><b>API</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops/docs/design"><b>Design</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit"><b>pipekit family</b></a>
 </p>
@@ -374,7 +374,7 @@ Array-aware features find what they need through the carrier instead.
 - [Patterns](https://github.com/jejjohnson/pipekit/blob/main/docs/patterns.md) for batch jobs, services, orchestrators and audits.
 - [Why operators are classes, not functions](https://github.com/jejjohnson/pipekit/blob/main/docs/background/toolz.md).
 - The [design docs](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops/docs/design) (vision, decisions, roadmap, per-module API specs) and the master plan, [Report 2](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_2_pipekit.md).
-- The [API reference](https://jejjohnson.github.io/pipekit/api/pipekit-ops/).
+- The [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-ops/).
 - Tutorials: [a bigger graph](https://github.com/jejjohnson/pipekit/blob/main/docs/tutorials/anomaly-graph.md), [ETL over many regions](https://github.com/jejjohnson/pipekit/blob/main/docs/tutorials/etl-regions.md), [inference](https://github.com/jejjohnson/pipekit/blob/main/docs/tutorials/inference.md).
 - The sibling foundation, [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array), and the rest of the [family](https://github.com/jejjohnson/pipekit#the-packages).
 

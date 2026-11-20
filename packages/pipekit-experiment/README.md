@@ -16,8 +16,8 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-experiment/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/tutorials/train-register-forecast/"><b>Tutorial</b></a>
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/train-register-forecast/"><b>Tutorial</b></a>
 </p>
 
 ## Why it exists
@@ -239,8 +239,8 @@ print(ns.u)  # 3.1
 
 ## Learn more
 
-- API reference: [pipekit-experiment](https://jejjohnson.github.io/pipekit/api/pipekit-experiment/).
-- Tutorials: [Train, register, forecast](https://jejjohnson.github.io/pipekit/tutorials/train-register-forecast/), [Train an emulator](https://jejjohnson.github.io/pipekit/tutorials/train-emulator/).
+- API reference: [pipekit-experiment](https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/).
+- Tutorials: [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/), [Train an emulator](https://jejjohnson.github.io/pipekit/train-emulator/).
 - Design: master plan [Report 12](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_10_pipekit_experiment.md).
 - The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
 - Packages that use this one: [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (training artifacts, `LogToExperiment`), [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (`JaxModelOp.from_registry`).

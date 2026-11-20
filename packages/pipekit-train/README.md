@@ -16,9 +16,9 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-train/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/tutorials/train-emulator/"><b>Tutorial</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/design-train/"><b>Design</b></a>
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-train/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/train-emulator/"><b>Tutorial</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/readme-2/"><b>Design</b></a>
 </p>
 
 ## Why it exists
@@ -330,11 +330,11 @@ Like every model wrapper, both are marked `forbid_in_yaml`, so `registry.load` r
 
 ## Learn more
 
-- The full design: [`packages/pipekit-train/docs/design/`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design), also [on the docs site](https://jejjohnson.github.io/pipekit/design-train/).
+- The full design: [`packages/pipekit-train/docs/design/`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design), also [on the docs site](https://jejjohnson.github.io/pipekit/readme-2/).
   Start with the [vision](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/vision.md), the [architecture](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/architecture.md) and the [decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/decisions.md) (ADRs D1 to D14); the backends are in [`api/adapters.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/api/adapters.md), [`numpyro_adapter.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/numpyro_adapter.md) and [`blackjax_adapter.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/blackjax_adapter.md); worked examples for the three training shapes are in [`examples/`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design/examples).
-- API reference: [pipekit-train](https://jejjohnson.github.io/pipekit/api/pipekit-train/).
-- Tutorials: [Train an emulator](https://jejjohnson.github.io/pipekit/tutorials/train-emulator/), [Train, register, forecast](https://jejjohnson.github.io/pipekit/tutorials/train-register-forecast/).
-- Notebooks: [quickstart](https://jejjohnson.github.io/pipekit/notebooks/pipekit_train_quickstart/), [cycle hand-off](https://jejjohnson.github.io/pipekit/notebooks/pipekit_train_cycle_handoff/), [NumPyro SVI](https://jejjohnson.github.io/pipekit/notebooks/pipekit_train_numpyro_svi/), [NumPyro NUTS](https://jejjohnson.github.io/pipekit/notebooks/pipekit_train_numpyro_mcmc/), [BlackJAX NUTS](https://jejjohnson.github.io/pipekit/notebooks/pipekit_train_blackjax/).
+- API reference: [pipekit-train](https://jejjohnson.github.io/pipekit/reference/pipekit-train/).
+- Tutorials: [Train an emulator](https://jejjohnson.github.io/pipekit/train-emulator/), [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/).
+- Notebooks: [quickstart](https://jejjohnson.github.io/pipekit/pipekit-train-quickstart/), [cycle hand-off](https://jejjohnson.github.io/pipekit/pipekit-train-cycle-handoff/), [NumPyro SVI](https://jejjohnson.github.io/pipekit/pipekit-train-numpyro-svi/), [NumPyro NUTS](https://jejjohnson.github.io/pipekit/pipekit-train-numpyro-mcmc/), [BlackJAX NUTS](https://jejjohnson.github.io/pipekit/pipekit-train-blackjax/).
 - Master plan: [Report 11](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_9_pipekit_train.md).
 - The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
 - Siblings: [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle), [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment), [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax).

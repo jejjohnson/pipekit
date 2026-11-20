@@ -8,7 +8,7 @@
 **pipekit-array is named-dim array operators on any Array API backend: one operator runs on NumPy, JAX, CuPy, PyTorch or dask, and on any carrier with named dims, with or without the rest of pipekit.**
 
 <p align="center">
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-array/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-array/"><b>API</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/docs/design"><b>Design</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit/blob/main/docs/concepts.md#5-backend-dispatch-pipekit-array"><b>Concepts</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit"><b>pipekit family</b></a>
@@ -340,7 +340,7 @@ Two gotchas:
 
 - The [design docs](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/docs/design): vision, [architecture](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/docs/design/architecture.md), [decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/docs/design/decisions.md), boundaries and the per-operator specs.
 - The master plan, [Report 3, "Sister libraries"](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_3_pipekit_array.md).
-- The [API reference](https://jejjohnson.github.io/pipekit/api/pipekit-array/).
+- The [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-array/).
 - [Concepts: backend dispatch](https://github.com/jejjohnson/pipekit/blob/main/docs/concepts.md#5-backend-dispatch-pipekit-array) and the tutorial [Run pipekit pipelines under `jit`](https://github.com/jejjohnson/pipekit/blob/main/docs/tutorials/pipekit-under-jit.md).
 - The sibling foundation, [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops), and the rest of the [family](https://github.com/jejjohnson/pipekit#the-packages).
 

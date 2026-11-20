@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-evaluate/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/"><b>API</b></a> ·
   <a href="https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md"><b>Benchmark ladder</b></a>
 </p>
 
@@ -282,7 +282,7 @@ Domain packages (`plumax`, `somax`, `xtremax`) satisfy them without importing pi
 
 ## Learn more
 
-- API reference: [pipekit-evaluate](https://jejjohnson.github.io/pipekit/api/pipekit-evaluate/).
+- API reference: [pipekit-evaluate](https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/).
 - Design: [the benchmark ladder](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md), the domain-independent framework.
 - The four pilots, each working the ladder for one domain:
   - [Plume](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/plume_pilot.md): methane retrieval through emission inference to persistency forecasts; the recommended first pilot.
