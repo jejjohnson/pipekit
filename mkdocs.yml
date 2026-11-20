@@ -1,17 +1,39 @@
-site_name: pipekit
-site_description: A carrier-agnostic operator-graph framework for composable scientific pipelines.
+# ---------------------------------------------------------------------------
+# Zensical builds ONLY the API reference from this file (it reads mkdocs.yml
+# as is), and it is deployed as the `/reference/` subtree of the MyST site.
+# Guides, tutorials, design pages and notebooks are built by mystmd from
+# `docs/myst.yml`. See `docs/README.md` for the split and the rationale.
+#
+# mkdocstrings publishes a Sphinx-compatible `objects.inv` into `site/`, and
+# that inventory is what lets the MyST prose cross-reference into these pages.
+# ---------------------------------------------------------------------------
+site_name: pipekit API reference
+site_description: API reference for the pipekit workspace (pipekit-ops, pipekit-array, pipekit-cycle, pipekit-experiment, pipekit-evaluate, pipekit-train and pipekit-jax), generated from Google-style docstrings.
 site_author: J. Emmanuel Johnson
 repo_url: https://github.com/jejjohnson/pipekit
 repo_name: jejjohnson/pipekit
 
+docs_dir: docs/api
+site_dir: site
+
+# The guide pages live in the MyST half of the site, so links to them point
+# outside `docs_dir` by design. The assembled-site link checker in
+# `scripts/build_docs.py` validates them instead, across both halves, which
+# neither tool can do on its own.
+validation:
+  links:
+    unrecognized_links: ignore
+    absolute_links: ignore
+
 theme:
   name: material
+  # Zensical's Material-compatible look; `modern` is its newer default.
+  variant: classic
   features:
-    - navigation.tabs
     - navigation.sections
     - navigation.top
     - content.code.copy
-    - content.code.annotate
+    - toc.follow
   palette:
     - scheme: default
       primary: indigo
@@ -43,62 +65,16 @@ plugins:
             docstring_style: google
             show_source: true
             show_root_heading: true
-  - mkdocs-jupyter:
-      execute: false
-      ignore_h1_titles: true
 
 nav:
-  - Home: index.md
-  - Getting Started: getting-started.md
-  - Concepts: concepts.md
-  - Protocols: protocols.md
-  - Installation: installation.md
-  - Tour of the core: core-tour.md
-  - Patterns: patterns.md
-  - Background: background/toolz.md
-  - Tutorials:
-      - Train an emulator: tutorials/train-emulator.md
-      - Run a DA cycle: tutorials/da-cycle.md
-      - Build a bigger graph: tutorials/anomaly-graph.md
-      - Train, register, forecast: tutorials/train-register-forecast.md
-      - Run inference: tutorials/inference.md
-      - Ensemble data assimilation: tutorials/ensemble-da.md
-      - ETL over many regions: tutorials/etl-regions.md
-      - Run pipelines under jit: tutorials/pipekit-under-jit.md
-  - API Reference:
-      - pipekit-ops: api/pipekit-ops.md
-      - pipekit-array: api/pipekit-array.md
-      - pipekit-cycle: api/pipekit-cycle.md
-      - pipekit-experiment: api/pipekit-experiment.md
-      - pipekit-evaluate: api/pipekit-evaluate.md
-      - pipekit-train: api/pipekit-train.md
-      - pipekit-jax: api/pipekit-jax.md
-  - Notebooks:
-      - Quickstart (MLP regression): notebooks/pipekit_train_quickstart.ipynb
-      - Cycle handoff (emulator → forecast): notebooks/pipekit_train_cycle_handoff.ipynb
-      - Bayesian — NumPyro SVI: notebooks/pipekit_train_numpyro_svi.ipynb
-      - Bayesian — NumPyro NUTS: notebooks/pipekit_train_numpyro_mcmc.ipynb
-      - Bayesian — BlackJAX NUTS: notebooks/pipekit_train_blackjax.ipynb
-  - Design:
-      - pipekit-ops:
-          - Overview: design-ops/README.md
-          - Vision: design-ops/vision.md
-          - Operator catalogue: design-ops/api/README.md
-          - Execution: design-ops/api/execution.md
-          - Operators: design-ops/api/operators.md
-          - toolz parity: design-ops/toolz.md
-          - Decisions: design-ops/decisions.md
-          - Roadmap and gates: design-ops/roadmap.md
-      - pipekit-train:
-          - Overview: design-train/README.md
-          - Vision: design-train/vision.md
-          - Architecture: design-train/architecture.md
-          - Decisions (ADRs): design-train/decisions.md
-          - Boundaries & future work: design-train/boundaries.md
-          - Backend adapters: design-train/api/adapters.md
-          - NumPyro adapters (SVI + MCMC): design-train/numpyro_adapter.md
-          - BlackJAX adapter (NUTS / SG-MCMC): design-train/blackjax_adapter.md
-  - Contributing: contributing.md
+  - Overview: index.md
+  - pipekit-ops: pipekit-ops.md
+  - pipekit-array: pipekit-array.md
+  - pipekit-cycle: pipekit-cycle.md
+  - pipekit-experiment: pipekit-experiment.md
+  - pipekit-evaluate: pipekit-evaluate.md
+  - pipekit-train: pipekit-train.md
+  - pipekit-jax: pipekit-jax.md
 
 markdown_extensions:
   - admonition

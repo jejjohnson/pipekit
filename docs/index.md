@@ -115,7 +115,7 @@ To train an emulator, register it and forecast with it as the forward model, fol
 
     Per-package install matrix. Every extra spelled out.
 
--   :material-api: **[API Reference](api/pipekit-ops.md)**
+-   :material-api: **[API Reference](https://jejjohnson.github.io/pipekit/reference/pipekit-ops/)**
 
     ---
 

@@ -78,4 +78,4 @@ jax / tensorflow.
 | [models.md](models.md)        | Layer 3 — TrainingLoop, TrainerCarryState          |
 | [adapters.md](adapters.md)    | Layer 4 — Equinox reference + Keras stub            |
 
-For usage patterns, see [../examples/](../examples/).
+For usage patterns, see [../examples/](../examples/README.md).
