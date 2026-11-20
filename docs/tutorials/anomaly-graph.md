@@ -14,8 +14,17 @@ checks, a branch, a second input, an observer and a summary).
 uv add pipekit-ops pipekit-array numpy jaxtyping
 ```
 
-![The anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs](../assets/graph-light.svg#only-light){ width="640" }
-![The anomaly detector as one pipekit Graph](../assets/graph-dark.svg#only-dark){ width="640" }
+:::{image} ../assets/graph-light.svg
+:alt: The anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs
+:class: dark:hidden
+:width: 640px
+:::
+
+:::{image} ../assets/graph-dark.svg
+:alt: The anomaly detector as one pipekit Graph: sources are read in parallel (ThreadMap around Cache around Retry around ReadTile), stacked and checked, composited by a Branch (median for few exposures, mean for many), turned into a z-score against a background input and a channel ratio, scored, thresholded with a Tap, and summarised by a Fanout; composite, score, mask and summary are its outputs
+:class: hidden dark:block
+:width: 640px
+:::
 
 Every box in the figure is one line of code below. The code blocks run
 in order as one script.

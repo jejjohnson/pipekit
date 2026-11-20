@@ -171,7 +171,7 @@ The workspace ships with:
 | Lint & format        | [`ruff`](https://github.com/astral-sh/ruff) (line-length 88, py312)      |
 | Type checking        | [`ty`](https://github.com/astral-sh/ty)                                  |
 | Tests                | `pytest` (+ `pytest-cov`)                                                |
-| Docs                 | MkDocs + Material + `mkdocstrings` + `mkdocs-jupyter`                    |
+| Docs                 | mystmd (prose, notebooks) + Zensical and `mkdocstrings` (API)            |
 | Pre-commit           | `.pre-commit-config.yaml` + `pre-commit-ci`                              |
 | Releases             | [release-please](https://github.com/googleapis/release-please)           |
 
@@ -181,7 +181,7 @@ Sync individual groups for partial development environments:
 uv sync --group dev            # runtime + tests
 uv sync --group lint           # ruff
 uv sync --group typecheck      # ty
-uv sync --group docs           # mkdocs + jupyter
+uv sync --group docs           # Zensical, mkdocstrings and the build script
 uv sync --group train-extras   # the pipekit-train backends, for their tests
 ```
 
@@ -191,7 +191,7 @@ uv sync --group train-extras   # the pipekit-train backends, for their tests
 make test         # full pytest suite (over 2,000 tests)
 make typecheck    # ty check across all packages
 make lint         # ruff check . (the whole repo)
-make docs-serve   # local MkDocs preview at http://localhost:8000
+make docs-serve   # build the docs site and serve it at http://127.0.0.1:8000
 ```
 
 `make precommit` runs the pre-commit hooks: the file-hygiene checks (end of file, trailing whitespace, YAML, large files), `ruff` and `ruff-format`.

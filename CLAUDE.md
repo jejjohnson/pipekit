@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `pipekit` is a uv workspace of seven Python packages, plus a code-free
 `pipekit` umbrella that installs them all. Together they
 provide a carrier-agnostic operator-graph framework for composable
-scientific pipelines. Built with Python 3.12+, uv, pytest, and MkDocs.
+scientific pipelines. Built with Python 3.12+, uv, pytest, mystmd and Zensical.
 
 The packages, in dependency order:
 
@@ -35,7 +35,7 @@ make format               # ruff format . && ruff check --fix .
 make lint                 # ruff check .
 make typecheck            # ty check on every package's src dir
 make precommit            # pre-commit run --all-files
-make docs-serve           # local MkDocs preview
+make docs-serve           # build the docs site and serve it locally
 ```
 
 ### Running the pipekit-train adapter tests
@@ -217,7 +217,8 @@ Example notebooks live in `docs/notebooks/` as `jupytext` percent-format
    `jupyter nbconvert --execute --inplace foo.ipynb`.
 3. Delete the `.py`; the executed `.ipynb` is the committed source of
    truth.
-4. `mkdocs-jupyter` renders pre-executed `.ipynb` with `execute: false`.
+4. List the notebook in the `toc` of `docs/myst.yml`; mystmd renders the
+   committed outputs as they are, without running it.
 
 Figures render inline via `plt.show()`; do **not** use `savefig` or
 commit separate PNG files. The `.ipynb` cell outputs are the single

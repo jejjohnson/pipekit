@@ -49,7 +49,7 @@ PUBLIC = REPO / "public"
 API_SUBDIR = "reference"
 # Plain files served at the site root, next to the prose pages. mystmd publishes
 # only pages it renders, so these are copied in by `assemble`.
-ROOT_FILES: tuple[str, ...] = ("llms.txt",)
+ROOT_FILES: tuple[str, ...] = ()
 
 # Must match `references.api` in docs/myst.yml. mystmd only loads intersphinx
 # inventories over http(s), so the freshly built Zensical output is served here

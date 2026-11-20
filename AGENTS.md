@@ -147,12 +147,13 @@ Plans and design documents go in `.plans/` (gitignored, never committed). If a p
 
 ## Documentation
 
-This repo uses **MkDocs + Material + mkdocstrings + mkdocs-jupyter** for documentation.
+The docs are built by two tools into one site (`docs/README.md` explains the split): mystmd builds the guides, tutorials, design pages and executed notebooks from `docs/myst.yml`, and Zensical + mkdocstrings builds the API reference from `mkdocs.yml` into `/reference/`. mystmd is a Node CLI (`npm install -g mystmd`).
 
-- **Build locally**: `make docs-serve` (or `uv run --group docs mkdocs serve`)
-- **Build static site**: `make docs` (or `uv run --group docs mkdocs build`)
-- **Deploy to GitHub Pages**: `make docs-deploy` (or `uv run --group docs mkdocs gh-deploy --force`)
-- **Auto-deploy**: the `pages.yml` workflow deploys automatically on every push to `main`
+- **Build and check**: `make docs` builds both halves into `public/` and fails on any broken link, including links between the halves.
+- **Preview**: `make docs-serve` builds, then serves `public/` at http://127.0.0.1:8000.
+- **CI**: `docs.yml` runs the same build on every pull request, and `pages.yml` deploys `public/` through GitHub Actions on every push to `main`.
+- **The table of contents** is the `toc` in `docs/myst.yml`; a page missing from it is not built, and each entry's `title` is its nav label. Page URLs are flat (from the file name).
+- **Prose is MyST Markdown**: `:::{note}` directives rather than `!!! note`, `::::{tab-set}` rather than `=== "…"`, `(label)=` before a heading to link to it, and API links as ``[`Sequential`](xref:api#pipekit_ops.Sequential)`` or by the deployed `/reference/` URL. Never link to a file under `docs/api/` or to a page left out of the `toc`: mystmd would publish it as a raw download, and `build_docs.py` fails on it.
 
 When writing docstrings, use **Google style** (enforced by `mkdocstrings` config).
 
