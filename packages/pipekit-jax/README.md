@@ -16,8 +16,8 @@
 
 <p align="center">
   <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/api/pipekit-jax/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/tutorials/pipekit-under-jit/"><b>Under jit</b></a>
+  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-jax/"><b>API</b></a> ·
+  <a href="https://jejjohnson.github.io/pipekit/pipekit-under-jit/"><b>Under jit</b></a>
 </p>
 
 ## Why it exists
@@ -236,7 +236,7 @@ Mark config-only fields `eqx.field(static=True)`, and set `forbid_in_yaml = True
 With `checkpoint=True` the backward pass keeps carries only every $\lceil \sqrt{n} \rceil$ steps and recomputes the rest, so `grad` stores $O(\sqrt{n})$ carries instead of $O(n)$.
 With `truncate=k`, gradients flow through the carry of the last `k` steps only, as in `integrix.adjoint.truncated_scan`.
 `EnsembleScanCycle` `vmap`s a cycle over a leading member axis, with one shared read-only state or one state per member; `Rollout` steps a carrier and returns the trajectory, keeping one carry per saved point with `checkpoint=True`.
-The [pipekit under jit](https://jejjohnson.github.io/pipekit/tutorials/pipekit-under-jit/) tutorial walks through all three.
+The [pipekit under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/) tutorial walks through all three.
 
 ### Adjoint specs, interpreted by integrix
 
@@ -248,8 +248,8 @@ Specs are matched by class name and fields, so a structurally identical spec fro
 
 ## Learn more
 
-- API reference: [pipekit-jax](https://jejjohnson.github.io/pipekit/api/pipekit-jax/).
-- Tutorials: [Run pipelines under jit](https://jejjohnson.github.io/pipekit/tutorials/pipekit-under-jit/), [Train, register, forecast](https://jejjohnson.github.io/pipekit/tutorials/train-register-forecast/).
+- API reference: [pipekit-jax](https://jejjohnson.github.io/pipekit/reference/pipekit-jax/).
+- Tutorials: [Run pipelines under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/), [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/).
 - Design: the reproducibility caveat this package closes is in pipekit-train's [`boundaries.md`, §13.1](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/boundaries.md); master plan [Report 11](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_9_pipekit_train.md).
 - The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
 - Siblings: [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) (the protocols and adjoint specs), [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) (the registry), [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (the training loop).

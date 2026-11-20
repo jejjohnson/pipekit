@@ -195,7 +195,7 @@ make install      # uv sync --all-groups except train-extras, + pre-commit hooks
 make test         # every package's tests
 make lint         # ruff check . (the whole repo)
 make typecheck    # ty on every package
-make docs-serve   # MkDocs preview
+make docs-serve   # build the docs site and serve it locally
 ```
 
 Conventional Commits drive releases (release-please, one version per package).

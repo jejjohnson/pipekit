@@ -8,15 +8,17 @@ carry, and why operators settled on a concrete base class while the data
 flowing through them did not. It is background: for what ships and when to
 reach for it, read the [tour of the core](../core-tour.md).
 
-??? note "About this page"
+:::{note} About this page
+:class: dropdown
 
-    | | |
-    |---|---|
-    | **Reading time** | about 15 minutes |
-    | **Audience** | anyone who wants to know why pipekit is shaped the way it is |
-    | **Companions** | [Tour of the core](../core-tour.md) (what ships), [Patterns](../patterns.md) (where it is used), [Concepts](../concepts.md) (the mental model in ten minutes) |
-    | **Checked against** | toolz 1.1 and pipekit-ops 0.2.1; every output below is from a real run |
-    | **History** | First written as Report 1 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/tree/main/docs/reports), which now point here |
+| | |
+|---|---|
+| **Reading time** | about 15 minutes |
+| **Audience** | anyone who wants to know why pipekit is shaped the way it is |
+| **Companions** | [Tour of the core](../core-tour.md) (what ships), [Patterns](../patterns.md) (where it is used), [Concepts](../concepts.md) (the mental model in ten minutes) |
+| **Checked against** | toolz 1.1 and pipekit-ops 0.2.1; every output below is from a real run |
+| **History** | First written as Report 1 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/tree/main/docs/reports), which now point here |
+:::
 
 ## Why this page exists
 
@@ -110,31 +112,34 @@ enough that the most accurate one-line description of pipekit is
 The same pipeline in both libraries shows the difference. Both outputs below
 are from real runs.
 
-=== "toolz"
+::::{tab-set}
+:::{tab-item} toolz
 
-    ```python title="A toolz composition prints its steps as raw function objects, in reverse order."
-    from toolz import compose_left
+```python title="A toolz composition prints its steps as raw function objects, in reverse order."
+from toolz import compose_left
 
-    steps = compose_left(str.strip, str.lower, lambda s: s.split("l"))
-    print(steps)
-    # Compose(<function <lambda> at 0x7f…>, <method 'lower' of 'str' objects>,
-    #         <method 'strip' of 'str' objects>)
-    ```
+steps = compose_left(str.strip, str.lower, lambda s: s.split("l"))
+print(steps)
+# Compose(<function <lambda> at 0x7f…>, <method 'lower' of 'str' objects>,
+#         <method 'strip' of 'str' objects>)
+```
+:::
+:::{tab-item} pipekit
 
-=== "pipekit"
+```python title="The same steps as pipekit operators: named, indexable, in order."
+from pipekit_ops import Lambda, Tap
 
-    ```python title="The same steps as pipekit operators: named, indexable, in order."
-    from pipekit_ops import Lambda, Tap
-
-    steps = (
-        Lambda(str.strip) | Lambda(str.lower) | Tap(print) | Lambda(lambda s: s.split("l"))
-    )
-    print(steps)
-    # Sequential([Lambda(name='strip'), Lambda(name='lower'),
-    #             Tap(name='print'), Lambda(name='<lambda>')])
-    steps[2]  # → Tap(name='print')
-    steps("  HELLO  ")  # prints "hello"; → ['he', '', 'o']
-    ```
+steps = (
+    Lambda(str.strip) | Lambda(str.lower) | Tap(print) | Lambda(lambda s: s.split("l"))
+)
+print(steps)
+# Sequential([Lambda(name='strip'), Lambda(name='lower'),
+#             Tap(name='print'), Lambda(name='<lambda>')])
+steps[2]  # → Tap(name='print')
+steps("  HELLO  ")  # prints "hello"; → ['he', '', 'o']
+```
+:::
+::::
 
 `toolz` is the design template. pipekit is the typed, introspectable,
 serialisable variant of the same idea.
@@ -228,11 +233,12 @@ flag. Operators whose constructor takes a closure declare
 Operators that only nest other operators, such as `Try`, `Retry` or `Cache`, are not flagged: a walker finds the flagged children inside them.
 The dict and iterable operators, `AssertThat` and `Log` take operators or plain values instead of closures, so none of them is flagged, and a bare `lambda` handed to one is refused with a `TypeError` that names `Lambda`.
 
-!!! important "The gaps in one line"
+:::{important} The gaps in one line
 
-    pipekit is what `toolz` becomes when the pipeline is a first-class object:
-    printable, configurable, summarisable, dispatchable, and bound by rules
-    about what it may contain.
+pipekit is what `toolz` becomes when the pipeline is a first-class object:
+printable, configurable, summarisable, dispatchable, and bound by rules
+about what it may contain.
+:::
 
 ## The trajectory: functions, Protocols, typed entities
 
@@ -247,155 +253,161 @@ separately.
 
 ### Operators
 
-=== "1 · Functions"
+::::{tab-set}
+:::{tab-item} 1 · Functions
 
-    The `toolz` shape: an operator is a Python function. Maximum flexibility,
-    zero boilerplate.
+The `toolz` shape: an operator is a Python function. Maximum flexibility,
+zero boilerplate.
 
-    ```python
-    def my_op(x):
-        return ...
-
-
-    pipe(value, my_op, other_op, third_op)
-    ```
-
-    **Buys you:** any existing function adapts trivially, with no subclassing
-    and no dependency beyond `toolz`.
-
-    **Costs you:** no config, no readable repr, no serialisation, no dispatch,
-    no flags, no state, and no reuse beyond reusing the function.
-
-=== "2 · Protocols"
-
-    The natural next thought is to write a `Protocol` for what an operator
-    looks like. Anything structurally compatible counts; nothing has to
-    inherit.
-
-    ```python
-    from typing import Protocol
+```python
+def my_op(x):
+    return ...
 
 
-    class OperatorLike(Protocol):
-        def __call__(self, x): ...
-        def get_config(self) -> dict: ...
-    ```
+pipe(value, my_op, other_op, third_op)
+```
 
-    **Buys you:** structural typing. Tools can recognise operator-shaped
-    objects without forcing inheritance, which suits third-party code that
-    does not import your library.
+**Buys you:** any existing function adapts trivially, with no subclassing
+and no dependency beyond `toolz`.
 
-    **Costs you:** a Protocol is a check, not a base class.
+**Costs you:** no config, no readable repr, no serialisation, no dispatch,
+no flags, no state, and no reuse beyond reusing the function.
+:::
+:::{tab-item} 2 · Protocols
 
-    - **No default implementations.** Every implementer rebuilds
-      `get_config`, `__repr__` and `__or__`; there is no `super()` to reuse.
-    - **No class-level flags.** `forbid_in_yaml` and `_terminal` describe an
-      operator's contract, not its instances, and a Protocol cannot carry
-      them cleanly.
-    - **No shared mechanism.** Dual-mode dispatch is infrastructure every
-      operator needs; with a Protocol each one reimplements it.
-    - **No class registry.** `Operator.from_state` rebuilds an operator by
-      walking `cls.__subclasses__()`; a Protocol has no subclasses to walk.
+The natural next thought is to write a `Protocol` for what an operator
+looks like. Anything structurally compatible counts; nothing has to
+inherit.
 
-    **Verdict:** a Protocol is the right tool to check that something is
-    operator-shaped, and the wrong tool to be the operator base. (pipekit
-    still uses Protocols where they fit: for the seams algorithm libraries
-    plug into without importing it; see [Protocols](../protocols.md).)
+```python
+from typing import Protocol
 
-=== "3 · Typed base class"
 
-    Where pipekit landed. A simplified view of `pipekit_ops/_base/operator.py`:
+class OperatorLike(Protocol):
+    def __call__(self, x): ...
+    def get_config(self) -> dict: ...
+```
 
-    ```python title="The Operator base class, simplified."
-    class Operator(ConfigMixin):
-        forbid_in_yaml: ClassVar[bool] = False  # closure-holding operators set True
-        _terminal: ClassVar[bool] = False  # may only end a Sequential
+**Buys you:** structural typing. Tools can recognise operator-shaped
+objects without forcing inheritance, which suits third-party code that
+does not import your library.
 
-        def __call__(self, *args, **kwargs):  # dual-mode dispatch
-            if any(isinstance(a, Node) for a in args):
-                ...  # build a graph node
-            return self._apply(*args, **kwargs)  # run eagerly
+**Costs you:** a Protocol is a check, not a base class.
 
-        def _apply(self, *args, **kwargs):  # the one method subclasses write
-            raise NotImplementedError
+- **No default implementations.** Every implementer rebuilds
+  `get_config`, `__repr__` and `__or__`; there is no `super()` to reuse.
+- **No class-level flags.** `forbid_in_yaml` and `_terminal` describe an
+  operator's contract, not its instances, and a Protocol cannot carry
+  them cleanly.
+- **No shared mechanism.** Dual-mode dispatch is infrastructure every
+  operator needs; with a Protocol each one reimplements it.
+- **No class registry.** `Operator.from_state` rebuilds an operator by
+  walking `cls.__subclasses__()`; a Protocol has no subclasses to walk.
 
-        def __or__(self, other) -> Sequential:  # pipe syntax, defined once
-            ...
+**Verdict:** a Protocol is the right tool to check that something is
+operator-shaped, and the wrong tool to be the operator base. (pipekit
+still uses Protocols where they fit: for the seams algorithm libraries
+plug into without importing it; see [Protocols](../protocols.md).)
+:::
+:::{tab-item} 3 · Typed base class
 
-        @classmethod
-        def from_state(cls, state) -> Operator:  # walks cls.__subclasses__()
-            ...
-    ```
+Where pipekit landed. A simplified view of `pipekit_ops/_base/operator.py`:
 
-    **Buys you:**
+```python title="The Operator base class, simplified."
+class Operator(ConfigMixin):
+    forbid_in_yaml: ClassVar[bool] = False  # closure-holding operators set True
+    _terminal: ClassVar[bool] = False  # may only end a Sequential
 
-    - `__init__` carries config, `get_config()` (derived by `ConfigMixin`)
-      exposes it, and `from_state` rebuilds from it.
-    - `__or__` is defined once, so every subclass gets pipe syntax for free.
-    - Dual-mode `__call__` is defined once; subclasses only write `_apply`.
-    - Class flags (`forbid_in_yaml`, `_terminal`) are visible to
-      `Sequential`'s validation and to any loader.
-    - IDEs and type checkers see the whole surface.
+    def __call__(self, *args, **kwargs):  # dual-mode dispatch
+        if any(isinstance(a, Node) for a in args):
+            ...  # build a graph node
+        return self._apply(*args, **kwargs)  # run eagerly
 
-    **Costs you:**
+    def _apply(self, *args, **kwargs):  # the one method subclasses write
+        raise NotImplementedError
 
-    - Subclassing is more ceremony than a function (`class NDVI(Operator)`).
-    - A third-party function does not adapt on its own; `Lambda` is the escape
-      hatch, and `ConfigMixin` keeps the boilerplate small.
-    - More framework code to maintain.
+    def __or__(self, other) -> Sequential:  # pipe syntax, defined once
+        ...
 
-    **Verdict:** the right design for operators. Every responsibility has a
-    natural home, and the cost is a one-time decision to subclass. geotoolz
-    and xrtoolz each arrived here independently before the base class moved
-    into pipekit, which is the strongest sign it is right.
+    @classmethod
+    def from_state(cls, state) -> Operator:  # walks cls.__subclasses__()
+        ...
+```
+
+**Buys you:**
+
+- `__init__` carries config, `get_config()` (derived by `ConfigMixin`)
+  exposes it, and `from_state` rebuilds from it.
+- `__or__` is defined once, so every subclass gets pipe syntax for free.
+- Dual-mode `__call__` is defined once; subclasses only write `_apply`.
+- Class flags (`forbid_in_yaml`, `_terminal`) are visible to
+  `Sequential`'s validation and to any loader.
+- IDEs and type checkers see the whole surface.
+
+**Costs you:**
+
+- Subclassing is more ceremony than a function (`class NDVI(Operator)`).
+- A third-party function does not adapt on its own; `Lambda` is the escape
+  hatch, and `ConfigMixin` keeps the boilerplate small.
+- More framework code to maintain.
+
+**Verdict:** the right design for operators. Every responsibility has a
+natural home, and the cost is a one-time decision to subclass. geotoolz
+and xrtoolz each arrived here independently before the base class moved
+into pipekit, which is the strongest sign it is right.
+:::
+::::
 
 ### Carriers
 
 The carrier trajectory is different, and not settled.
 
-=== "1 · Any"
+::::{tab-set}
+:::{tab-item} 1 · Any
 
-    pipekit's core uses `Carrier = Any`. The framework does not care what
-    flows through; operators that need structure check it in their own
-    signatures.
+pipekit's core uses `Carrier = Any`. The framework does not care what
+flows through; operators that need structure check it in their own
+signatures.
 
-    **Buys you:** maximum flexibility. Composition works the same whether the
-    carrier is a NumPy array, an `xr.DataArray`, a DataFrame, an AnnData, a
-    scalar or a user type, and test pipelines can run on scalars.
+**Buys you:** maximum flexibility. Composition works the same whether the
+carrier is a NumPy array, an `xr.DataArray`, a DataFrame, an AnnData, a
+scalar or a user type, and test pipelines can run on scalars.
 
-    **Costs you:** operators that do want structure (named axes, coordinate
-    systems, units) duck-check it every time, and there is no shared metadata
-    surface.
+**Costs you:** operators that do want structure (named axes, coordinate
+systems, units) duck-check it every time, and there is no shared metadata
+surface.
+:::
+:::{tab-item} 2 · Protocols
 
-=== "2 · Protocols"
+The ecosystem has converged on Protocol-shaped array descriptions through
+the [Array API standard](https://data-apis.org/array-api/):
+`numpy.ndarray`, `jax.Array`, `cupy.ndarray`, `torch.Tensor` and
+`dask.array.Array` all expose `__array_namespace__`. Operators written
+against it declare the Protocol and work across backends; pipekit-array
+is where they live.
 
-    The ecosystem has converged on Protocol-shaped array descriptions through
-    the [Array API standard](https://data-apis.org/array-api/):
-    `numpy.ndarray`, `jax.Array`, `cupy.ndarray`, `torch.Tensor` and
-    `dask.array.Array` all expose `__array_namespace__`. Operators written
-    against it declare the Protocol and work across backends; pipekit-array
-    is where they live.
+**Buys you:** an operator written once runs on NumPy, JAX, CuPy and
+PyTorch arrays, which is real value for cross-framework pipelines.
 
-    **Buys you:** an operator written once runs on NumPy, JAX, CuPy and
-    PyTorch arrays, which is real value for cross-framework pipelines.
+**Costs you:** the Array API becomes a dependency; operators call the
+namespace (`xp.mean(x)`) rather than NumPy (`np.mean(x)`); and some
+operations do not generalise cleanly, NaN handling for one.
+:::
+:::{tab-item} 3 · Concrete types
 
-    **Costs you:** the Array API becomes a dependency; operators call the
-    namespace (`xp.mean(x)`) rather than NumPy (`np.mean(x)`); and some
-    operations do not generalise cleanly, NaN handling for one.
+Domain libraries type their operators to a specific carrier. In the
+GeoStack, geotoolz uses `GeoTensor` and xrtoolz uses `xr.DataArray` or
+`xr.Dataset`.
 
-=== "3 · Concrete types"
+**Buys you:** rich metadata used natively. geotoolz operators read
+`.crs` and `.transform` without defensive checks; xrtoolz operators use
+`.dims` and `.coords` directly.
 
-    Domain libraries type their operators to a specific carrier. In the
-    GeoStack, geotoolz uses `GeoTensor` and xrtoolz uses `xr.DataArray` or
-    `xr.Dataset`.
-
-    **Buys you:** rich metadata used natively. geotoolz operators read
-    `.crs` and `.transform` without defensive checks; xrtoolz operators use
-    `.dims` and `.coords` directly.
-
-    **Costs you:** each library is locked to its carrier, so
-    `Sequential([geotoolz_op, xrtoolz_op])` does not compose across them, and
-    a carrier-specific operator is written once per library.
+**Costs you:** each library is locked to its carrier, so
+`Sequential([geotoolz_op, xrtoolz_op])` does not compose across them, and
+a carrier-specific operator is written once per library.
+:::
+::::
 
 ### Where pipekit lands
 

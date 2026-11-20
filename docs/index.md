@@ -86,49 +86,45 @@ To train an emulator, register it and forecast with it as the forward model, fol
 
 ## Three doors
 
-<div class="grid cards" markdown>
+::::{grid} 1 1 2 3
 
--   :material-rocket-launch: **[Getting Started](getting-started.md)**
+:::{card} Getting Started
+:link: getting-started.md
 
-    ---
+From `git clone` to your first pipeline, first DA cycle, and first registered model, in five minutes of copy and paste.
+:::
 
-    From `git clone` to your first pipeline, first DA cycle, and
-    first registered model, in five minutes of copy and paste.
+:::{card} Concepts
+:link: concepts.md
 
--   :material-book-open-page-variant: **[Concepts](concepts.md)**
+The 10-minute mental model. What's an `Operator`? Why carrier-agnostic? How does dispatch work?
+:::
 
-    ---
+:::{card} Tutorials
+:link: tutorials/train-emulator.md
 
-    The 10-minute mental model. What's an `Operator`? Why
-    carrier-agnostic? How does dispatch work?
+End-to-end walkthroughs. Train an emulator. Run a DA cycle. Persist via the registry.
+:::
 
--   :material-toolbox: **[Tutorials](tutorials/train-emulator.md)**
+:::{card} Installation
+:link: installation.md
 
-    ---
+Per-package install matrix. Every extra spelled out.
+:::
 
-    End-to-end walkthroughs. Train an emulator. Run a DA cycle.
-    Persist via the registry.
+:::{card} API Reference
+:link: https://jejjohnson.github.io/pipekit/reference/pipekit-ops/
 
--   :material-package-variant: **[Installation](installation.md)**
+`mkdocstrings`-generated reference, kept in sync with source.
+:::
 
-    ---
+:::{card} Notebooks
+:link: notebooks/pipekit_train_quickstart.ipynb
 
-    Per-package install matrix. Every extra spelled out.
+Executed Jupyter notebooks: an MLP quickstart, and the train → forecast handoff on a toy oscillator.
+:::
 
--   :material-api: **[API Reference](api/pipekit-ops.md)**
-
-    ---
-
-    `mkdocstrings`-generated reference, kept in sync with source.
-
--   :material-notebook: **[Notebooks](notebooks/pipekit_train_quickstart.ipynb)**
-
-    ---
-
-    Executed Jupyter notebooks: an MLP quickstart, and the train → forecast
-    handoff on a toy oscillator.
-
-</div>
+::::
 
 ## The packages
 
@@ -136,13 +132,13 @@ Each package has its own README on GitHub, which is also its PyPI page.
 
 | | Package | Purpose | Status | Version |
 |---|---|---|---|---|
-| ![](assets/packages/pipekit-ops/icon.svg){ width="28" } | [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) | **Foundation.** The operator core: `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. | ✅ implemented | 0.2.1 |
-| ![](assets/packages/pipekit-array/icon.svg){ width="28" } | [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) | **Foundation.** Array API dispatch, `DimArray`, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `KernelOp`, `Estimator`; the array QC asserts, the array `Histogram` and `ModelOp` are still to come. | 🚧 partial | 0.1.1 |
-| ![](assets/packages/pipekit-cycle/icon.svg){ width="28" } | [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) | Time-stepping, DA cycles, observation/forward protocols. | ✅ implemented | 0.1.0 |
-| ![](assets/packages/pipekit-experiment/icon.svg){ width="28" } | [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) | Content-addressed model registry, tracker protocols, tool adapters. | ✅ implemented | 0.1.0 |
-| ![](assets/packages/pipekit-evaluate/icon.svg){ width="28" } | [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. | 🚧 partial | 0.2.0 |
-| ![](assets/packages/pipekit-train/icon.svg){ width="28" } | [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. | ✅ implemented | 0.2.0 |
-| ![](assets/packages/pipekit-jax/icon.svg){ width="28" } | [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. | ✅ implemented | 0.1.0 |
+| <img src="assets/packages/pipekit-ops/icon.svg" width="28" alt=""> | [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) | **Foundation.** The operator core: `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. | ✅ implemented | 0.2.1 |
+| <img src="assets/packages/pipekit-array/icon.svg" width="28" alt=""> | [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) | **Foundation.** Array API dispatch, `DimArray`, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `KernelOp`, `Estimator`; the array QC asserts, the array `Histogram` and `ModelOp` are still to come. | 🚧 partial | 0.1.1 |
+| <img src="assets/packages/pipekit-cycle/icon.svg" width="28" alt=""> | [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) | Time-stepping, DA cycles, observation/forward protocols. | ✅ implemented | 0.1.0 |
+| <img src="assets/packages/pipekit-experiment/icon.svg" width="28" alt=""> | [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) | Content-addressed model registry, tracker protocols, tool adapters. | ✅ implemented | 0.1.0 |
+| <img src="assets/packages/pipekit-evaluate/icon.svg" width="28" alt=""> | [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. | 🚧 partial | 0.2.0 |
+| <img src="assets/packages/pipekit-train/icon.svg" width="28" alt=""> | [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. | ✅ implemented | 0.2.0 |
+| <img src="assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. | ✅ implemented | 0.1.0 |
 
 ## Links
 

@@ -57,7 +57,7 @@ docs/design/
    **[datasets](api/datasets.md)** → **[primitives](api/primitives.md)**
    → **[components](api/components.md)** → **[models](api/models.md)**
    → **[adapters](api/adapters.md)**.
-5. **[examples/](examples/)** — see the three training shapes in code.
+5. **[examples/](examples/README.md)** — see the three training shapes in code.
 6. **[boundaries.md](boundaries.md)** — what's deferred and why.
 
 ## Sources

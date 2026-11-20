@@ -6,7 +6,7 @@
 - **Package Manager**: uv, as a workspace of eight packages
 - **Layout**: `packages/<pkg>/src/<pkg_module>/` per package (for example `packages/pipekit-ops/src/pipekit_ops/`)
 - **Testing**: pytest
-- **Docs**: MkDocs + Material + mkdocstrings + mkdocs-jupyter
+- **Docs**: mystmd (prose and notebooks) + Zensical and mkdocstrings (API reference)
 
 The packages are the core `pipekit-ops`, its six sister packages (`pipekit-array`, `pipekit-cycle`, `pipekit-experiment`, `pipekit-evaluate`, `pipekit-train`, `pipekit-jax`) and the code-free `pipekit` umbrella.
 `CLAUDE.md` has the module layout and the dependency rules.
@@ -50,7 +50,7 @@ make typecheck
 | `packages/<pkg>/src/<pkg_module>/` | Source code of one package |
 | `packages/<pkg>/tests/` | That package's test suite |
 | `packages/<pkg>/docs/design/` | Design notes, for the larger packages |
-| `docs/` | Documentation (MkDocs) |
+| `docs/` | Documentation (mystmd prose, Zensical API reference) |
 | `notebooks/` | Jupyter notebooks |
 | `scripts/` | Repo scripts (for example the README figures) |
 

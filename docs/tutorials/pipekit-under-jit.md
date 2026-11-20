@@ -107,10 +107,11 @@ check_jax_operator(Laplacian(dx=DX), jnp.sin(2 * jnp.pi * x))
 check_jax_operator(LinComb(coeffs=[0.1, -1.0]), x, x**2)
 ```
 
-!!! note "Compile with `eqx.filter_jit`"
-    `jax.jit(op)` hashes the callable, and an `eqx.Module` with array
-    fields is unhashable. Use `eqx.filter_jit(op)`, or `jax.jit` on a
-    function that takes the operator as an argument.
+:::{note} Compile with `eqx.filter_jit`
+`jax.jit(op)` hashes the callable, and an `eqx.Module` with array
+fields is unhashable. Use `eqx.filter_jit(op)`, or `jax.jit` on a
+function that takes the operator as an argument.
+:::
 
 ## 2. One step as a graph
 

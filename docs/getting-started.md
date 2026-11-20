@@ -209,4 +209,4 @@ The full end-to-end notebook is at [notebooks/pipekit_train_cycle_handoff.ipynb]
 - **[Concepts](concepts.md)**: the 10-minute mental model. Read this if anything above felt magic.
 - **[Installation](installation.md)**: the per-package install matrix.
 - **[Tutorials](tutorials/train-emulator.md)**: substantive end-to-end walkthroughs.
-- **[API reference](api/pipekit-ops.md)**: generated from docstrings.
+- **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-ops/)**: generated from docstrings.

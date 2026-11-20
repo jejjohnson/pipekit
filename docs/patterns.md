@@ -3,13 +3,15 @@
 *The shapes real pipelines take once they leave the notebook, which pipekit
 pieces each one uses, and what is still missing.*
 
-??? note "About this page"
-    | | |
-    |---|---|
-    | **Covers** | Fourteen deployment patterns and four habits that cut across them |
-    | **Read first** | [A tour of the core](core-tour.md) |
-    | **Worked examples** | The [tutorials](tutorials/anomaly-graph.md), linked from each pattern |
-    | **History** | Distilled from Report 9 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/blob/main/docs/reports/09_use_cases.md), which walks twenty cases through one domain (a methane plume from a satellite scene) and now points here |
+:::{note} About this page
+:class: dropdown
+| | |
+|---|---|
+| **Covers** | Fourteen deployment patterns and four habits that cut across them |
+| **Read first** | [A tour of the core](core-tour.md) |
+| **Worked examples** | The [tutorials](tutorials/anomaly-graph.md), linked from each pattern |
+| **History** | Distilled from Report 9 of the [GeoStack design reports](https://github.com/jejjohnson/geostack/blob/main/docs/reports/09_use_cases.md), which walks twenty cases through one domain (a methane plume from a satellite scene) and now points here |
+:::
 
 A pipeline is written once and then used in many places: a notebook, a batch job, a web service, a scheduled family of runs, an audit.
 pipekit's bet is that these are the *same object* run by different runners, so the patterns below are mostly about which runner to put around an `Operator`, and which of its properties (a config, a hash, pickleability) the runner relies on.
@@ -54,6 +56,7 @@ class Threshold(Operator):
 
 ## Exploration and batch
 
+(1-explore-then-batch)=
 ### 1. Explore, then batch
 
 **The problem.** A pipeline grows in a notebook, one step at a time, with
@@ -85,6 +88,7 @@ snap.captures["clean"], prof.report()  # what the exploration saw
 **Today.** All of it.
 `ShapeTrace(extra=...)` adds a line for whatever else a carrier carries (units, a coordinate system).
 
+(2-etl-over-many-inputs)=
 ### 2. ETL over many inputs
 
 **The problem.** One pipeline, many inputs (regions, files, stations, days),
@@ -103,6 +107,7 @@ Run `check_pickleable(pipeline)` before fanning out: closures do not cross proce
 `ProcessMap(pipeline, on_error=...)` is the same map as a preset, but it keeps the platform's default start method and raises a `FutureWarning` when that is not spawn, as on Linux (fork); the preset adopts spawn in the next minor release.
 The executor can also be chosen at deployment time: `Map(pipeline, executor="scope")` runs on whatever `executor_scope(...)` binds around the call.
 
+(3-validation-as-operators)=
 ### 3. Validation as operators
 
 **The problem.** Checks scattered through glue code are skipped, duplicated,
@@ -118,6 +123,7 @@ Put the hard checks at the boundaries (after loading, before the model, before w
 `AssertSignature("... y x", dtype=...)` checks named dims and dtype, at build time through `compute_output_signature` as well as at run time.
 Array-aware checks (finite values, value ranges, across array libraries) are planned for `pipekit-array`; until then `AssertThat` or `AssertCallable` takes any predicate.
 
+(4-fusing-several-inputs)=
 ### 4. Fusing several inputs
 
 **The problem.** A product needs two or more sources at once: two sensors, a
@@ -142,6 +148,7 @@ Shape inference stops at the graph's edge.
 
 ## Machine learning
 
+(5-one-preprocessing-object-for-training-and-serving)=
 ### 5. One preprocessing object for training and serving
 
 **The problem.** Training normalises with one piece of code and serving with
@@ -166,6 +173,7 @@ serve = registry.load("scaler") | model_template.with_weights(
 `JaxModelOp.with_weights`). The tutorial fits the scaler on the training split
 only, so validation never sees its statistics.
 
+(6-cycles-time-stepping-and-assimilation)=
 ### 6. Cycles: time stepping and assimilation
 
 **The problem.** Forecast, observe, correct, repeat: the carrier is a state,
@@ -182,6 +190,7 @@ operators around the cycle.
 
 ## Serving
 
+(7-an-inference-service)=
 ### 7. An inference service
 
 **The problem.** A web handler receives a request, runs a pipeline and must
@@ -196,6 +205,7 @@ Return the pipeline's content hash with every answer, so a response can be trace
 `Timeout(op, seconds)` bounds one slow call and `RateLimit(op, calls, period)` bounds how often an upstream service is called.
 pipekit provides no server: LitServe, FastAPI or anything else hosts the operator.
 
+(8-promotion-by-tag)=
 ### 8. Promotion by tag
 
 **The problem.** Several candidate versions exist; one of them is "the" model
@@ -224,6 +234,7 @@ registry.store(Threshold(k=3.0)) == v1  # → True: same config, same hash
 
 **Today.** All of it.
 
+(9-pipelines-from-users)=
 ### 9. Pipelines from users
 
 **The problem.** Users (or another team, or a queue) send pipelines as data.
@@ -262,6 +273,7 @@ not resolved, so a sandboxed config cannot read the environment.
 
 ## Reproducibility and operations
 
+(10-a-pinned-artifact)=
 ### 10. A pinned artifact
 
 **The problem.** A result has to be reproducible months later, for a review,
@@ -281,6 +293,7 @@ it back with the same `state`.
 **Today.** All of it. `TrainingLoop.run()` returns a `TrainingArtifact` when
 `pipekit-experiment` is installed.
 
+(11-orchestrator-tasks-with-deterministic-keys)=
 ### 11. Orchestrator tasks with deterministic keys
 
 **The problem.** An orchestrator (Prefect, Dagster, Airflow, a cron job)
@@ -331,6 +344,7 @@ with store_scope(results=results):
     flags = Map(detect)(items)  # → [True, False]
 ```
 
+(12-ab-comparison)=
 ### 12. A/B comparison
 
 **The problem.** A new pipeline version must be compared with the current one
@@ -352,6 +366,7 @@ ab(2.8)  # → {'a': False, 'b': True}
 configurations, and a report of where their outputs disagree, do not.
 `pipekit-evaluate`'s scorers and `EvaluationReport` are the natural home.
 
+(13-scheduled-families-backfills-and-what-if-reruns)=
 ### 13. Scheduled families, backfills and what-if reruns
 
 **The problem.** The same pipeline runs every day (monitoring), over a past
@@ -364,6 +379,7 @@ changed, so it has a new hash and writes beside the original, never over it.
 
 **Today.** All of it; the schedule belongs to the orchestrator.
 
+(14-the-feedback-loop)=
 ### 14. The feedback loop
 
 **The problem.** Reviewers accept or reject the pipeline's outputs, and those

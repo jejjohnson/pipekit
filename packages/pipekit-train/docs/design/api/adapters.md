@@ -222,6 +222,7 @@ test_equinox_sharding.py`) and a scripted 2-process `jax.distributed` smoke
 
 ---
 
+(keras-v03)=
 ## Keras (v0.3 scaffold)
 
 `pipekit_train.adapters.keras`. Extras: `pipekit-train[keras]`.

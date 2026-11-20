@@ -117,3 +117,6 @@ venv.bak/
 
 # Plans (tracked via GitHub issues, not committed)
 .plans/
+
+# the assembled two-tool docs site (scripts/build_docs.py)
+/public

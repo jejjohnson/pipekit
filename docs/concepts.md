@@ -186,4 +186,4 @@ Most reshaping that used to need a `Lambda` now has an operator that round-trips
 - **[Getting Started](getting-started.md)**: install, your first pipeline, your first DA cycle, your first registry round-trip.
 - **[Installation](installation.md)**: the per-package install matrix with every extras combination.
 - **[Tutorials](tutorials/train-emulator.md)**: substantive walkthroughs; train an emulator, run a DA cycle.
-- **[API reference](api/pipekit-ops.md)**: generated from docstrings.
+- **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-ops/)**: generated from docstrings.

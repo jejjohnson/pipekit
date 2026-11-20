@@ -436,6 +436,7 @@ async def handler(items):
     return await AsyncMap(Scale(2.0)).run(items)  # → [2.0, 4.0] for [1, 2]
 ```
 
+(map)=
 ### `Map`
 
 `Map(op, executor=...)` is the one engine the four wrappers are built on:
