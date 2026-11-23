@@ -442,6 +442,15 @@ def test_an_output_with_a_core_dim_is_broadcast_before_it() -> None:
     assert total.dims == ("x",)
 
 
+def test_a_core_dim_of_the_size_of_the_loop_dim_is_not_mistaken_for_it() -> None:
+    spectrum = DimArray(np.arange(3.0), ("band",))
+    gain = DimArray(np.ones(3), ("x",))
+    op = KernelOp(lambda s, g: np.arange(3.0), "(c),()->(c)", core={"c": "band"})
+    out = op(spectrum, gain)
+    assert out.dims == ("band", "x")
+    np.testing.assert_array_equal(out.data, np.stack([np.arange(3.0)] * 3, -1))
+
+
 def test_an_output_of_the_wrong_shape_raises() -> None:
     x = DimArray(np.ones(3), ("x",))
     with pytest.raises(ValueError, match="broadcast"):

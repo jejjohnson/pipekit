@@ -350,6 +350,8 @@ class _Plan:
     # per output: the permutation back to the target order (None if none is
     # needed), and that order
     restore: tuple[tuple[tuple[int, ...] | None, tuple[str, ...]], ...]
+    # how many loop dims the inputs have together
+    n_loop: int
 
 
 @functools.lru_cache(maxsize=1024)
@@ -383,7 +385,7 @@ def _plan(
         produced = (*loop, *(core[c] for c in group))
         axes = tuple(produced.index(d) for d in target)
         restore.append((_unless_identity(axes), target))
-    return _Plan(tuple(arrange), size_checks, tuple(restore))
+    return _Plan(tuple(arrange), size_checks, tuple(restore), len(loop))
 
 
 def _unless_identity(axes: tuple[int, ...]) -> tuple[int, ...] | None:
@@ -421,13 +423,17 @@ def _run_named(
         for position in inserts:
             moved = xp.expand_dims(moved, axis=position)
         arrays.append(moved)
-    result = full_loop(_call(kernel, spec, kwargs, backend), spec)(*arrays)
+    result = _call(kernel, spec, kwargs, backend)(*arrays)
     many = len(plan.restore) > 1
     results = tuple(result) if many else (result,)
+    # as full_loop does, without its cost: every array has all the loop axes here
+    loops = {x.shape[: plan.n_loop] for x in arrays}
+    loop = loops.pop() if len(loops) == 1 else _loop_shape(list(loops))
     template, template_adapter = carriers[0], adapters[0]
     wrapped = []
     for out, (axes, target) in zip(results, plan.restore, strict=True):
-        moved_out = _permute(xp, out, axes)
+        full = _broadcast(out, loop, len(target) - plan.n_loop)
+        moved_out = _permute(xp, full, axes)
         wrapped.append(template_adapter.rewrap(template, moved_out, target))
     return tuple(wrapped) if many else wrapped[0]
 
