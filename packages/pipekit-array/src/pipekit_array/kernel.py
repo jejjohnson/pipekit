@@ -31,6 +31,11 @@ Rules from the spike (geotoolz#516):
 - **Outputs keep the first input's dim order** (F2): a gufunc puts core
   dims last, so each output is transposed back, with dims new to the
   output last.
+- **Every output has the loop dims of all the inputs.** An output that
+  ignores an input is broadcast (#246).
+- **A DataArray's name and attributes are dropped,** because the kernel
+  changes the quantity and its unit. Coordinates keep theirs, and other
+  carriers keep what their adapter's ``rewrap`` keeps.
 - **``geometry=`` needs one geometry per call** (F4): on a carrier whose
   adapter reports ``batch_dims`` (per-item transforms), `KernelOp` raises
   and names ``map_over``.
@@ -46,6 +51,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import itertools
 import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, Protocol, cast, runtime_checkable
@@ -344,6 +350,8 @@ class _Plan:
     # per output: the permutation back to the target order (None if none is
     # needed), and that order
     restore: tuple[tuple[tuple[int, ...] | None, tuple[str, ...]], ...]
+    # how many loop dims the inputs have together
+    n_loop: int
 
 
 @functools.lru_cache(maxsize=1024)
@@ -377,7 +385,7 @@ def _plan(
         produced = (*loop, *(core[c] for c in group))
         axes = tuple(produced.index(d) for d in target)
         restore.append((_unless_identity(axes), target))
-    return _Plan(tuple(arrange), size_checks, tuple(restore))
+    return _Plan(tuple(arrange), size_checks, tuple(restore), len(loop))
 
 
 def _unless_identity(axes: tuple[int, ...]) -> tuple[int, ...] | None:
@@ -418,12 +426,61 @@ def _run_named(
     result = _call(kernel, spec, kwargs, backend)(*arrays)
     many = len(plan.restore) > 1
     results = tuple(result) if many else (result,)
+    # as full_loop does, without its cost: every array has all the loop axes here
+    loops = {x.shape[: plan.n_loop] for x in arrays}
+    loop = loops.pop() if len(loops) == 1 else _loop_shape(list(loops))
     template, template_adapter = carriers[0], adapters[0]
     wrapped = []
     for out, (axes, target) in zip(results, plan.restore, strict=True):
-        moved_out = _permute(xp, out, axes)
+        full = _broadcast(out, loop, len(target) - plan.n_loop)
+        moved_out = _permute(xp, full, axes)
         wrapped.append(template_adapter.rewrap(template, moved_out, target))
     return tuple(wrapped) if many else wrapped[0]
+
+
+def full_loop(kernel: Callable[..., Any], spec: KernelSpec) -> Callable[..., Any]:
+    """``kernel`` with every output broadcast to the loop dims of all the inputs.
+
+    An output may ignore an input (z of a position on a sphere does not
+    depend on the longitude), and then lacks its dims or has them in size 1.
+    """
+    if spec.vectorize:  # vectorize maps over all the loop dims itself
+        return kernel
+    in_cores = [len(group) for group in spec.inputs]
+    out_cores = [len(group) for group in spec.outputs]
+
+    def run(*arrays: Any, **kwargs: Any) -> Any:
+        result = kernel(*arrays, **kwargs)
+        loops = [
+            x.shape[: len(x.shape) - n] for x, n in zip(arrays, in_cores, strict=True)
+        ]
+        loop = _loop_shape(loops)
+        if len(out_cores) == 1:
+            return _broadcast(result, loop, out_cores[0])
+        outs = zip(result, out_cores, strict=True)
+        return tuple(_broadcast(out, loop, n) for out, n in outs)
+
+    return run
+
+
+def _loop_shape(shapes: list[tuple[int, ...]]) -> tuple[int, ...]:
+    """The shapes broadcast together, aligned at the right."""
+    if all(shape == shapes[0] for shape in shapes):
+        return shapes[0]
+    reversed_shapes = [tuple(reversed(shape)) for shape in shapes]
+    sizes = itertools.zip_longest(*reversed_shapes, fillvalue=1)
+    return tuple(next((n for n in axis if n != 1), 1) for axis in sizes)[::-1]
+
+
+def _broadcast(out: Any, loop: tuple[int, ...], n_core: int) -> Any:
+    """``out`` in the shape of the loop dims and its own core dims."""
+    shape = getattr(out, "shape", None)
+    if shape is None or len(shape) < n_core:
+        return out
+    target = (*loop, *shape[len(shape) - n_core :])
+    if shape == target:
+        return out
+    return namespace_of(out).broadcast_to(out, target)
 
 
 def _permute(xp: Any, data: Any, axes: tuple[int, ...] | None) -> Any:
@@ -494,6 +551,10 @@ class KernelOp(Operator):
             parameter has the name of a derived-geometry keyword.
         TypeError: ``geometry`` is not a mapping of callables (pass a kernel
             parameter named ``geometry`` through ``params=``).
+
+    Every output has the loop dims of all the inputs, in the first input's
+    order. On DataArrays an output keeps the coordinates and has no name or
+    attributes: a density is not in the pressure's units.
 
     ``KernelOp`` holds a user function, so its config is a debug repr only
     (``forbid_in_yaml``, like `pipekit_ops.Lambda`); a named operator built on

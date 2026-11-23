@@ -31,7 +31,12 @@ from pipekit_ops import Signature, get_adapter, register_adapter
 
 from pipekit_array.dimarray import DimArray
 from pipekit_array.dims import check_index_labels
-from pipekit_array.kernel import BackendError, KernelSpec, kernel_output_dims
+from pipekit_array.kernel import (
+    BackendError,
+    KernelSpec,
+    full_loop,
+    kernel_output_dims,
+)
 
 
 __all__ = ["XarrayAdapter", "from_xarray", "register"]
@@ -263,7 +268,8 @@ class XarrayAdapter:
 
         Core dims move last; ``kwargs`` (params and derived geometry) are
         passed whole; output-only core dims take their sizes from
-        ``spec.sizes``; outputs come back in the first input's dim order (F2).
+        ``spec.sizes``; outputs come back with the loop dims of all the inputs,
+        in the first input's dim order (F2), without a name or attributes.
 
         Raises:
             BackendError: The spec does not list ``"xarray"``.
@@ -281,7 +287,7 @@ class XarrayAdapter:
                 letter_size[letter] = int(x.sizes[core[letter]])
         output_sizes = {core[out]: letter_size[source] for out, source in spec.sizes}
         result = xr.apply_ufunc(
-            kernel,
+            full_loop(kernel, spec),
             *checked,
             input_core_dims=in_dims,
             output_core_dims=out_dims,
@@ -289,6 +295,8 @@ class XarrayAdapter:
             vectorize=spec.vectorize,
             dask="parallelized",
             join="exact",
+            # for the coordinates: False would drop their attributes too
+            keep_attrs="drop_conflicts",
             output_dtypes=_output_dtypes(kernel, spec, kwargs, checked, letter_size),
             dask_gufunc_kwargs={"allow_rechunk": True, "output_sizes": output_sizes},
         )
@@ -296,8 +304,16 @@ class XarrayAdapter:
             spec, core, [tuple(map(str, x.dims)) for x in checked]
         )
         if len(out_dims) > 1:
-            return tuple(r.transpose(*t) for r, t in zip(result, targets, strict=True))
-        return result.transpose(*targets[0])
+            outs = zip(result, targets, strict=True)
+            return tuple(anonymous(out.transpose(*dims)) for out, dims in outs)
+        return anonymous(result.transpose(*targets[0]))
+
+
+def anonymous(x: xr.DataArray) -> xr.DataArray:
+    """``x`` without its name and attributes, which described another quantity."""
+    out = x.rename(None)
+    out.attrs = {}
+    return out
 
 
 def _label_array(values: tuple[Any, ...]) -> Any:

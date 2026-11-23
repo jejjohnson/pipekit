@@ -450,3 +450,53 @@ def test_rewrap_drops_a_scalar_coord_named_after_a_new_dim() -> None:
     # isel leaves a scalar band coordinate; xarray refuses it next to a band dim
     out = XarrayAdapter().rewrap(first, np.zeros((3, 4)), ("band", "x"))
     assert "band" not in out.coords
+
+
+# -- KernelOp outputs: shape, name and attributes (#246) -------------------------------
+
+
+def _to_xyz(lon: Any, lat: Any) -> tuple[Any, Any, Any]:
+    """Unit vectors; z does not depend on the longitude."""
+    return np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_every_output_has_the_loop_dims_of_all_the_inputs(lazy: bool) -> None:
+    lon = xr.DataArray([0.0, 1.0, 2.0], dims="lon")
+    lat = xr.DataArray([0.0, 1.0], dims="lat")
+    expected = _to_xyz(lon, lat)
+    if lazy:
+        lon, lat = lon.chunk({"lon": 2}), lat.chunk({"lat": 1})
+    outs = KernelOp(_to_xyz, "(),()->(),(),()", core={})(lon, lat)
+    for out, want in zip(outs, expected, strict=True):
+        assert out.dims == ("lon", "lat")
+        assert (out.chunks is not None) is lazy
+        np.testing.assert_allclose(out, want.broadcast_like(out).transpose(*out.dims))
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_the_name_and_attributes_go_and_those_of_the_coordinates_stay(
+    lazy: bool,
+) -> None:
+    level = ("level", [1000, 800], {"units": "hPa"})
+    p = xr.DataArray(
+        [1e5, 8e4], {"level": level}, ("level",), name="p", attrs={"units": "Pa"}
+    )
+    if lazy:
+        p = p.chunk({"level": 1})
+    density = KernelOp(lambda p, t: p / (287.0 * t), "(),()->()", core={})
+    pair = KernelOp(lambda p: (p, 2.0 * p), "()->(),()", core={})
+    for out in (density(p, p), *pair(p)):
+        assert out.name is None
+        assert out.attrs == {}
+        assert out.level.attrs == {"units": "hPa"}
+    assert p.name == "p"
+    assert p.attrs == {"units": "Pa"}
+
+
+def test_a_vectorized_kernel_that_ignores_an_input() -> None:
+    lon = xr.DataArray([0.0, 1.0, 2.0], dims="lon")
+    lat = xr.DataArray([0.0, 1.0], dims="lat")
+    spec = KernelSpec("(),()->()", vectorize=True)
+    out = KernelOp(lambda lon, lat: np.sin(lat), spec, core={})(lon, lat)
+    assert out.sizes == {"lon": 3, "lat": 2}

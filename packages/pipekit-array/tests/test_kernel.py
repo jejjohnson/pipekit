@@ -405,3 +405,53 @@ def test_kernel_signature_dtype_is_declared_or_unknown() -> None:
     assert declared.compute_output_signature(sig).dtype == "bool"
     with pytest.raises(ValueError, match="dtypes"):
         KernelSpec("(c)->()", dtypes=("bool", "bool"))
+
+
+# -- outputs that ignore an input (#246) -----------------------------------------------
+
+
+def _to_xyz(lon: Any, lat: Any) -> tuple[Any, Any, Any]:
+    """Unit vectors; z does not depend on the longitude."""
+    xp = _xp(lon)
+    return xp.cos(lat) * xp.cos(lon), xp.cos(lat) * xp.sin(lon), xp.sin(lat)
+
+
+def test_every_output_has_the_loop_dims_of_all_the_inputs(xp: Any) -> None:
+    lon = DimArray(xp.asarray([0.0, 1.0, 2.0]), ("lon",))
+    lat = DimArray(xp.asarray([0.0, 1.0]), ("lat",))
+    outs = KernelOp(_to_xyz, "(),()->(),(),()", core={})(lon, lat)
+    assert [out.dims for out in outs] == [("lon", "lat")] * 3
+    assert [out.shape for out in outs] == [(3, 2)] * 3
+    raw = _to_xyz(lon.data[:, None], lat.data)
+    for out, expected in zip(outs, raw, strict=True):
+        np.testing.assert_array_equal(out.data, np.broadcast_to(expected, (3, 2)))
+
+
+def test_an_output_with_a_core_dim_is_broadcast_before_it() -> None:
+    spectrum = DimArray(np.arange(4.0), ("band",))
+    gain = DimArray(np.asarray([1.0, 2.0]), ("x",))
+
+    def kernel(spectrum: Any, gain: Any) -> tuple[Any, Any]:
+        return spectrum, spectrum.sum(-1) * gain
+
+    spectra, total = KernelOp(kernel, "(c),()->(c),()", core={"c": "band"})(
+        spectrum, gain
+    )
+    assert spectra.dims == ("band", "x")
+    np.testing.assert_array_equal(spectra.data, np.stack([np.arange(4.0)] * 2, -1))
+    assert total.dims == ("x",)
+
+
+def test_a_core_dim_of_the_size_of_the_loop_dim_is_not_mistaken_for_it() -> None:
+    spectrum = DimArray(np.arange(3.0), ("band",))
+    gain = DimArray(np.ones(3), ("x",))
+    op = KernelOp(lambda s, g: np.arange(3.0), "(c),()->(c)", core={"c": "band"})
+    out = op(spectrum, gain)
+    assert out.dims == ("band", "x")
+    np.testing.assert_array_equal(out.data, np.stack([np.arange(3.0)] * 3, -1))
+
+
+def test_an_output_of_the_wrong_shape_raises() -> None:
+    x = DimArray(np.ones(3), ("x",))
+    with pytest.raises(ValueError, match="broadcast"):
+        KernelOp(lambda x: np.ones(2), "()->()", core={})(x)
