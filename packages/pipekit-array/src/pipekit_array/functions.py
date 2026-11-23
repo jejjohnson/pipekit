@@ -30,7 +30,7 @@ from typing import Any, cast
 
 from pipekit_ops import BackendError, get_adapter
 
-from pipekit_array.kernel import KernelSpec, run_kernel
+from pipekit_array.kernel import KernelSpec, full_loop, run_kernel
 
 
 try:
@@ -285,9 +285,13 @@ def _apply_xarray(
     function: Callable[..., Any], bound: inspect.BoundArguments, n_outputs: int
 ) -> Any:
     """Call ``function`` through ``xarray.apply_ufunc`` on its DataArrays."""
+    # xarray is imported by now, so its adapter's module imports nothing new
+    from pipekit_array.xarray import anonymous
+
     names = _labelled_names(bound, is_dataarray)
+    kernel = _on_data(function, bound, names)
     result = sys.modules["xarray"].apply_ufunc(
-        _on_data(function, bound, names, n_outputs),
+        full_loop(kernel, _spec(len(names), n_outputs)),
         *(bound.arguments[name] for name in names),
         output_core_dims=[()] * n_outputs,
         join="exact",
@@ -296,15 +300,8 @@ def _apply_xarray(
         keep_attrs="drop_conflicts",
     )
     if n_outputs == 1:
-        return _anonymous(result)
-    return tuple(_anonymous(array) for array in result)
-
-
-def _anonymous(array: Any) -> Any:
-    """A DataArray without its name and attributes, which described the input."""
-    array = array.rename(None)
-    array.attrs = {}
-    return array
+        return anonymous(result)
+    return tuple(anonymous(array) for array in result)
 
 
 def _apply_carriers(
@@ -313,7 +310,7 @@ def _apply_carriers(
     """Call ``function`` through `run_kernel` on its carriers."""
     names = _labelled_names(bound, _is_carrier)
     carriers = [bound.arguments[name] for name in names]
-    kernel = _on_data(function, bound, names, n_outputs)
+    kernel = _on_data(function, bound, names)
     return run_kernel(kernel, _spec(len(names), n_outputs), {}, carriers, {})
 
 
@@ -342,20 +339,13 @@ def _labelled_names(
 
 
 def _on_data(
-    function: Callable[..., Any],
-    bound: inspect.BoundArguments,
-    names: list[str],
-    n_outputs: int,
+    function: Callable[..., Any], bound: inspect.BoundArguments, names: list[str]
 ) -> Callable[..., Any]:
-    """``function`` of the labelled arguments' data, with its results broadcast."""
+    """``function`` of the labelled arguments' data."""
 
     def on_data(*data: Any) -> Any:
         bound.arguments.update(zip(names, data, strict=True))
-        values = function(*bound.args, **bound.kwargs)
-        shape = np.broadcast_shapes(*(array.shape for array in data))
-        if n_outputs == 1:
-            return _broadcast(values, shape)
-        return tuple(_broadcast(value, shape) for value in values)
+        return function(*bound.args, **bound.kwargs)
 
     return on_data
 
@@ -365,17 +355,6 @@ def _has_dimensions(value: Any) -> bool:
     if isinstance(value, (list, tuple)):
         return True
     return getattr(value, "ndim", 0) > 0
-
-
-def _broadcast(array: Any, shape: tuple[int, ...]) -> Any:
-    """``array`` in the shape of the inputs together.
-
-    An output may not depend on every input: z of a position on a sphere does
-    not depend on the longitude.
-    """
-    if array.shape == shape:
-        return array
-    return namespace_of(array).broadcast_to(array, shape)
 
 
 @functools.lru_cache
