@@ -292,11 +292,19 @@ def _apply_xarray(
         output_core_dims=[()] * n_outputs,
         join="exact",
         dask="allowed",
-        keep_attrs=False,
+        # for the coordinates: False would drop their attributes too
+        keep_attrs="drop_conflicts",
     )
     if n_outputs == 1:
-        return result.rename(None)
-    return tuple(array.rename(None) for array in result)
+        return _anonymous(result)
+    return tuple(_anonymous(array) for array in result)
+
+
+def _anonymous(array: Any) -> Any:
+    """A DataArray without its name and attributes, which described the input."""
+    array = array.rename(None)
+    array.attrs = {}
+    return array
 
 
 def _apply_carriers(

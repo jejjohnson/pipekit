@@ -353,7 +353,7 @@ def temperature(xr):
         np.asarray([[280.0, 290.0], [250.0, 260.0]], dtype=np.float32),
         dims=("level", "x"),
         coords={
-            "level": [1000, 800],
+            "level": ("level", [1000, 800], {"units": "hPa"}),
             "x": [1, 2],
             "height": ("level", [100.0, 2000.0]),
         },
@@ -388,7 +388,9 @@ def test_coordinates_stay_and_the_name_and_attributes_go(pressure, temperature) 
         assert set(out.coords) == {"level", "x", "height"}
         assert out.name is None
         assert out.attrs == {}
+        assert out.level.attrs == {"units": "hPa"}
         assert out.dtype == np.float32
+    assert temperature.attrs == {"units": "K"}
 
 
 def test_every_output_has_the_dimensions_of_all_the_inputs(xr) -> None:
