@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.1...pipekit-array-v0.1.2) (2026-11-23)
+
+
+### Features
+
+* **array:** plain functions get one array backend, pipekit_array.functions ([#248](https://github.com/jejjohnson/pipekit/issues/248)) ([68532bd](https://github.com/jejjohnson/pipekit/commit/68532bde543f4cdb9caba08528c0668e76e59a1a)), closes [#245](https://github.com/jejjohnson/pipekit/issues/245)
+
+
+### Bug Fixes
+
+* **array:** every KernelOp output has all the loop dims, and on DataArrays no name or attributes ([#250](https://github.com/jejjohnson/pipekit/issues/250)) ([b07494d](https://github.com/jejjohnson/pipekit/commit/b07494d3703d373e9519f3a27888bc669d4480ab)), closes [#246](https://github.com/jejjohnson/pipekit/issues/246)
+
 ## [0.1.1](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.0...pipekit-array-v0.1.1) (2026-11-07)
 
 

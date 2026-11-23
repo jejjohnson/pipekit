@@ -120,7 +120,7 @@ from pipekit_array.reductions import MeanScalar
 from pipekit_array.rows import RowLayout, from_rows, to_rows
 
 
-__version__ = "0.1.1"  # x-release-please-version
+__version__ = "0.1.2"  # x-release-please-version
 
 register_adapter(DimArray, DimArrayAdapter())
 
