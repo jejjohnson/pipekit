@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.1...pipekit-ops-v0.2.2) (2026-11-23)
+
+
+### Features
+
+* **array:** plain functions get one array backend, pipekit_array.functions ([#248](https://github.com/jejjohnson/pipekit/issues/248)) ([68532bd](https://github.com/jejjohnson/pipekit/commit/68532bde543f4cdb9caba08528c0668e76e59a1a)), closes [#245](https://github.com/jejjohnson/pipekit/issues/245)
+
 ## [0.2.1](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.0...pipekit-ops-v0.2.1) (2026-11-07)
 
 
