@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.2...pipekit-array-v0.1.3) (2026-11-23)
+
+
+### Features
+
+* **array:** elementwise takes labelled arrays in variadic arguments ([#251](https://github.com/jejjohnson/pipekit/issues/251)) ([acbdb96](https://github.com/jejjohnson/pipekit/commit/acbdb961f9ab53dce45e7e17b344428a3917b899))
+
 ## [0.1.2](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.1...pipekit-array-v0.1.2) (2026-11-23)
 
 
