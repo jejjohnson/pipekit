@@ -37,3 +37,27 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  array-backends:
+    name: pipekit-array without array-api-compat, and on torch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --group dev
+      # The dev group has the [compat] extra; a user may not.
+      - name: Run the pipekit-array tests without array-api-compat
+        run: |
+          uv pip uninstall array-api-compat
+          uv run --no-sync pytest packages/pipekit-array/tests
+      # torch is large, so it is in no dependency group. 2.10 is pinned because
+      # its asarray detaches a tensor; 2.13 no longer does.
+      - name: Run pipekit_array.functions on torch
+        run: |
+          uv pip install array-api-compat
+          uv pip install "torch==2.10.*" --index-url https://download.pytorch.org/whl/cpu
+          uv run --no-sync pytest packages/pipekit-array/tests/test_functions.py

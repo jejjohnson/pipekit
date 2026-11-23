@@ -34,14 +34,16 @@ The scikit-learn import is lazy: install the ``[sklearn]`` extra.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, ClassVar, Literal, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
-import numpy as np
 from pipekit_ops import Operator, backend_of
 
 from pipekit_array.dims import adapter_of
 from pipekit_array.rows import RowLayout, from_rows, to_rows
 
+
+if TYPE_CHECKING:
+    import numpy as np
 
 __all__ = ["Estimator", "NanPolicy"]
 
@@ -141,6 +143,7 @@ class Estimator(Operator):
             ValueError: ``nan_policy="raise"`` and ``x`` has a non-finite
                 entry.
         """
+        import numpy as np
         from sklearn.base import clone
 
         rows, layout = to_rows(x, self.sample_dims)
@@ -220,6 +223,8 @@ class Estimator(Operator):
         return self.layout_
 
     def _apply_method(self, name: str, x: Any) -> Any:
+        import numpy as np
+
         layout = self._fitted()
         rows, x_layout = to_rows(x, self.sample_dims)
         _require_same_features(x_layout, layout)
@@ -244,6 +249,8 @@ class Estimator(Operator):
 
     def _check(self, table: np.ndarray) -> None:
         """Raise on a non-finite entry under ``nan_policy="raise"``."""
+        import numpy as np
+
         if self.nan_policy == "raise" and not np.isfinite(table).all():
             raise ValueError(
                 "Estimator: the input has non-finite entries (nan_policy='raise'); "
@@ -256,6 +263,8 @@ class Estimator(Operator):
 
     def _restore_features(self, cols: np.ndarray) -> np.ndarray:
         """Re-insert features dropped at fit time as ``NaN`` columns."""
+        import numpy as np
+
         if self.kept_features_ is None:
             return cols
         out = np.full((cols.shape[0], self.kept_features_.size), np.nan)
@@ -265,6 +274,8 @@ class Estimator(Operator):
 
 def _host(rows: Any, what: str) -> np.ndarray:
     """``rows`` as a NumPy array; a JAX tracer raises, naming eager use."""
+    import numpy as np
+
     if backend_of(rows) == "jax":
         from jax.core import Tracer
 
@@ -297,6 +308,8 @@ def _require_same_features(got: RowLayout, fitted: RowLayout) -> None:
 
 def _fill_rows(values: np.ndarray, keep: np.ndarray, n_cols: int | None) -> np.ndarray:
     """``values`` for the kept rows, ``NaN`` in the others."""
+    import numpy as np
+
     if keep.all():
         return values
     shape = (keep.size,) if n_cols is None else (keep.size, n_cols)
@@ -307,10 +320,14 @@ def _fill_rows(values: np.ndarray, keep: np.ndarray, n_cols: int | None) -> np.n
 
 
 def _finite_rows(table: np.ndarray) -> np.ndarray:
+    import numpy as np
+
     return np.asarray(np.isfinite(table).all(axis=1))
 
 
 def _all(table: np.ndarray) -> np.ndarray:
+    import numpy as np
+
     return np.ones(table.shape[0], dtype=bool)
 
 

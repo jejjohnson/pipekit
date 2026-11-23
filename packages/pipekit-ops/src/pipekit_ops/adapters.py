@@ -247,8 +247,13 @@ def signature_of(x: Any) -> Any:
     return adapter.signature(x)
 
 
-class BackendError(TypeError):
-    """Inputs on more than one backend, or a backend the code does not run on."""
+class BackendError(TypeError, ValueError):
+    """Inputs on more than one backend, or a backend the code does not run on.
+
+    A `TypeError`, because the type of an input decides its backend, and a
+    `ValueError`, which the plain functions of `pipekit_array.functions` raise
+    for every other input they cannot take.
+    """
 
 
 def backend_name(data: Any) -> str:

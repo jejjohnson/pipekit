@@ -87,7 +87,7 @@ uv add "pipekit-array[numpy]"
 | `torch` | PyTorch | PyTorch tensors; add `compat` too |
 | `cupy` | CuPy | NumPy-style arrays on a CUDA GPU |
 | `dask` | `dask[array]` | lazy, chunked arrays larger than memory |
-| `compat` | `array-api-compat` | backends without a native `__array_namespace__` (PyTorch) |
+| `compat` | `array-api-compat` | backends without a native `__array_namespace__` (PyTorch); with `numpy`, `pipekit_array.functions` |
 | `xarray` | xarray | the `xr.DataArray` adapter and `DimArray.to_xarray` |
 | `sklearn` | scikit-learn | `Estimator` |
 | `einx` | einx | `pipekit_array.einx`: einx patterns with dim names as axes |
@@ -264,10 +264,11 @@ The estimator sees a `(T Y X, B)` table, and the result comes back with the band
 | `estimator` | `Estimator` | a scikit-learn-style estimator fitted and applied on a named carrier (`[sklearn]`) |
 | `kernel` | `KernelSpec`, `KernelOp` | one array kernel, written once, run on raw arrays and every named carrier |
 | `einx` | `rearrange`, `reduce`, `einsum`, `repeat`, `Einx` | einx with dim names as axes (`[einx]`; `from pipekit_array import einx`) |
+| [`functions`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#plain-functions) | `namespace_of`, `floating_inputs`, `like`, `is_dataarray`, `elementwise` | the array backend of plain functions, which are no operators (`[numpy,compat]`) |
 | `xarray` | the `xr.DataArray` adapter | loaded the first time a DataArray reaches `pipekit_ops.get_adapter` (`[xarray]`) |
 | `testing` | `check_adapter`, `check_kernel_op` | the test kit for carrier libraries that register their own adapter |
 
-`pipekit_array.__all__` has 68 names; `einx`, `xarray` and `testing` are imported as submodules.
+`pipekit_array.__all__` has 68 names; `einx`, `functions`, `xarray` and `testing` are imported as submodules.
 
 ### Not built yet
 

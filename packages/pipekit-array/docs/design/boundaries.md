@@ -56,6 +56,9 @@ This is logged as a v0.2 issue if anyone asks for it.
 
 **As built.** The named layer follows the same rule: multi-input dim functions (`dot`, `combine`, `concat`, …) raise `BackendError` when their inputs sit on more than one backend (`require_one_backend` in `dims.py`).
 
+**Plain functions.** `pipekit_array.functions` does not follow this rule (ADR A23).
+It serves functions that are no operators, where a NumPy constant or coordinate next to a JAX array is common: values on the host join the other library, and two libraries other than NumPy raise `BackendError`.
+
 ### Q7. `Signature` integration depth
 
 The v0.1 plan: operators that reshape (`ApplyAlong`, `Subsample`, `BatchAlong`) override `compute_output_signature`, and operators that pass through inherit.
@@ -71,6 +74,7 @@ These were explicitly considered and rejected for the v0.1 scope.
   The library is a bag of operators.
 - **Backend conversion.** No `to_numpy()`, no `device=` argument, no automatic `x.cpu().numpy()`.
   Conversion lives in user code or in a future opt-in operator (Q6).
+  The one exception is the host rule of `pipekit_array.functions` (ADR A23), which builds a host value (a number, a sequence, a NumPy array) in the library and on the device of the other arrays; it moves no other array.
 - **JAX traceability of operators.** pipekit operators dispatch in two modes (`__call__` vs `_apply`) and are not `jax.jit`-compatible.
   We live with it; `pipekit-jax` is the answer for differentiable or traceable pipelines.
   The dim-level functions trace under `jit` and `vmap` because they are plain functions on a pytree (gates G4 and G5).
@@ -78,6 +82,7 @@ These were explicitly considered and rejected for the v0.1 scope.
 - **DataFrame / pandas / polars operators.** They are not array-shaped and not in the Array API, so they are deferred indefinitely.
 - **Distributed scheduling.** dask graphs work because the user scheduled them; pipekit-array does not run a distributed scheduler (Q3).
 - **GPU memory management.** CuPy and GPU PyTorch users own their device placement; pipekit-array does not call `.to(device)` for them.
+  `pipekit_array.functions` gives a value from the host the device of the other arrays.
 - **A NaN-tolerant arithmetic suite.** `nanmean`, `nansum` and the like are *partially* in the Array API, but the edge cases (all-NaN slices) differ between backends.
   A user who needs them writes a per-backend operator in user code, or waits for a future `pipekit_array.numeric_nan` module; it is out of v0.1 scope.
   As built, `reduce` resolves any namespace function by name, so `reduce(x, "nanmean", "time")` works wherever the namespace has `nanmean`.

@@ -221,6 +221,25 @@ All sixteen shipped in #204 to #207, together with `ApplyAlong`, `BatchAlong` an
 - **A19.** `BatchAlong` restores `dim`'s labels after `concat` (which drops them) when the output length matches the input, and `pad="drop"` raises `ValueError` when every entry would be dropped.
 - **A22.** pipekit-array finds `relabel` by name (`getattr`), so it still imports on a pipekit-ops without `LabelledAdapter`.
 
+## A23. Plain functions have their own array backend, with a host rule
+
+**Decision (23 Nov 2026, #244):** `pipekit_array.functions` holds the array backend of plain functions, which are no operators: `namespace_of`, `floating_inputs`, `like` and `elementwise`.
+Python numbers, sequences and NumPy arrays join the library and the device of the other arrays.
+Two libraries other than NumPy in one call raise `BackendError`, and so does an array of an unknown library.
+`array_namespace` (A1) and the named layer keep refusing NumPy next to JAX.
+`BackendError` derives from `TypeError` and `ValueError`.
+
+**Alternatives considered:**
+
+- **The host rule in `array_namespace`:** one rule for the package.
+  Rejected: the named layer would then move a carrier's data from NumPy to JAX without saying so.
+- **A backend in each library:** geophysix, radiomax and gridax each had one.
+  Rejected: the same device and torch fix was made twice on one day, and the copies of `elementwise` drifted on the same day.
+- **A public `geophysix.arrays`:** Rejected: gridax and radiomax would depend on a physics library for their array dispatch.
+
+**Rationale:** a formula takes constants and coordinates from NumPy next to data on JAX or torch, and the user expects them to join.
+An array of the call's library is cast with `astype(copy=False)` and never rebuilt, because `asarray` detaches a torch tensor in torch 2.5 and 2.10.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
@@ -235,7 +254,7 @@ For reference, the extras that follow from these decisions, as declared in `pack
 | `[xarray]` | `xarray>=2024.6` | `DimArray.to_xarray`; the `DataArray` adapter (A9) |
 | `[sklearn]` | `scikit-learn>=1.4` | `Estimator` (geostack OP-O3) |
 | `[einx]` | `einx>=0.4` | `pipekit_array.einx` (geostack OP-O2) |
-| `[compat]` | `array-api-compat>=1.4` | The `_namespace.py` shim's first path; required for PyTorch |
+| `[compat]` | `array-api-compat>=1.11` | The `_namespace.py` shim's first path; required for PyTorch and, with `[numpy]`, for `pipekit_array.functions` (A23) |
 
 The first design marked `[compat]` as a proposed v0.2 addition; it ships, together with the shim's `array_api_compat` path (`architecture.md` §4).
 

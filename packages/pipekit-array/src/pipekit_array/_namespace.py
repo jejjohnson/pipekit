@@ -48,7 +48,7 @@ def _compat_namespace() -> Callable[..., Any] | None:
     global _compat
     if _compat is _UNSET:
         try:
-            import array_api_compat  # ty: ignore[unresolved-import]
+            import array_api_compat
 
             _compat = array_api_compat.array_namespace
         except ImportError:

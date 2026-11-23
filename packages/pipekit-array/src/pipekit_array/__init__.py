@@ -44,6 +44,11 @@ Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
 `KernelOp`, which runs one L1 kernel on raw arrays and on every named
 carrier; `BackendError` for mixed or unsupported backends.
 
+Plain functions (``[numpy,compat]``): the submodule
+`pipekit_array.functions` holds `namespace_of`, `floating_inputs`, `like` and
+`elementwise`, the array backend of functions that are no operators; import it
+by name.
+
 xarray (``[xarray]``): the ``xr.DataArray`` adapter, `pipekit_array.xarray`,
 loads lazily the first time a DataArray reaches `pipekit_ops.get_adapter`, so
 importing pipekit-array never imports xarray.
