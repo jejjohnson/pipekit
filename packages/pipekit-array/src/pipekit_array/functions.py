@@ -21,6 +21,7 @@ This module needs ``pipekit-array[numpy,compat]``, so importing
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import inspect
 import sys
@@ -194,7 +195,7 @@ def elementwise[F: Callable[..., Any]](*, n_outputs: int = 1) -> Callable[[F], F
         n_outputs: How many arrays the function returns; above 1, a tuple.
 
     Returns:
-        The decorator, for a function without ``*args`` and ``**kwargs``.
+        The decorator.
 
     Raises:
         ValueError: (the decorated function) if a labelled array meets an
@@ -219,14 +220,16 @@ def elementwise[F: Callable[..., Any]](*, n_outputs: int = 1) -> Callable[[F], F
 
         @functools.wraps(function)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            values = [v for v in (*args, *kwargs.values()) if not _is_host(v)]
-            if any(map(is_dataarray, values)):
-                bound = signature.bind(*args, **kwargs)
-                return _apply_xarray(function, bound, n_outputs)
-            if any(map(_is_carrier, values)):
-                bound = signature.bind(*args, **kwargs)
-                return _apply_carriers(function, bound, n_outputs)
-            return function(*args, **kwargs)
+            given = [v for v in (*args, *kwargs.values()) if not _is_host(v)]
+            if any(map(is_dataarray, given)):
+                apply = _apply_xarray
+            elif any(map(_is_carrier, given)):
+                apply = _apply_carriers
+            else:
+                return function(*args, **kwargs)
+            bound = signature.bind(*args, **kwargs)
+            values = {**dict(enumerate(bound.args)), **bound.kwargs}
+            return apply(_Call(function, signature, values), n_outputs)
 
         return cast(Any, wrapper)
 
@@ -281,18 +284,70 @@ def _is_carrier(value: Any) -> bool:
     return not _is_host(value) and get_adapter(value) is not None
 
 
-def _apply_xarray(
-    function: Callable[..., Any], bound: inspect.BoundArguments, n_outputs: int
-) -> Any:
-    """Call ``function`` through ``xarray.apply_ufunc`` on its DataArrays."""
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Call:
+    """One call of ``function``, its arguments by position or keyword.
+
+    A variadic argument is spread out, so each of its values has its own key.
+    """
+
+    function: Callable[..., Any]
+    signature: inspect.Signature
+    values: dict[int | str, Any]
+
+    def name(self, key: int | str) -> str:
+        """The parameter at a position, or of a keyword."""
+        if isinstance(key, str):
+            return key
+        parameters = list(self.signature.parameters.values())
+        for parameter in parameters[:key]:
+            # it takes every position from its own on
+            if parameter.kind is inspect.Parameter.VAR_POSITIONAL:
+                return parameter.name
+        return parameters[key].name
+
+    def labelled(self, is_labelled: Callable[[Any], bool]) -> list[int | str]:
+        """The keys of the labelled arguments, which must be all the arrays."""
+        keys = [key for key, value in self.values.items() if is_labelled(value)]
+        first, kind = self.name(keys[0]), type(self.values[keys[0]]).__name__
+        for key, value in self.values.items():
+            if key in keys:
+                continue
+            if _is_carrier(value):
+                msg = (
+                    f"'{self.name(key)}' is a {type(value).__name__} and '{first}' a "
+                    f"{kind}; convert them to one kind first"
+                )
+                raise BackendError(msg)
+            if _has_dimensions(value):
+                msg = (
+                    f"'{self.name(key)}' has dimensions but no names, and cannot be "
+                    f"aligned with the {kind} '{first}'; make it a {kind} too"
+                )
+                raise ValueError(msg)
+        return keys
+
+    def on_data(self, keys: list[int | str]) -> Callable[..., Any]:
+        """The function of the data of the arguments ``keys``."""
+
+        def function(*data: Any) -> Any:
+            given = self.values | dict(zip(keys, data, strict=True))
+            args = [v for key, v in given.items() if isinstance(key, int)]
+            kwargs = {key: v for key, v in given.items() if isinstance(key, str)}
+            return self.function(*args, **kwargs)
+
+        return function
+
+
+def _apply_xarray(call: _Call, n_outputs: int) -> Any:
+    """The call through ``xarray.apply_ufunc`` on its DataArrays."""
     # xarray is imported by now, so its adapter's module imports nothing new
     from pipekit_array.xarray import anonymous
 
-    names = _labelled_names(bound, is_dataarray)
-    kernel = _on_data(function, bound, names)
+    keys = call.labelled(is_dataarray)
     result = sys.modules["xarray"].apply_ufunc(
-        full_loop(kernel, _spec(len(names), n_outputs)),
-        *(bound.arguments[name] for name in names),
+        full_loop(call.on_data(keys), _spec(len(keys), n_outputs)),
+        *(call.values[key] for key in keys),
         output_core_dims=[()] * n_outputs,
         join="exact",
         dask="allowed",
@@ -304,50 +359,12 @@ def _apply_xarray(
     return tuple(anonymous(array) for array in result)
 
 
-def _apply_carriers(
-    function: Callable[..., Any], bound: inspect.BoundArguments, n_outputs: int
-) -> Any:
-    """Call ``function`` through `run_kernel` on its carriers."""
-    names = _labelled_names(bound, _is_carrier)
-    carriers = [bound.arguments[name] for name in names]
-    kernel = _on_data(function, bound, names)
-    return run_kernel(kernel, _spec(len(names), n_outputs), {}, carriers, {})
-
-
-def _labelled_names(
-    bound: inspect.BoundArguments, is_labelled: Callable[[Any], bool]
-) -> list[str]:
-    """The names of the labelled arguments, which must be all the arrays there are."""
-    names = [name for name, value in bound.arguments.items() if is_labelled(value)]
-    first, kind = names[0], type(bound.arguments[names[0]]).__name__
-    for name, value in bound.arguments.items():
-        if name in names:
-            continue
-        if _is_carrier(value):
-            msg = (
-                f"'{name}' is a {type(value).__name__} and '{first}' a {kind}; "
-                "convert them to one kind first"
-            )
-            raise BackendError(msg)
-        if _has_dimensions(value):
-            msg = (
-                f"'{name}' has dimensions but no names, and cannot be aligned with "
-                f"the {kind} '{first}'; make it a {kind} too"
-            )
-            raise ValueError(msg)
-    return names
-
-
-def _on_data(
-    function: Callable[..., Any], bound: inspect.BoundArguments, names: list[str]
-) -> Callable[..., Any]:
-    """``function`` of the labelled arguments' data."""
-
-    def on_data(*data: Any) -> Any:
-        bound.arguments.update(zip(names, data, strict=True))
-        return function(*bound.args, **bound.kwargs)
-
-    return on_data
+def _apply_carriers(call: _Call, n_outputs: int) -> Any:
+    """The call through `run_kernel` on its carriers."""
+    keys = call.labelled(_is_carrier)
+    carriers = [call.values[key] for key in keys]
+    spec = _spec(len(keys), n_outputs)
+    return run_kernel(call.on_data(keys), spec, {}, carriers, {})
 
 
 def _has_dimensions(value: Any) -> bool:

@@ -448,6 +448,37 @@ def test_a_dataset_is_not_an_array(xr) -> None:
         density(xr.Dataset({"p": ("x", [1.0])}), 280.0)
 
 
+def _total(first, *others, scale=1.0, **more):
+    for other in (*others, *more.values()):
+        first = first + other
+    return scale * first
+
+
+def test_variadic_arguments_align_by_name_too(xr) -> None:
+    total = elementwise()(_total)
+    a = xr.DataArray([1.0, 2.0], dims="x")
+    b = xr.DataArray([10.0, 20.0, 30.0], dims="y")
+    got = total(1.0, 2.0, a, b, scale=2.0, c=a)
+    assert got.dims == ("x", "y")
+    np.testing.assert_array_equal(got, 2.0 * (3.0 + (a + b) + a))
+    with pytest.raises(ValueError, match="'others' has dimensions"):
+        total(a, 1.0, np.ones(2))
+    with pytest.raises(ValueError, match="'scale' has dimensions"):
+        total(a, scale=np.ones(2))
+    with pytest.raises(ValueError, match="'c' has dimensions"):
+        total(a, c=np.ones(2))
+
+
+def test_variadic_dimarrays_align_by_name_too() -> None:
+    a = DimArray(np.asarray([1.0, 2.0]), ("x",))
+    b = DimArray(np.asarray([10.0, 20.0, 30.0]), ("y",))
+    got = elementwise()(_total)(1.0, a, b, c=a)
+    assert got.dims == ("x", "y")
+    np.testing.assert_array_equal(
+        got.data, 1.0 + 2.0 * a.data[:, None] + b.data[None, :]
+    )
+
+
 # --- carriers with an adapter ---
 
 
