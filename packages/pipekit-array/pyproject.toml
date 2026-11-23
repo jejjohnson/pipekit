@@ -25,8 +25,9 @@ xarray = ["xarray>=2024.6"]
 sklearn = ["scikit-learn>=1.4"]
 # The named-dims einx bridge, pipekit_array.einx (geostack OP-O2).
 einx = ["einx>=0.4"]
+# With numpy, also pipekit_array.functions, which needs 1.11.
 compat = [
-    "array-api-compat>=1.4",
+    "array-api-compat>=1.11",
 ]
 
 [build-system]

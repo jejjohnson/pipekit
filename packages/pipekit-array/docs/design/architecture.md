@@ -162,6 +162,8 @@ src/pipekit_array/
 ├── rows.py              # to_rows, from_rows, RowLayout
 ├── estimator.py         # Estimator                         ([sklearn])
 ├── einx.py              # rearrange, reduce, einsum, repeat, Einx  ([einx])
+├── functions.py         # namespace_of, floating_inputs, like, elementwise:
+│                        # plain functions (A23)          ([numpy,compat])
 ├── kernel.py            # KernelSpec, KernelOp
 ├── xarray.py            # the xr.DataArray adapter, loaded lazily ([xarray])
 └── testing.py           # check_adapter, check_kernel_op
