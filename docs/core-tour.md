@@ -33,9 +33,10 @@ Every output on this page is from a real run of pipekit-ops 0.2.1.
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
 | Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
+| Guards | `guards` | `guard`, `guard_level`, `report_move`, `BackendWarning` | finding the step that moves data between NumPy and JAX |
 | Import hooks | `imports` | `on_import` | running code once a module is imported, without importing it (JAX pytree registration) |
 
-`pipekit_ops.testing` (`assert_round_trip`) is the 22nd module; it is imported on its own and adds nothing to `__all__`.
+`pipekit_ops.testing` (`assert_round_trip`) is the 23rd module; it is imported on its own and adds nothing to `__all__`.
 
 The sister packages build on this core: time stepping and data assimilation
 in `pipekit-cycle`, training in `pipekit-train`, the model registry in

@@ -7,7 +7,13 @@ from typing import Any
 import numpy as np
 import pytest
 from pipekit_array import DimArray, DimArrayAdapter
-from pipekit_ops import NamedArrayAdapter, Signature, get_adapter
+from pipekit_ops import (
+    BackendError,
+    NamedArrayAdapter,
+    Signature,
+    get_adapter,
+    guard,
+)
 
 
 BANDS = ("B11", "B12")
@@ -261,3 +267,13 @@ def test_importing_pipekit_array_does_not_import_jax() -> None:
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "('y', 'x')"
+
+
+def test_guard_reports_a_copy_of_jax_data_to_the_host():
+    jnp = pytest.importorskip("jax.numpy")
+    on_jax, on_numpy = DimArray(jnp.ones(2), ("x",)), DimArray(np.ones(2), ("x",))
+    np.asarray(on_jax)
+    with guard("raise"):
+        np.asarray(on_numpy)
+        with pytest.raises(BackendError, match="JAX data copied to the host"):
+            np.asarray(on_jax)

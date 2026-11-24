@@ -9,7 +9,7 @@ import sys
 import types
 
 import pytest
-from pipekit_ops import BackendError, get_adapter
+from pipekit_ops import BackendError, BackendWarning, get_adapter, guard
 
 
 # the module under test needs both, and so do its tests
@@ -559,3 +559,49 @@ def test_a_missing_argument_is_reported_as_python_does(temperature) -> None:
     for pressure in (1e5, temperature):
         with pytest.raises(TypeError, match="temperature"):
             density(pressure)
+
+
+# --- the guard on moves ---
+
+
+@needs_jax
+def test_guard_reports_a_numpy_array_that_joins_jax():
+    import jax.numpy as jnp
+
+    a, b = np.ones(3, np.float32), jnp.ones(3, np.float32)
+    floating_inputs(a, b)
+    for values in [(a, b), (b, a), (b, [1.0, 2.0, 3.0])]:
+        with guard("raise"), pytest.raises(BackendError, match="NumPy data joined jax"):
+            floating_inputs(*values)
+
+
+@needs_jax
+def test_guard_lets_numbers_and_constants_of_a_trace_pass():
+    import jax
+    import jax.numpy as jnp
+
+    a, b = np.ones(3, np.float32), jnp.ones(3, np.float32)
+    with guard("raise"):
+        floating_inputs(b, 2.0)
+        floating_inputs(b, np.float32(2.0), np.asarray(1.0, np.float32))
+        floating_inputs(a, a)
+        floating_inputs(b, b)
+        jax.jit(lambda x: floating_inputs(a, x)[1][1])(b)
+
+
+@needs_jax
+def test_guard_reports_a_wider_dtype():
+    import jax
+    import jax.numpy as jnp
+
+    with jax.enable_x64(True), guard("warn"), pytest.warns(BackendWarning) as got:
+        floating_inputs(np.ones(3), jnp.ones(3, jnp.float32))
+    assert [str(w.message).split(": ")[1] for w in got] == [
+        "NumPy data joined jax",
+        "NumPy data widened float32 to float64",
+    ]
+
+
+def test_guard_names_the_library_that_was_joined():
+    with guard("raise"), pytest.raises(BackendError, match="joined array_api_strict"):
+        floating_inputs(np.ones(3), strict.ones(3))

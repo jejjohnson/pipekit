@@ -64,6 +64,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.adapters
 
+## Guards
+
+::: pipekit_ops.guards
+
 ## Import hooks
 
 ::: pipekit_ops.imports
