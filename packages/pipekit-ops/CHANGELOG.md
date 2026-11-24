@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.3](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.2...pipekit-ops-v0.2.3) (2026-11-24)
+
+
+### Features
+
+* **ops:** a NumPy-only operator takes JAX data and returns JAX ([#264](https://github.com/jejjohnson/pipekit/issues/264)) ([05812b7](https://github.com/jejjohnson/pipekit/commit/05812b7dc6cf9bae72c5ae6f8b5d9128ea895b48))
+* **ops:** add guard, an opt-in report of data moving between NumPy and JAX ([#261](https://github.com/jejjohnson/pipekit/issues/261)) ([28ded27](https://github.com/jejjohnson/pipekit/commit/28ded27cc7a648a6c13a33858fc1fd9358025df1))
+* **ops:** jit_report says which steps of a pipeline are jittable, and why the others are not ([#265](https://github.com/jejjohnson/pipekit/issues/265)) ([5a5901d](https://github.com/jejjohnson/pipekit/commit/5a5901d7a6023b931e89ac485b8661add03964d7))
+
+
+### Bug Fixes
+
+* **array:** elementwise keeps a carrier's missing elements missing ([#268](https://github.com/jejjohnson/pipekit/issues/268)) ([2543eef](https://github.com/jejjohnson/pipekit/commit/2543eef7b1287d56cb8a69b500674291073b4197))
+
 ## [0.2.2](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.1...pipekit-ops-v0.2.2) (2026-11-23)
 
 

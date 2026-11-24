@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.3...pipekit-array-v0.1.4) (2026-11-24)
+
+
+### Features
+
+* **array:** the dim functions, KernelOp and elementwise join NumPy to JAX ([#262](https://github.com/jejjohnson/pipekit/issues/262)) ([cf5d1d1](https://github.com/jejjohnson/pipekit/commit/cf5d1d11e079b6eec382a4b34b1fb6e4004ad56e))
+* **ops:** a NumPy-only operator takes JAX data and returns JAX ([#264](https://github.com/jejjohnson/pipekit/issues/264)) ([05812b7](https://github.com/jejjohnson/pipekit/commit/05812b7dc6cf9bae72c5ae6f8b5d9128ea895b48))
+* **ops:** add guard, an opt-in report of data moving between NumPy and JAX ([#261](https://github.com/jejjohnson/pipekit/issues/261)) ([28ded27](https://github.com/jejjohnson/pipekit/commit/28ded27cc7a648a6c13a33858fc1fd9358025df1))
+
+
+### Bug Fixes
+
+* **array:** a scan stack of a DimArray has the tree structure of one DimArray ([#266](https://github.com/jejjohnson/pipekit/issues/266)) ([82dae66](https://github.com/jejjohnson/pipekit/commit/82dae667ef86c4b94a80d400a41556520ea324a0))
+* **array:** elementwise keeps a carrier's missing elements missing ([#268](https://github.com/jejjohnson/pipekit/issues/268)) ([2543eef](https://github.com/jejjohnson/pipekit/commit/2543eef7b1287d56cb8a69b500674291073b4197))
+
+
+### Performance Improvements
+
+* **array:** map_over runs one vmap on JAX data ([#267](https://github.com/jejjohnson/pipekit/issues/267)) ([399a67d](https://github.com/jejjohnson/pipekit/commit/399a67d4fb2e9ea0e66e55d595fbf3a31120fc87))
+
 ## [0.1.3](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.2...pipekit-array-v0.1.3) (2026-11-23)
 
 
