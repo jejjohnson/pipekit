@@ -21,7 +21,16 @@ from pipekit_array import (
     TakeAlong,
     Transpose,
 )
-from pipekit_ops import BackendWarning, Signature, backend_of, get_adapter, guard
+from pipekit_ops import (
+    BackendWarning,
+    Operator,
+    Signature,
+    backend_of,
+    get_adapter,
+    guard,
+    register_adapter,
+    unregister_adapter,
+)
 
 
 BANDS = ("B4", "B8")
@@ -564,3 +573,115 @@ def test_isel_numpy_indices_survive_dumps_loads(index: Any, native: Any) -> None
     again = loads(dumps(op))
     assert again.index == native
     np.testing.assert_array_equal(again(cube).data, op(cube).data)
+
+
+# -- map_over on JAX data -----------------------------------------------------------
+
+
+def _member_cube(backend: str = "jax") -> DimArray:
+    values = np.random.default_rng(0).random((5, 2, 4)).astype(np.float32)
+    if backend == "jax":
+        values = pytest.importorskip("jax.numpy").asarray(values)
+    labels = {"member": tuple("abcde"), "band": ("B4", "B8")}
+    return DimArray(values, ("member", "band", "x"), labels)
+
+
+MAPPED = {
+    "reduce": lambda c: pa.reduce(c, "max", "x"),
+    "isel": lambda c: pa.isel(c, x=1),
+    "sel": lambda c: pa.sel(c, band="B8"),
+    "transpose": lambda c: pa.transpose(c, ("x", "band")),
+    "identity": lambda c: c,
+}
+
+
+@pytest.mark.parametrize("dim", ["member", "band"])
+@pytest.mark.parametrize("name", list(MAPPED))
+def test_map_over_on_jax_equals_the_loop(name: str, dim: str) -> None:
+    if dim == "band" and name in ("sel", "transpose"):
+        pytest.skip("fn names the band dim")
+    out = pa.map_over(_member_cube(), MAPPED[name], dim)
+    want = pa.map_over(_member_cube("numpy"), MAPPED[name], dim)
+    assert (out.dims, out.labels) == (want.dims, want.labels)
+    np.testing.assert_array_equal(out.data, want.data)
+
+
+def test_map_over_is_one_vmap() -> None:
+    jax = pytest.importorskip("jax")
+    x = DimArray(jax.numpy.ones((64, 4, 4)), ("t", "y", "x"))
+    calls = []
+
+    def run(c: DimArray) -> DimArray:
+        return pa.map_over(
+            c, lambda i: calls.append(1) or pa.reduce(i, "mean", "x"), "t"
+        )
+
+    jaxpr = jax.make_jaxpr(run)(x)
+    assert len(jaxpr.eqns) < 10
+    assert len(calls) == 1
+
+
+def test_map_over_loops_when_fn_cannot_be_traced() -> None:
+    jax = pytest.importorskip("jax")
+    cube = _member_cube()
+
+    class HostMax(Operator):
+        backends = ("numpy",)
+
+        def _apply(self, c: DimArray) -> DimArray:
+            return pa.reduce(c, "max", "x")
+
+    def branching(c: DimArray) -> DimArray:
+        return pa.reduce(c, "max" if float(c.data.sum()) > 0 else "min", "x")
+
+    want = pa.map_over(cube, lambda c: pa.reduce(c, "max", "x"), "member")
+    for fn in (HostMax(), branching):
+        out = pa.map_over(cube, fn, "member")
+        assert backend_of(out) == "jax"
+        assert (out.dims, out.labels) == (want.dims, want.labels)
+        np.testing.assert_array_equal(out.data, want.data)
+        with pytest.raises(Exception, match=r"jax\.jit|[Cc]oncret|[Tt]rac"):
+            jax.jit(lambda c, fn=fn: pa.map_over(c, fn, "member"))(cube)
+
+
+def test_map_over_result_errors() -> None:
+    cube = _member_cube()
+    with pytest.raises(ValueError, match="already"):
+        pa.map_over(cube, lambda c: pa.expand_dims(c, "member"), "member")
+    with pytest.raises(TypeError, match="named carriers"):
+        pa.map_over(cube, lambda c: c.data, "member")
+
+
+def test_map_over_keeps_a_dim_called_batch() -> None:
+    jnp = pytest.importorskip("jax.numpy")
+    x = DimArray(jnp.ones((3, 2, 4)), ("t", "batch", "x"))
+    assert pa.map_over(x, lambda c: c, "t").dims == ("t", "batch", "x")
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_map_over_relabels_any_adapter_that_can(backend: str) -> None:
+    class Other(DimArray):
+        pass
+
+    class OtherAdapter(DimArrayAdapter):
+        def isel(self, x: Other, indexers: dict[str, Any]) -> Other:
+            out = super().isel(x, indexers)
+            return Other(out.data, out.dims, out.labels)
+
+        def rewrap(self, x: Other, data: Any, dims: tuple[str, ...]) -> Other:
+            out = super().rewrap(x, data, dims)
+            return Other(out.data, out.dims, out.labels)
+
+        def relabel(self, x: Other, labels: Any) -> Other:
+            out = super().relabel(x, labels)
+            return Other(out.data, out.dims, out.labels)
+
+    cube = _member_cube(backend)
+    register_adapter(Other, OtherAdapter())
+    try:
+        given = Other(cube.data, cube.dims, cube.labels)
+        out = pa.map_over(given, lambda c: pa.reduce(c, "max", "x"), "member")
+    finally:
+        unregister_adapter(Other)
+    assert type(out) is Other
+    assert out.labels == {"member": tuple("abcde"), "band": ("B4", "B8")}
