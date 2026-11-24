@@ -60,6 +60,7 @@ from pipekit_ops import (
     NamedArrayAdapter,
     Operator,
     Signature,
+    backend_of,
     get_adapter,
     signature_of,
 )
@@ -612,6 +613,24 @@ class KernelOp(Operator):
                 f"{clash} are both parameters and derived-geometry keywords; "
                 "the kernel can take each name once."
             )
+
+    def _place_inputs(
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        backends: tuple[str, ...] | None = None,
+    ) -> tuple[tuple[Any, ...], dict[str, Any], bool]:
+        """The kernel's backends for NumPy and JAX inputs; other inputs pass on.
+
+        ``run_kernel`` joins a mix the kernel takes, and checks dask and xarray.
+        """
+        if backends is None and self.backends is None:
+            found = {backend_of(x) for x in args} - {None}
+            runs_on = {*self.spec.backends}
+            if not found <= {"numpy", "jax"} or found <= runs_on:
+                return args, kwargs, False
+            backends = self.spec.backends
+        return super()._place_inputs(args, kwargs, backends)
 
     def _apply(self, *carriers: Any) -> Any:
         if len(carriers) != len(self.spec.inputs):

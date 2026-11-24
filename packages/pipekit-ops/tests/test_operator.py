@@ -175,7 +175,7 @@ def test_operator_rejects_mixed_node_and_literal_args(Scale_cls, TwoInput_cls):
     assert isinstance(op(a, Input("b")), Node)
 
 
-# ---- backends: an operator refuses inputs on a backend it does not run on ----
+# ---- backends: NumPy and JAX inputs go where the operator runs ----
 
 
 class _NumpyOnly(Operator):
@@ -235,36 +235,204 @@ def test_an_operator_without_backends_checks_nothing() -> None:
     assert Agnostic()(x) is x
 
 
-def test_a_numpy_operator_refuses_a_jax_array() -> None:
-    from pipekit_ops import BackendError
+class _Seen(_NumpyOnly):
+    """Records the types it was called with."""
 
+    def _apply(self, *xs, **named):
+        self.types = [type(v).__module__ for v in (*xs, *named.values())]
+        return xs[0] if len(xs) == 1 else list(xs)
+
+
+def test_a_numpy_operator_takes_jax_data_and_returns_jax() -> None:
+    jax = pytest.importorskip("jax")
+    op = _Seen()
+    out = op(jax.numpy.arange(3.0))
+    assert op.types == ["numpy"]
+    assert isinstance(out, jax.Array)
+    np.testing.assert_array_equal(out, op(np.arange(3.0)))
+    assert isinstance(op(np.arange(3.0)), np.ndarray)
+
+
+def test_the_host_copy_is_writable() -> None:
     jnp = pytest.importorskip("jax.numpy")
-    with pytest.raises(BackendError, match=r"_NumpyOnly runs on numpy only, not jax"):
-        _NumpyOnly()(jnp.zeros(3))
+
+    class InPlace(_NumpyOnly):
+        def _apply(self, x):
+            x[0] = 1.0
+            return x
+
+    given = jnp.zeros(2)
+    np.testing.assert_array_equal(InPlace()(given), [1.0, 0.0])
+    np.testing.assert_array_equal(given, [0.0, 0.0])
 
 
-def test_a_carrier_is_checked_through_its_adapter(carrier_adapter) -> None:
+def test_a_mix_runs_on_the_host_for_a_numpy_operator() -> None:
+    jax = pytest.importorskip("jax")
+    op = _Seen()
+    out = op(np.zeros(2), jax.numpy.ones(2))
+    assert op.types == ["numpy", "numpy"]
+    assert all(isinstance(x, jax.Array) for x in out)
+
+
+@pytest.mark.parametrize("backends", [("numpy", "jax"), ("jax",)])
+def test_numpy_joins_jax_for_an_operator_that_lists_it(backends) -> None:
+    jax = pytest.importorskip("jax")
+
+    class Sums(Operator):
+        def _apply(self, xs):
+            assert all(isinstance(x, jax.Array) for x in xs)
+            return sum(xs)
+
+    Sums.backends = backends
+    for xs in ([np.zeros(3), jax.numpy.ones(3)], [jax.numpy.ones(3), np.zeros(3)]):
+        out = Sums()(xs)
+        assert isinstance(out, jax.Array)
+        np.testing.assert_array_equal(out, np.ones(3))
+
+
+def test_a_jax_operator_takes_numpy_data() -> None:
+    jax = pytest.importorskip("jax")
+
+    class JaxOnly(_NumpyOnly):
+        backends = ("jax",)
+
+    assert isinstance(JaxOnly()(np.zeros(2)), jax.Array)
+
+
+@pytest.mark.parametrize("transform", ["jit", "grad", "vmap"])
+def test_a_numpy_operator_names_itself_under_a_trace(transform) -> None:
     from pipekit_ops import BackendError
 
-    jnp = pytest.importorskip("jax.numpy")
-    ok = _Carrier(np.zeros(3))
-    assert _NumpyOnly()(ok) is ok
-    with pytest.raises(BackendError, match="not jax"):
-        _NumpyOnly()(_Carrier(jnp.zeros(3)))
-    with pytest.raises(BackendError, match="not jax"):
-        _NumpyOnly()(x=_Carrier(jnp.zeros(3)))
+    jax = pytest.importorskip("jax")
+    run = getattr(jax, transform)(lambda x: _NumpyOnly()(x).sum())
+    with pytest.raises(BackendError, match=r"_NumpyOnly runs on numpy only.*jax\.jit"):
+        run(jax.numpy.ones(3))
 
 
-def test_mixed_backends_are_refused_even_in_a_list() -> None:
-    from pipekit_ops import BackendError
+def test_a_constant_joins_a_trace() -> None:
+    jax = pytest.importorskip("jax")
+    from pipekit_ops import guard
+
+    class Scale(_NumpyOnly):
+        backends = ("numpy", "jax")
+
+        def _apply(self, x, weight):
+            return x * weight
+
+    weight = np.full(3, 2.0, np.float32)
+    with guard("raise"):
+        out = jax.jit(lambda x: Scale()(x, weight))(jax.numpy.ones(3))
+    np.testing.assert_array_equal(out, [2.0, 2.0, 2.0])
+
+
+def test_the_guard_names_the_operator() -> None:
+    from pipekit_ops import BackendError, guard
 
     jnp = pytest.importorskip("jax.numpy")
 
     class Both(_NumpyOnly):
         backends = ("numpy", "jax")
 
-    with pytest.raises(BackendError, match=r"inputs on \['jax', 'numpy'\]"):
-        Both()([np.zeros(3), jnp.zeros(3)])
+    with guard("raise"):
+        _NumpyOnly()(np.zeros(2))
+        Both()(jnp.zeros(2))
+        with pytest.raises(BackendError, match=r"^_NumpyOnly: JAX data copied to the"):
+            _NumpyOnly()(jnp.zeros(2))
+        with pytest.raises(BackendError, match=r"^Both: NumPy data joined jax"):
+            Both()([np.zeros(2), jnp.zeros(2)])
+
+
+def test_dask_keeps_its_rules() -> None:
+    from pipekit_ops import BackendError
+
+    da = pytest.importorskip("dask.array")
+    jnp = pytest.importorskip("jax.numpy")
+
+    class DaskOnly(_NumpyOnly):
+        backends = ("dask",)
+
+    with pytest.raises(BackendError, match="_NumpyOnly runs on numpy only, not dask"):
+        _NumpyOnly()(da.zeros(2))
+    with pytest.raises(BackendError, match="DaskOnly runs on dask only, not jax"):
+        DaskOnly()(jnp.zeros(2))
+    for other in (np.zeros(2), jnp.zeros(2)):
+        with pytest.raises(BackendError, match="inputs on"):
+            _NumpyOnly()([da.zeros(2), other])
+
+
+def test_a_carrier_converts_through_its_adapter(carrier_adapter) -> None:
+    jax = pytest.importorskip("jax")
+    ok = _Carrier(np.zeros(3))
+    assert _NumpyOnly()(ok) is ok
+    op = _Seen()
+    out = op(_Carrier(jax.numpy.zeros(3)))
+    assert isinstance(out.data, jax.Array)
+    assert isinstance(op(x0 := ok).data, np.ndarray) and x0 is ok
+
+
+class _Located:
+    """A carrier with a second array, which ``rewrap`` does not see."""
+
+    def __init__(self, data, lat):
+        self.data, self.lat = data, lat
+
+
+class _LocatedAdapter(_CarrierAdapter):
+    def to_backend(self, x, backend):
+        from pipekit_ops import to_backend
+
+        return _Located(to_backend(x.data, backend), to_backend(x.lat, backend))
+
+
+def test_to_backend_of_an_adapter_moves_every_array() -> None:
+    from pipekit_ops import ConvertingAdapter, register_adapter, unregister_adapter
+
+    jax = pytest.importorskip("jax")
+    assert isinstance(_LocatedAdapter(), ConvertingAdapter)
+    register_adapter(_Located, _LocatedAdapter())
+    try:
+        seen = []
+
+        class Reads(_NumpyOnly):
+            def _apply(self, x):
+                seen.extend([type(x.data), type(x.lat)])
+                return x
+
+        out = Reads()(_Located(jax.numpy.zeros(2), jax.numpy.ones(2)))
+    finally:
+        unregister_adapter(_Located)
+    assert seen == [np.ndarray, np.ndarray]
+    assert isinstance(out.data, jax.Array) and isinstance(out.lat, jax.Array)
+
+
+def test_to_backend_of_containers_and_other_values() -> None:
+    from typing import NamedTuple
+
+    from pipekit_ops import to_backend
+
+    jax = pytest.importorskip("jax")
+
+    class Stats(NamedTuple):
+        mean: object
+        name: str
+
+    given = {
+        "stats": Stats(np.zeros(2), "b4"),
+        "list": [np.ones(1), 3],
+        "time": np.array(["2026-11-24"], "datetime64[D]"),
+        "text": np.array(["a"]),
+        "key": jax.random.key(0),
+        "bfloat": np.array(jax.numpy.ones(1, "bfloat16")),
+    }
+    out = to_backend(given, "jax")
+    assert isinstance(out["stats"], Stats) and out["stats"].name == "b4"
+    assert isinstance(out["stats"].mean, jax.Array)
+    assert isinstance(out["list"][0], jax.Array) and out["list"][1] == 3
+    assert out["time"] is given["time"] and out["text"] is given["text"]
+    assert out["bfloat"].dtype == jax.numpy.bfloat16
+    back = to_backend(out, "numpy")
+    assert isinstance(back["list"][0], np.ndarray)
+    assert back["key"] is given["key"]
 
 
 def test_values_without_a_backend_pass() -> None:
@@ -291,17 +459,17 @@ def test_numpy_scalars_and_dtypes_have_no_backend() -> None:
     assert Both()(x, axis=np.int64(0), dtype=np.dtype("float32")) is x
 
 
-def test_async_map_checks_a_coroutine_apply() -> None:
-    from pipekit_ops import AsyncMap, BackendError
+def test_async_map_places_the_input_of_a_coroutine_apply() -> None:
+    from pipekit_ops import AsyncMap
 
-    jnp = pytest.importorskip("jax.numpy")
+    jax = pytest.importorskip("jax")
 
     class AsyncNumpy(Operator):
         backends = ("numpy",)
 
         async def _apply(self, x):
+            assert isinstance(x, np.ndarray)
             return x
 
     assert AsyncMap(AsyncNumpy())([np.zeros(2)])[0].shape == (2,)
-    with pytest.raises(BackendError, match="AsyncNumpy runs on numpy only"):
-        AsyncMap(AsyncNumpy())([jnp.zeros(2)])
+    assert isinstance(AsyncMap(AsyncNumpy())([jax.numpy.zeros(2)])[0], jax.Array)

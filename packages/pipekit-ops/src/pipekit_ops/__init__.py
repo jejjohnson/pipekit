@@ -41,13 +41,15 @@ The v0.1 public surface, grouped by module:
 - **Group N — structural protocols** (`protocols`): `Predictor`,
   `FittableTransformer`.
 - **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
-  `LabelledAdapter` (the optional ``relabel``),
+  `LabelledAdapter` (the optional ``relabel``), `ConvertingAdapter` (the
+  optional ``to_backend``),
   `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
   `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
   reaches a carrier with named dims; `backend_of`, `backend_name` and
   `BackendError` — the array backend an input sits on, which
-  ``Operator.backends`` checks.
+  ``Operator.backends`` is about; `to_backend` moves a value between NumPy
+  and JAX.
 - **Guards** (`guards`): `guard(level)` reports data moving between NumPy and
   JAX, off by default; `report_move`, `guard_level` and `BackendWarning`.
 - **Import hooks** (`imports`): `on_import(name, callback)` runs code once
@@ -70,6 +72,7 @@ from pipekit_ops._base.operator import Carrier, ConfigMixin, Operator
 from pipekit_ops._base.sequential import Sequential
 from pipekit_ops.adapters import (
     BackendError,
+    ConvertingAdapter,
     LabelledAdapter,
     MissingAdapterError,
     NamedArrayAdapter,
@@ -79,6 +82,7 @@ from pipekit_ops.adapters import (
     register_adapter,
     register_lazy_adapter,
     signature_of,
+    to_backend,
     unregister_adapter,
 )
 from pipekit_ops.blocks import Const, Identity, Lambda, Sink
@@ -178,6 +182,7 @@ __all__ = [
     "Concat",
     "ConfigMixin",
     "Const",
+    "ConvertingAdapter",
     "Count",
     "CountBy",
     "DirectoryStore",
@@ -265,6 +270,7 @@ __all__ = [
     "report_move",
     "signature_of",
     "store_scope",
+    "to_backend",
     "unregister",
     "unregister_adapter",
     "upgrade_state",

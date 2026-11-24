@@ -32,7 +32,7 @@ Every output on this page is from a real run of pipekit-ops 0.2.1.
 | Hashing | `hashing` | `pipeline_hash` | one key for "the same pipeline again": a registry, a cache, an orchestrator task |
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
-| Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
+| Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `to_backend`, `ConvertingAdapter`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
 | Guards | `guards` | `guard`, `guard_level`, `report_move`, `BackendWarning` | finding the step that moves data between NumPy and JAX |
 | Import hooks | `imports` | `on_import` | running code once a module is imported, without importing it (JAX pytree registration) |
 
@@ -79,9 +79,11 @@ supplies the rest:
   rebuilt) and `_terminal` (may only end a `Sequential`);
 - **`backends`**: the array backends the operator runs on, such as
   `("numpy",)` or `("numpy", "jax")`. Left at `None`, nothing is checked. When
-  set, an eager call whose carriers or arrays sit on another backend, or on
-  several, raises `BackendError` before `_apply` runs, so inputs never move
-  between backends silently.
+  set, NumPy and JAX inputs go where the operator runs: NumPy joins JAX if it
+  lists `"jax"`, and otherwise JAX data goes to the host and the result comes
+  back as JAX. Under `jax.jit` a NumPy-only operator raises `BackendError`, and
+  so do dask inputs of an operator that does not list `"dask"`. A
+  [guard](guards.md) reports each move.
 
 ```python
 import pipekit_ops as pk

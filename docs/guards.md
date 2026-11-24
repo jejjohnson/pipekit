@@ -1,6 +1,7 @@
 # Guards
 
 NumPy and JAX interoperate by default: a NumPy array next to a JAX one joins it, and nothing warns.
+An operator that runs on NumPy only (`backends = ("numpy",)`) takes JAX data too: it runs on the host and returns JAX.
 When you build an app, and above all one on a GPU, you may want to know what moves.
 A guard tells you, and it is opt-in.
 

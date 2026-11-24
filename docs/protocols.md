@@ -22,6 +22,7 @@ Models invoked via bare `__call__` (PyTorch modules, JAX functions) are covered 
 |----------|----------|--------------|
 | `NamedArrayAdapter` | `dims(x)`, `data(x)`, `labels(x, dim)`, `rewrap(…)`, … per carrier family | pipekit-array's `DimArrayAdapter` and xarray adapter, or a carrier library's own; registered with `register_adapter` |
 | `LabelledAdapter` | `relabel(x, labels)` | adapters that can set the labels of new or renamed dims (optional) |
+| `ConvertingAdapter` | `to_backend(x, backend)` | adapters whose carriers have more arrays than their data (optional) |
 | `Store` | `key in store`, `load(key)`, `save(key, value)` | `MemoryStore`, `DirectoryStore`; where a `Cache(op, store=name)` keeps its entries |
 
 ## Data assimilation (`pipekit_cycle.protocols`)
