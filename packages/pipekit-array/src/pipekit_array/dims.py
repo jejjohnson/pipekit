@@ -40,7 +40,6 @@ from pipekit_ops._base.tracing import is_traced
 from pipekit_ops.adapters import BackendError, backend_name
 
 from pipekit_array._namespace import array_namespace
-from pipekit_array.dimarray import DimArray
 
 
 __all__ = [
@@ -554,12 +553,7 @@ def map_over(x: Any, fn: Callable[[Any], Any], dim: str) -> Any:
             return mapped
     size = adapter.data(x).shape[axis]
     items = [fn(adapter.isel(x, {dim: i})) for i in range(size)]
-    out = stack(items, dim)
-    # each output position is the input's: keep the mapped dim's labels
-    labels = adapter.labels(x, dim)
-    if labels is not None and isinstance(out, DimArray):
-        return DimArray(out.data, out.dims, {**out.labels, dim: labels})
-    return out
+    return _with_labels_of(adapter, x, stack(items, dim), dim)
 
 
 def _only_array(adapter: NamedArrayAdapter, x: Any) -> bool:
@@ -602,10 +596,20 @@ def _map_over_vmap(
     if dim in out_dims:
         raise ValueError(f"map_over: fn's result has {dim!r} already: {out_dims}.")
     out = out_adapter.rewrap(template, mapped, (dim, *out_dims))
+    return _with_labels_of(adapter, x, out, dim)
+
+
+def _with_labels_of(adapter: NamedArrayAdapter, x: Any, out: Any, dim: str) -> Any:
+    """``out`` with the labels ``x`` has on ``dim``, where its adapter can set them.
+
+    Each output position of `map_over` is the input's.
+    """
     labels = adapter.labels(x, dim)
-    relabel = getattr(get_adapter(out), "relabel", None)
-    # each output position is the input's: keep the mapped dim's labels
-    return out if labels is None or relabel is None else relabel(out, {dim: labels})
+    out_adapter = adapter_of(out, "map_over")
+    relabel = getattr(out_adapter, "relabel", None)
+    if labels is None or relabel is None or out_adapter.labels(out, dim) is not None:
+        return out
+    return relabel(out, {dim: labels})
 
 
 def stack(xs: Sequence[Any], dim: str) -> Any:
