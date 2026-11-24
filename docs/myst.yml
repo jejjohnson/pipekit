@@ -51,6 +51,8 @@ project:
           title: Protocols
         - file: patterns.md
           title: Patterns
+        - file: guards.md
+          title: Guards
         - file: background/toolz.md
           title: "Background: toolz"
     - title: Tutorials

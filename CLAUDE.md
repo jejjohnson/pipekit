@@ -96,6 +96,7 @@ packages/
 │   │   │                     # AssertSignature, …
 │   │   ├── signature.py      # Signature (shape inference)
 │   │   ├── adapters.py       # NamedArrayAdapter, register_adapter, backend_of, …
+│   │   ├── guards.py         # guard, guard_level, report_move, BackendWarning
 │   │   ├── imports.py        # on_import
 │   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
 │   │   ├── state.py          # StatefulOperator, CarryState

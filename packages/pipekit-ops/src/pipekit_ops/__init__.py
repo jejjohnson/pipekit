@@ -48,6 +48,8 @@ The v0.1 public surface, grouped by module:
   reaches a carrier with named dims; `backend_of`, `backend_name` and
   `BackendError` — the array backend an input sits on, which
   ``Operator.backends`` checks.
+- **Guards** (`guards`): `guard(level)` reports data moving between NumPy and
+  JAX, off by default; `report_move`, `guard_level` and `BackendWarning`.
 - **Import hooks** (`imports`): `on_import(name, callback)` runs code once
   a module is imported without importing it (JAX pytree registration).
 
@@ -104,6 +106,7 @@ from pipekit_ops.execution import (
     executor_scope,
 )
 from pipekit_ops.flow import RateLimit, Timeout, Until
+from pipekit_ops.guards import BackendWarning, guard, guard_level, report_move
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
 from pipekit_ops.observe import Histogram, Log, Profile, ShapeTrace, Snapshot, Tap
@@ -165,6 +168,7 @@ __all__ = [
     "Assoc",
     "AsyncMap",
     "BackendError",
+    "BackendWarning",
     "BatchedMap",
     "Branch",
     "Cache",
@@ -247,6 +251,8 @@ __all__ = [
     "executor_scope",
     "from_state_sandboxed",
     "get_adapter",
+    "guard",
+    "guard_level",
     "juxt",
     "loads",
     "loads_sandboxed",
@@ -256,6 +262,7 @@ __all__ = [
     "register",
     "register_adapter",
     "register_lazy_adapter",
+    "report_move",
     "signature_of",
     "store_scope",
     "unregister",

@@ -27,7 +27,7 @@ import numbers
 from collections.abc import Mapping
 from typing import Any
 
-from pipekit_ops import Signature, on_import
+from pipekit_ops import Signature, backend_name, on_import, report_move
 
 
 __all__ = ["DimArray", "DimArrayAdapter"]
@@ -96,6 +96,8 @@ class DimArray:
         """The data as a NumPy array, so ``np.asarray(d)`` works (dims are dropped)."""
         import numpy as np
 
+        if backend_name(self.data) == "jax":
+            report_move("DimArray.__array__", "JAX data copied to the host")
         if copy is None:
             return np.asarray(self.data, dtype=dtype)
         # copy=True always copies; copy=False raises if a copy is needed

@@ -29,7 +29,8 @@ from collections.abc import Callable
 from types import ModuleType
 from typing import Any, cast
 
-from pipekit_ops import BackendError, get_adapter
+from pipekit_ops import BackendError, get_adapter, guard_level, report_move
+from pipekit_ops._base.tracing import is_traced
 
 from pipekit_array.kernel import KernelSpec, full_loop, run_kernel
 
@@ -139,6 +140,8 @@ def floating_inputs(
             msg = f"inputs must be real numbers, got dtype {dtype}"
             raise ValueError(msg)
     dtype = xp.result_type(*floating) if floating else xp.asarray(0.0).dtype
+    if guard_level() != "off":
+        _report_moves((*values, *params), xp, dtype)
     return xp, [_place(value, xp, dtype, device) for value in values]
 
 
@@ -274,6 +277,24 @@ def _place(value: Any, xp: ModuleType, dtype: Any, device: Any) -> Any:
     if device is None:
         return xp.asarray(value, dtype=dtype)
     return xp.asarray(value, dtype=dtype, device=device)
+
+
+def _report_moves(values: tuple[Any, ...], xp: ModuleType, dtype: Any) -> None:
+    """Tell the guard about the host arrays that join ``xp``, and a wider dtype.
+
+    A number or a 0-d array is no move, and neither is a constant of a trace.
+    """
+    joining = [v for v in values if isinstance(v, (np.ndarray, list, tuple))]
+    joining = [v for v in joining if np.ndim(v) > 0]
+    others = [v for v in values if not _is_host(v)]
+    if not joining or not others or any(map(is_traced, others)):
+        return
+    library = xp.__name__.removeprefix("array_api_compat.").partition(".")[0]
+    report_move("floating_inputs", f"NumPy data joined {library}")
+    own = [v.dtype for v in others if xp.isdtype(v.dtype, "real floating")]
+    if own and xp.result_type(*own) != dtype:
+        narrow = xp.result_type(*own)
+        report_move("floating_inputs", f"NumPy data widened {narrow} to {dtype}")
 
 
 # --- labelled arrays ---
