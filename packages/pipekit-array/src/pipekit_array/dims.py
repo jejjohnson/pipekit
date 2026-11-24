@@ -525,6 +525,16 @@ def map_over(x: Any, fn: Callable[[Any], Any], dim: str) -> Any:
     Each item is ``isel(x, dim=i)``; ``fn`` returns a named carrier, and every
     result must have the same dims.
 
+    On JAX data this is one ``jax.vmap``, for a carrier whose only array is its
+    data (an adapter with more has a fast path of its own). A ``fn`` that cannot
+    be traced (it branches on a value, or runs on NumPy only) is called on each
+    item in a loop instead, unless ``x`` is traced itself.
+
+    Raises:
+        KeyError: ``dim`` is not a dim of ``x``.
+        TypeError: ``fn`` returns something other than a named carrier.
+        ValueError: The results have different dims, or have ``dim`` already.
+
     Example:
         >>> import numpy as np
         >>> from pipekit_array import DimArray
@@ -538,6 +548,10 @@ def map_over(x: Any, fn: Callable[[Any], Any], dim: str) -> Any:
         return fast(x, fn, dim)
     dims = adapter.dims(x)
     (axis,) = _axes(dims, (dim,), "map_over")
+    if backend_name(adapter.data(x)) == "jax" and _only_array(adapter, x):
+        mapped = _map_over_vmap(adapter, x, fn, dim, axis)
+        if mapped is not None:
+            return mapped
     size = adapter.data(x).shape[axis]
     items = [fn(adapter.isel(x, {dim: i})) for i in range(size)]
     out = stack(items, dim)
@@ -546,6 +560,52 @@ def map_over(x: Any, fn: Callable[[Any], Any], dim: str) -> Any:
     if labels is not None and isinstance(out, DimArray):
         return DimArray(out.data, out.dims, {**out.labels, dim: labels})
     return out
+
+
+def _only_array(adapter: NamedArrayAdapter, x: Any) -> bool:
+    """Whether the carrier is a JAX pytree whose one leaf is its data."""
+    import jax
+
+    leaves = jax.tree_util.tree_leaves(x)
+    return len(leaves) == 1 and leaves[0] is adapter.data(x)
+
+
+def _map_over_vmap(
+    adapter: NamedArrayAdapter, x: Any, fn: Callable[[Any], Any], dim: str, axis: int
+) -> Any:
+    """`map_over` as one ``jax.vmap``; ``None`` if ``fn`` has to be looped over."""
+    import jax
+
+    dims = adapter.dims(x)
+    item = adapter.isel(x, {dim: 0})
+    item_dims = tuple(d for d in dims if d != dim)
+    traced: list[Any] = []
+
+    def one(values: Any) -> Any:
+        out = fn(adapter.rewrap(item, values, item_dims))
+        traced[:] = [out]
+        return adapter_of(out, "map_over").data(out)
+
+    data = jax.numpy.moveaxis(adapter.data(x), axis, 0)
+    try:
+        mapped = jax.vmap(one)(data)
+    except (jax.errors.JAXTypeError, jax.errors.JAXIndexError, BackendError):
+        if is_traced(data):
+            raise
+        return None
+    # what one item's result is, but for its data
+    (template,) = traced
+    out_adapter = adapter_of(template, "map_over")
+    if not _only_array(out_adapter, template):
+        return None
+    out_dims = out_adapter.dims(template)
+    if dim in out_dims:
+        raise ValueError(f"map_over: fn's result has {dim!r} already: {out_dims}.")
+    out = out_adapter.rewrap(template, mapped, (dim, *out_dims))
+    labels = adapter.labels(x, dim)
+    relabel = getattr(get_adapter(out), "relabel", None)
+    # each output position is the input's: keep the mapped dim's labels
+    return out if labels is None or relabel is None else relabel(out, {dim: labels})
 
 
 def stack(xs: Sequence[Any], dim: str) -> Any:
