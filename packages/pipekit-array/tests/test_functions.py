@@ -12,9 +12,12 @@ import pytest
 from pipekit_ops import (
     BackendError,
     BackendWarning,
+    MissingValueAdapter,
     backend_of,
     get_adapter,
     guard,
+    register_adapter,
+    unregister_adapter,
 )
 
 
@@ -26,7 +29,7 @@ import array_api_compat.numpy as numpy_namespace
 import numpy as np
 import pipekit_array.functions as functions
 from hypothesis import given, strategies as st
-from pipekit_array import DimArray
+from pipekit_array import DimArray, DimArrayAdapter, expand_dims, transpose
 from pipekit_array.functions import (
     elementwise,
     floating_inputs,
@@ -608,3 +611,60 @@ def test_guard_reports_a_wider_dtype():
 def test_guard_names_the_library_that_was_joined():
     with guard("raise"), pytest.raises(BackendError, match="joined array_api_strict"):
         floating_inputs(np.ones(3), strict.ones(3))
+
+
+# --- missing elements ---
+
+
+class Filled(DimArray):
+    """A `DimArray` whose fill value marks missing elements."""
+
+    fill = -9999.0
+
+
+class FilledAdapter(DimArrayAdapter):
+    def rewrap(self, x, data, dims):
+        return Filled(data, dims)
+
+    def keep_missing(self, out, *inputs):
+        xp = namespace_of(out.data)
+        missing = xp.zeros(out.shape, dtype=bool)
+        for x in inputs:
+            lacking = [d for d in out.dims if d not in x.dims]
+            full = expand_dims(x, lacking) if lacking else x
+            missing = missing | (transpose(full, out.dims).data == Filled.fill)
+        return Filled(xp.where(missing, Filled.fill, out.data), out.dims)
+
+
+@pytest.fixture
+def filled():
+    register_adapter(Filled, FilledAdapter())
+    yield
+    unregister_adapter(Filled)
+
+
+def test_missing_elements_stay_missing(filled) -> None:
+    fill = Filled.fill
+    pressure = Filled(np.asarray([[1e5, fill], [9e4, 8e4]]), ("y", "x"))
+    temperature = Filled(np.asarray([300.0, fill]), ("y",))
+    out = density(pressure, 300.0)
+    assert isinstance(out, Filled)
+    np.testing.assert_array_equal(out.data == fill, [[False, True], [False, False]])
+    np.testing.assert_allclose(out.data[0, 0], 1e5 / (287.0 * 300.0))
+    both = density(pressure, temperature)
+    np.testing.assert_array_equal(both.data == fill, [[False, True], [True, True]])
+
+
+def test_missing_elements_stay_missing_in_every_output(filled) -> None:
+    @elementwise(n_outputs=2)
+    def twice_and_half(x):
+        return 2 * x, x / 2
+
+    given = Filled(np.asarray([1.0, Filled.fill]), ("x",))
+    for out, value in zip(twice_and_half(given), (2.0, 0.5), strict=True):
+        np.testing.assert_array_equal(out.data, [value, Filled.fill])
+
+
+def test_the_adapter_protocol_for_missing_values() -> None:
+    assert isinstance(FilledAdapter(), MissingValueAdapter)
+    assert not isinstance(DimArrayAdapter(), MissingValueAdapter)

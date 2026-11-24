@@ -32,7 +32,7 @@ Every output on this page is from a real run of pipekit-ops 0.2.1.
 | Hashing | `hashing` | `pipeline_hash` | one key for "the same pipeline again": a registry, a cache, an orchestrator task |
 | State | `state` | `StatefulOperator`, `CarryState` | state carried across calls: time steps, training, streams |
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
-| Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `to_backend`, `ConvertingAdapter`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
+| Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `to_backend`, `ConvertingAdapter`, `MissingValueAdapter`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
 | Guards | `guards` | `guard`, `guard_level`, `report_move`, `BackendWarning` | finding the step that moves data between NumPy and JAX |
 | Jittability | `jit` | `jit_report`, `JitReport`, `JitStep` | which steps run under `jax.jit`, and why the others do not |
 | Import hooks | `imports` | `on_import` | running code once a module is imported, without importing it (JAX pytree registration) |

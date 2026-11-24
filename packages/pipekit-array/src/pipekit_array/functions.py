@@ -189,7 +189,9 @@ def elementwise[F: Callable[..., Any]](*, n_outputs: int = 1) -> Callable[[F], F
         3. Broadcast every result to the dimensions of the inputs together.
         4. Return labelled arrays with the inputs' coordinates. A DataArray
            has no name or attributes, because the quantity and its unit have
-           changed; another carrier keeps what its adapter's ``rewrap`` keeps.
+           changed; another carrier keeps what its adapter's ``rewrap`` keeps,
+           and its missing elements stay missing
+           (`pipekit_ops.MissingValueAdapter`).
 
     An array without dimension names cannot be aligned with one that has
     them, so it is refused, unless it has no dimensions.
@@ -388,7 +390,13 @@ def _apply_carriers(call: _Call, n_outputs: int) -> Any:
     keys = call.labelled(_is_carrier)
     carriers = [call.values[key] for key in keys]
     spec = _spec(len(keys), n_outputs)
-    return run_kernel(call.on_data(keys), spec, {}, carriers, {})
+    result = run_kernel(call.on_data(keys), spec, {}, carriers, {})
+    keep = getattr(get_adapter(carriers[0]), "keep_missing", None)
+    if keep is None:
+        return result
+    if n_outputs == 1:
+        return keep(result, *carriers)
+    return tuple(keep(out, *carriers) for out in result)
 
 
 def _has_dimensions(value: Any) -> bool:

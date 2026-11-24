@@ -42,7 +42,8 @@ The v0.1 public surface, grouped by module:
   `FittableTransformer`.
 - **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
   `LabelledAdapter` (the optional ``relabel``), `ConvertingAdapter` (the
-  optional ``to_backend``),
+  optional ``to_backend``), `MissingValueAdapter` (the optional
+  ``keep_missing``),
   `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
   `get_adapter`,
   `signature_of`, `MissingAdapterError` — how carrier-agnostic code
@@ -77,6 +78,7 @@ from pipekit_ops.adapters import (
     ConvertingAdapter,
     LabelledAdapter,
     MissingAdapterError,
+    MissingValueAdapter,
     NamedArrayAdapter,
     backend_name,
     backend_of,
@@ -213,6 +215,7 @@ __all__ = [
     "MemoryStore",
     "Merge",
     "MissingAdapterError",
+    "MissingValueAdapter",
     "NamedArrayAdapter",
     "Node",
     "Not",
