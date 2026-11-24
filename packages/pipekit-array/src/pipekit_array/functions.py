@@ -49,11 +49,14 @@ except ImportError as err:
 
 __all__ = [
     "BackendError",
+    "boolean_like",
+    "divide_or_nan",
     "elementwise",
     "floating_inputs",
     "is_dataarray",
     "like",
     "namespace_of",
+    "table_like",
 ]
 
 # Values that live on the host and join whatever library the others are from.
@@ -162,6 +165,89 @@ def like(value: Any, ref: Any, xp: ModuleType) -> Any:
         dtype('float32')
     """
     return _place(value, xp, ref.dtype, _device_of(ref, xp))
+
+
+def table_like(table: np.ndarray, ref: Any, xp: ModuleType) -> Any:
+    """A NumPy table (an index, a mask) in ``ref``'s library, on its device.
+
+    Unlike `like`, it keeps its own shape and dtype.
+
+    Args:
+        table: The table.
+        ref: An array of the namespace ``xp``.
+        xp: The namespace of the call.
+
+    Returns:
+        The table as an array of ``xp``.
+
+    Example:
+        >>> import numpy as np
+        >>> table_like(np.arange(3), np.zeros(2, dtype=np.float32), np).tolist()
+        [0, 1, 2]
+    """
+    device = _device_of(ref, xp)
+    return xp.asarray(table) if device is None else xp.asarray(table, device=device)
+
+
+def boolean_like(value: Any, ref: Any, xp: ModuleType, *, name: str = "valid") -> Any:
+    """A boolean argument (a mask) in ``ref``'s library, on its device.
+
+    Args:
+        value: A boolean, a sequence of them, or a boolean array. A value on the
+            host joins ``ref``; any other array must be of its library already.
+        ref: An array of the namespace ``xp``.
+        xp: The namespace of the call.
+        name: What the argument is called, for the error.
+
+    Returns:
+        The mask as an array of ``xp``, in its own shape.
+
+    Raises:
+        ValueError: If ``value`` is not boolean.
+
+    Example:
+        >>> import numpy as np
+        >>> boolean_like([True, False], np.zeros(2), np).tolist()
+        [True, False]
+        >>> boolean_like([1, 0], np.zeros(2), np)
+        Traceback (most recent call last):
+            ...
+        ValueError: 'valid' must be boolean (True = use), got dtype int64
+    """
+    on_host = _is_host(value)
+    if on_host:
+        value = np.asarray(value)
+    # a NumPy dtype is one of every namespace that NumPy arrays join
+    namespace = numpy_namespace if on_host else xp
+    if not namespace.isdtype(value.dtype, "bool"):
+        msg = f"'{name}' must be boolean (True = use), got dtype {value.dtype}"
+        raise ValueError(msg)
+    return table_like(value, ref, xp) if on_host else value
+
+
+def divide_or_nan(numerator: Any, denominator: Any, xp: ModuleType) -> Any:
+    """The quotient of two arrays, NaN where the denominator is 0.
+
+    It goes through a double ``where``, so a gradient is finite in the other
+    elements: the division that is not used divides by 1.
+
+    Args:
+        numerator: An array of the namespace ``xp``.
+        denominator: An array that broadcasts against it, of its dtype.
+        xp: The namespace of the call.
+
+    Returns:
+        The quotient.
+
+    Example:
+        >>> import numpy as np
+        >>> divide_or_nan(np.asarray([1.0, 1.0]), np.asarray([2.0, 0.0]), np)
+        array([0.5, nan])
+    """
+    zero = denominator == 0
+    safe = xp.where(zero, xp.ones_like(denominator), denominator)
+    quotient = numerator / safe
+    return xp.where(zero, xp.full_like(quotient, xp.nan), quotient)
 
 
 def is_dataarray(value: Any) -> bool:

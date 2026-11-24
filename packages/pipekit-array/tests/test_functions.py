@@ -31,11 +31,14 @@ import pipekit_array.functions as functions
 from hypothesis import given, strategies as st
 from pipekit_array import DimArray, DimArrayAdapter, expand_dims, transpose
 from pipekit_array.functions import (
+    boolean_like,
+    divide_or_nan,
     elementwise,
     floating_inputs,
     is_dataarray,
     like,
     namespace_of,
+    table_like,
 )
 
 
@@ -668,3 +671,54 @@ def test_missing_elements_stay_missing_in_every_output(filled) -> None:
 def test_the_adapter_protocol_for_missing_values() -> None:
     assert isinstance(FilledAdapter(), MissingValueAdapter)
     assert not isinstance(DimArrayAdapter(), MissingValueAdapter)
+
+
+# --- tables, masks and quotients ---
+
+
+@pytest.mark.parametrize("device", [None, SECOND])
+def test_table_like_keeps_its_dtype_on_the_device(device) -> None:
+    ref = strict.zeros(2, dtype=strict.float32, device=device)
+    out = table_like(np.arange(3), ref, strict)
+    assert out.dtype == strict.int64
+    assert out.device == ref.device
+
+
+def test_boolean_like_takes_the_host_and_its_own_library() -> None:
+    ref = strict.zeros(2, device=SECOND)
+    for value in (True, [True, False], np.asarray([True, False]), np.True_):
+        out = boolean_like(value, ref, strict)
+        assert out.dtype == strict.bool
+        assert out.device == SECOND
+    own = strict.asarray([True, False], device=SECOND)
+    assert boolean_like(own, ref, strict) is own
+
+
+@pytest.mark.parametrize("value", [1, [1.0], np.ones(2), strict.ones(2)])
+def test_boolean_like_refuses_what_is_not_boolean(value) -> None:
+    with pytest.raises(ValueError, match="'wet' must be boolean"):
+        boolean_like(value, strict.zeros(2), strict, name="wet")
+
+
+def test_divide_or_nan() -> None:
+    num = np.asarray([1.0, 0.0, 2.0, np.nan], dtype=np.float32)
+    den = np.asarray([2.0, 0.0, -4.0, 1.0], dtype=np.float32)
+    with np.errstate(all="raise"):
+        out = divide_or_nan(num, den, np)
+    assert out.dtype == np.float32
+    np.testing.assert_array_equal(out, [0.5, np.nan, -0.5, np.nan])
+
+
+@needs_jax
+def test_divide_or_nan_has_a_finite_gradient() -> None:
+    import jax
+    import jax.numpy as jnp
+
+    den = jnp.asarray([2.0, 0.0])
+
+    def loss(num, den):
+        out = divide_or_nan(num, den, jnp)
+        return jnp.where(den == 0, 0.0, out).sum()
+
+    for gradient in jax.grad(loss, (0, 1))(jnp.ones(2), den):
+        assert np.isfinite(gradient).all()
