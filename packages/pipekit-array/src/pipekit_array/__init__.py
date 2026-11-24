@@ -42,7 +42,7 @@ batches (``value``, ``valid``) along a new dim; ``pad="last" | "none" |
 
 Kernels (`kernel`): `KernelSpec` (a generalized-ufunc signature) and
 `KernelOp`, which runs one L1 kernel on raw arrays and on every named
-carrier; `BackendError` for mixed or unsupported backends.
+carrier; `BackendError` for an unsupported backend or mix (NumPy joins JAX).
 
 Plain functions (``[numpy,compat]``): the submodule
 `pipekit_array.functions` holds `namespace_of`, `floating_inputs`, `like` and

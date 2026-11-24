@@ -22,7 +22,8 @@ from pipekit_array._namespace import array_namespace
 class StackAlong(Operator):
     """Stack a list-of-arrays along a new axis via `xp.stack`.
 
-    All input arrays must share the same shape, dtype, and backend.
+    All input arrays must share the same shape, dtype, and backend; NumPy
+    arrays join JAX ones.
 
     Args:
         axis: Position of the new axis in the output, for raw arrays.
@@ -33,7 +34,7 @@ class StackAlong(Operator):
 
     Raises:
         ValueError: From ``_apply`` when the input sequence is empty
-            (also via `array_namespace` when the inputs mix backends).
+            (also when the inputs mix backends other than NumPy and JAX).
 
     Example::
 
@@ -51,8 +52,9 @@ class StackAlong(Operator):
             raise ValueError("StackAlong requires at least one input array.")
         if self.dim is not None:
             return dims.stack(list(xs), self.dim)
-        xp = array_namespace(*xs)
-        return xp.stack(list(xs), axis=self.axis)
+        arrays = dims.join_backends(xs, "StackAlong")
+        xp = array_namespace(*arrays)
+        return xp.stack(arrays, axis=self.axis)
 
     def get_config(self) -> dict[str, Any]:
         if self.dim is not None:
@@ -66,7 +68,7 @@ class ConcatenateAlong(Operator):
     `xp.concat` is the Array API standardised name; numpy 2.0+
     exposes it as `concat` alongside the legacy `concatenate` alias.
     All input arrays must share shape (except along `axis`), dtype,
-    and backend.
+    and backend; NumPy arrays join JAX ones.
 
     Args:
         axis: Existing axis to concatenate along, for raw arrays. Default 0.
@@ -76,7 +78,7 @@ class ConcatenateAlong(Operator):
 
     Raises:
         ValueError: From ``_apply`` when the input sequence is empty
-            (also via `array_namespace` when the inputs mix backends).
+            (also when the inputs mix backends other than NumPy and JAX).
 
     Example::
 
@@ -96,8 +98,9 @@ class ConcatenateAlong(Operator):
             raise ValueError("ConcatenateAlong requires at least one input array.")
         if self.dim is not None:
             return dims.concat(list(xs), self.dim)
-        xp = array_namespace(*xs)
-        return xp.concat(list(xs), axis=self.axis)
+        arrays = dims.join_backends(xs, "ConcatenateAlong")
+        xp = array_namespace(*arrays)
+        return xp.concat(arrays, axis=self.axis)
 
     def get_config(self) -> dict[str, Any]:
         if self.dim is not None:

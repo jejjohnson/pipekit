@@ -54,10 +54,10 @@ The alternative, converting automatically at boundaries, was rejected.
 If a real use case demands it (rare, but for example "compute on JAX, log to NumPy"), we would add a `pipekit_array.convert.To(backend)` operator: single-purpose, explicit and opt-in.
 This is logged as a v0.2 issue if anyone asks for it.
 
-**As built.** The named layer follows the same rule: multi-input dim functions (`dot`, `combine`, `concat`, …) raise `BackendError` when their inputs sit on more than one backend (`require_one_backend` in `dims.py`).
+**Reversed for NumPy and JAX (ADR A24).** NumPy next to JAX joins it in every layer, and `pipekit_ops.guard` reports it on request.
+Any other mix still fails loudly: dask next to NumPy or JAX, or another library next to JAX, raises `BackendError` (`join_backends` in `dims.py`).
 
-**Plain functions.** `pipekit_array.functions` does not follow this rule (ADR A23).
-It serves functions that are no operators, where a NumPy constant or coordinate next to a JAX array is common: values on the host join the other library, and two libraries other than NumPy raise `BackendError`.
+**Plain functions.** `pipekit_array.functions` goes further (ADR A23): values on the host join any other library, and two libraries other than NumPy raise `BackendError`.
 
 ### Q7. `Signature` integration depth
 
@@ -74,7 +74,7 @@ These were explicitly considered and rejected for the v0.1 scope.
   The library is a bag of operators.
 - **Backend conversion.** No `to_numpy()`, no `device=` argument, no automatic `x.cpu().numpy()`.
   Conversion lives in user code or in a future opt-in operator (Q6).
-  The one exception is the host rule of `pipekit_array.functions` (ADR A23), which builds a host value (a number, a sequence, a NumPy array) in the library and on the device of the other arrays; it moves no other array.
+  Two exceptions build a host value in the library of the other arrays, and move no other array: the host rule of `pipekit_array.functions` (ADR A23), and NumPy next to JAX in the named layer (ADR A24).
 - **JAX traceability of operators.** pipekit operators dispatch in two modes (`__call__` vs `_apply`) and are not `jax.jit`-compatible.
   We live with it; `pipekit-jax` is the answer for differentiable or traceable pipelines.
   The dim-level functions trace under `jit` and `vmap` because they are plain functions on a pytree (gates G4 and G5).

@@ -75,7 +75,7 @@ A short last batch is padded with copies of its last item (`pad="last"`), yielde
 ## Plain functions
 
 `pipekit_array.functions` is the array backend of functions that are no operators, such as the formulas of geophysix and radiomax (`[numpy,compat]`).
-Python numbers, sequences and NumPy arrays join the library and the device of the other arrays, which the named layer refuses (ADR A23).
+Python numbers, sequences and NumPy arrays join the library and the device of the other arrays (ADR A23); the named layer joins NumPy to JAX, and refuses other mixes (ADR A24).
 
 ::: pipekit_array.functions
 

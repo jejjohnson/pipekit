@@ -34,7 +34,7 @@ from typing import Any, ClassVar
 from pipekit_ops import Operator, backend_of
 from pipekit_ops.adapters import BackendError
 
-from pipekit_array.dims import adapter_of, transpose
+from pipekit_array.dims import adapter_of, join_backends, transpose
 
 
 __all__ = ["Einx", "PatternError", "einsum", "rearrange", "reduce", "repeat"]
@@ -131,9 +131,7 @@ def _datas(xs: Sequence[Any], what: str) -> list[Any]:
             f"{what}: einx has no dask backend; call .compute() (or .load()) on "
             "the input first."
         )
-    if len(backends) > 1:
-        raise BackendError(f"{what}: inputs on {sorted(b or '?' for b in backends)}")
-    return datas
+    return join_backends(datas, what)
 
 
 def _einx() -> Any:

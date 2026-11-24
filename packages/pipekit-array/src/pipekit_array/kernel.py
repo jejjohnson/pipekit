@@ -64,7 +64,12 @@ from pipekit_ops import (
     signature_of,
 )
 
-from pipekit_array.dims import BackendError, backend_name, namespace_of
+from pipekit_array.dims import (
+    BackendError,
+    backend_name,
+    join_backends,
+    namespace_of,
+)
 
 
 __all__ = [
@@ -257,20 +262,20 @@ def _check_core_not_loop(
         )
 
 
-def _require_backend(backends: set[str], spec: KernelSpec) -> str:
-    """The one backend of the inputs, checked against the spec.
+def _one_backend(
+    datas: Sequence[Any], kernel: Callable[..., Any], spec: KernelSpec
+) -> tuple[list[Any], str]:
+    """The inputs on one backend, NumPy joined to JAX, and its name.
 
     Raises:
-        BackendError: Inputs on several backends, a backend the spec does
-            not list, or ``vectorize=True`` on dask arrays (``np.vectorize``
-            would compute the whole graph; the xarray path stays lazy).
+        BackendError: Inputs on several other backends, a backend the spec
+            does not list, or ``vectorize=True`` on dask arrays
+            (``np.vectorize`` would compute the whole graph; the xarray path
+            stays lazy).
     """
-    if len(backends) > 1:
-        raise BackendError(
-            f"inputs on {sorted(backends)}: call to_jax() on the NumPy carriers "
-            "first (inputs never move between backends silently)."
-        )
-    backend = backends.pop() if backends else "numpy"
+    joined = join_backends(datas, getattr(kernel, "__name__", "KernelOp"))
+    backends = {backend_name(d) for d in joined}
+    backend = "jax" if "jax" in backends else next(iter(backends), "numpy")
     if backend not in spec.backends:
         raise BackendError(
             f"the kernel declares backends {spec.backends}, not {backend!r}."
@@ -280,7 +285,7 @@ def _require_backend(backends: set[str], spec: KernelSpec) -> str:
             "vectorize=True on dask arrays would compute them eagerly; pass an "
             "xr.DataArray (apply_ufunc keeps it lazy) or a vectorized kernel."
         )
-    return backend
+    return joined, backend
 
 
 def _call(
@@ -309,16 +314,16 @@ def run_kernel(
     """Run ``kernel`` on raw arrays or named carriers; the dispatch behind `KernelOp`.
 
     Raises:
-        BackendError: Carriers on more than one backend, or a backend the
-            spec does not list.
+        BackendError: Carriers on several backends other than NumPy and JAX,
+            or a backend the spec does not list.
         TypeError: A raw array next to named carriers.
         ValueError: A core dim is missing from its input, or a dim has two
             sizes.
     """
     adapters = [get_adapter(x) for x in carriers]
     if all(a is None for a in adapters):
-        backend = _require_backend({backend_name(x) for x in carriers}, spec)
-        return _call(kernel, spec, kwargs, backend)(*carriers)
+        arrays, backend = _one_backend(carriers, kernel, spec)
+        return _call(kernel, spec, kwargs, backend)(*arrays)
     for i, adapter in enumerate(adapters):
         if adapter is None:
             raise TypeError(
@@ -400,11 +405,10 @@ def _run_named(
     adapters: list[NamedArrayAdapter],
     kwargs: dict[str, Any],
 ) -> Any:
-    datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
-    backend = _require_backend({backend_name(d) for d in datas}, spec)
     if len(carriers) > 1:
         carriers = _check_by_kind(carriers, adapters)
-        datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
+    datas = [a.data(x) for a, x in zip(adapters, carriers, strict=True)]
+    datas, backend = _one_backend(datas, kernel, spec)
     dims = tuple(tuple(a.dims(x)) for a, x in zip(adapters, carriers, strict=True))
     plan = _plan(spec, tuple(sorted(core.items())), dims)
     sizes: dict[str, int] = {}

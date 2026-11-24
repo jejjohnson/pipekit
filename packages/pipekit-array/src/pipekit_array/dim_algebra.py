@@ -32,8 +32,8 @@ from pipekit_array.dims import (
     _fast_path,
     _resolve,
     adapter_of,
+    join_backends,
     namespace_of,
-    require_one_backend,
 )
 
 
@@ -219,7 +219,7 @@ def dot(*xs: Any, dim: str | Sequence[str]) -> Any:
             f"{len(string.ascii_letters)} letters."
         )
     datas = [a.data(x) for a, x in zip(adapters, xs, strict=True)]
-    require_one_backend(datas, "dot")
+    datas = join_backends(datas, "dot")
     fast = _fast_path(adapter, "dot")
     if fast is not None:
         return fast(list(xs), names)

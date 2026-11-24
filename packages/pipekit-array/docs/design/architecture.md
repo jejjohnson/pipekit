@@ -72,11 +72,11 @@ xp2 = array_namespace(y)  # a different namespace?
 return xp1.add(x, y)  # crashes if y is JAX and x is NumPy
 
 # Do:
-xp = array_namespace(x, y)  # raises TypeError on two backends
+xp = array_namespace(x, y)  # NumPy joins JAX (A24); another mix raises TypeError
 return xp.add(x, y)
 ```
 
-`array_namespace(x, y)` is the standard's way to assert "both inputs are on the same backend" and pick the namespace.
+`array_namespace(x, y)` is the standard's way to assert "both inputs are on the same backend" and pick the namespace; with NumPy next to JAX it picks JAX's (A24).
 Operators with several array inputs always use the multi-argument form.
 
 The named layer has its own form of this rule: `require_one_backend` in [`dims.py`](../../src/pipekit_array/dims.py) raises `BackendError` when the inputs of `dot`, `combine`, `concat`, `stack` or `take_along` sit on more than one backend.

@@ -35,7 +35,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
-from pipekit_ops import NamedArrayAdapter, get_adapter
+from pipekit_ops import NamedArrayAdapter, get_adapter, guard_level, report_move
+from pipekit_ops._base.tracing import is_traced
 from pipekit_ops.adapters import BackendError, backend_name
 
 from pipekit_array._namespace import array_namespace
@@ -127,18 +128,90 @@ def namespace_of(data: Any) -> Any:
     return array_namespace(data)
 
 
-def require_one_backend(datas: Sequence[Any], what: str) -> None:
-    """Raise `BackendError` when raw arrays sit on more than one backend.
+def join_backends(datas: Sequence[Any], what: str) -> list[Any]:
+    """The raw arrays on one backend: NumPy arrays next to JAX ones join them.
 
-    Inputs never move between backends silently: a NumPy array next to a
-    JAX one would otherwise be converted depending on input order.
+    The order of the inputs does not matter, and a NumPy array is a constant
+    when a JAX one is traced (ADR A24). `pipekit_ops.guard` reports the arrays
+    of one dimension or more that join eagerly, and a dtype they widen.
+
+    Args:
+        datas: Raw arrays.
+        what: The function that joins them, for the guard and the errors.
+
+    Raises:
+        BackendError: Any other mix: dask with NumPy or JAX, or another
+            library with JAX.
+
+    Example:
+        >>> import numpy as np
+        >>> [x.shape for x in join_backends([np.ones(2), np.ones(3)], "stack")]
+        [(2,), (3,)]
     """
-    backends = {backend_name(d) for d in datas}
-    if len(backends) > 1:
+    joined = list(datas)
+    backends = {backend_name(d) for d in joined}
+    if len(backends) < 2:
+        return joined
+    strangers = [d for d in joined if backend_name(d) == "numpy" and not _is_numpy(d)]
+    if backends != {"numpy", "jax"} or strangers:
+        names = sorted(backends - {"numpy"} | {_library(d) for d in joined})
         raise BackendError(
-            f"{what}: inputs on {sorted(backends)}; call to_jax() on the NumPy "
-            "carriers first (inputs never move between backends silently)."
+            f"{what}: inputs on {names}; put them on one backend first (NumPy joins "
+            "JAX, and nothing else moves)."
         )
+    import jax.numpy as jnp
+
+    if guard_level() != "off":
+        _report_join(joined, what)
+    # a Python number stays one: JAX gives it the arrays' dtype
+    numbers = (bool, int, float, complex)
+    return [
+        d if backend_name(d) == "jax" or type(d) in numbers else jnp.asarray(d)
+        for d in joined
+    ]
+
+
+def _library(data: Any) -> str:
+    """The backend's name, or the library's for a type pipekit has no name for."""
+    name = backend_name(data)
+    if name != "numpy" or _is_numpy(data):
+        return name
+    return type(data).__module__.partition(".")[0]
+
+
+def _is_numpy(data: Any) -> bool:
+    """Whether ``data`` is NumPy's, or a Python number or sequence."""
+    return type(data).__module__.partition(".")[0] in ("numpy", "builtins")
+
+
+def _report_join(datas: Sequence[Any], what: str) -> None:
+    """Tell the guard about the NumPy arrays that join, and a dtype they widen."""
+    import jax.numpy as jnp
+
+    own = [d for d in datas if backend_name(d) == "jax"]
+    joining = [d for d in datas if backend_name(d) != "jax" and getattr(d, "ndim", 0)]
+    # a NumPy constant of a trace is compiled in, not moved on each call
+    if not joining or any(map(is_traced, own)):
+        return
+    report_move(what, "NumPy data joined jax")
+    narrow, wide = jnp.result_type(*own), jnp.result_type(*own, *joining)
+    if narrow != wide and jnp.issubdtype(narrow, jnp.inexact):
+        report_move(what, f"NumPy data widened {narrow} to {wide}")
+
+
+def join_mask(
+    adapter: NamedArrayAdapter, x: Any, data: Any, mask: Any, what: str
+) -> tuple[Any, Any, Any]:
+    """``x``, its data and its mask, with NumPy joined to JAX if either is JAX.
+
+    A mask of another backend stays as it is (a NumPy mask on dask data).
+    """
+    if "jax" not in (backend_name(data), backend_name(mask)):
+        return x, data, mask
+    own, mask = join_backends([data, mask], what)
+    if own is not data:
+        x = adapter.rewrap(x, own, adapter.dims(x))
+    return x, own, mask
 
 
 def _fast_path(adapter: NamedArrayAdapter, name: str) -> Callable[..., Any] | None:
@@ -295,6 +368,8 @@ def reduce(
     if where is not None:
         _require_where_backend(data)
     mask = None if where is None else _aligned_mask(where, dims, data, "reduce")
+    if mask is not None:
+        x, data, mask = join_mask(adapter, x, data, mask, "reduce")
     if fast is not None:
         return fast(x, fn, names) if mask is None else fast(x, fn, names, where=mask)
     axes = _axes(dims, names, "reduce")
@@ -417,11 +492,10 @@ def take_along(x: Any, index: Any, dim: str) -> Any:
     index_dims = index_adapter.dims(index)
     if not set(index_dims) <= set(rest):
         raise ValueError(f"take_along: index dims {index_dims} are not among {rest}.")
-    data = adapter.data(x)
-    xp = namespace_of(data)
-    idx = index_adapter.data(index)
     # a JAX index next to NumPy data would be converted (or fail under jit)
-    require_one_backend([data, idx], "take_along")
+    datas = [adapter.data(x), index_adapter.data(index)]
+    data, idx = join_backends(datas, "take_along")
+    xp = namespace_of(data)
     # index → x's dim order with dim as a size-1 axis; missing dims broadcast
     check_index_labels(adapter, x, index_adapter, index, index_dims)
     sizes = dict(zip(dims, data.shape, strict=True))
@@ -485,8 +559,7 @@ def stack(xs: Sequence[Any], dim: str) -> Any:
     dims = _same_dims(adapter, checked, "stack")
     if dim in dims:
         raise ValueError(f"stack: {dim!r} is already a dim of {dims}; use concat.")
-    datas = [adapter.data(x) for x in checked]
-    require_one_backend(datas, "stack")
+    datas = join_backends([adapter.data(x) for x in checked], "stack")
     xp = namespace_of(datas[0])
     return adapter.rewrap(checked[0], xp.stack(datas), (dim, *dims))
 
@@ -540,8 +613,7 @@ def concat(xs: Sequence[Any], dim: str) -> Any:
     # when an input has no entries along dim
     others = [adapter.isel(x, {dim: slice(0, 0)}) for x in xs]
     adapter.check_compatible(*others)
-    datas = [adapter.data(x) for x in xs]
-    require_one_backend(datas, "concat")
+    datas = join_backends([adapter.data(x) for x in xs], "concat")
     xp = namespace_of(datas[0])
     return adapter.rewrap(xs[0], xp.concat(datas, axis=axis), dims)
 
@@ -550,7 +622,8 @@ def combine(fn: Callable[..., Any], *xs: Any) -> Any:
     """``fn`` of the data of carriers with the same dims; never aligns.
 
     Inputs are put in the first one's dim order by name before ``fn`` sees
-    them, and the result has those dims.
+    them, and the result has those dims. NumPy inputs join JAX ones; ``fn``
+    then decides what it returns (``np.add`` of JAX arrays is NumPy's).
 
     Example:
         >>> import numpy as np
@@ -568,14 +641,13 @@ def combine(fn: Callable[..., Any], *xs: Any) -> Any:
     if fast is not None:
         return fast(fn, *xs)
     checked = adapter.check_compatible(*xs)
-    require_one_backend([adapter.data(x) for x in checked], "combine")
+    joined = join_backends([adapter.data(x) for x in checked], "combine")
     dims = adapter.dims(checked[0])
     datas = []
-    for x in checked:
+    for x, data in zip(checked, joined, strict=True):
         other = adapter.dims(x)
         if sorted(other) != sorted(dims):
             raise ValueError(f"combine: dims {other} differ from {dims}.")
-        data = adapter.data(x)
         if other != dims:
             data = namespace_of(data).permute_dims(data, _axes(other, dims, "combine"))
         datas.append(data)

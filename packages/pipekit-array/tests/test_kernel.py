@@ -8,7 +8,13 @@ from typing import Any
 import numpy as np
 import pytest
 from pipekit_array import BackendError, DimArray, KernelOp, KernelSpec
-from pipekit_ops import Signature, get_adapter, register_adapter, unregister_adapter
+from pipekit_ops import (
+    Signature,
+    backend_name,
+    get_adapter,
+    register_adapter,
+    unregister_adapter,
+)
 
 
 BANDS = ("B1", "B2", "B3", "B4")
@@ -205,14 +211,6 @@ def test_loop_dims_broadcast_by_name() -> None:
 # -- errors -------------------------------------------------------------------------
 
 
-def test_mixed_backends_name_to_jax() -> None:
-    jnp = pytest.importorskip("jax.numpy")
-    a = DimArray(np.ones((2, 3)), ("y", "x"))
-    b = DimArray(jnp.ones((2, 3)), ("y", "x"))
-    with pytest.raises(BackendError, match="to_jax"):
-        ND(a, b)
-
-
 def test_undeclared_backend() -> None:
     jnp = pytest.importorskip("jax.numpy")
     numpy_only = KernelOp(
@@ -375,8 +373,16 @@ def test_dim_core_for_one_input_loop_for_another() -> None:
 def test_raw_inputs_are_checked_like_carriers() -> None:
     jnp = pytest.importorskip("jax.numpy")
     nd = KernelOp(lambda a, b: a - b, "(),()->()", core={})
-    with pytest.raises(BackendError, match="to_jax"):
-        nd(np.ones(3), jnp.ones(3))
+    assert backend_name(nd(np.ones(3), jnp.ones(3))) == "jax"
+    assert nd(2.0, jnp.ones(3, "float32")).dtype == np.float32
+    da = pytest.importorskip("dask.array")
+    with pytest.raises(BackendError, match="inputs on"):
+        nd(da.ones(3), jnp.ones(3))
+    numpy_only = KernelOp(
+        lambda a, b: a - b, KernelSpec("(),()->()", backends=("numpy",)), core={}
+    )
+    with pytest.raises(BackendError, match="not 'jax'"):
+        numpy_only(np.ones(3), jnp.ones(3))
     jax_only = KernelOp(lambda a: a, KernelSpec("()->()", backends=("jax",)), core={})
     with pytest.raises(BackendError, match="not 'numpy'"):
         jax_only(np.ones(3))

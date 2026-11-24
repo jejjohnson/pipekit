@@ -28,13 +28,22 @@ def test_array_namespace_no_array_input_raises():
         array_namespace("not an array")
 
 
-def test_array_namespace_mixed_backends_raises():
+def test_array_namespace_numpy_joins_jax():
     np = pytest.importorskip("numpy")
     jnp = pytest.importorskip("jax.numpy")
     x_np = np.array([1.0, 2.0])
     x_jax = jnp.array([1.0, 2.0])
-    with pytest.raises(TypeError, match="multiple Array API backends"):
-        array_namespace(x_np, x_jax)
+    assert array_namespace(x_np, x_jax) is array_namespace(x_jax)
+    assert array_namespace(x_jax, x_np, x_np) is array_namespace(x_jax)
+
+
+def test_array_namespace_other_mixed_backends_raise():
+    np = pytest.importorskip("numpy")
+    jnp = pytest.importorskip("jax.numpy")
+    strict = pytest.importorskip("array_api_strict")
+    for other in (np.array([1.0]), jnp.array([1.0])):
+        with pytest.raises(TypeError, match="multiple Array API backends"):
+            array_namespace(strict.ones(1), other)
 
 
 def test_array_namespace_non_array_among_arrays_raises(backend, make_array):

@@ -12,8 +12,8 @@ CuPy, dask and any other library that `array_api_compat` knows:
 The host rule (ADR A23): Python numbers, sequences and NumPy arrays live on
 the host, and join the library and the device of the other arrays. No other
 array is moved, and two libraries other than NumPy in one call raise.
-`pipekit_array.array_namespace` and the named layer (the dim-level functions,
-`KernelOp`) keep their stricter rule, which refuses NumPy next to JAX.
+The named layer (the dim-level functions, `KernelOp`) joins NumPy to JAX in
+the same way (ADR A24).
 
 This module needs ``pipekit-array[numpy,compat]``, so importing
 ``pipekit_array`` does not import it. It imports no array library but NumPy.
@@ -204,7 +204,8 @@ def elementwise[F: Callable[..., Any]](*, n_outputs: int = 1) -> Callable[[F], F
         ValueError: (the decorated function) if a labelled array meets an
             array with dimensions but no names.
         BackendError: (the decorated function) if a DataArray meets a carrier
-            of another kind, or carriers hold arrays of several libraries.
+            of another kind, or carriers hold arrays of several libraries
+            other than NumPy and JAX.
 
     Example:
         >>> import numpy as np
@@ -357,6 +358,8 @@ class _Call:
             kwargs = {key: v for key, v in given.items() if isinstance(key, str)}
             return self.function(*args, **kwargs)
 
+        # the guard names the function the caller knows
+        function.__name__ = getattr(self.function, "__name__", "elementwise")
         return function
 
 
