@@ -27,6 +27,8 @@ imports pipekit in its core and ``xr.DataArray`` needs no accessor.
 - `to_backend` — a value moved between NumPy and JAX, carriers through
   their adapter; `ConvertingAdapter` is the optional method for carriers
   with more arrays than their data.
+- `MissingValueAdapter` — the optional method for carriers that mark
+  missing elements in their data (a fill value).
 
 The registry lives here, in pipekit core, because pipekit-array already
 depends on pipekit: a lookup from core into pipekit-array would be a
@@ -47,6 +49,7 @@ __all__ = [
     "ConvertingAdapter",
     "LabelledAdapter",
     "MissingAdapterError",
+    "MissingValueAdapter",
     "NamedArrayAdapter",
     "backend_name",
     "backend_of",
@@ -142,6 +145,24 @@ class ConvertingAdapter(Protocol):
 
     def to_backend(self, x: Any, backend: Literal["numpy", "jax"]) -> Any:
         """``x`` with every array on ``backend``."""
+        ...
+
+
+@runtime_checkable
+class MissingValueAdapter(Protocol):
+    """An adapter whose carriers mark missing elements in their data (optional).
+
+    A formula behind ``pipekit_array.functions.elementwise`` sees raw arrays,
+    so it computes on a fill value as if it were data. ``elementwise`` hands
+    its result to ``keep_missing``, which marks the elements that were missing
+    in an input. The dim-level functions and ``KernelOp`` do not call it.
+    """
+
+    def keep_missing(self, out: Any, *inputs: Any) -> Any:
+        """``out`` with its elements missing wherever an input's element was.
+
+        ``out`` has the dims of all the inputs; an input may lack some.
+        """
         ...
 
 
