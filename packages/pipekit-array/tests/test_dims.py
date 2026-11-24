@@ -28,6 +28,8 @@ from pipekit_ops import (
     backend_of,
     get_adapter,
     guard,
+    register_adapter,
+    unregister_adapter,
 )
 
 
@@ -654,3 +656,32 @@ def test_map_over_keeps_a_dim_called_batch() -> None:
     jnp = pytest.importorskip("jax.numpy")
     x = DimArray(jnp.ones((3, 2, 4)), ("t", "batch", "x"))
     assert pa.map_over(x, lambda c: c, "t").dims == ("t", "batch", "x")
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_map_over_relabels_any_adapter_that_can(backend: str) -> None:
+    class Other(DimArray):
+        pass
+
+    class OtherAdapter(DimArrayAdapter):
+        def isel(self, x: Other, indexers: dict[str, Any]) -> Other:
+            out = super().isel(x, indexers)
+            return Other(out.data, out.dims, out.labels)
+
+        def rewrap(self, x: Other, data: Any, dims: tuple[str, ...]) -> Other:
+            out = super().rewrap(x, data, dims)
+            return Other(out.data, out.dims, out.labels)
+
+        def relabel(self, x: Other, labels: Any) -> Other:
+            out = super().relabel(x, labels)
+            return Other(out.data, out.dims, out.labels)
+
+    cube = _member_cube(backend)
+    register_adapter(Other, OtherAdapter())
+    try:
+        given = Other(cube.data, cube.dims, cube.labels)
+        out = pa.map_over(given, lambda c: pa.reduce(c, "max", "x"), "member")
+    finally:
+        unregister_adapter(Other)
+    assert type(out) is Other
+    assert out.labels == {"member": tuple("abcde"), "band": ("B4", "B8")}
