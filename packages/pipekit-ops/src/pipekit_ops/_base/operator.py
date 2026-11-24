@@ -147,6 +147,10 @@ class Operator(ConfigMixin):
             `pipekit_ops.adapters.BackendError` before ``_apply`` runs.
             Values with no backend (numbers, strings, tables) stay as they
             are.
+        traceable: ``False`` on an operator that must not run inside
+            ``jax.jit``: it stores what it computes, or acts on the world.
+            `pipekit_ops.jit_report` reads it; nothing else does. Default
+            ``True``.
 
     Example:
         Define and compose::
@@ -165,6 +169,7 @@ class Operator(ConfigMixin):
     forbid_in_yaml: ClassVar[bool] = False
     _terminal: ClassVar[bool] = False
     backends: ClassVar[tuple[str, ...] | None] = None
+    traceable: ClassVar[bool] = True
     # Stateful-pipeline marker — `StatefulOperator` overrides to True; the
     # `Sequential` plumbing reads this to decide whether to thread state.
     # See `pipekit_ops.state` (Group M).

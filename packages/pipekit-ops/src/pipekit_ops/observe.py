@@ -212,6 +212,7 @@ def _sig(x: Any) -> str:
 class _SnapshotAt(Operator):
     """Internal: operator returned by `Snapshot.at`."""
 
+    traceable: ClassVar[bool] = False
     forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 
@@ -421,6 +422,7 @@ class Profile:
 class _HistogramAt(Operator):
     """Internal: operator returned by `Histogram.at`."""
 
+    traceable: ClassVar[bool] = False
     forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 

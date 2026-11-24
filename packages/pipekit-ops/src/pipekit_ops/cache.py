@@ -35,7 +35,7 @@ See master plan Report 2, Group G.
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
@@ -85,6 +85,7 @@ class Cache(Operator):
         {'id': 'a', 'cloud': 3}
     """
 
+    traceable: ClassVar[bool] = False
     __config_mixin_auto__ = False
     __config_exclude__ = ("hits", "misses")
 

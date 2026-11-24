@@ -34,9 +34,10 @@ Every output on this page is from a real run of pipekit-ops 0.2.1.
 | Protocols | `protocols` | `Predictor`, `FittableTransformer` | accepting a model without importing its library |
 | Named-array adapters | `adapters` | `NamedArrayAdapter`, `LabelledAdapter`, `register_adapter`, `register_lazy_adapter`, `unregister_adapter`, `get_adapter`, `signature_of`, `MissingAdapterError`, `backend_of`, `backend_name`, `to_backend`, `ConvertingAdapter`, `BackendError` | reading a carrier's named dims, or the array backend it sits on, without importing its library |
 | Guards | `guards` | `guard`, `guard_level`, `report_move`, `BackendWarning` | finding the step that moves data between NumPy and JAX |
+| Jittability | `jit` | `jit_report`, `JitReport`, `JitStep` | which steps run under `jax.jit`, and why the others do not |
 | Import hooks | `imports` | `on_import` | running code once a module is imported, without importing it (JAX pytree registration) |
 
-`pipekit_ops.testing` (`assert_round_trip`) is the 23rd module; it is imported on its own and adds nothing to `__all__`.
+`pipekit_ops.testing` (`assert_round_trip`) is the 24th module; it is imported on its own and adds nothing to `__all__`.
 
 The sister packages build on this core: time stepping and data assimilation
 in `pipekit-cycle`, training in `pipekit-train`, the model registry in
@@ -77,6 +78,8 @@ supplies the rest:
   placeholder (`Input` or `Node`) it records a node instead;
 - **class flags**: `forbid_in_yaml` (holds a closure, so its config cannot be
   rebuilt) and `_terminal` (may only end a `Sequential`);
+- **`traceable`**: `False` on an operator that must not run inside `jax.jit`,
+  such as `Cache`; [`jit_report`](guards.md) reads it;
 - **`backends`**: the array backends the operator runs on, such as
   `("numpy",)` or `("numpy", "jax")`. Left at `None`, nothing is checked. When
   set, NumPy and JAX inputs go where the operator runs: NumPy joins JAX if it
