@@ -21,7 +21,7 @@ from pipekit_array import (
     TakeAlong,
     Transpose,
 )
-from pipekit_ops import Signature, get_adapter
+from pipekit_ops import BackendWarning, Signature, backend_of, get_adapter, guard
 
 
 BANDS = ("B4", "B8")
@@ -417,17 +417,83 @@ def test_take_along_rejects_reordered_labels() -> None:
         pa.take_along(data, index, "time")
 
 
-def test_mixed_backends_never_stack_silently() -> None:
+def _add(a: Any, b: Any) -> Any:
+    return a + b
+
+
+#: each multi-input dim function of two (y, x) arrays
+MIXED = {
+    "stack": lambda a, b: pa.stack([a, b], "run"),
+    "concat": lambda a, b: pa.concat([a, b], "y"),
+    "combine": lambda a, b: pa.combine(_add, a, b),
+    "dot": lambda a, b: pa.dot(a, b, dim="x"),
+    "where": lambda a, b: pa.where(a, pa.combine(lambda v: v != 1, b)),
+    "reduce": lambda a, b: pa.reduce(
+        a, "mean", "x", where=pa.combine(lambda v: v != 1, b)
+    ),
+    "take_along": lambda a, b: pa.take_along(a, pa.argreduce(b, "argmax", "x"), "x"),
+    "KernelOp": lambda a, b: pa.KernelOp(_add, "(),()->()", core={})(a, b),
+}
+
+
+@pytest.mark.parametrize("order", ["numpy first", "jax first"])
+@pytest.mark.parametrize("wrap", ["DimArray", "DataArray"])
+@pytest.mark.parametrize("name", list(MIXED))
+def test_numpy_joins_jax(name: str, wrap: str, order: str) -> None:
     jnp = pytest.importorskip("jax.numpy")
-    a = DimArray(np.ones((2, 3)), ("y", "x"))
-    b = DimArray(jnp.ones((2, 3)), ("y", "x"))
-    for join in (
-        lambda: pa.stack([a, b], "run"),
-        lambda: pa.concat([a, b], "y"),
-        lambda: pa.combine(np.add, a, b),
-    ):
-        with pytest.raises(pa.BackendError, match="to_jax"):
-            join()
+    values = np.arange(6.0, dtype=np.float32).reshape(2, 3)
+    if wrap == "DimArray":
+        make = DimArray
+    else:
+        make = pytest.importorskip("xarray").DataArray
+        if name in ("where", "reduce", "take_along"):
+            pytest.skip("xarray's own functions decide the backend")
+    a, b = make(values, dims=("y", "x")), make(jnp.asarray(values), dims=("y", "x"))
+    first, second = (a, b) if order == "numpy first" else (b, a)
+    out = MIXED[name](first, second)
+    assert backend_of(out) == "jax"
+    np.testing.assert_allclose(out.data, MIXED[name](a, a).data, rtol=1e-6)
+
+
+@pytest.mark.parametrize("name", ["stack", "concat", "combine", "dot", "KernelOp"])
+def test_the_guard_reports_a_join_with_its_name(name: str) -> None:
+    jnp = pytest.importorskip("jax.numpy")
+    values = np.ones((2, 3), np.float32)
+    a, b = DimArray(values, ("y", "x")), DimArray(jnp.asarray(values), ("y", "x"))
+    what = "_add" if name == "KernelOp" else name
+    with guard("raise"):
+        MIXED[name](a, a)
+        MIXED[name](b, b)
+        with pytest.raises(pa.BackendError, match=f"^{what}: NumPy data joined jax"):
+            MIXED[name](a, b)
+
+
+def test_the_guard_reports_a_dtype_the_join_widens() -> None:
+    jax = pytest.importorskip("jax")
+    narrow = DimArray(jax.numpy.ones(3, "float32"), ("x",))
+    with jax.enable_x64(True), guard("warn"), pytest.warns(BackendWarning) as got:
+        out = pa.combine(_add, narrow, DimArray(np.ones(3), ("x",)))
+    assert out.dtype == np.float64
+    assert "widened float32 to float64" in str(got[-1].message)
+
+
+def test_a_numpy_array_is_a_constant_of_a_trace() -> None:
+    jax = pytest.importorskip("jax")
+    ones = DimArray(np.ones(3, np.float32), ("x",))
+    x = DimArray(jax.numpy.arange(3.0), ("x",))
+    with guard("raise"):
+        out = jax.jit(lambda v: pa.combine(_add, ones, v))(x)
+    np.testing.assert_array_equal(out.data, [1.0, 2.0, 3.0])
+
+
+def test_other_mixes_raise() -> None:
+    da = pytest.importorskip("dask.array")
+    jnp = pytest.importorskip("jax.numpy")
+    strict = pytest.importorskip("array_api_strict")
+    x = DimArray(jnp.ones(3), ("x",))
+    for data in (da.ones(3), strict.ones(3)):
+        with pytest.raises(pa.BackendError, match="put them on one backend"):
+            pa.stack([x, DimArray(data, ("x",))], "run")
 
 
 def test_sel_operator_keeps_a_tuple_label() -> None:
@@ -467,15 +533,6 @@ def test_sel_with_a_label_array_keeps_the_dim_in_its_signature() -> None:
     assert sig.dims == (("band", 2), ("x", 2))
     assert op(cube).dims == ("band", "x")
     assert loads(dumps(op)).label == ["a", "c"]
-
-
-def test_take_along_refuses_a_jax_index_on_numpy_data() -> None:
-    """Codex #110: mixed backends raise instead of converting the index."""
-    jnp = pytest.importorskip("jax.numpy")
-    x = DimArray(np.zeros((3, 2)), ("t", "x"))
-    index = DimArray(jnp.zeros(2, dtype=jnp.int32), ("x",))
-    with pytest.raises(pa.BackendError, match="take_along"):
-        pa.take_along(x, index, "t")
 
 
 @pytest.mark.parametrize(

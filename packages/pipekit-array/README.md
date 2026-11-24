@@ -288,7 +288,7 @@ The array-shaped `BatchedMap` became `BatchAlong`, so it no longer shares a name
 
 Every function asks its input for its namespace, `array_namespace(x)`, and calls `xp.mean`, `xp.stack` and so on from it.
 So one operator runs on NumPy, JAX, CuPy, PyTorch or dask without importing any of them, and the result stays on the backend it came from.
-Inputs that span two backends raise a `TypeError` instead of being moved silently.
+A NumPy input next to a JAX one joins it, and `pipekit_ops.guard` reports that on request; any other mix of backends raises a `TypeError`.
 PyTorch tensors have no native `__array_namespace__`, so they need the `[compat]` extra.
 
 ### Named dims through the adapter protocol

@@ -107,7 +107,7 @@ out = StackAlong(axis=0)([arr_a, arr_b, arr_c])  # 3 × (H, W) → (3, H, W)
 
 **`get_config()`:** `{"axis": self.axis}`, or `{"dim": self.dim}` for the named form.
 
-**Failure mode:** an empty input list raises `ValueError`; a mixed-backend list raises `TypeError` via `array_namespace`; mismatched shapes raise the backend's stack error.
+**Failure mode:** an empty input list raises `ValueError`; NumPy joins JAX (A24) and another mixed-backend list raises `TypeError`; mismatched shapes raise the backend's stack error.
 
 ---
 

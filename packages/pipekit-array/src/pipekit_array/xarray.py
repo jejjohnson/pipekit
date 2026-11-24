@@ -27,10 +27,10 @@ from typing import Any
 
 import numpy as np
 import xarray as xr
-from pipekit_ops import Signature, get_adapter, register_adapter
+from pipekit_ops import Signature, backend_name, get_adapter, register_adapter
 
 from pipekit_array.dimarray import DimArray
-from pipekit_array.dims import check_index_labels
+from pipekit_array.dims import check_index_labels, join_backends
 from pipekit_array.kernel import (
     BackendError,
     KernelSpec,
@@ -212,7 +212,7 @@ class XarrayAdapter:
                 f"stack: {dim!r} is already a dim of {tuple(xs[0].dims)}; use concat."
             )
         _require_same_dims(xs, "stack")
-        checked = self.check_compatible(*xs)
+        checked = _joined(self.check_compatible(*xs), "stack")
         return xr.concat(
             checked, dim=dim, join="exact", coords="minimal", compat="identical"
         )
@@ -223,12 +223,16 @@ class XarrayAdapter:
         if dim not in dims:
             raise ValueError(f"concat: {dim!r} is not a dim of {dims}; use stack.")
         return xr.concat(
-            list(xs), dim=dim, join="exact", coords="minimal", compat="identical"
+            _joined(xs, "concat"),
+            dim=dim,
+            join="exact",
+            coords="minimal",
+            compat="identical",
         )
 
     def combine(self, fn: Callable[..., Any], *xs: xr.DataArray) -> xr.DataArray:
         """``apply_ufunc(fn, …, join="exact")``, lazy on dask."""
-        checked = self.check_compatible(*xs)
+        checked = _joined(self.check_compatible(*xs), "combine")
         dims = tuple(checked[0].dims)
         ordered = [x.transpose(*dims) for x in checked]
         lazy = any(_is_dask(x) for x in ordered)
@@ -278,7 +282,9 @@ class XarrayAdapter:
             raise BackendError(
                 f"the kernel declares backends {spec.backends}, not 'xarray'."
             )
-        checked = self.check_compatible(*xs)
+        checked = _joined(
+            self.check_compatible(*xs), getattr(kernel, "__name__", "KernelOp")
+        )
         in_dims = [[core[c] for c in group] for group in spec.inputs]
         out_dims = [[core[c] for c in group] for group in spec.outputs]
         letter_size: dict[str, int] = {}
@@ -416,6 +422,14 @@ def _numpy_function(fn: Any, what: str) -> Callable[..., Any]:
     if resolved is None:
         raise ValueError(f"{what}: the array namespace has no {fn!r}.")
     return resolved
+
+
+def _joined(xs: Sequence[xr.DataArray], what: str) -> list[xr.DataArray]:
+    """The DataArrays with NumPy data joined to JAX data, if there is any."""
+    if not any(backend_name(x.variable._data) == "jax" for x in xs):
+        return list(xs)
+    datas = join_backends([x.data for x in xs], what)
+    return [x.copy(data=data) for x, data in zip(xs, datas, strict=True)]
 
 
 def _as_dataarray(index: Any) -> xr.DataArray:

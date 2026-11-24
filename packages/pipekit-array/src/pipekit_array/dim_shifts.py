@@ -35,6 +35,7 @@ from pipekit_array.dims import (
     _fast_path,
     _resolve,
     adapter_of,
+    join_mask,
     namespace_of,
 )
 
@@ -372,6 +373,7 @@ def where(x: Any, cond: Any, /, other: float | None = None) -> Any:
     dims = adapter.dims(x)
     data = adapter.data(x)
     mask = _aligned_mask(cond, dims, data, "where")
+    x, data, mask = join_mask(adapter, x, data, mask, "where")
     xp = namespace_of(data)
     if other is None and not _holds_nan(xp, data.dtype):
         raise _no_nan_fill("where", "other", data.dtype)

@@ -283,9 +283,9 @@ def test_g10_quantile_stays_lazy_on_dask() -> None:
     assert type(out.data).__module__.startswith("dask.")
 
 
-def test_g10_mixed_backends_raise() -> None:
+def test_g10_dask_with_jax_raises() -> None:
     with pytest.raises(BackendError, match="dot: inputs on"):
-        pa.dot(_cube("numpy"), _weights("jax"), dim="band")
+        pa.dot(_cube("dask"), _weights("jax"), dim="band")
 
 
 # -- G9 operators ----------------------------------------------------------------

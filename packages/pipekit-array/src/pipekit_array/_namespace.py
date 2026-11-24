@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from pipekit_ops import backend_name
+
 
 _NO_BACKEND_MSG = (
     "No input implements the Array API. Install one of: "
@@ -59,9 +61,11 @@ def _compat_namespace() -> Callable[..., Any] | None:
 def array_namespace(*xs: Any) -> Any:
     """Return the Array API namespace shared by all input arrays.
 
+    NumPy arrays next to JAX ones join them, so the namespace is JAX's.
+
     Args:
         *xs: One or more array-like objects. All must share the same
-            Array API backend.
+            Array API backend, but for NumPy with JAX.
 
     Returns:
         The module-like namespace object (e.g. `numpy`, `jax.numpy`,
@@ -72,6 +76,11 @@ def array_namespace(*xs: Any) -> Any:
             inputs span more than one backend. The error message is
             consistent whether or not `array-api-compat` is installed.
     """
+    if len(xs) > 1:
+        # ADR A24: NumPy joins JAX, whatever the order
+        own = [x for x in xs if not type(x).__module__.startswith("numpy")]
+        if own and all(backend_name(x) == "jax" for x in own):
+            xs = tuple(own)
     compat_ns = _compat_namespace()
 
     if compat_ns is not None:

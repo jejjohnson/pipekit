@@ -226,7 +226,7 @@ All sixteen shipped in #204 to #207, together with `ApplyAlong`, `BatchAlong` an
 **Decision (23 Nov 2026, #244):** `pipekit_array.functions` holds the array backend of plain functions, which are no operators: `namespace_of`, `floating_inputs`, `like` and `elementwise`.
 Python numbers, sequences and NumPy arrays join the library and the device of the other arrays.
 Two libraries other than NumPy in one call raise `BackendError`, and so does an array of an unknown library.
-`array_namespace` (A1) and the named layer keep refusing NumPy next to JAX.
+`array_namespace` (A1) and the named layer kept refusing NumPy next to JAX until A24.
 `BackendError` derives from `TypeError` and `ValueError`.
 
 **Alternatives considered:**
@@ -239,6 +239,24 @@ Two libraries other than NumPy in one call raise `BackendError`, and so does an 
 
 **Rationale:** a formula takes constants and coordinates from NumPy next to data on JAX or torch, and the user expects them to join.
 An array of the call's library is cast with `astype(copy=False)` and never rebuilt, because `asarray` detaches a torch tensor in torch 2.5 and 2.10.
+
+## A24. NumPy joins JAX in every layer, and guards are opt-in
+
+**Decision (24 Nov 2026, #253):** a NumPy array next to a JAX one joins it, in either order, in `array_namespace`, the dim functions, `KernelOp`, `StackAlong` and `ConcatenateAlong`, and `elementwise` on carriers.
+Under a trace the NumPy array is a constant.
+`pipekit_ops.guard` reports each eager join of an array with one dimension or more, and a dtype it widens; without a guard nothing warns.
+Any other mix raises `BackendError`, as before.
+The result of `combine` is what the caller's function returns: `np.add` of JAX arrays is NumPy's.
+
+**Alternatives considered:**
+
+- **Refuse (A1 and A23 until this decision):** it finds a host copy for everybody, and makes everybody convert by hand.
+  It also stopped jittable code: `combine` raised on a NumPy constant inside `jax.jit`.
+- **`jax.transfer_guard` instead of a guard of our own:** Rejected: at `"disallow"` it refuses `x * 2.0`, and on CPU it does not see a copy from JAX to NumPy (jax 0.12.1).
+- **Join dask too:** Rejected: it would compute a lazy array, or wrap an eager one, without being asked.
+
+**Rationale:** a NumPy mask, coordinate or constant next to a field on JAX is ordinary code.
+The cost of joining silently (a host copy, or float32 widened to float64) matters to an app, and an app can switch the guard on.
 
 ## Optional extras matrix
 

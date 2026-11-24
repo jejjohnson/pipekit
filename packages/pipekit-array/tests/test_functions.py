@@ -9,7 +9,13 @@ import sys
 import types
 
 import pytest
-from pipekit_ops import BackendError, BackendWarning, get_adapter, guard
+from pipekit_ops import (
+    BackendError,
+    BackendWarning,
+    backend_of,
+    get_adapter,
+    guard,
+)
 
 
 # the module under test needs both, and so do its tests
@@ -20,7 +26,7 @@ import array_api_compat.numpy as numpy_namespace
 import numpy as np
 import pipekit_array.functions as functions
 from hypothesis import given, strategies as st
-from pipekit_array import DimArray, array_namespace
+from pipekit_array import DimArray
 from pipekit_array.functions import (
     elementwise,
     floating_inputs,
@@ -150,14 +156,6 @@ def test_jax_wins_over_numpy_and_meets_no_third_library() -> None:
 
     jax.jit(probe)(jnp.ones(2))
     assert seen == [jnp]
-
-
-@needs_jax
-def test_the_operators_still_refuse_numpy_next_to_jax() -> None:
-    import jax.numpy as jnp
-
-    with pytest.raises(TypeError, match="multiple Array API backends"):
-        array_namespace(np.zeros(2), jnp.zeros(2))
 
 
 @pytest.mark.parametrize("value", [Unknown(), object(), "text", {"a": 1}])
@@ -509,7 +507,7 @@ def test_a_dimarray_of_another_library_stays_on_its_device() -> None:
 
 
 @needs_jax
-def test_dimarrays_trace_and_refuse_mixed_backends() -> None:
+def test_dimarrays_trace_and_join_backends() -> None:
     import jax
     import jax.numpy as jnp
 
@@ -517,7 +515,12 @@ def test_dimarrays_trace_and_refuse_mixed_backends() -> None:
     on_numpy = DimArray(np.asarray([280.0, 250.0]), ("x",))
     out = jax.jit(density)(1e5, on_jax)
     np.testing.assert_allclose(out.data, density(1e5, on_jax).data, rtol=1e-6)
-    with pytest.raises(BackendError, match="inputs on"):
+    mixed = density(on_numpy, on_jax)
+    assert backend_of(mixed) == "jax"
+    with (
+        guard("raise"),
+        pytest.raises(BackendError, match="density: NumPy"),
+    ):
         density(on_numpy, on_jax)
     # a traced number joins the carrier of NumPy
     slope = jax.grad(lambda p: density(p, on_numpy).data.sum())(1e5)
