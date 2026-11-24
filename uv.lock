@@ -4096,7 +4096,7 @@ requires-dist = [
 
 [[package]]
 name = "pipekit-array"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4369,7 +4369,7 @@ typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
 name = "pipekit-ops"
-version = "0.2.1"
+version = "0.2.3"
 source = { editable = "packages/pipekit-ops" }
 
 [[package]]

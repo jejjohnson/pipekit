@@ -79,6 +79,19 @@ Python numbers, sequences and NumPy arrays join the library and the device of th
 
 ::: pipekit_array.functions
 
+### Masked and weighted reductions
+
+`pipekit_array.weighted` is written on that backend: sums and means with a mask and weights, of an array or of static groups of samples (an average over months, rings or labelled regions).
+The array API standard has no `nansum` and no `bincount`, and a mask says which samples count, never a NaN (ADR A25).
+
+::: pipekit_array.weighted
+
+### Records
+
+`register_record` makes a frozen dataclass a JAX pytree once JAX loads, for libraries whose import never loads JAX.
+
+::: pipekit_array.records
+
 ## xarray
 
 ::: pipekit_array.xarray

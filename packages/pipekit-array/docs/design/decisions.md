@@ -258,6 +258,20 @@ The result of `combine` is what the caller's function returns: `np.add` of JAX a
 **Rationale:** a NumPy mask, coordinate or constant next to a field on JAX is ordinary code.
 The cost of joining silently (a host copy, or float32 widened to float64) matters to an app, and an app can switch the guard on.
 
+## A25. Masked reductions and records of plain functions live here too
+
+**Decision (24 Nov 2026):** what a library of plain functions needs and is about no field of science goes next to `pipekit_array.functions`: `table_like`, `boolean_like` and `divide_or_nan` in it, `weighted_sum`, `weighted_mean` and `Groups` in `pipekit_array.weighted`, and `register_record` in `pipekit_array.records`.
+They come from diagnostix v0.0.1, and `register_record` had copies in geophysix and radiomax.
+
+**Alternatives considered:**
+
+- **Each library keeps its own:** Rejected: three copies of `register_record` exist, two of them with an import hook of their own beside `pipekit_ops.on_import`.
+- **`reduce(where=)` of the named layer (A10):** it takes carriers, has no weights and no groups, and an all-masked mean is the namespace's.
+- **`nanmean`, `nansum`:** Rejected, as in the non-goals: a NaN in a valid sample must give NaN, and a mask says what is missing.
+
+**Rationale:** `Groups` is a padded gather, because the standard has no `bincount` and a difference of cumulative sums loses float32's precision.
+A library's own exception is its own business: these raise `ValueError` and `BackendError`.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
