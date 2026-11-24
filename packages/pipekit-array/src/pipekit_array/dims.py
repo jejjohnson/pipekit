@@ -145,8 +145,9 @@ def join_backends(datas: Sequence[Any], what: str) -> list[Any]:
 
     Example:
         >>> import numpy as np
-        >>> [x.shape for x in join_backends([np.ones(2), np.ones(3)], "stack")]
-        [(2,), (3,)]
+        >>> first, second = join_backends([np.ones(2), np.ones(3)], "stack")
+        >>> first.shape, second.shape
+        ((2,), (3,))
     """
     joined = list(datas)
     backends = {backend_name(d) for d in joined}
