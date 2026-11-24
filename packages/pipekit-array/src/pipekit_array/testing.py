@@ -14,7 +14,8 @@ instead of copying tests::
 - `check_adapter(adapter, make_carrier)` — every dim-level function (and
   the adapter's fast paths, which are what the functions call) on the
   carrier equals the generic path on a `DimArray` with the same data,
-  dims and labels; the protocol methods behave. The functions that make
+  dims and labels; the protocol methods behave; a stack of pytree carriers
+  has the tree structure of one. The functions that make
   new or renamed dims (`pipekit_array.dim_shapes`) must also give the
   same labels; those on the band labels run when the adapter has
   ``relabel`` (`pipekit_ops.LabelledAdapter`). So must the index-only
@@ -31,6 +32,7 @@ They need NumPy, and nothing from pytest.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -323,6 +325,7 @@ def check_adapter(
         f"not the adapter under test {type(adapter).__name__}"
     )
     _check_protocol(adapter, carrier, data, name)
+    _check_stack_structure(carrier, name)
     lazy = _dims.backend_name(adapter.data(carrier)) == "dask"
     labelled = getattr(adapter, "relabel", None) is not None
     shape_cases = _dim_shape_cases(labelled)
@@ -347,6 +350,24 @@ def check_adapter(
             np.testing.assert_array_equal(a, e, err_msg=f"{label} on {name}")
         else:
             np.testing.assert_allclose(a, e, rtol=rtol, err_msg=f"{label} on {name}")
+
+
+def _check_stack_structure(carrier: Any, name: str) -> None:
+    """A stack of carriers has the tree structure of one (`core_dims`).
+
+    Only for a carrier that is a JAX pytree, once JAX is imported.
+    """
+    jax = sys.modules.get("jax")
+    if jax is None:
+        return
+    tree = jax.tree_util
+    if tree.all_leaves([carrier]):
+        return
+    stacked = tree.tree_map(lambda leaf: np.stack([leaf, leaf]), carrier)
+    assert tree.tree_structure(stacked) == tree.tree_structure(carrier), (
+        f"{name}: a stack of carriers (vmap, scan) has another tree structure than "
+        "one; store pipekit_array.dimarray.core_dims(dims) as the static dims"
+    )
 
 
 def _check_protocol(

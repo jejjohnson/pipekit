@@ -10,7 +10,8 @@ named carrier for tests and for libraries with none of their own
 - **It is** a JAX pytree whose only leaf is the data: dims and labels are
   static, so a new set of values never recompiles. Under a bare
   ``jax.vmap`` (``in_axes=0``) the mapped dim is the first one: it is
-  dropped inside and comes back as ``"batch"`` (`vmapped_dims`); to map a
+  dropped inside and comes back as ``"batch"`` (`vmapped_dims`), and a stack
+  of them has the tree structure of one (`core_dims`); to map a
   named dim, use `pipekit_array.map_over`.
 - **It does not hold** a georeference, coordinates beyond labels, or
   attrs, and **does not do** alignment, arithmetic or selection by value;
@@ -330,27 +331,54 @@ def vmapped_dims(dims: tuple[str, ...], shape: Any) -> tuple[str, ...]:
     first dims, or prepend ``"batch"`` (``"batch_1"``, … if taken). A
     shape that already matches, or no shape (a tracing placeholder),
     leaves ``dims`` alone. Map over any other axis with `map_over`.
+
+    A carrier's pytree stores `core_dims` as its static dims and calls this
+    when it is unflattened.
     """
     if shape is None or not hasattr(shape, "__len__") or len(shape) == len(dims):
         return dims
     if len(shape) < len(dims):
         return dims[len(dims) - len(shape) :]
+    return (*_batch_names(len(shape) - len(dims), dims), *dims)
+
+
+def core_dims(dims: tuple[str, ...]) -> tuple[str, ...]:
+    """``dims`` without the leading ones that `vmapped_dims` would add back.
+
+    A stack of carriers (from ``vmap``, ``scan`` or ``jnp.stack``) and one of
+    them then have the same tree structure, as a stack of arrays and one array
+    have: a solver that allocates its output and writes one step into it
+    compares the two. Leading dims called ``"batch"``, ``"batch_1"``, … are
+    taken to be added ones, also when the caller named them so.
+
+    Example:
+        >>> core_dims(("batch", "y", "x")), core_dims(("time", "y", "x"))
+        (('y', 'x'), ('time', 'y', 'x'))
+    """
+    k = 0
+    while k < len(dims) and dims[: k + 1] == _batch_names(k + 1, dims[k + 1 :]):
+        k += 1
+    return dims[k:]
+
+
+def _batch_names(count: int, dims: tuple[str, ...]) -> tuple[str, ...]:
+    """``count`` names for axes in front of ``dims``: ``"batch"``, ``"batch_1"``, …"""
     added: list[str] = []
     k = 0
-    while len(added) < len(shape) - len(dims):
+    while len(added) < count:
         name = "batch" if k == 0 else f"batch_{k}"
         k += 1
         if name not in dims:
             added.append(name)
-    return (*added, *dims)
+    return tuple(added)
 
 
 def _register_pytree(jax: Any) -> None:
     """Register `DimArray` with JAX (run by `on_import` once JAX is imported)."""
 
     def flatten(d: DimArray) -> tuple[tuple[Any], Any]:
-        aux = (d.dims, tuple((dim, d.labels[dim]) for dim in d.dims if dim in d.labels))
-        return (d.data,), aux
+        labels = tuple((dim, d.labels[dim]) for dim in d.dims if dim in d.labels)
+        return (d.data,), (core_dims(d.dims), labels)
 
     def flatten_with_keys(d: DimArray) -> tuple[Any, Any]:
         (data,), aux = flatten(d)
