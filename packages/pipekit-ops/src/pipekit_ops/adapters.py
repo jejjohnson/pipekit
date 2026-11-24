@@ -24,6 +24,9 @@ imports pipekit in its core and ``xr.DataArray`` needs no accessor.
 - `backend_name`, `backend_of`, `BackendError` — which array backend a
   raw array or a carrier sits on (``"numpy"``, ``"jax"``, ``"dask"``),
   for ``Operator.backends`` and pipekit-array's kernels.
+- `to_backend` — a value moved between NumPy and JAX, carriers through
+  their adapter; `ConvertingAdapter` is the optional method for carriers
+  with more arrays than their data.
 
 The registry lives here, in pipekit core, because pipekit-array already
 depends on pipekit: a lookup from core into pipekit-array would be a
@@ -34,13 +37,14 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Mapping
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from pipekit_ops.signature import Signature
 
 
 __all__ = [
     "BackendError",
+    "ConvertingAdapter",
     "LabelledAdapter",
     "MissingAdapterError",
     "NamedArrayAdapter",
@@ -50,6 +54,7 @@ __all__ = [
     "register_adapter",
     "register_lazy_adapter",
     "signature_of",
+    "to_backend",
     "unregister_adapter",
 ]
 
@@ -123,6 +128,20 @@ class LabelledAdapter(Protocol):
         Each tuple has one entry per index of its dim; dims left out keep
         theirs.
         """
+        ...
+
+
+@runtime_checkable
+class ConvertingAdapter(Protocol):
+    """An adapter that moves a whole carrier between NumPy and JAX (optional).
+
+    Without it `to_backend` converts the data and calls ``rewrap``, which is
+    all a carrier with one array needs. A carrier with more arrays (a swath's
+    latitudes and longitudes, a point set's times) moves each of them here.
+    """
+
+    def to_backend(self, x: Any, backend: Literal["numpy", "jax"]) -> Any:
+        """``x`` with every array on ``backend``."""
         ...
 
 
@@ -309,3 +328,64 @@ def backend_of(x: Any) -> str | None:
     if isinstance(x, _array_types()):
         return backend_name(x)
     return None
+
+
+def to_backend(x: Any, backend: Literal["numpy", "jax"]) -> Any:
+    """``x`` with its NumPy and JAX arrays on one of the two backends.
+
+    Carriers convert through their adapter (`ConvertingAdapter`, or ``rewrap``
+    of the converted data), raw arrays directly, and the items of a list,
+    tuple or dict each on their own. Any other value comes back as it is: a
+    number, a dask array, a table, and an array whose dtype JAX has not
+    (dates, strings, objects). A NumPy copy of JAX data is writable.
+
+    Args:
+        x: A carrier, an array, a container of them, or any other value.
+        backend: ``"numpy"`` or ``"jax"``.
+
+    Example:
+        >>> import numpy as np
+        >>> data, path = to_backend([np.zeros(2), "a.tif"], "numpy")
+        >>> data.shape, path
+        ((2,), 'a.tif')
+    """
+    adapter = get_adapter(x)
+    if adapter is not None:
+        own = getattr(adapter, "to_backend", None)
+        if own is not None:
+            return own(x, backend)
+        data = adapter.data(x)
+        moved = _to_backend(data, backend)
+        return x if moved is data else adapter.rewrap(x, moved, adapter.dims(x))
+    if isinstance(x, dict):
+        return {key: to_backend(value, backend) for key, value in x.items()}
+    if isinstance(x, (list, tuple)):
+        items = [to_backend(item, backend) for item in x]
+        if hasattr(x, "_fields"):  # a namedtuple takes its fields one by one
+            return type(x)(*items)
+        return type(x)(items)
+    if isinstance(x, _array_types()):
+        return _to_backend(x, backend)
+    return x
+
+
+def _to_backend(data: Any, backend: str) -> Any:
+    """A raw array on ``backend``; itself if it is there or cannot go."""
+    current = backend_name(data)
+    if current == backend or current == "dask":
+        return data
+    dtype = getattr(data, "dtype", None)
+    # isbuiltin 2: a dtype a library added to NumPy, such as bfloat16
+    numeric = (
+        getattr(dtype, "kind", "O") in "biufc" or getattr(dtype, "isbuiltin", 0) == 2
+    )
+    if not isinstance(data, _array_types()) or not numeric:
+        return data
+    if backend == "numpy":
+        import numpy as np
+
+        # np.asarray of a JAX array is read-only
+        return np.array(data)
+    import jax.numpy as jnp
+
+    return jnp.asarray(data)

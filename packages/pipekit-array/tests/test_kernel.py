@@ -8,10 +8,12 @@ from typing import Any
 import numpy as np
 import pytest
 from pipekit_array import BackendError, DimArray, KernelOp, KernelSpec
+from pipekit_array.kernel import run_kernel
 from pipekit_ops import (
     Signature,
     backend_name,
     get_adapter,
+    guard,
     register_adapter,
     unregister_adapter,
 )
@@ -212,7 +214,8 @@ def test_loop_dims_broadcast_by_name() -> None:
 
 
 def test_undeclared_backend() -> None:
-    jnp = pytest.importorskip("jax.numpy")
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     numpy_only = KernelOp(
         normalized_difference,
         KernelSpec("(),()->()", backends=("numpy",)),
@@ -220,8 +223,19 @@ def test_undeclared_backend() -> None:
         eps=0.0,
     )
     a = DimArray(jnp.ones((2, 3)), ("y", "x"))
-    with pytest.raises(BackendError, match="declares"):
+    # the operator moves JAX data to the kernel and back (pipekit-ops #256)
+    for other in (a, DimArray(np.ones((2, 3)), ("y", "x"))):
+        out = numpy_only(a, other)
+        assert backend_name(out.data) == "jax"
+        np.testing.assert_array_equal(out.data, np.zeros((2, 3)))
+    with pytest.raises(BackendError, match=r"KernelOp runs on numpy only.*jax\.jit"):
+        jax.jit(numpy_only)(a, a)
+    with guard("raise"), pytest.raises(BackendError, match="KernelOp: JAX data copied"):
         numpy_only(a, a)
+    da = pytest.importorskip("dask.array")
+    lazy = DimArray(da.ones((2, 3)), ("y", "x"))
+    with pytest.raises(BackendError, match="declares"):
+        numpy_only(lazy, lazy)
 
 
 def test_raw_array_next_to_carriers() -> None:
@@ -381,11 +395,11 @@ def test_raw_inputs_are_checked_like_carriers() -> None:
     numpy_only = KernelOp(
         lambda a, b: a - b, KernelSpec("(),()->()", backends=("numpy",)), core={}
     )
+    assert backend_name(numpy_only(np.ones(3), jnp.ones(3))) == "jax"
     with pytest.raises(BackendError, match="not 'jax'"):
-        numpy_only(np.ones(3), jnp.ones(3))
+        run_kernel(numpy_only.kernel, numpy_only.spec, {}, [jnp.ones(3)] * 2, {})
     jax_only = KernelOp(lambda a: a, KernelSpec("()->()", backends=("jax",)), core={})
-    with pytest.raises(BackendError, match="not 'numpy'"):
-        jax_only(np.ones(3))
+    assert backend_name(jax_only(np.ones(3))) == "jax"
 
 
 def test_vectorize_refuses_dask_instead_of_computing_it() -> None:

@@ -38,6 +38,7 @@ from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
+from pipekit_ops.adapters import to_backend
 from pipekit_ops.store import Store, bind_stores, bound_stores
 
 
@@ -223,8 +224,10 @@ async def _run_chunk_async(op: Operator, chunk: Chunk) -> list[Outcome]:
     for index, item in chunk:
         try:
             if is_coroutine:
-                op._check_backends((item,), {})
-                value = await op._apply(item)
+                (placed,), _, on_host = op._place_inputs((item,), {})
+                value = await op._apply(placed)
+                if on_host:
+                    value = to_backend(value, "jax")
             else:
                 value = await asyncio.to_thread(op, item)
             outcomes.append((index, True, value))
