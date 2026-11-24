@@ -133,6 +133,7 @@ class Sink(Operator):
         # log fires between Scale and AddConst; the carrier is untouched
     """
 
+    traceable: ClassVar[bool] = False
     forbid_in_yaml: ClassVar[bool] = True
     __config_mixin_auto__ = False
 

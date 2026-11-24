@@ -68,6 +68,10 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.guards
 
+## Jittability
+
+::: pipekit_ops.jit
+
 ## Import hooks
 
 ::: pipekit_ops.imports

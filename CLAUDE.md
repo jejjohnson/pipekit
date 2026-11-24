@@ -98,6 +98,7 @@ packages/
 │   │   ├── adapters.py       # NamedArrayAdapter, register_adapter, backend_of, …
 │   │   ├── guards.py         # guard, guard_level, report_move, BackendWarning
 │   │   ├── imports.py        # on_import
+│   │   ├── jit.py            # jit_report, JitReport, JitStep
 │   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
 │   │   ├── state.py          # StatefulOperator, CarryState
 │   │   ├── protocols.py      # Predictor, FittableTransformer (structural seams)

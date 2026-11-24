@@ -17,7 +17,7 @@ import threading
 import time
 from collections import deque
 from concurrent.futures import Future, wait
-from typing import Any
+from typing import Any, ClassVar
 
 from pipekit_ops._base.operator import Operator, nested_config, require_operator
 from pipekit_ops._base.tracing import is_traced
@@ -131,6 +131,7 @@ class Timeout(Operator):
         5
     """
 
+    traceable: ClassVar[bool] = False
     __config_mixin_auto__ = False
 
     def __init__(self, op: Operator, seconds: float, max_abandoned: int = 8) -> None:
@@ -267,6 +268,7 @@ class RateLimit(Operator):
         4
     """
 
+    traceable: ClassVar[bool] = False
     __config_mixin_auto__ = False
 
     def __init__(self, op: Operator, calls: int, period: float) -> None:

@@ -52,6 +52,8 @@ The v0.1 public surface, grouped by module:
   and JAX.
 - **Guards** (`guards`): `guard(level)` reports data moving between NumPy and
   JAX, off by default; `report_move`, `guard_level` and `BackendWarning`.
+- **Jittability** (`jit`): `jit_report(op, x)` says which steps run under
+  ``jax.jit`` and why the others do not; `JitReport`, `JitStep`.
 - **Import hooks** (`imports`): `on_import(name, callback)` runs code once
   a module is imported without importing it (JAX pytree registration).
 
@@ -113,6 +115,7 @@ from pipekit_ops.flow import RateLimit, Timeout, Until
 from pipekit_ops.guards import BackendWarning, guard, guard_level, report_move
 from pipekit_ops.hashing import pipeline_hash
 from pipekit_ops.imports import on_import
+from pipekit_ops.jit import JitReport, JitStep, jit_report
 from pipekit_ops.observe import Histogram, Log, Profile, ShapeTrace, Snapshot, Tap
 from pipekit_ops.parallel import (
     AsyncMap,
@@ -199,6 +202,8 @@ __all__ = [
     "Histogram",
     "Identity",
     "Input",
+    "JitReport",
+    "JitStep",
     "LabelledAdapter",
     "Lambda",
     "Log",
@@ -258,6 +263,7 @@ __all__ = [
     "get_adapter",
     "guard",
     "guard_level",
+    "jit_report",
     "juxt",
     "loads",
     "loads_sandboxed",
