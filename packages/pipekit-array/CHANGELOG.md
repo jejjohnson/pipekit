@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.4...pipekit-array-v0.1.5) (2026-11-24)
+
+
+### Features
+
+* **array:** masked reductions, static groups and records for plain functions ([#269](https://github.com/jejjohnson/pipekit/issues/269)) ([5fa2894](https://github.com/jejjohnson/pipekit/commit/5fa2894c1c0d4968841ecb03a634ee09eba60000))
+
 ## [0.1.4](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.3...pipekit-array-v0.1.4) (2026-11-24)
 
 
