@@ -6,7 +6,9 @@ from typing import Any
 
 import numpy as np
 import pytest
+from hypothesis import given, strategies as st
 from pipekit_array import DimArray, DimArrayAdapter
+from pipekit_array.dimarray import core_dims, vmapped_dims
 from pipekit_ops import (
     BackendError,
     NamedArrayAdapter,
@@ -183,9 +185,57 @@ def test_bare_vmap_drops_and_restores_the_leading_dim() -> None:
     assert out.shape == (3, 4)
 
 
-def test_vmapped_dims_skips_taken_names() -> None:
-    from pipekit_array.dimarray import vmapped_dims
+def test_a_scan_stack_takes_one_step() -> None:
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
+    x = DimArray(jnp.arange(8.0).reshape(2, 4), ("band", "x"), {"band": ("a", "b")})
+    _, xs = jax.lax.scan(lambda c, _: (c, c), x, None, length=3)
+    assert xs.dims == ("batch", "band", "x")
+    zeros = jax.tree.map(jnp.zeros_like, xs)
+    written = jax.tree.map(lambda stack, one: stack.at[1].set(one), zeros, x)
+    assert written.dims == xs.dims
+    assert written.labels == {"band": ("a", "b")}
+    np.testing.assert_array_equal(written.data[1], x.data)
 
+
+@pytest.mark.parametrize("how", ["vmap", "scan", "stack"])
+def test_a_stack_has_the_tree_structure_of_one(how: str) -> None:
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
+    x = DimArray(jnp.ones((2, 4)), ("y", "x"))
+    xs = {
+        "vmap": lambda: jax.vmap(lambda a: jax.tree.map(lambda v: a * v, x))(
+            jnp.arange(3.0)
+        ),
+        "scan": lambda: jax.lax.scan(lambda c, _: (c, c), x, None, length=3)[1],
+        "stack": lambda: jax.tree.map(lambda *vs: jnp.stack(vs), x, x),
+    }[how]()
+    assert jax.tree.structure(xs) == jax.tree.structure(x)
+    twice = jax.tree.map(lambda v: v[None], xs)
+    assert twice.dims == ("batch", "batch_1", "y", "x")
+    assert jax.tree.structure(twice) == jax.tree.structure(x)
+
+
+@given(
+    st.lists(
+        st.sampled_from(["batch", "batch_1", "batch_2", "y", "x"]),
+        unique=True,
+        max_size=5,
+    ).map(tuple)
+)
+def test_core_dims_are_added_back(dims: tuple[str, ...]) -> None:
+    assert vmapped_dims(core_dims(dims), (1,) * len(dims)) == dims
+
+
+def test_a_leading_dim_named_batch_round_trips() -> None:
+    jax = pytest.importorskip("jax")
+    x = DimArray(jax.numpy.ones((3, 2)), ("batch", "x"), {"batch": ("a", "b", "c")})
+    leaves, tree = jax.tree.flatten(x)
+    again = jax.tree.unflatten(tree, leaves)
+    assert again.dims == ("batch", "x") and again.labels == x.labels
+
+
+def test_vmapped_dims_skips_taken_names() -> None:
     assert vmapped_dims(("batch", "x"), (2, 3, 4)) == ("batch_1", "batch", "x")
     assert vmapped_dims(("y", "x"), None) == ("y", "x")
 
