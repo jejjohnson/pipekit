@@ -32,6 +32,7 @@ from hypothesis import given, strategies as st
 from pipekit_array import DimArray, DimArrayAdapter, expand_dims, transpose
 from pipekit_array.functions import (
     boolean_like,
+    concrete,
     divide_or_nan,
     elementwise,
     floating_inputs,
@@ -722,3 +723,38 @@ def test_divide_or_nan_has_a_finite_gradient() -> None:
 
     for gradient in jax.grad(loss, (0, 1))(jnp.ones(2), den):
         assert np.isfinite(gradient).all()
+
+
+# --- concrete ---
+
+
+@pytest.mark.parametrize("value", [1.5, [1.5], np.asarray([1.5]), strict.ones(1) * 1.5])
+def test_concrete_gives_the_values_on_the_host(value) -> None:
+    out = concrete(value)
+    assert isinstance(out, np.ndarray)
+    np.testing.assert_array_equal(out, np.full(out.shape, 1.5))
+
+
+@needs_jax
+def test_concrete_is_none_under_a_trace() -> None:
+    import jax
+    import jax.numpy as jnp
+
+    seen = []
+
+    def f(x):
+        seen.append((concrete(x), concrete(2.0)))
+        return x.sum()
+
+    for transformed in (jax.jit(f), jax.grad(f), jax.vmap(f)):
+        transformed(jnp.ones((2, 2)))
+    assert [(x, float(two)) for x, two in seen] == [(None, 2.0)] * 3
+    np.testing.assert_array_equal(concrete(jnp.arange(3)), [0, 1, 2])
+
+
+@needs_torch
+def test_concrete_of_a_tensor_with_a_gradient() -> None:
+    import torch
+
+    out = concrete(torch.ones(2, requires_grad=True))
+    np.testing.assert_array_equal(out, np.ones(2))
