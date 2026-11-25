@@ -159,3 +159,18 @@ def test_import_optional_leaves_another_error_alone(
     monkeypatch.syspath_prepend(str(tmp_path))
     with pytest.raises(ImportError, match=r"^wrong version$"):
         import_optional("pk_broken", install="x", needed_by="f")
+
+
+def test_import_optional_sees_through_a_librarys_own_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # functax raises MissingExtraError, from Python's, when JAX is missing
+    (tmp_path / "pk_library.py").write_text(
+        "try:\n"
+        "    import pk_absent_extra\n"
+        "except ImportError as err:\n"
+        "    raise ImportError('pk_library needs its own extra') from err\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(ImportError, match=r"f needs 'pk_absent_extra'.*'x\[extra\]'"):
+        import_optional("pk_library", install="x[extra]", needed_by="f")

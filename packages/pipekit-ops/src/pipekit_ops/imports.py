@@ -39,8 +39,9 @@ def import_optional(
 ) -> ModuleType:
     """Import a module of an optional extra, or say what to install.
 
-    Only a missing module is reported this way: one that is installed and fails
-    while it is imported raises its own error.
+    Only a missing module is reported this way, at whatever depth: a library may
+    report its own missing extra with an error of its own, raised from Python's. A
+    module that is installed and fails for another reason raises its own error.
 
     Args:
         module: The module, dotted if need be (``"sklearn.impute"``).
@@ -68,13 +69,22 @@ pip install 'x[absent]'
     """
     try:
         return importlib.import_module(module)
-    except ModuleNotFoundError as exc:
-        missing = exc.name or module
+    except ImportError as exc:
+        missing = _missing_module(exc)
+        if missing is None:
+            raise
         msg = (
-            f"{needed_by} needs {missing!r}, which is not installed; "
+            f"{needed_by} needs {missing.name or module!r}, which is not installed; "
             f"install it with: pip install '{install}'"
         )
         raise error(msg) from exc
+
+
+def _missing_module(error: BaseException | None) -> ModuleNotFoundError | None:
+    """The missing module behind an error, or ``None`` if there is none."""
+    while error is not None and not isinstance(error, ModuleNotFoundError):
+        error = error.__cause__
+    return error
 
 
 def on_import(name: str, callback: Callable[[ModuleType], object]) -> None:
