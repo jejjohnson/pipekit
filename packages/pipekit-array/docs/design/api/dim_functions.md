@@ -488,7 +488,7 @@ As built: `LabelledAdapter` is exported from `pipekit_ops`, and pipekit-array fi
 
 ## 7. Testing gates
 
-Fixtures: the test kit's layout ([`testing.py`](../../../src/pipekit_array/testing.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
+Fixtures: the test kit's layout ([`testing`](../../../src/pipekit_array/testing/_contracts.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
 
 | Gate | Pass condition |
 | --- | --- |

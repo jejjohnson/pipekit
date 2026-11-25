@@ -111,7 +111,20 @@ The array API standard has no `nansum` and no `bincount`, and a mask says which 
 
 ## Test kit
 
-The test kit ships in the wheel, for carrier libraries' own test suites (gates PK-K1 and PK-K4).
-pipekit's own tests run PK-K2, PK-K3 and, under `-m slow`, PK-K5.
+The test kit ships in the wheel, for other libraries' own test suites.
+`check_adapter` and `check_kernel_op` are for carrier libraries (gates PK-K1 and PK-K4); pipekit's own tests run PK-K2, PK-K3 and, under `-m slow`, PK-K5.
+The others are for functions on any array library (ADR A29).
 
 ::: pipekit_array.testing
+    options:
+      members: false
+
+::: pipekit_array.testing._contracts
+
+::: pipekit_array.testing._backends
+
+::: pipekit_array.testing._oracles
+
+::: pipekit_array.testing._transforms
+
+::: pipekit_array.testing._samples

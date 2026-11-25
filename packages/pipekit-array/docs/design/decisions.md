@@ -313,6 +313,20 @@ equinox is no dependency: it is imported under a trace only, and an `ImportError
 
 **Rationale:** the libraries that call it under a trace all depend on equinox.
 
+## A29. The checks of a test suite ship in the wheel
+
+**Decision (25 Nov 2026, #282):** `pipekit_array.testing` holds the checks that six libraries copied into their `tests/`: the array libraries, the oracle, the adjoint, JAX's transforms, the gradients and the samples.
+`assert_backends_agree` is the union of three copies: every kind of array that is installed, both precisions, the device, and JAX under `jit`.
+A DataArray is checked on request only, because a function over an axis refuses it.
+
+**Alternatives considered:**
+
+- **A pytest plugin:** Rejected: it would need pytest; a check that cannot run raises `unittest.SkipTest`, which pytest reports as a skip.
+- **A list of kinds at import (`KINDS`, as in the copies):** Rejected: importing the test kit of a carrier library would import JAX and torch. `array_kinds()` imports them when called.
+
+**Rationale:** the copies had drifted, so a library's coverage depended on which one it had copied.
+Two faults of the copies are fixed here: an infinite reference, or a NaN finite difference, made the tolerance NaN or infinite, and every value passed.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
