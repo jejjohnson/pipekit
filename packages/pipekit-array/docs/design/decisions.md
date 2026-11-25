@@ -286,6 +286,21 @@ A root is 0 with a zero gradient at x ≤ 0, and NaN at NaN.
 
 **Rationale:** each library wrote these for what the array API standard leaves out, and the copies no longer agreed.
 
+## A27. A hook is JAX's own call on JAX data
+
+**Decision (25 Nov 2026, #273, #274, #275):** `pipekit_array.hooks` gives an equivalent off JAX for `x.at[index].set`, `.add` and `.multiply`, `jax.vmap`, `jax.lax.scan`, `jnp.pad`, `jax.lax.stop_gradient` and `jax.lax.optimization_barrier`.
+On JAX data the jaxpr is that of the JAX function, and the tests compare the two.
+`add_at` and `multiply_at` count a repeated index each time; with an integer array they run on NumPy and JAX only, and raise `BackendError` elsewhere.
+
+**Alternatives considered:**
+
+- **`while_loop` and `cond`:** left out, because nothing outside JAX needs them yet.
+- **A functional update through `where` and a mask:** it needs no assignment, but reads the whole array for one entry, and does not lower to JAX's scatter.
+- **`y[index] += v` on NumPy:** Rejected: it adds to a repeated entry once.
+
+**Rationale:** a library that stays on JAX loses nothing, and a function that only used one of these becomes array agnostic where it is.
+An index out of bounds raises on NumPy, and JAX does not report it; a hook does not hide that difference.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
