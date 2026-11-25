@@ -7,8 +7,7 @@ import sys
 import warnings
 
 import pytest
-from pipekit_ops import Cache, Lambda, Sequential
-from pipekit_ops._base.tracing import is_traced
+from pipekit_ops import Cache, Lambda, Sequential, is_concrete, is_traced
 from pipekit_ops.blocks import Sink
 from pipekit_ops.observe import Profile, ShapeTrace, Snapshot, Tap
 
@@ -31,6 +30,35 @@ def test_is_traced_finds_a_tracer_inside_a_pytree() -> None:
     jax.jit(f)(jnp.ones(2))
     assert seen == [True, True, False]
     assert not is_traced(jnp.ones(2))
+
+
+def test_is_concrete_under_jit_grad_and_vmap() -> None:
+    seen: list[bool] = []
+
+    def f(x):
+        seen.append(is_concrete({"a": (x, 1.0)}) or is_concrete(1.0, x))
+        assert is_concrete(1.0, "name", None)
+        return x.sum()
+
+    for transformed in (jax.jit(f), jax.grad(f), jax.vmap(f)):
+        transformed(jnp.ones((2, 2)))
+    assert seen == [False, False, False]
+    assert is_concrete(jnp.ones(2), {"a": [jnp.ones(2)]})
+    assert is_concrete()
+
+
+def test_a_placeholder_leaf_is_concrete() -> None:
+    # jax.tree.map may rebuild a record with leaves that are no arrays
+    assert is_concrete(object())
+
+
+def test_is_concrete_without_jax() -> None:
+    code = (
+        "import sys; sys.modules['jax'] = None\n"
+        "from pipekit_ops import is_concrete, is_traced\n"
+        "assert is_concrete(1.0, [2.0]) and not is_traced(1.0)\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_cache_raises_under_jit_and_names_it() -> None:

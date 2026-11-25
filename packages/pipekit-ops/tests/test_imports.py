@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from pipekit_ops import on_import
+from pipekit_ops import import_optional, on_import
 
 
 @pytest.fixture
@@ -114,3 +114,48 @@ def test_warnings_as_errors_never_abort_the_import(
     assert module.VALUE == 42
     assert ran == ["second"]
     assert "nope" in capsys.readouterr().err
+
+
+# -- import_optional -------------------------------------------------------------------
+
+
+def test_import_optional_returns_an_installed_module() -> None:
+    module = import_optional("json.decoder", install="x[json]", needed_by="f")
+    assert module is importlib.import_module("json.decoder")
+
+
+@pytest.mark.parametrize("module", ["pk_absent", "json.absent"])
+def test_import_optional_names_the_module_the_caller_and_the_extra(module: str) -> None:
+    with pytest.raises(ImportError) as caught:
+        import_optional(module, install="x[extra]", needed_by="Op.save")
+    assert str(caught.value) == (
+        f"Op.save needs '{module}', which is not installed; "
+        "install it with: pip install 'x[extra]'"
+    )
+    assert isinstance(caught.value.__cause__, ModuleNotFoundError)
+
+
+def test_import_optional_names_what_a_module_itself_lacks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pk_needs.py").write_text("import pk_needed\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(ImportError, match="needs 'pk_needed'"):
+        import_optional("pk_needs", install="x[extra]", needed_by="f")
+
+
+def test_import_optional_raises_the_callers_class() -> None:
+    class ExtraError(ImportError):
+        pass
+
+    with pytest.raises(ExtraError):
+        import_optional("pk_absent", install="x", needed_by="f", error=ExtraError)
+
+
+def test_import_optional_leaves_another_error_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pk_broken.py").write_text("raise ImportError('wrong version')\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(ImportError, match=r"^wrong version$"):
+        import_optional("pk_broken", install="x", needed_by="f")

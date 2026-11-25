@@ -10,6 +10,9 @@ import sys
 from typing import Any
 
 
+__all__ = ["is_concrete", "is_traced"]
+
+
 def is_traced(x: Any) -> bool:
     """Return whether ``x`` is, or is a pytree containing, a JAX tracer.
 
@@ -40,3 +43,27 @@ def is_traced(x: Any) -> bool:
     except Exception:
         return False
     return any(isinstance(leaf, jax.core.Tracer) for leaf in leaves)
+
+
+def is_concrete(*values: Any) -> bool:
+    """Return whether no leaf of any value is traced, so that they can be compared.
+
+    It is the negation of `is_traced`. The placeholder leaves that
+    ``jax.tree.map`` may put in a pytree are not tracers, so they count as
+    concrete: a record that checks itself when it is rebuilt has to look at the
+    type of its fields as well.
+
+    Args:
+        *values: Any carriers, as in `is_traced`.
+
+    Returns:
+        ``False`` if a leaf of one of them is a tracer. Always ``True`` when JAX
+        has not been imported.
+
+    Examples:
+        >>> is_concrete(1.0, {"a": [1.0, 2.0]})
+        True
+        >>> is_concrete()
+        True
+    """
+    return not any(map(is_traced, values))

@@ -1,4 +1,4 @@
-"""Run code when a module is imported, without importing it.
+"""Optional imports: after someone else's import, or with an error that helps.
 
 `on_import` lets a library hook into an optional dependency (register a
 pytree with JAX, a converter with xarray) without paying for that import
@@ -6,6 +6,9 @@ itself: the callback runs now when the module is already imported, and
 otherwise once something else imports it. Importing pipekit-array or
 geoarray therefore never imports JAX, yet their carriers are JAX pytrees
 from the moment JAX is loaded.
+
+`import_optional` imports a module that belongs to an optional extra, and says
+what to install if it is missing.
 """
 
 from __future__ import annotations
@@ -21,10 +24,57 @@ from types import ModuleType
 from typing import Any
 
 
-__all__ = ["on_import"]
+__all__ = ["import_optional", "on_import"]
 
 _PENDING: dict[str, list[Callable[[ModuleType], object]]] = {}
 _LOCK = threading.RLock()
+
+
+def import_optional(
+    module: str,
+    *,
+    install: str,
+    needed_by: str,
+    error: type[ImportError] = ImportError,
+) -> ModuleType:
+    """Import a module of an optional extra, or say what to install.
+
+    Only a missing module is reported this way: one that is installed and fails
+    while it is imported raises its own error.
+
+    Args:
+        module: The module, dotted if need be (``"sklearn.impute"``).
+        install: What to give to ``pip install`` (``"geotoolz-ops[learn]"``).
+        needed_by: What needs the module (``"ModelOp.save"``).
+        error: The class to raise, such as a library's own subclass of
+            `ImportError`.
+
+    Returns:
+        The module.
+
+    Raises:
+        ImportError: ``error``, if the module, or one that it needs, is not
+            installed. The message names the module that is missing, and the
+            first error is the cause.
+
+    Example:
+        >>> import_optional("json", install="x[json]", needed_by="f").__name__
+        'json'
+        >>> import_optional("absent", install="x[absent]", needed_by="f")
+        Traceback (most recent call last):
+            ...
+        ImportError: f needs 'absent', which is not installed; install it with: \
+pip install 'x[absent]'
+    """
+    try:
+        return importlib.import_module(module)
+    except ModuleNotFoundError as exc:
+        missing = exc.name or module
+        msg = (
+            f"{needed_by} needs {missing!r}, which is not installed; "
+            f"install it with: pip install '{install}'"
+        )
+        raise error(msg) from exc
 
 
 def on_import(name: str, callback: Callable[[ModuleType], object]) -> None:

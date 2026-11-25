@@ -35,8 +35,13 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
-from pipekit_ops import NamedArrayAdapter, get_adapter, guard_level, report_move
-from pipekit_ops._base.tracing import is_traced
+from pipekit_ops import (
+    NamedArrayAdapter,
+    get_adapter,
+    guard_level,
+    is_traced,
+    report_move,
+)
 from pipekit_ops.adapters import BackendError, backend_name
 
 from pipekit_array._namespace import array_namespace

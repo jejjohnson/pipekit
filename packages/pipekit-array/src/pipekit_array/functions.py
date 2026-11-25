@@ -29,8 +29,13 @@ from collections.abc import Callable
 from types import ModuleType
 from typing import Any, cast
 
-from pipekit_ops import BackendError, get_adapter, guard_level, report_move
-from pipekit_ops._base.tracing import is_traced
+from pipekit_ops import (
+    BackendError,
+    get_adapter,
+    guard_level,
+    is_traced,
+    report_move,
+)
 
 from pipekit_array.kernel import KernelSpec, full_loop, run_kernel
 
@@ -50,6 +55,7 @@ except ImportError as err:
 __all__ = [
     "BackendError",
     "boolean_like",
+    "concrete",
     "divide_or_nan",
     "elementwise",
     "floating_inputs",
@@ -248,6 +254,29 @@ def divide_or_nan(numerator: Any, denominator: Any, xp: ModuleType) -> Any:
     safe = xp.where(zero, xp.ones_like(denominator), denominator)
     quotient = numerator / safe
     return xp.where(zero, xp.full_like(quotient, xp.nan), quotient)
+
+
+def concrete(x: Any) -> np.ndarray | None:
+    """The values of an array on the host, or ``None`` if it has none yet.
+
+    For a check or a table that needs values and is skipped under ``jax.jit``.
+    No gradient goes through the copy, and a dask array is computed.
+
+    Args:
+        x: An array, a sequence or a number.
+
+    Returns:
+        The values as a NumPy array, or ``None`` for a JAX tracer.
+
+    Example:
+        >>> concrete([1.0, 2.0])
+        array([1., 2.])
+    """
+    if is_traced(x):
+        return None
+    if array_api_compat.is_torch_array(x):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
 
 
 def is_dataarray(value: Any) -> bool:

@@ -72,7 +72,11 @@ this package was `pipekit`. Master plan reference: Report 2.
 
 ::: pipekit_ops.jit
 
-## Import hooks
+## Tracing
+
+::: pipekit_ops._base.tracing
+
+## Optional imports
 
 ::: pipekit_ops.imports
 

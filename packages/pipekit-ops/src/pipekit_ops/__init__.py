@@ -56,7 +56,10 @@ The v0.1 public surface, grouped by module:
 - **Jittability** (`jit`): `jit_report(op, x)` says which steps run under
   ``jax.jit`` and why the others do not; `JitReport`, `JitStep`.
 - **Import hooks** (`imports`): `on_import(name, callback)` runs code once
-  a module is imported without importing it (JAX pytree registration).
+  a module is imported without importing it (JAX pytree registration);
+  `import_optional` imports a module of an extra, or says what to install.
+- **Tracing**: `is_traced` and `is_concrete` say whether a value has a JAX
+  tracer in it, without importing JAX.
 
 Hashing: `pipeline_hash(op)` is the content hash of a whole pipeline,
 the one the pipekit-experiment registries store under. `pipekit_ops.hashing`
@@ -73,6 +76,7 @@ See the master plan (Report 2) for the full v0.1 inventory.
 from pipekit_ops._base.graph import Graph, Input, Node
 from pipekit_ops._base.operator import Carrier, ConfigMixin, Operator
 from pipekit_ops._base.sequential import Sequential
+from pipekit_ops._base.tracing import is_concrete, is_traced
 from pipekit_ops.adapters import (
     BackendError,
     ConvertingAdapter,
@@ -116,7 +120,7 @@ from pipekit_ops.execution import (
 from pipekit_ops.flow import RateLimit, Timeout, Until
 from pipekit_ops.guards import BackendWarning, guard, guard_level, report_move
 from pipekit_ops.hashing import pipeline_hash
-from pipekit_ops.imports import on_import
+from pipekit_ops.imports import import_optional, on_import
 from pipekit_ops.jit import JitReport, JitStep, jit_report
 from pipekit_ops.observe import Histogram, Log, Profile, ShapeTrace, Snapshot, Tap
 from pipekit_ops.parallel import (
@@ -266,6 +270,9 @@ __all__ = [
     "get_adapter",
     "guard",
     "guard_level",
+    "import_optional",
+    "is_concrete",
+    "is_traced",
     "jit_report",
     "juxt",
     "loads",
