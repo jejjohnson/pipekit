@@ -188,7 +188,10 @@ def assert_refuses_dataarrays(fn: Callable[..., Any], *args: Any) -> None:
 
     Example:
         >>> from pipekit_array.functions import floating_inputs
-        >>> assert_refuses_dataarrays(lambda x: floating_inputs(x)[1][0], np.ones(2))
+        >>> def plain(x):
+        ...     _, (x,) = floating_inputs(x)
+        ...     return x
+        >>> assert_refuses_dataarrays(plain, np.ones(2))
     """
     if not _installed("xarray"):
         raise unittest.SkipTest("xarray is not installed")
