@@ -11,7 +11,7 @@ from the `KernelOp` instead of a hand-written operator per kernel:
   functions and every non-array parameter (``eps``, a dim name).
 
 The call is the same dispatch as the `KernelOp`'s
-(`pipekit_array.kernel.run_kernel`), so the same carriers work.
+(`pipekit_array.kernels.run_kernel`), so the same carriers work.
 
 It lives here, not on `KernelOp`, because pipekit-jax already reaches
 pipekit-array (through pipekit-cycle's ``[array]`` extra): an edge from
@@ -38,10 +38,10 @@ _HINT = "pipekit_jax.to_jax needs pipekit-array: pip install 'pipekit-jax[array]
 
 def _kernel_module() -> Any:
     try:
-        from pipekit_array import kernel
+        from pipekit_array import kernels
     except ImportError as exc:
         raise ImportError(_HINT) from exc
-    return kernel
+    return kernels
 
 
 def _is_array(value: Any) -> bool:

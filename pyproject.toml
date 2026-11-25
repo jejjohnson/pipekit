@@ -42,10 +42,10 @@ dev = [
     "dask[array]>=2024",
     # scikit-learn backs the pipekit-array [sklearn] extra (Estimator).
     "scikit-learn>=1.4",
-    # einx backs the pipekit-array [einx] extra (pipekit_array.einx).
+    # einx backs the pipekit-array [einx] extra (pipekit_array.bridges.einx).
     "einx>=0.4",
     # array-api-compat backs the pipekit-array [compat] extra
-    # (pipekit_array.functions); array-api-strict is its test-only reference.
+    # (pipekit_array.arrays); array-api-strict is its test-only reference.
     "array-api-compat>=1.11",
     "array-api-strict>=2.3",
     # fsspec backs the pipekit-experiment [s3] extra; dev-installed so the

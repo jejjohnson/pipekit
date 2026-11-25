@@ -131,7 +131,7 @@ uv add 'pipekit-array[dask]'     # dask[array] >= 2024 (partial conformance)
 uv add 'pipekit-array[compat]'   # array-api-compat (required for torch dispatch)
 uv add 'pipekit-array[xarray]'   # the xr.DataArray adapter
 uv add 'pipekit-array[sklearn]'  # Estimator (scikit-learn on any carrier)
-uv add 'pipekit-array[einx]'     # pipekit_array.einx
+uv add 'pipekit-array[einx]'     # pipekit_array.bridges.einx
 ```
 
 The default install brings no backend, so operators raise `TypeError` at call time if the input does not implement the Array API.

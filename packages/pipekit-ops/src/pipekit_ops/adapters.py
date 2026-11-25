@@ -152,7 +152,7 @@ class ConvertingAdapter(Protocol):
 class MissingValueAdapter(Protocol):
     """An adapter whose carriers mark missing elements in their data (optional).
 
-    A formula behind ``pipekit_array.functions.elementwise`` sees raw arrays,
+    A formula behind ``pipekit_array.kernels.elementwise`` sees raw arrays,
     so it computes on a fill value as if it were data. ``elementwise`` hands
     its result to ``keep_missing``, which marks the elements that were missing
     in an input. The dim-level functions and ``KernelOp`` do not call it.
@@ -291,7 +291,7 @@ class BackendError(TypeError, ValueError):
     """Inputs on more than one backend, or a backend the code does not run on.
 
     A `TypeError`, because the type of an input decides its backend, and a
-    `ValueError`, which the plain functions of `pipekit_array.functions` raise
+    `ValueError`, which the plain functions of `pipekit_array.arrays` raise
     for every other input they cannot take.
     """
 
