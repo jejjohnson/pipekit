@@ -160,6 +160,8 @@ def concrete(x: Any) -> np.ndarray | None:
         return None
     if array_api_compat.is_torch_array(x):
         return x.detach().cpu().numpy()
+    if array_api_compat.is_cupy_array(x):
+        return x.get()  # CuPy refuses an implicit copy to the host
     return np.asarray(x)
 
 

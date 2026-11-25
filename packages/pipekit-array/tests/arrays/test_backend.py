@@ -411,3 +411,18 @@ def test_concrete_of_a_tensor_with_a_gradient() -> None:
 
     out = concrete(torch.ones(2, requires_grad=True))
     np.testing.assert_array_equal(out, np.ones(2))
+
+
+def test_concrete_of_a_cupy_array_copies_it_explicitly(monkeypatch) -> None:
+    class OnGpu:
+        """What CuPy's arrays do: ``get`` copies, and an implicit copy raises."""
+
+        def get(self) -> np.ndarray:
+            return np.asarray([1.0, 2.0])
+
+        def __array__(self, dtype=None, copy=None):
+            raise TypeError("Implicit conversion to a NumPy array is not allowed")
+
+    array_api_compat = _backend.array_api_compat
+    monkeypatch.setattr(array_api_compat, "is_cupy_array", lambda x: True)
+    np.testing.assert_array_equal(concrete(OnGpu()), [1.0, 2.0])
