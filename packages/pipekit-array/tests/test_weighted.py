@@ -16,7 +16,13 @@ strict = pytest.importorskip("array_api_strict")
 import numpy as np
 from hypothesis import given, strategies as st
 from pipekit_array import DimArray
-from pipekit_array.weighted import Groups, weighted_mean, weighted_sum
+from pipekit_array.weighted import (
+    Groups,
+    reduction_inputs,
+    used_weights,
+    weighted_mean,
+    weighted_sum,
+)
 from pipekit_ops import BackendError
 
 
@@ -277,3 +283,30 @@ class TestArguments:
         np.testing.assert_array_equal(groups.labels, LABELS)
         with pytest.raises(ValueError, match="read-only"):
             groups.index[0, 0] = 1
+
+
+class TestInputs:
+    def test_weights_broadcast_and_take_the_dtype(self) -> None:
+        values = np.ones((2, 3), dtype=np.float32)
+        weights = np.asarray([1, 2, 3])
+        xp, x, w, m = reduction_inputs(values, weights, None)
+        assert x.shape == w.shape == (2, 3)
+        assert x.dtype == w.dtype == np.float32
+        assert m is None
+        np.testing.assert_array_equal(used_weights(xp, x, w, m), w)
+
+    def test_a_weight_is_zero_where_a_sample_is_not_valid(self) -> None:
+        xp, x, w, m = reduction_inputs([1.0, np.nan], None, [True, False])
+        assert w is None
+        np.testing.assert_array_equal(used_weights(xp, x, w, m), [1.0, 0.0])
+
+    def test_params_never_decide_the_dtype(self) -> None:
+        values = np.ones(2, dtype=np.float32)
+        _, x, _, _ = reduction_inputs(values, None, None, params=(np.float64(2.0),))
+        assert x.dtype == np.float32
+
+    def test_params_choose_the_library_and_the_device(self) -> None:
+        level = strict.asarray(0.5, device=strict.Device("device1"))
+        xp, x, _, m = reduction_inputs([1.0], None, [True], params=(level,))
+        assert xp.__name__ == "array_api_strict"
+        assert x.device == m.device == level.device
