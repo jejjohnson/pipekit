@@ -7,14 +7,14 @@ version: 0.1.0
 
 ## 1. The dispatch pattern
 
-Every operator follows the same three-line core, as `MeanScalar` does in [`reductions.py`](../../src/pipekit_array/reductions.py):
+Every operator follows the same three-line core, as `MeanScalar` does in [`operators/_reduce.py`](../../src/pipekit_array/operators/_reduce.py):
 
 ```python
 from typing import Any
 
 from pipekit_ops import Operator
 
-from pipekit_array._namespace import array_namespace
+from pipekit_array.named import array_namespace
 
 
 class MeanScalar(Operator):
@@ -79,7 +79,7 @@ return xp.add(x, y)
 `array_namespace(x, y)` is the standard's way to assert "both inputs are on the same backend" and pick the namespace; with NumPy next to JAX it picks JAX's (A24).
 Operators with several array inputs always use the multi-argument form.
 
-The named layer has its own form of this rule: `require_one_backend` in [`dims.py`](../../src/pipekit_array/dims.py) raises `BackendError` when the inputs of `dot`, `combine`, `concat`, `stack` or `take_along` sit on more than one backend.
+The named layer has its own form of this rule: `join_backends` in [`named/_dispatch.py`](../../src/pipekit_array/named/_dispatch.py) raises `BackendError` when the inputs of `dot`, `combine`, `concat`, `stack` or `take_along` sit on more than one backend.
 
 ### R3. No backend-name conditionals
 
@@ -99,7 +99,7 @@ return generic_path(x, xp)  # via xp dispatch only
 If an operator genuinely *needs* a per-backend path (for example an FFT that is not in the Array API standard), it does not belong in pipekit-array.
 It belongs in a per-backend sister package (`pipekit-jax`, a future `pipekit-torch`) or in user code (ADR A4).
 
-**As built.** The dim-level functions bend this rule in a few places, each confined to a helper in `dims.py` or `dim_algebra.py` rather than written inside an operator:
+**As built.** The dim-level functions bend this rule in a few places, each confined to a helper in `named/` rather than written inside an operator:
 
 - `namespace_of` returns a `_DaskNamespace` for dask data, which maps the Array API names dask lacks (`permute_dims`, `concat`, `cumulative_sum`, `cumulative_prod`) to `transpose`, `concatenate`, `cumsum` and `cumprod`, and supplies a blockwise `take_along_axis`;
 - `reduce(..., where=)` checks the backend and raises `TypeError` for anything but NumPy and JAX, whose reductions are the only ones that take `where=`;
@@ -127,93 +127,55 @@ Operators that *must* change dtype take an explicit `dtype` argument.
 - `shift`, `pad(mode="constant")` and `where` on integer or bool data raise `TypeError` when no fill value is given, instead of promoting to float for a NaN fill;
 - the xarray fast path of `window` fills with zero, not NaN, before it drops the partial windows, so integer and bool input keep their dtype.
 
-## 3. The three-layer surface
-
-The planned layout of the v0.1 catalogue, and what ships in 0.1.1:
+## 3. The areas
 
 ```
 src/pipekit_array/
-├── __init__.py          # Re-exports the public surface; registers the adapters.
-├── _namespace.py        # array_namespace(): array-api-compat if installed,
-│                        # x.__array_namespace__() otherwise.
-├── reductions.py        # MeanScalar                              (today)
-├── combinators.py       # StackAlong, ConcatenateAlong            (today)
-├── dim_operators.py     # ApplyAlong and the dim-function twins   (today)
-├── batching.py          # batch, Padded, BatchAlong               (today)
-├── geom.py              # Subsample                    (retired: isel, A15)
-├── observe.py           # Histogram (carrier-aware controller)  (not built)
-├── qc.py                # AssertClose, AssertValueRange,         (not built)
-│                        # AssertNoNaN, AssertValidFraction
-└── inference.py         # ModelOp                               (not built)
+├── __init__.py       # the named functions, the kernels and the operators
+├── _recorded.py      # where a saved pipeline says that an operator lives
+├── arrays/           # functions of plain arrays              ([numpy,compat])
+│   ├── _backend.py      namespace_of, floating_inputs, as_inexact, concrete
+│   ├── _host.py         like, constants_like, table_like, boolean_like
+│   ├── _numerics.py     divide_or_nan, the safe roots, stand_in
+│   ├── _indexing.py     set_at, add_at, multiply_at, pad
+│   ├── _transforms.py   vmap, scan, stop_gradient, optimization_barrier
+│   ├── _checks.py       check_values, require_floating
+│   ├── _reductions.py   weighted_sum, weighted_mean, Groups
+│   └── _records.py      register_record
+├── named/            # functions of carriers with dimension names
+│   ├── _carrier.py      DimArray, DimArrayAdapter
+│   ├── _dispatch.py     array_namespace, join_backends, and what the rest share
+│   ├── _select.py  _reduce.py  _shape.py  _shift.py  _window.py  _join.py  _map.py
+│   └── _batches.py  _rows.py
+├── kernels/          # one array function on every carrier
+│   ├── _spec.py  _run.py  _op.py
+│   └── _elementwise.py                                       ([numpy,compat])
+├── operators/        # the operator twins, in files named as in named/
+├── bridges/          # xarray.py, einx.py, sklearn.py: one extra each
+└── testing/          # the test kit
 ```
 
-The named-carrier layer that grew alongside it (all today):
+An area imports only from the ones before it, in the order `arrays`, `named`, `kernels`, `operators`, `bridges`; `testing` imports from all of them.
+`named` and `operators` do not import `arrays`, because they run with no extra.
+`tests/test_areas.py` enforces both.
 
-```
-src/pipekit_array/
-├── dimarray.py          # DimArray, DimArrayAdapter (the reference adapter)
-├── dims.py              # isel, sel, transpose, reduce, argreduce, take_along,
-│                        # map_over, stack, stack_items, concat, combine
-├── dim_shapes.py        # rename, expand_dims, squeeze, broadcast_like,
-│                        # merge_dims, split_dims                  (#204)
-├── dim_shifts.py        # pad, roll, shift, diff, cumreduce, where (#205)
-├── dim_windows.py       # window, coarsen                          (#206)
-├── dim_algebra.py       # quantile, dot                            (#207)
-├── rows.py              # to_rows, from_rows, RowLayout
-├── estimator.py         # Estimator                         ([sklearn])
-├── einx.py              # rearrange, reduce, einsum, repeat, Einx  ([einx])
-├── functions.py         # namespace_of, floating_inputs, like, elementwise:
-│                        # plain functions (A23)          ([numpy,compat])
-├── hooks.py             # set_at, add_at, scan, vmap, pad, … (A27)
-├── checks.py            # check_values, require_floating   (A28)
-├── kernel.py            # KernelSpec, KernelOp
-├── xarray.py            # the xr.DataArray adapter, loaded lazily ([xarray])
-└── testing/             # check_adapter, check_kernel_op, assert_backends_agree, …
-```
+A name is imported from its area (`from pipekit_array.arrays import floating_inputs`), and the files in an area are private.
+The package itself re-exports the named functions, the kernels, the operators, `Estimator` and `BackendError`; `arrays` and `testing` are imported by name.
 
-The module boundaries mirror `pipekit-ops` core's grouping (`combinators` with `pipekit_ops.combine`, `qc` with `pipekit_ops.qc`, and so on), so discovery is consistent.
-The planned re-exports through `__init__.py`, marked by status:
+**Not built** from the v0.1 catalogue: the numeric QC family, the array-aware `Histogram` and `ModelOp`.
+The first two would be new files of `operators`, and `ModelOp` a bridge.
 
-```python
-# pipekit_array/__init__.py
-# today (pipekit-array)
-from pipekit_array.batching import BatchAlong
-from pipekit_array.combinators import ConcatenateAlong, StackAlong
-from pipekit_array.dim_operators import ApplyAlong
-from pipekit_array.reductions import MeanScalar
-
-# proposed (phase B; retired by A15)
-from pipekit_array.geom import Subsample
-
-# proposed (phase D)
-from pipekit_array.inference import ModelOp
-
-# proposed (phase B)
-from pipekit_array.observe import Histogram
-
-# proposed (phase C)
-from pipekit_array.qc import (
-    AssertClose,
-    AssertNoNaN,
-    AssertValidFraction,
-    AssertValueRange,
-)
-```
-
-The shipped `__all__` lists the `today` names above plus the named layer: `DimArray`, every dim function and twin, `batch`, `Padded`, `to_rows`, `from_rows`, `RowLayout`, `Estimator`, `KernelSpec`, `KernelOp` and `BackendError`.
-`pipekit_array.einx` and `pipekit_array.testing` are submodules, imported by name.
-
-## 4. The `_namespace.py` shim
+## 4. The `array_namespace` shim
 
 The standard needs a small wrapper because Array API namespace discovery has two paths:
 
 1. **Native conformance** (NumPy 2.0+, JAX, CuPy): the array implements `__array_namespace__()` directly.
 2. **Wrapped conformance** (PyTorch, older NumPy, dask edge cases): the `array-api-compat` library provides the namespace.
 
-The shipped shim in [`_namespace.py`](../../src/pipekit_array/_namespace.py), simplified:
+The shipped shim in [`named/_dispatch.py`](../../src/pipekit_array/named/_dispatch.py), simplified:
 
 ```python
-# pipekit_array/_namespace.py
+# pipekit_array/named/_dispatch.py
 def array_namespace(*xs: Any) -> Any:
     """Return the Array API namespace shared by all inputs."""
     compat_ns = _compat_namespace()  # looked up once, then cached
@@ -305,7 +267,7 @@ The numeric work (`xp.any(x < min_val)`) lives once, in pipekit-array.
 The extraction and reconstruction are xarray-specific; the array maths is pipekit-array's.
 It is the same delegation pattern as geotoolz, on a different carrier.
 
-**As built.** For the dim-level functions the delegation already lives in pipekit-array: the `[xarray]` adapter (`pipekit_array.xarray`) is registered lazily with `pipekit_ops`, so `rename`, `window`, `dot` and the rest run on an `xr.DataArray` directly and keep its coordinates.
+**As built.** For the dim-level functions the delegation already lives in pipekit-array: the `[xarray]` adapter (`pipekit_array.bridges.xarray`) is registered lazily with `pipekit_ops`, so `rename`, `window`, `dot` and the rest run on an `xr.DataArray` directly and keep its coordinates.
 geoarray carriers reach the same functions through their own registered adapter (ADR A9).
 
 ## 7. Integration with pipekit-train

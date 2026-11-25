@@ -60,4 +60,4 @@ jobs:
         run: |
           uv pip install array-api-compat
           uv pip install "torch==2.10.*" --index-url https://download.pytorch.org/whl/cpu
-          uv run --no-sync pytest packages/pipekit-array/tests/test_{functions,hooks,checks}.py
+          uv run --no-sync pytest packages/pipekit-array/tests/arrays packages/pipekit-array/tests/kernels/test_elementwise.py

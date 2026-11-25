@@ -19,13 +19,13 @@ Importing this module needs NumPy, and neither pytest nor another array library.
 
 from __future__ import annotations
 
-from pipekit_array.testing._backends import (
+from pipekit_array.testing._arrays import (
     ArrayKind,
     array_kinds,
     assert_backends_agree,
     assert_refuses_dataarrays,
 )
-from pipekit_array.testing._contracts import (
+from pipekit_array.testing._carriers import (
     DIMS,
     LABELS,
     check_adapter,

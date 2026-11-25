@@ -107,23 +107,15 @@ packages/
 │   └── tests/
 ├── pipekit-array/            # Array-API operators and dim-level functions
 │   ├── src/pipekit_array/
-│   │   ├── _namespace.py     # array_namespace (backend dispatch)
-│   │   ├── reductions.py     # MeanScalar
-│   │   ├── combinators.py    # StackAlong, ConcatenateAlong
-│   │   ├── dimarray.py       # DimArray, DimArrayAdapter
-│   │   ├── dims.py           # isel, sel, transpose, reduce, stack, concat, …
-│   │   ├── dim_shapes.py     # rename, expand_dims, squeeze, merge_dims, …
-│   │   ├── dim_shifts.py     # pad, roll, shift, diff, cumreduce, where
-│   │   ├── dim_windows.py    # window, coarsen
-│   │   ├── dim_algebra.py    # quantile, dot
-│   │   ├── dim_operators.py  # the dim functions as Operators (ISel, Reduce, …)
-│   │   ├── batching.py       # batch, Padded, BatchAlong
-│   │   ├── rows.py           # to_rows, from_rows
-│   │   ├── estimator.py      # Estimator (scikit-learn on any carrier)
-│   │   ├── kernel.py         # KernelSpec, KernelOp
-│   │   ├── einx.py           # rearrange, reduce, einsum, repeat, Einx ([einx])
-│   │   ├── xarray.py         # the xr.DataArray adapter ([xarray])
-│   │   └── testing.py        # check_adapter, check_kernel_op
+│   │   ├── arrays/           # plain arrays: floating_inputs, set_at, scan, checks,
+│   │   │                     # safe roots, weighted reductions ([numpy,compat])
+│   │   ├── named/            # named carriers: DimArray, isel, reduce, rename, pad,
+│   │   │                     # window, stack, map_over, batch, to_rows
+│   │   ├── kernels/          # KernelSpec, KernelOp, elementwise
+│   │   ├── operators/        # the named functions as Operators (ISel, Reduce, …)
+│   │   ├── bridges/          # xarray, einx, sklearn (one extra each)
+│   │   └── testing/          # check_adapter, assert_backends_agree, …
+│   │                         # an area imports only from the ones before it
 │   └── tests/
 ├── pipekit-cycle/            # Time-stepping + DA on top of pipekit_ops.state
 │   ├── src/pipekit_cycle/

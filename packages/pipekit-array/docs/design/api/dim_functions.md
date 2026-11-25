@@ -5,7 +5,7 @@ version: 0.1.0
 
 # Dim-level functions: the missing ones
 
-The dim-level functions in [`dims.py`](../../../src/pipekit_array/dims.py) select, reduce, stack and map by dim name on any carrier with a `pipekit_ops.NamedArrayAdapter`.
+The dim-level functions in [`named`](../../../src/pipekit_array/named) select, reduce, stack and map by dim name on any carrier with a `pipekit_ops.NamedArrayAdapter`.
 Before #204 they could not rename a dim, add or drop a length-1 dim, broadcast one carrier against another, merge `y x` into `pixel`, shift or difference along time, cut windows, coarsen, take a quantile or contract two carriers.
 This page adds those as free functions with operator twins in `dim_operators`, and checks every name and argument against xarray.
 
@@ -29,17 +29,17 @@ Where the build departed from this design, the page says so in an **As built** n
 
 **Not changed:**
 
-- The joining rule (GA-Q3, in the module docstring of [`dims.py`](../../../src/pipekit_array/dims.py)): a function never reads coordinate values or geometry.
+- The joining rule (GA-Q3, in the module docstring of [`named`](../../../src/pipekit_array/named)): a function never reads coordinate values or geometry.
   Every new function works on positions, and labels only follow the data.
 - `NamedArrayAdapter` keeps its seven required methods ([`adapters.py`](../../../../pipekit-ops/src/pipekit_ops/adapters.py)).
   Every new function has a generic path through `data`, `isel` and `rewrap`, and an adapter may add a fast path of the same name.
   One optional method is added, `relabel`, for the six functions that put labels on a dim `rewrap` cannot label (section 3.0, decision A22).
-- `DimArray` gets no methods ([`dimarray.py`](../../../src/pipekit_array/dimarray.py)).
+- `DimArray` gets no methods ([`named/_carrier.py`](../../../src/pipekit_array/named/_carrier.py)).
 - Element-wise functions (`fillna`, `clip`, `isin`, `isnull`, `round`, `astype`) stay `combine` calls: they touch no dim.
 - `groupby`, `resample`, `interp`, `reindex` and anything else that selects by label value stay in xarray (and coordax).
 
-**As built:** the functions live in four new modules, [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py), [`dim_windows.py`](../../../src/pipekit_array/dim_windows.py) and [`dim_algebra.py`](../../../src/pipekit_array/dim_algebra.py), not in `dims.py`, so the four phases could be written in parallel.
-They reuse `dims.py`'s helpers and are re-exported from `pipekit_array`.
+**As built:** the functions live in four files of `pipekit_array.named`, [`named/_shape.py`](../../../src/pipekit_array/named/_shape.py), [`named/_shift.py`](../../../src/pipekit_array/named/_shift.py), [`named/_window.py`](../../../src/pipekit_array/named/_window.py) and [`named/_reduce.py`](../../../src/pipekit_array/named/_reduce.py), so the four phases could be written in parallel.
+They share the helpers of [`named/_dispatch.py`](../../../src/pipekit_array/named/_dispatch.py) and are re-exported from `pipekit_array`.
 
 ## 2. The running example
 
@@ -79,14 +79,14 @@ mean = reduce(cube, "mean", "time")  # (T, B, Y, X) → (B, Y, X)
 ## 3. The function catalogue
 
 Columns: the signature (keyword dims, `x` positional-only as in `isel`), the semantics, what the adapter must provide, the JAX behaviour and the status.
-"Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`dims.py`](../../../src/pipekit_array/dims.py)).
+"Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`named`](../../../src/pipekit_array/named)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables ships today: phase 1 (section 3.1) in [`dim_shapes.py`](../../../src/pipekit_array/dim_shapes.py), phase 2 (section 3.2) in [`dim_shifts.py`](../../../src/pipekit_array/dim_shifts.py), phase 3 (section 3.3) in [`dim_windows.py`](../../../src/pipekit_array/dim_windows.py) and phase 4 (section 3.4) in [`dim_algebra.py`](../../../src/pipekit_array/dim_algebra.py).
+Every function in the tables ships today: phase 1 (section 3.1) in [`named/_shape.py`](../../../src/pipekit_array/named/_shape.py), phase 2 (section 3.2) in [`named/_shift.py`](../../../src/pipekit_array/named/_shift.py), phase 3 (section 3.3) in [`named/_window.py`](../../../src/pipekit_array/named/_window.py) and phase 4 (section 3.4) in [`named/_reduce.py`](../../../src/pipekit_array/named/_reduce.py).
 A dim named like one of a function's keyword-only arguments (`mode` and `constant_values` for `pad`, `fill_value` for `shift`, `window_dim` and `stride` for `window`, `boundary` for `coarsen`) cannot be passed through `**dims`, because Python binds the keyword first (see the as-built note under A15).
 
 ### 3.0 Labels on new or renamed dims
 
-`rewrap(x, data, dims)` keeps labels by dim name: `DimArrayAdapter.rewrap` copies `x.labels[dim]` for each output dim whose size is unchanged ([`dimarray.py`](../../../src/pipekit_array/dimarray.py)), and the xarray adapter keeps a coordinate when all its dims survive with their sizes ([`xarray.py`](../../../src/pipekit_array/xarray.py)).
+`rewrap(x, data, dims)` keeps labels by dim name: `DimArrayAdapter.rewrap` copies `x.labels[dim]` for each output dim whose size is unchanged ([`named/_carrier.py`](../../../src/pipekit_array/named/_carrier.py)), and the xarray adapter keeps a coordinate when all its dims survive with their sizes ([`xarray.py`](../../../src/pipekit_array/xarray.py)).
 So `rewrap` alone cannot label a dim whose name or labels are new, and six functions need exactly that:
 
 | Function | Output dim | Its labels |
@@ -225,7 +225,7 @@ For a namespace without `einsum`, the fallback is to `broadcast_like` every inpu
 
 ### 3.5 Operator twins
 
-Every twin lives in [`dim_operators.py`](../../../src/pipekit_array/dim_operators.py), takes only names and numbers, round-trips through `dumps` / `loads`, and implements `compute_output_signature` from `Signature.drop_dims` and `Signature.replace_dims`.
+Every twin lives in [`operators`](../../../src/pipekit_array/operators), takes only names and numbers, round-trips through `dumps` / `loads`, and implements `compute_output_signature` from `Signature.drop_dims` and `Signature.replace_dims`.
 
 | Function | Operator | Serialises | Output signature | Status |
 | --- | --- | --- | --- | --- |
@@ -421,10 +421,10 @@ A method would exist only on `DimArray`, so code written with it would not run o
 Alternative: thin method sugar that calls the free functions; rejected, because it invites carrier-specific code and doubles the documented surface.
 
 **A14. `merge_dims` / `split_dims`, not `stack` / `unstack`.**
-Recommended: new names, because `stack` already means xarray's `concat` along a new dim ([`dims.py`](../../../src/pipekit_array/dims.py)).
+Recommended: new names, because `stack` already means xarray's `concat` along a new dim ([`named`](../../../src/pipekit_array/named)).
 Placement follows xarray's `stack`: other dims first, the merged dim last, C order.
 Labels: the merged dim's label is the tuple of the source labels, with positions for an unlabelled source (xarray's `MultiIndex` does the same); `split_dims` recovers each source's labels from the tuples, so the round trip is exact.
-`einx.rearrange("(y x)")` stays as is: it names the dim `y_x` and drops labels ([`einx.py`](../../../src/pipekit_array/einx.py)).
+`einx.rearrange("(y x)")` stays as is: it names the dim `y_x` and drops labels ([`bridges/einx.py`](../../../src/pipekit_array/bridges/einx.py)).
 Alternative: `unstack` reading sizes from the tuple labels; rejected, because the sizes must be static under `jit`.
 As built: with no labelled source, the merged dim gets no labels rather than tuples of positions, and a split part whose labels are exactly its positions comes back unlabelled (section 3.0); both round trips stay exact.
 
@@ -488,7 +488,7 @@ As built: `LabelledAdapter` is exported from `pipekit_ops`, and pipekit-array fi
 
 ## 7. Testing gates
 
-Fixtures: the test kit's layout ([`testing`](../../../src/pipekit_array/testing/_contracts.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
+Fixtures: the test kit's layout ([`testing`](../../../src/pipekit_array/testing/_carriers.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
 
 | Gate | Pass condition |
 | --- | --- |

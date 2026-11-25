@@ -26,7 +26,7 @@ Six of the 12 are built or replaced today; the QC family, `Histogram` and `Model
 | `qc` | `AssertValidFraction` | Pass-through; raise if the non-NaN fraction is `< min_valid`. | not built |
 | `inference` | `ModelOp` | Framework-agnostic inference wrapper. | not built |
 
-Beyond the catalogue, the package ships `batch` and `Padded` (A10), `to_rows` / `from_rows` and `Estimator` (OP-O3), the einx bridge `pipekit_array.einx` (OP-O2), `KernelSpec` / `KernelOp`, the xarray adapter and the test kit `pipekit_array.testing`.
+Beyond the catalogue, the package ships `batch` and `Padded` (A10), `to_rows` / `from_rows` and `Estimator` (OP-O3), the einx bridge `pipekit_array.bridges.einx` (OP-O2), `KernelSpec` / `KernelOp`, the xarray adapter and the test kit `pipekit_array.testing`.
 
 ## Named carriers: dim-level functions
 
