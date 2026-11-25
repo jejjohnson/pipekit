@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.6](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.5...pipekit-array-v0.1.6) (2026-11-25)
+
+
+### Features
+
+* **array:** check_values and require_floating also work under jit ([#287](https://github.com/jejjohnson/pipekit/issues/287)) ([1558bd5](https://github.com/jejjohnson/pipekit/commit/1558bd5639231305f4bf27abfec268502f1fa568))
+* **array:** indexed updates, vmap, scan and pad run on any backend ([#286](https://github.com/jejjohnson/pipekit/issues/286)) ([2944f7c](https://github.com/jejjohnson/pipekit/commit/2944f7c3e5a7548218319aa6e7d9dac88148c6b1))
+* **array:** safe roots, as_inexact, constants_like and the inputs of a reduction ([#285](https://github.com/jejjohnson/pipekit/issues/285)) ([517e7f5](https://github.com/jejjohnson/pipekit/commit/517e7f517e48fa70a04b6a1c425671b34d1073ce))
+* **array:** shared test checks for backends, transforms and gradients ([#288](https://github.com/jejjohnson/pipekit/issues/288)) ([b612af3](https://github.com/jejjohnson/pipekit/commit/b612af37ef7902928456bc8468a32ece9b00cb16))
+* **ops:** is_traced, is_concrete and import_optional are public ([#284](https://github.com/jejjohnson/pipekit/issues/284)) ([4ba4eba](https://github.com/jejjohnson/pipekit/commit/4ba4eba44d4e4d1677e9633fbd8e5e60f5de6a69))
+
 ## [0.1.5](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.4...pipekit-array-v0.1.5) (2026-11-24)
 
 
