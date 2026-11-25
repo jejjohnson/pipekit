@@ -272,6 +272,20 @@ They come from diagnostix v0.0.1, and `register_record` had copies in geophysix 
 **Rationale:** `Groups` is a padded gather, because the standard has no `bincount` and a difference of cumulative sums loses float32's precision.
 A library's own exception is its own business: these raise `ValueError` and `BackendError`.
 
+## A26. The helpers of a plain function live here, and the subject stays in its library
+
+**Decision (25 Nov 2026, #272):** pipekit-array is a core library, and every library of the stack may import it.
+A helper belongs here if its description needs no grid, Earth, kernel, spectrum, operator or solver: safe roots, tables of numbers, integers to floats, the inputs of a reduction.
+A root is 0 with a zero gradient at x ≤ 0, and NaN at NaN.
+
+**Alternatives considered:**
+
+- **NaN at 0 too (three of the four `safe_sqrt` that this replaces):** `where(x > 0, √x, 0)` sends NaN to 0.
+  Rejected: a missing value must not become a number.
+- **NaN at x < 0 (the fourth):** Rejected: a difference of squares rounds below 0, and every caller would clip first.
+
+**Rationale:** each library wrote these for what the array API standard leaves out, and the copies no longer agreed.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:

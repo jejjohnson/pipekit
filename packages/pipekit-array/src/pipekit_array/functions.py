@@ -54,14 +54,21 @@ except ImportError as err:
 
 __all__ = [
     "BackendError",
+    "as_inexact",
     "boolean_like",
     "concrete",
+    "constants_like",
     "divide_or_nan",
     "elementwise",
     "floating_inputs",
     "is_dataarray",
     "like",
     "namespace_of",
+    "safe_atan2",
+    "safe_power",
+    "safe_sqrt",
+    "squared_magnitude",
+    "stand_in",
     "table_like",
 ]
 
@@ -154,6 +161,39 @@ def floating_inputs(
     return xp, [_place(value, xp, dtype, device) for value in values]
 
 
+def as_inexact(x: Any, xp: ModuleType | None = None) -> Any:
+    """An array as it is if floating or complex, else in the default float.
+
+    Unlike `floating_inputs`, it takes one array, and complex numbers. The
+    default float is the namespace's: float64 on NumPy, and on JAX what
+    ``jax_enable_x64`` says.
+
+    Args:
+        x: An array, a sequence or a number.
+        xp: The namespace of the call; that of ``x`` if not given.
+
+    Returns:
+        An array of ``xp``, on ``x``'s device.
+
+    Raises:
+        BackendError: If ``x`` is not an array of a known library.
+        ValueError: If ``x`` is not numeric, such as a date.
+
+    Example:
+        >>> import numpy as np
+        >>> as_inexact(np.arange(3)).dtype, as_inexact([1j]).dtype
+        (dtype('float64'), dtype('complex128'))
+    """
+    xp = namespace_of(x) if xp is None else xp
+    array = xp.asarray(x) if _is_host(x) else x
+    if xp.isdtype(array.dtype, ("real floating", "complex floating")):
+        return array
+    if not xp.isdtype(array.dtype, ("bool", "integral")):
+        msg = f"the input must be numeric, got dtype {array.dtype}"
+        raise ValueError(msg)
+    return xp.astype(array, xp.asarray(0.0).dtype)
+
+
 def like(value: Any, ref: Any, xp: ModuleType) -> Any:
     """``value`` (a number or a 0-d array) in ``ref``'s dtype, on its device.
 
@@ -193,6 +233,35 @@ def table_like(table: np.ndarray, ref: Any, xp: ModuleType) -> Any:
     """
     device = _device_of(ref, xp)
     return xp.asarray(table) if device is None else xp.asarray(table, device=device)
+
+
+def constants_like(table: Any, ref: Any, xp: ModuleType) -> Any:
+    """A table of numbers in ``ref``'s library and dtype, on its device.
+
+    The numbers are constants of the problem (weights, the spacing of a grid),
+    and no request for a precision, so a float64 table leaves a float32 field in
+    float32. A table that is an array of ``xp`` already, such as the metric of a
+    grid that is traced with its field, keeps its gradient.
+
+    Args:
+        table: The numbers: an array, a sequence or a number.
+        ref: An array of the namespace ``xp``. If its dtype is not floating, the
+            table keeps its own, so that an integer field does not truncate it.
+        xp: The namespace of the call.
+
+    Returns:
+        The table as an array of ``xp``, in its own shape.
+
+    Example:
+        >>> import numpy as np
+        >>> constants_like([0.5, 1.5], np.zeros(3, dtype=np.float32), np)
+        array([0.5, 1.5], dtype=float32)
+        >>> constants_like([0.5, 1.5], np.zeros(3, dtype=np.int64), np)
+        array([0.5, 1.5])
+    """
+    if xp.isdtype(ref.dtype, ("real floating", "complex floating")):
+        return _place(table, xp, ref.dtype, _device_of(ref, xp))
+    return table_like(np.asarray(table), ref, xp) if _is_host(table) else table
 
 
 def boolean_like(value: Any, ref: Any, xp: ModuleType, *, name: str = "valid") -> Any:
@@ -254,6 +323,130 @@ def divide_or_nan(numerator: Any, denominator: Any, xp: ModuleType) -> Any:
     safe = xp.where(zero, xp.ones_like(denominator), denominator)
     quotient = numerator / safe
     return xp.where(zero, xp.full_like(quotient, xp.nan), quotient)
+
+
+def safe_sqrt(x: Any, xp: ModuleType) -> Any:
+    """√x for x > 0, 0 with a zero gradient for x ≤ 0, and NaN for NaN.
+
+    A difference of squares can round below 0, and its root is then 0; a missing
+    value stays missing. It goes through a double ``where``, so the gradient is
+    finite at 0.
+
+    Args:
+        x: A floating array of the namespace ``xp``.
+        xp: The namespace of the call.
+
+    Returns:
+        The roots.
+
+    Example:
+        >>> import numpy as np
+        >>> safe_sqrt(np.asarray([4.0, 0.0, -1.0, np.nan]), np)
+        array([ 2.,  0.,  0., nan])
+    """
+    zero = x <= 0  # False for NaN
+    # the root of 1 where the result is 0, so that the unused branch is finite
+    root = xp.sqrt(xp.where(zero, xp.ones_like(x), x))
+    return xp.where(zero, xp.zeros_like(x), root)
+
+
+def safe_power(x: Any, p: Any, xp: ModuleType) -> Any:
+    """xᵖ for x > 0, 0 with a zero gradient for x ≤ 0, and NaN for NaN.
+
+    The rule at x ≤ 0 is that of `safe_sqrt`, and does not depend on p: it is 0
+    for a negative p, too. The gradient by p is finite.
+
+    Args:
+        x: A floating array of the namespace ``xp``.
+        p: The exponent, a number or an array that broadcasts against ``x``.
+        xp: The namespace of the call.
+
+    Returns:
+        The powers.
+
+    Example:
+        >>> import numpy as np
+        >>> safe_power(np.asarray([4.0, 0.0, -1.0, np.nan]), 1.5, np)
+        array([ 8.,  0.,  0., nan])
+    """
+    zero = x <= 0
+    power = xp.pow(xp.where(zero, xp.ones_like(x), x), constants_like(p, x, xp))
+    return xp.where(zero, xp.zeros_like(power), power)
+
+
+def safe_atan2(y: Any, x: Any, xp: ModuleType) -> Any:
+    """atan2(y, x), and 0 with a zero gradient at the origin.
+
+    Args:
+        y: A floating array of the namespace ``xp``.
+        x: An array that broadcasts against it, of its dtype.
+        xp: The namespace of the call.
+
+    Returns:
+        The angles [rad], in (-π, π].
+
+    Example:
+        >>> import numpy as np
+        >>> safe_atan2(np.asarray([0.0, 1.0]), np.asarray([0.0, 0.0]), np).round(6)
+        array([0.      , 1.570796])
+    """
+    origin = (x == 0) & (y == 0)
+    # atan2(0, 1) = 0 at the origin, so that the unused branch is finite
+    safe_x = xp.where(origin, xp.ones_like(x), x)
+    safe_y = xp.where(origin, xp.zeros_like(y), y)
+    return xp.atan2(safe_y, safe_x)
+
+
+def squared_magnitude(z: Any, xp: ModuleType) -> Any:
+    """|z|² = Re(z)² + Im(z)², with a gradient at 0, which that of |z| has not.
+
+    Args:
+        z: A real or complex array of the namespace ``xp``.
+        xp: The namespace of the call.
+
+    Returns:
+        The squares, real.
+
+    Example:
+        >>> import numpy as np
+        >>> squared_magnitude(np.asarray([3.0 + 4.0j, 0.0]), np)
+        array([25.,  0.])
+    """
+    if not xp.isdtype(z.dtype, "complex floating"):
+        return z * z
+    return xp.real(z) ** 2 + xp.imag(z) ** 2
+
+
+def stand_in(x: Any, mask: Any, xp: ModuleType, *, reference: Any = None) -> Any:
+    """Rows of an array, with a valid one in place of each row to leave out.
+
+    A function that is undefined at a row gives NaN there, and masking its result
+    alone leaves 0 times NaN in the reverse pass, which spoils the gradient of every
+    row. So it is evaluated somewhere valid instead, and its result masked.
+
+    Args:
+        x: The rows, (n, *rest), an array of the namespace ``xp``.
+        mask: Which rows to use (True = use), boolean (n,), of the same library.
+        xp: The namespace of the call.
+        reference: The row, (*rest), to put in place of the others. If not given,
+            the first one in use, or the first one of all if none is.
+
+    Returns:
+        The rows, in ``x``'s shape and dtype. No gradient reaches a row that is
+        not in use, or the reference.
+
+    Example:
+        >>> import numpy as np
+        >>> x = np.asarray([[np.nan, 0.0], [1.0, 2.0]])
+        >>> stand_in(x, np.asarray([False, True]), np)
+        array([[1., 2.],
+               [1., 2.]])
+    """
+    if reference is None:
+        first = xp.argmax(xp.astype(mask, xp.int32), keepdims=True)
+        reference = xp.take(x, first, axis=0)[0, ...]
+    reference = _constant(like(reference, x, xp), xp)
+    return xp.where(xp.reshape(mask, (-1, *[1] * (x.ndim - 1))), x, reference)
 
 
 def concrete(x: Any) -> np.ndarray | None:
@@ -358,6 +551,15 @@ def elementwise[F: Callable[..., Any]](*, n_outputs: int = 1) -> Callable[[F], F
 
 
 # --- the host and the device ---
+
+
+def _constant(x: Any, xp: ModuleType) -> Any:
+    """An array that no gradient reaches."""
+    if array_api_compat.is_jax_namespace(xp):
+        import jax
+
+        return jax.lax.stop_gradient(x)
+    return x.detach() if array_api_compat.is_torch_namespace(xp) else x
 
 
 def _is_host(value: Any) -> bool:

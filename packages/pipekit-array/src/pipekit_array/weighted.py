@@ -25,7 +25,13 @@ from pipekit_array.functions import (
 )
 
 
-__all__ = ["Groups", "weighted_mean", "weighted_sum"]
+__all__ = [
+    "Groups",
+    "reduction_inputs",
+    "used_weights",
+    "weighted_mean",
+    "weighted_sum",
+]
 
 type Axis = int | tuple[int, ...] | None
 
@@ -64,7 +70,7 @@ def weighted_sum(
         >>> float(weighted_sum(x[[0, 2]], weights=[0.5, 2.0]))
         6.5
     """
-    xp, x, w, m = _reduction_inputs(values, weights, valid)
+    xp, x, w, m = reduction_inputs(values, weights, valid)
     # S = ∑ₙ mₙ wₙ xₙ
     return xp.sum(_kept(xp, x, w, m), axis=axis, dtype=x.dtype)
 
@@ -104,23 +110,28 @@ def weighted_mean(
         >>> float(weighted_mean(x[0], weights=[0.0, 0.0]))
         nan
     """
-    xp, x, w, m = _reduction_inputs(values, weights, valid)
+    xp, x, w, m = reduction_inputs(values, weights, valid)
     # S = ∑ₙ mₙ wₙ xₙ
     total = xp.sum(_kept(xp, x, w, m), axis=axis, dtype=x.dtype)
     # W = ∑ₙ mₙ wₙ
-    weight = xp.sum(_used_weights(xp, x, w, m), axis=axis, dtype=x.dtype)
+    weight = xp.sum(used_weights(xp, x, w, m), axis=axis, dtype=x.dtype)
     return divide_or_nan(total, weight, xp)
 
 
-def _reduction_inputs(
-    values: Any, weights: Any, valid: Any
+def reduction_inputs(
+    values: Any, weights: Any, valid: Any, *, params: tuple[Any, ...] = ()
 ) -> tuple[ModuleType, Any, Any, Any]:
     """The namespace of a reduction, and its inputs broadcast against each other.
+
+    For a reduction that `weighted_sum`, `weighted_mean` and `Groups` do not
+    cover, with their rules for masks and weights.
 
     Args:
         values: x.
         weights: w, or ``None``.
-        valid: The validity, boolean, or ``None``.
+        valid: The validity, boolean (True = use), or ``None``.
+        params: Other arguments, as in `floating_inputs`: they help to choose the
+            namespace and the device, and never decide the dtype.
 
     Returns:
         The namespace, x and w in one floating dtype, and the validity as a
@@ -129,12 +140,18 @@ def _reduction_inputs(
     Raises:
         BackendError: If an argument is a labelled array, or of another library.
         ValueError: If ``valid`` is not boolean.
+
+    Example:
+        >>> import numpy as np
+        >>> xp, x, w, m = reduction_inputs(np.ones((2, 3)), [1.0, 2.0, 3.0], None)
+        >>> x.shape, w.shape, m
+        ((2, 3), (2, 3), None)
     """
     if weights is None:
-        xp, (x,) = floating_inputs(values, params=(valid,))
+        xp, (x,) = floating_inputs(values, params=(valid, *params))
         w = None
     else:
-        xp, (x, w) = floating_inputs(values, weights, params=(valid,))
+        xp, (x, w) = floating_inputs(values, weights, params=(valid, *params))
     m = None if valid is None else boolean_like(valid, x, xp)
     given = [array for array in (x, w, m) if array is not None]
     broadcast = iter(xp.broadcast_arrays(*given))
@@ -150,11 +167,27 @@ def _kept(xp: ModuleType, x: Any, w: Any, m: Any) -> Any:
     """m w x, where an invalid sample is replaced before the product."""
     # 0 in place of xₙ where mₙ = 0: 0 times NaN is NaN
     kept = x if m is None else xp.where(m, x, xp.zeros_like(x))
-    return kept if w is None else kept * _used_weights(xp, x, w, m)
+    return kept if w is None else kept * used_weights(xp, x, w, m)
 
 
-def _used_weights(xp: ModuleType, x: Any, w: Any, m: Any) -> Any:
-    """m w, the weight each sample enters with, in ``x``'s shape and dtype."""
+def used_weights(xp: ModuleType, x: Any, w: Any, m: Any) -> Any:
+    """The weight m w that each sample enters a reduction with.
+
+    Args:
+        xp: The namespace of the call.
+        x: The samples, as `reduction_inputs` returns them.
+        w: The weights in ``x``'s shape and dtype, or ``None`` for 1.
+        m: The validity in ``x``'s shape, or ``None`` if every sample is valid.
+
+    Returns:
+        m w, in ``x``'s shape and dtype.
+
+    Example:
+        >>> import numpy as np
+        >>> x = np.asarray([1.0, np.nan])
+        >>> used_weights(np, x, None, np.asarray([True, False]))
+        array([1., 0.])
+    """
     weight = xp.ones_like(x) if w is None else w
     return weight if m is None else xp.where(m, weight, xp.zeros_like(weight))
 
@@ -340,7 +373,7 @@ class Groups:
         used = xp.broadcast_to(used, x_rows.shape)
         w_rows = None if w is None else self._gather(xp, w)
         # mₙ wₙ, 0 on the padding too
-        weight_rows = _used_weights(xp, x_rows, w_rows, used)
+        weight_rows = used_weights(xp, x_rows, w_rows, used)
         kept = xp.where(used, x_rows, xp.zeros_like(x_rows))
         # Sⱼ = ∑ mₙ wₙ xₙ over the row of group j
         total = xp.sum(kept * weight_rows, axis=-1, dtype=x.dtype)
@@ -385,7 +418,7 @@ class Groups:
         axis: int,
     ) -> tuple[ModuleType, Any, Any, Any]:
         """The namespace, and x, w and m with the samples on the last axis."""
-        xp, *arrays = _reduction_inputs(values, weights, valid)
+        xp, *arrays = reduction_inputs(values, weights, valid)
         self._check_axis(arrays[0], axis, self.n_samples, "samples")
         x, w, m = (
             None if array is None else xp.moveaxis(array, axis, -1) for array in arrays
