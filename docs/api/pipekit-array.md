@@ -79,6 +79,13 @@ Python numbers, sequences and NumPy arrays join the library and the device of th
 
 ::: pipekit_array.functions
 
+### Hooks
+
+`pipekit_array.hooks` holds what the array API standard leaves out: indexed updates (`set_at`, `add_at`, `multiply_at`), loops (`vmap`, `scan`), `pad`, `stop_gradient` and `optimization_barrier`.
+Each is JAX's own call on JAX data, and a plain equivalent on every other library (ADR A27).
+
+::: pipekit_array.hooks
+
 ### Masked and weighted reductions
 
 `pipekit_array.weighted` is written on that backend: sums and means with a mask and weights, of an array or of static groups of samples (an average over months, rings or labelled regions).

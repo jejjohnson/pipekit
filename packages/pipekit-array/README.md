@@ -264,13 +264,14 @@ The estimator sees a `(T Y X, B)` table, and the result comes back with the band
 | `estimator` | `Estimator` | a scikit-learn-style estimator fitted and applied on a named carrier (`[sklearn]`) |
 | `kernel` | `KernelSpec`, `KernelOp` | one array kernel, written once, run on raw arrays and every named carrier |
 | `einx` | `rearrange`, `reduce`, `einsum`, `repeat`, `Einx` | einx with dim names as axes (`[einx]`; `from pipekit_array import einx`) |
-| [`functions`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#plain-functions) | `namespace_of`, `floating_inputs`, `like`, `table_like`, `boolean_like`, `divide_or_nan`, `is_dataarray`, `elementwise` | the array backend of plain functions, which are no operators (`[numpy,compat]`) |
-| [`weighted`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#masked-and-weighted-reductions) | `weighted_sum`, `weighted_mean`, `Groups` | masked, weighted sums and means, of an array and of static groups (`[numpy,compat]`) |
+| [`functions`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#plain-functions) | `namespace_of`, `floating_inputs`, `as_inexact`, `concrete`, `like`, `table_like`, `constants_like`, `boolean_like`, `divide_or_nan`, `safe_sqrt`, `safe_power`, `safe_atan2`, `squared_magnitude`, `stand_in`, `is_dataarray`, `elementwise` | the array backend of plain functions, which are no operators (`[numpy,compat]`) |
+| [`hooks`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#hooks) | `set_at`, `add_at`, `multiply_at`, `vmap`, `scan`, `pad`, `stop_gradient`, `optimization_barrier` | JAX's own call on JAX data, a plain equivalent elsewhere (`[numpy,compat]`) |
+| [`weighted`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#masked-and-weighted-reductions) | `weighted_sum`, `weighted_mean`, `Groups`, `reduction_inputs`, `used_weights` | masked, weighted sums and means, of an array and of static groups (`[numpy,compat]`) |
 | [`records`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#records) | `register_record` | a frozen dataclass as a JAX pytree, once JAX loads |
 | `xarray` | the `xr.DataArray` adapter | loaded the first time a DataArray reaches `pipekit_ops.get_adapter` (`[xarray]`) |
 | `testing` | `check_adapter`, `check_kernel_op` | the test kit for carrier libraries that register their own adapter |
 
-`pipekit_array.__all__` has 68 names; `einx`, `functions`, `weighted`, `records`, `xarray` and `testing` are imported as submodules.
+`pipekit_array.__all__` has 68 names; `einx`, `functions`, `hooks`, `weighted`, `records`, `xarray` and `testing` are imported as submodules.
 
 ### Not built yet
 
