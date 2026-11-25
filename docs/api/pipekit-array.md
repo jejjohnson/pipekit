@@ -86,6 +86,12 @@ Each is JAX's own call on JAX data, and a plain equivalent on every other librar
 
 ::: pipekit_array.hooks
 
+### Checks
+
+`pipekit_array.checks` raises at once on a concrete array, and when the compiled code runs on a traced one (through equinox, imported under a trace only).
+
+::: pipekit_array.checks
+
 ### Masked and weighted reductions
 
 `pipekit_array.weighted` is written on that backend: sums and means with a mask and weights, of an array or of static groups of samples (an average over months, rings or labelled regions).

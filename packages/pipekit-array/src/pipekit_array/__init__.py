@@ -48,8 +48,9 @@ Plain functions (``[numpy,compat]``): the submodule
 `pipekit_array.functions` holds `namespace_of`, `floating_inputs`, `like` and
 `elementwise`, the array backend of functions that are no operators,
 `pipekit_array.hooks` the indexed updates and loops that the standard leaves
-out, and `pipekit_array.weighted` its masked, weighted sums and means; import
-them by name, and `pipekit_array.records` for `register_record`.
+out, `pipekit_array.checks` the checks that also work under ``jax.jit``, and
+`pipekit_array.weighted` its masked, weighted sums and means; import them by
+name, and `pipekit_array.records` for `register_record`.
 
 xarray (``[xarray]``): the ``xr.DataArray`` adapter, `pipekit_array.xarray`,
 loads lazily the first time a DataArray reaches `pipekit_ops.get_adapter`, so

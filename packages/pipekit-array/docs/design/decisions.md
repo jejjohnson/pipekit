@@ -301,6 +301,18 @@ On JAX data the jaxpr is that of the JAX function, and the tests compare the two
 **Rationale:** a library that stays on JAX loses nothing, and a function that only used one of these becomes array agnostic where it is.
 An index out of bounds raises on NumPy, and JAX does not report it; a hook does not hide that difference.
 
+## A28. A check under a trace needs equinox
+
+**Decision (25 Nov 2026, #278):** `check_values` raises at once on a concrete array, and returns `equinox.error_if` under a trace.
+equinox is no dependency: it is imported under a trace only, and an `ImportError` names it if it is missing.
+
+**Alternatives considered:**
+
+- **Skip the check under a trace:** Rejected: a bad value passes through.
+- **`jax.experimental.checkify`:** Rejected: the caller has to transform the whole function to see the error.
+
+**Rationale:** the libraries that call it under a trace all depend on equinox.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
