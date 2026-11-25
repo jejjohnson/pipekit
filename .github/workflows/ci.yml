@@ -56,8 +56,8 @@ jobs:
           uv run --no-sync pytest packages/pipekit-array/tests
       # torch is large, so it is in no dependency group. 2.10 is pinned because
       # its asarray detaches a tensor; 2.13 no longer does.
-      - name: Run pipekit_array.functions and hooks on torch
+      - name: Run the plain functions on torch
         run: |
           uv pip install array-api-compat
           uv pip install "torch==2.10.*" --index-url https://download.pytorch.org/whl/cpu
-          uv run --no-sync pytest packages/pipekit-array/tests/test_functions.py packages/pipekit-array/tests/test_hooks.py
+          uv run --no-sync pytest packages/pipekit-array/tests/test_{functions,hooks,checks}.py
