@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.1.0...pipekit-jax-v0.2.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pipekit-jax:** pipekit-jax no longer depends on diffrax and integrix ([#289](https://github.com/jejjohnson/pipekit/issues/289))
+
+### Code Refactoring
+
+* **pipekit-jax:** pipekit-jax no longer depends on diffrax and integrix ([#289](https://github.com/jejjohnson/pipekit/issues/289)) ([e600b8c](https://github.com/jejjohnson/pipekit/commit/e600b8ce9555f35bc345a88af3903b7785693884))
+
 ## [0.1.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.0.6...pipekit-jax-v0.1.0) (2026-11-07)
 
 

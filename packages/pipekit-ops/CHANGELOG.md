@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.3...pipekit-ops-v0.2.4) (2026-11-25)
+
+
+### Features
+
+* **ops:** is_traced, is_concrete and import_optional are public ([#284](https://github.com/jejjohnson/pipekit/issues/284)) ([4ba4eba](https://github.com/jejjohnson/pipekit/commit/4ba4eba44d4e4d1677e9633fbd8e5e60f5de6a69))
+
 ## [0.2.3](https://github.com/jejjohnson/pipekit/compare/pipekit-ops-v0.2.2...pipekit-ops-v0.2.3) (2026-11-24)
 
 
