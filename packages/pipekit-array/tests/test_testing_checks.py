@@ -304,6 +304,17 @@ def test_a_gradient_that_is_cut() -> None:
 
 
 @needs_jax
+def test_a_gradient_at_a_minimum_is_compared_above_the_rounding() -> None:
+    import jax.numpy as jnp
+
+    # both differences are rounding here, and only one is exactly 0
+    assert_grad_matches_fd(
+        lambda x: jnp.sum(jnp.abs(jnp.fft.rfft(x - jnp.mean(x))) ** 2 / 3.0),
+        np.zeros(8),
+    )
+
+
+@needs_jax
 def test_a_gradient_that_is_not_finite() -> None:
     import jax.numpy as jnp
 

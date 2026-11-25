@@ -97,8 +97,8 @@ def assert_grad_matches_fd(
 
     For each entry k of the input, (f(x + ε eₖ) - f(x - ε eₖ)) / 2ε approximates
     column k of the Jacobian. The tolerance is relative to its largest entry,
-    since an entry near zero carries the O(ε²) truncation error at full size.
-    Skips without JAX.
+    since an entry near zero carries the O(ε²) truncation error at full size, and
+    never below the rounding of f divided by ε. Skips without JAX.
 
     Args:
         fn: The function under test, which JAX can trace.
@@ -118,18 +118,22 @@ def assert_grad_matches_fd(
     flat_fn, point = _flat(jax, fn, x)
     jacobian = np.asarray(jax.jit(jax.jacrev(flat_fn))(point))
 
-    def difference(step: Any) -> Any:
-        # (f(x + ε eₖ) - f(x - ε eₖ)) / 2ε
-        return (flat_fn(point + step) - flat_fn(point - step)) / (2.0 * eps)
+    def beside(step: Any) -> Any:
+        return flat_fn(point + step), flat_fn(point - step)
 
     steps = eps * jax.numpy.eye(point.shape[0], dtype=point.dtype)
     # compiled once, with one column per input entry
-    expected = np.asarray(jax.jit(jax.vmap(difference, out_axes=1))(steps))
+    above, below = jax.jit(jax.vmap(beside, out_axes=1))(steps)
+    above, below = np.asarray(above), np.asarray(below)
+    expected = (above - below) / (2.0 * eps)
     _require_finite("derivatives", jacobian)
     # a NaN scale would let every entry pass
     _require_finite("finite differences", expected)
     scale = float(np.max(np.abs(expected), initial=0.0))
-    assert_matches_oracle(jacobian, expected, rtol=0.0, atol=rtol * scale)
+    # the rounding of f, divided by the step: it is what is left at a minimum
+    largest = float(np.max(np.abs([above, below]), initial=0.0))
+    noise = float(np.finfo(expected.dtype).eps) * largest / eps
+    assert_matches_oracle(jacobian, expected, rtol=0.0, atol=rtol * scale + noise)
 
 
 def assert_finite_gradient(
