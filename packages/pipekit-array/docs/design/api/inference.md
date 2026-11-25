@@ -7,7 +7,7 @@ version: 0.1.0
 
 > **Status: not built** (phase D of `boundaries.md` §4).
 > `pipekit_array.inference` does not exist in pipekit-array 0.1.1, so every call to `ModelOp` below is `proposed`.
-> Two shipped pieces cover part of the ground: `BatchAlong` (`pipekit_array.batching`) splits a carrier for chunked inference, and `Estimator` (`pipekit_array.estimator`, `[sklearn]`) fits and applies a scikit-learn-style estimator on a named carrier.
+> Two shipped pieces cover part of the ground: `BatchAlong` (`pipekit_array.operators`) splits a carrier for chunked inference, and `Estimator` (`pipekit_array.bridges.sklearn`, `[sklearn]`) fits and applies a scikit-learn-style estimator on a named carrier.
 
 `ModelOp` is the framework-agnostic trained-model wrapper.
 It holds a callable (a NumPy function, an sklearn `predict`, a raw torch `nn.Module`, a Keras model, …) and calls it on the input.
@@ -130,7 +130,7 @@ pipe = AssertNoNaN() | ModelOp(rf_classifier, method="predict_proba")
 probs = pipe(X_test)  # (n_samples, n_features) → (n_samples, n_classes)
 ```
 
-On a named carrier, `Estimator(rf_classifier, sample_dims=..., method="predict_proba")` already does this today, fitting by dim name (`pipekit_array.estimator`).
+On a named carrier, `Estimator(rf_classifier, sample_dims=..., method="predict_proba")` already does this today, fitting by dim name (`pipekit_array.bridges.sklearn`).
 
 ### Keras model wrapped after pipekit-train (planned for v0.3 of pipekit-train)
 

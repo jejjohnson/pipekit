@@ -82,7 +82,9 @@ def test_named_needs_no_extra() -> None:
 
 
 @pytest.mark.parametrize("area", ["arrays", "named", "kernels", "operators", "testing"])
-def test_the_names_of_an_area_are_sorted_and_importable(area: str) -> None:
+def test_the_names_of_an_area_are_unique_and_importable(area: str) -> None:
+    if area in ("arrays", "kernels"):  # elementwise is a kernel on plain arrays
+        pytest.importorskip("array_api_compat")
     module = importlib.import_module(f"pipekit_array.{area}")
     assert len(set(module.__all__)) == len(module.__all__)
     for name in module.__all__:

@@ -9,16 +9,16 @@ The seven operators that move arrays through a pipeline: the combinators, the re
 
 | Operator | Status |
 | --- | --- |
-| `ApplyAlong` (was `ApplyToBands`) | today, `pipekit_array.dim_operators` (#206) |
-| `StackAlong`, `ConcatenateAlong` | today, `pipekit_array.combinators` |
+| `ApplyAlong` (was `ApplyToBands`) | today, `pipekit_array.operators` (#206) |
+| `StackAlong`, `ConcatenateAlong` | today, `pipekit_array.operators` |
 | `Subsample` | retired: `isel` with a stepped slice (A15) |
 | `Histogram` | not built |
-| `MeanScalar` | today, `pipekit_array.reductions` |
-| `BatchAlong` (was the array-shaped `BatchedMap`) | today, `pipekit_array.batching` (#206) |
+| `MeanScalar` | today, `pipekit_array.operators` |
+| `BatchAlong` (was the array-shaped `BatchedMap`) | today, `pipekit_array.operators` (#206) |
 
 ## `ApplyToBands(inner: Operator, axis: int = 0)`
 
-Superseded by `ApplyAlong(inner: Operator, dim: str)` in `pipekit_array.dim_operators` (ADR A15, phase 3 of [dim_functions.md](dim_functions.md)), which ships today.
+Superseded by `ApplyAlong(inner: Operator, dim: str)` in `pipekit_array.operators` (ADR A15, phase 3 of [dim_functions.md](dim_functions.md)), which ships today.
 It does the same split, apply and stack by dim name, and it serialises whenever `inner` does.
 `ApplyToBands` itself was never built.
 
@@ -27,7 +27,7 @@ It is the canonical "apply a band-wise operation" combinator.
 
 ```python
 # proposed (phase B; superseded by ApplyAlong, A15)
-from pipekit_array.combinators import ApplyToBands
+from pipekit_array.operators import ApplyToBands
 
 # proposed (phase C)
 from pipekit_array.qc import AssertValueRange
@@ -248,7 +248,7 @@ An `axis` out of range for the signature's rank raises `ValueError`.
 
 ## `BatchAlong(inner: Operator, size: int, dim: str, pad: str = "none")`
 
-Ships today in `pipekit_array.batching` (phase 3 of [dim_functions.md](dim_functions.md), #206).
+Ships today in `pipekit_array.operators` (phase 3 of [dim_functions.md](dim_functions.md), #206).
 It was renamed from the planned array-shaped `BatchedMap(inner, batch_size, axis)` by ADR A19, which supersedes A5: `pipekit_ops.parallel.BatchedMap` takes an iterable and calls `inner` on lists, so one name for both would fail in confusing ways when both are imported.
 
 Split the input carrier along the named `dim` into chunks of `size`, apply `inner` to each chunk, and concatenate the results along `dim`.

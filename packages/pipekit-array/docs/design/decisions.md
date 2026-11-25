@@ -327,6 +327,24 @@ A DataArray is checked on request only, because a function over an axis refuses 
 **Rationale:** the copies had drifted, so a library's coverage depended on which one it had copied.
 Two faults of the copies are fixed here: an infinite reference, or a NaN finite difference, made the tolerance NaN or infinite, and every value passed.
 
+## A30. Six areas, one import direction, and a recorded module
+
+**Decision (25 Nov 2026, #291):** the package is `arrays`, `named`, `kernels`, `operators`, `bridges` and `testing`.
+An area imports only from the ones before it, and a name is imported from its area.
+A saved pipeline records an operator under `pipekit_array`, wherever its file is, and `__former_modules__` loads the states saved before.
+The decisions above name the modules of their day: `functions`, `hooks`, `checks`, `weighted` and `records` are `arrays`, `dims`, `dim_*`, `dimarray`, `rows` and `batching` are `named`, `kernel` is `kernels`, `dim_operators`, `combinators` and `reductions` are `operators`, and `xarray`, `einx` and `estimator` are `bridges`.
+
+**Alternatives considered:**
+
+- **A second distribution for the named layer:** Rejected: one more pin in every library that uses both, and the import direction makes a later split easy.
+- **Names loaded on first use:** Rejected: `Operator.from_state` looks among the operators that are loaded, so a saved pipeline would not load; and the eager import costs about 11 ms, next to 77 ms for pipekit-ops (measured with `-X importtime`).
+- **Operators recorded under their files:** Rejected: the module is part of `pipeline_hash`, so each later move would change every hash again. They changed once, here.
+
+`register_record` needed no array library in `records`; in `arrays` it needs `[numpy,compat]`, which each library that uses it has.
+
+**Rationale:** geophysix, radiomax and diagnostix use only plain arrays and geotoolz only named carriers, and the flat list of modules said neither.
+`functions` imported `kernel`, so the bottom depended on the top; `elementwise`, which needs both, is now a kernel.
+
 ## Optional extras matrix
 
 For reference, the extras that follow from these decisions, as declared in `packages/pipekit-array/pyproject.toml`:
@@ -340,8 +358,8 @@ For reference, the extras that follow from these decisions, as declared in `pack
 | `[dask]` | `dask[array]>=2024` | Partial conformance; lazy |
 | `[xarray]` | `xarray>=2024.6` | `DimArray.to_xarray`; the `DataArray` adapter (A9) |
 | `[sklearn]` | `scikit-learn>=1.4` | `Estimator` (geostack OP-O3) |
-| `[einx]` | `einx>=0.4` | `pipekit_array.einx` (geostack OP-O2) |
-| `[compat]` | `array-api-compat>=1.11` | The `_namespace.py` shim's first path; required for PyTorch and, with `[numpy]`, for `pipekit_array.functions` (A23) |
+| `[einx]` | `einx>=0.4` | `pipekit_array.bridges.einx` (geostack OP-O2) |
+| `[compat]` | `array-api-compat>=1.11` | The first path of `array_namespace`; required for PyTorch and, with `[numpy]`, for `pipekit_array.arrays` (A23) |
 
 The first design marked `[compat]` as a proposed v0.2 addition; it ships, together with the shim's `array_api_compat` path (`architecture.md` §4).
 

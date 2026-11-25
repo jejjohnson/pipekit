@@ -55,9 +55,9 @@ If a real use case demands it (rare, but for example "compute on JAX, log to Num
 This is logged as a v0.2 issue if anyone asks for it.
 
 **Reversed for NumPy and JAX (ADR A24).** NumPy next to JAX joins it in every layer, and `pipekit_ops.guard` reports it on request.
-Any other mix still fails loudly: dask next to NumPy or JAX, or another library next to JAX, raises `BackendError` (`join_backends` in `dims.py`).
+Any other mix still fails loudly: dask next to NumPy or JAX, or another library next to JAX, raises `BackendError` (`join_backends` in `pipekit_array.named`).
 
-**Plain functions.** `pipekit_array.functions` goes further (ADR A23): values on the host join any other library, and two libraries other than NumPy raise `BackendError`.
+**Plain functions.** `pipekit_array.arrays` goes further (ADR A23): values on the host join any other library, and two libraries other than NumPy raise `BackendError`.
 
 ### Q7. `Signature` integration depth
 
@@ -74,7 +74,7 @@ These were explicitly considered and rejected for the v0.1 scope.
   The library is a bag of operators.
 - **Backend conversion.** No `to_numpy()`, no `device=` argument, no automatic `x.cpu().numpy()`.
   Conversion lives in user code or in a future opt-in operator (Q6).
-  Two exceptions build a host value in the library of the other arrays, and move no other array: the host rule of `pipekit_array.functions` (ADR A23), and NumPy next to JAX in the named layer (ADR A24).
+  Two exceptions build a host value in the library of the other arrays, and move no other array: the host rule of `pipekit_array.arrays` (ADR A23), and NumPy next to JAX in the named layer (ADR A24).
 - **JAX traceability of operators.** pipekit operators dispatch in two modes (`__call__` vs `_apply`) and are not `jax.jit`-compatible.
   We live with it; `pipekit-jax` is the answer for differentiable or traceable pipelines.
   The dim-level functions trace under `jit` and `vmap` because they are plain functions on a pytree (gates G4 and G5).
@@ -82,7 +82,7 @@ These were explicitly considered and rejected for the v0.1 scope.
 - **DataFrame / pandas / polars operators.** They are not array-shaped and not in the Array API, so they are deferred indefinitely.
 - **Distributed scheduling.** dask graphs work because the user scheduled them; pipekit-array does not run a distributed scheduler (Q3).
 - **GPU memory management.** CuPy and GPU PyTorch users own their device placement; pipekit-array does not call `.to(device)` for them.
-  `pipekit_array.functions` gives a value from the host the device of the other arrays.
+  `pipekit_array.arrays` gives a value from the host the device of the other arrays.
 - **A NaN-tolerant arithmetic suite.** `nanmean`, `nansum` and the like are *partially* in the Array API, but the edge cases (all-NaN slices) differ between backends.
   A user who needs them writes a per-backend operator in user code, or waits for a future `pipekit_array.numeric_nan` module; it is out of v0.1 scope.
   As built, `reduce` resolves any namespace function by name, so `reduce(x, "nanmean", "time")` works wherever the namespace has `nanmean`.
@@ -92,11 +92,11 @@ These were explicitly considered and rejected for the v0.1 scope.
 The v0.1 implementation PRs close on the list below; ticks mark what pipekit-array 0.1.1 has.
 
 - [ ] All 12 operators implemented and tested per the `api/` files:
-  - [x] `ApplyAlong` (in `dim_operators.py`, not `combinators.py`), `StackAlong`, `ConcatenateAlong` (in `combinators.py`);
+  - [x] `ApplyAlong`, `StackAlong`, `ConcatenateAlong`;
   - [x] `Subsample`: retired, it is `isel` with a stepped slice (A15);
   - [ ] `observe.py`: `Histogram` (controller);
-  - [x] `MeanScalar`, in `reductions.py` (the module was `reduce.py` before 0.0.3);
-  - [x] `BatchAlong`, in `batching.py` (not `parallel.py`);
+  - [x] `MeanScalar`;
+  - [x] `BatchAlong`;
   - [ ] `qc.py`: `AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`;
   - [ ] `inference.py`: `ModelOp`.
 - [x] `_namespace.array_namespace()` shim implemented and tested.
@@ -114,7 +114,7 @@ The v0.1 implementation PRs close on the list below; ticks mark what pipekit-arr
 
 Suggested chunking for the implementation PRs:
 
-1. **Phase A: Foundations.** `_namespace.py`, the conftest fixture, `MeanScalar`, `StackAlong`, `ConcatenateAlong`.
+1. **Phase A: Foundations.** `array_namespace`, the conftest fixture, `MeanScalar`, `StackAlong`, `ConcatenateAlong`.
    About 150 LOC; it sets the per-backend test pattern.
    One PR. **Done.**
 2. **Phase B: Catalogue body.** `Subsample`, `ApplyAlong`, `BatchAlong`, `Histogram`.

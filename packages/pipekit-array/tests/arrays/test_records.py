@@ -7,6 +7,12 @@ import subprocess
 import sys
 
 import pytest
+
+
+# the area needs both
+pytest.importorskip("numpy")
+pytest.importorskip("array_api_compat")
+
 from pipekit_array.arrays import register_record
 
 

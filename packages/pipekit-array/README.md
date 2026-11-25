@@ -87,10 +87,10 @@ uv add "pipekit-array[numpy]"
 | `torch` | PyTorch | PyTorch tensors; add `compat` too |
 | `cupy` | CuPy | NumPy-style arrays on a CUDA GPU |
 | `dask` | `dask[array]` | lazy, chunked arrays larger than memory |
-| `compat` | `array-api-compat` | backends without a native `__array_namespace__` (PyTorch); with `numpy`, `pipekit_array.functions` |
+| `compat` | `array-api-compat` | backends without a native `__array_namespace__` (PyTorch); with `numpy`, `pipekit_array.arrays` |
 | `xarray` | xarray | the `xr.DataArray` adapter and `DimArray.to_xarray` |
 | `sklearn` | scikit-learn | `Estimator` |
-| `einx` | einx | `pipekit_array.einx`: einx patterns with dim names as axes |
+| `einx` | einx | `pipekit_array.bridges.einx`: einx patterns with dim names as axes |
 
 ## Quickstart
 
@@ -247,32 +247,30 @@ The estimator sees a `(T Y X, B)` table, and the result comes back with the band
 
 ## What ships
 
-| Module | Public names | Purpose |
-| --- | --- | --- |
-| `_namespace` | `array_namespace` | the Array API namespace shared by the inputs; the one point of backend dispatch |
-| `reductions` | `MeanScalar` | a mean over positional axes, on raw arrays |
-| `combinators` | `StackAlong`, `ConcatenateAlong` | join a list of arrays (`axis=`) or named carriers (`dim=`) |
-| `dimarray` | `DimArray`, `DimArrayAdapter` | the plain named carrier (data, dims, static labels) and its reference adapter |
-| `dims` | `isel`, `sel`, `transpose`, `reduce`, `argreduce`, `take_along`, `map_over`, `stack`, `stack_items`, `concat`, `combine`, `BackendError` | select, reduce, map and join by dim name |
-| `dim_shapes` | `rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims` | change which dims a carrier has |
-| `dim_shifts` | `pad`, `roll`, `shift`, `diff`, `cumreduce`, `where` | move, difference and mask along a dim |
-| `dim_windows` | `window`, `coarsen` | sliding windows and non-overlapping blocks |
-| `dim_algebra` | `quantile`, `dot` | quantiles and contractions over named dims |
-| `dim_operators` | `ISel`, `Sel`, `Transpose`, `Reduce`, `ArgReduce`, `TakeAlong`, `MapOver`, `Combine`, `Rename`, `ExpandDims`, `Squeeze`, `BroadcastLike`, `MergeDims`, `SplitDims`, `Pad`, `Roll`, `Shift`, `Diff`, `CumReduce`, `Where`, `Window`, `Coarsen`, `Quantile`, `Dot`, `ApplyAlong` | the operator twin of each dim function, plus `ApplyAlong` |
-| `batching` | `batch`, `Padded`, `BatchAlong` | fixed-size batches with a validity mask; an operator on chunks of a dim |
-| `rows` | `to_rows`, `from_rows`, `RowLayout` | a carrier to a `(samples, features)` table by dim name, and back |
-| `estimator` | `Estimator` | a scikit-learn-style estimator fitted and applied on a named carrier (`[sklearn]`) |
-| `kernel` | `KernelSpec`, `KernelOp` | one array kernel, written once, run on raw arrays and every named carrier |
-| `einx` | `rearrange`, `reduce`, `einsum`, `repeat`, `Einx` | einx with dim names as axes (`[einx]`; `from pipekit_array import einx`) |
-| [`functions`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#plain-functions) | `namespace_of`, `floating_inputs`, `as_inexact`, `concrete`, `like`, `table_like`, `constants_like`, `boolean_like`, `divide_or_nan`, `safe_sqrt`, `safe_power`, `safe_atan2`, `squared_magnitude`, `stand_in`, `is_dataarray`, `elementwise` | the array backend of plain functions, which are no operators (`[numpy,compat]`) |
-| [`hooks`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#hooks) | `set_at`, `add_at`, `multiply_at`, `vmap`, `scan`, `pad`, `stop_gradient`, `optimization_barrier` | JAX's own call on JAX data, a plain equivalent elsewhere (`[numpy,compat]`) |
-| [`checks`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#checks) | `check_values`, `require_floating` | checks that also work under `jit` (`[numpy,compat]`, equinox under a trace) |
-| [`weighted`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#masked-and-weighted-reductions) | `weighted_sum`, `weighted_mean`, `Groups`, `reduction_inputs`, `used_weights` | masked, weighted sums and means, of an array and of static groups (`[numpy,compat]`) |
-| [`records`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#records) | `register_record` | a frozen dataclass as a JAX pytree, once JAX loads |
-| `xarray` | the `xr.DataArray` adapter | loaded the first time a DataArray reaches `pipekit_ops.get_adapter` (`[xarray]`) |
-| `testing` | `check_adapter`, `check_kernel_op`; `assert_backends_agree`, `assert_matches_oracle`, `assert_traces` and [seven more](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#test-kit) | the test kit: for carrier libraries that register their own adapter, and for functions on any array library |
+The package is six areas, and a name is imported from its area.
+An area imports only from the ones before it, and `testing` from all of them.
 
-`pipekit_array.__all__` has 68 names; `checks`, `einx`, `functions`, `hooks`, `weighted`, `records`, `xarray` and `testing` are imported as submodules.
+| Area | Public names | Purpose |
+| --- | --- | --- |
+| [`arrays`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#plain-arrays) | `namespace_of`, `floating_inputs`, `as_inexact`, `concrete`, `is_dataarray`; `like`, `constants_like`, `table_like`, `boolean_like` | functions of plain arrays: the library, the dtype and the device of a call (`[numpy,compat]`) |
+| | `set_at`, `add_at`, `multiply_at`, `pad`; `vmap`, `scan`, `stop_gradient`, `optimization_barrier` | JAX's own call on JAX data, a plain equivalent elsewhere |
+| | `divide_or_nan`, `safe_sqrt`, `safe_power`, `safe_atan2`, `squared_magnitude`, `stand_in`; `check_values`, `require_floating` | finite gradients; checks that also work under `jit` |
+| | `weighted_sum`, `weighted_mean`, `Groups`, `reduction_inputs`, `used_weights`; `register_record` | masked, weighted reductions; a frozen dataclass as a JAX pytree |
+| [`named`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#named-carriers) | `DimArray`, `DimArrayAdapter` | the plain carrier (data, dims, static labels) and its reference adapter |
+| | `isel`, `sel`, `take_along`; `reduce`, `argreduce`, `cumreduce`, `quantile`, `dot` | select; reduce |
+| | `transpose`, `rename`, `expand_dims`, `squeeze`, `broadcast_like`, `merge_dims`, `split_dims`; `pad`, `roll`, `shift`, `diff`, `where`; `window`, `coarsen` | shape; shift; windows |
+| | `stack`, `stack_items`, `concat`, `combine`; `map_over`; `batch`, `Padded`; `to_rows`, `from_rows`, `RowLayout` | join; map; batches with a validity mask; sample tables |
+| | `array_namespace`, `join_backends` | backend dispatch |
+| [`kernels`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#kernels) | `KernelSpec`, `KernelOp`, `run_kernel`; `elementwise` | one array function on raw arrays and every carrier |
+| [`operators`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#operators) | `ISel`, `Sel`, `TakeAlong`, `Reduce`, `ArgReduce`, `CumReduce`, `Quantile`, `Dot`, `Transpose`, `Rename`, `ExpandDims`, `Squeeze`, `BroadcastLike`, `MergeDims`, `SplitDims`, `Pad`, `Roll`, `Shift`, `Diff`, `Where`, `Window`, `Coarsen`, `Combine`, `MapOver` | the operator twin of each named function |
+| | `ApplyAlong`, `BatchAlong`; `MeanScalar`, `StackAlong`, `ConcatenateAlong` | an operator along a dim; operators of raw arrays |
+| [`bridges`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#bridges) | `xarray`: the `xr.DataArray` adapter | loaded the first time a DataArray reaches `pipekit_ops.get_adapter` (`[xarray]`) |
+| | `einx`: `rearrange`, `reduce`, `einsum`, `repeat`, `Einx` | einx with dim names as axes (`[einx]`; `from pipekit_array.bridges import einx`) |
+| | `sklearn`: `Estimator` | a scikit-learn-style estimator on a named carrier (`[sklearn]`) |
+| [`testing`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#test-kit) | `check_adapter`, `check_kernel_op`; `assert_backends_agree`, `assert_matches_oracle`, `assert_traces` and seven more | the test kit, for carrier libraries and for functions on any array library |
+
+`pipekit_array.__all__` has 68 names: those of `named`, `kernels` and `operators` that a pipeline uses, `Estimator` and `BackendError`.
+`arrays` and `testing` are imported by name.
 
 ### Not built yet
 

@@ -30,7 +30,7 @@ docs/design/
 ├── vision.md             # Motivation, scope, the Array API bet.
 ├── architecture.md       # The dispatch pattern and how operators
 │                         # delegate to array_namespace(x).
-├── decisions.md          # ADRs A1 to A29 (dispatch, scope vs core,
+├── decisions.md          # ADRs A1 to A30 (dispatch, scope vs core,
 │                         # backend extras, named carriers, the
 │                         # dim-level functions).
 ├── boundaries.md         # Non-goals, open questions, v0.1 DoD.
