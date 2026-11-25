@@ -437,7 +437,7 @@ call away.
 
 ### JAX speeds the model, not the pipeline
 
-`pipekit-jax` wraps an Equinox model as an operator (`JaxModelOp`), with byte-identical weight round-trips through the registry, and adds diffrax forward models for `pipekit-cycle`.
+`pipekit-jax` wraps an Equinox model as an operator (`JaxModelOp`), with byte-identical weight round-trips through the registry, and `ScanCycle` steps a `pipekit-cycle` forward model inside one `jax.lax.scan`.
 Inside the model, `jit` and `vmap` do their work; the pipeline around it stays eager Python.
 That is a deliberate split: pre- and post-processing are I/O and bookkeeping, where tracing buys little and costs flexibility.
 When the numerical core is itself a pipeline, importing `pipekit_jax` registers `Sequential` and `Graph` as pytrees, so a pipeline of `JaxOperator`s traces under `jit` as a whole ([pipekit under jit](tutorials/pipekit-under-jit.md)); `Map` refuses JAX tracers on its non-serial executors.

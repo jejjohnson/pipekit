@@ -11,7 +11,7 @@ workspace, each imported under its own name:
 | ``pipekit-experiment`` | ``pipekit_experiment`` | Model registry and run tracking |
 | ``pipekit-evaluate`` | ``pipekit_evaluate`` | Benchmarks and scoring |
 | ``pipekit-train`` | ``pipekit_train`` | Training pipelines |
-| ``pipekit-jax`` | ``pipekit_jax`` | Equinox models and diffrax forward models |
+| ``pipekit-jax`` | ``pipekit_jax`` | Equinox models and cycles under ``jit`` |
 
     import pipekit_ops as pk
     import pipekit_cycle as pc

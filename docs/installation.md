@@ -149,7 +149,6 @@ uv add 'pipekit-array[torch,compat]'
 
 ```bash
 uv add pipekit-jax
-uv add 'pipekit-jax[diffrax]'   # plus DiffraxForwardModel
 uv add 'pipekit-jax[array]'     # plus to_jax for pipekit-array's KernelOp
 ```
 

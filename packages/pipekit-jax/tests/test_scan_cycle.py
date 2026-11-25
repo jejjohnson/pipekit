@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from pipekit_cycle import Cycle
-from pipekit_jax import JaxOperator, Rollout, ScanCycle, truncated_scan
+from pipekit_jax import JaxOperator, Rollout, ScanCycle
 from pipekit_ops import Operator, Sequential, StatefulOperator
 
 
@@ -249,6 +249,18 @@ def test_truncate_cuts_gradients_through_early_carries():
     np.testing.assert_allclose(grad_c0(3), 0.0)  # c0 only reaches the output via step 0
     _close(grad_c0(10), full)
     _close(grad_c0(None), full)
+
+
+def truncated_scan(f, init, xs, *, k):
+    """``lax.scan`` whose carry has no gradient before the last ``k`` steps."""
+    cutoff = len(xs) - k
+
+    def body(carry, indexed):
+        i, x = indexed
+        carry, y = f(carry, x)
+        return jnp.where(i < cutoff, jax.lax.stop_gradient(carry), carry), y
+
+    return jax.lax.scan(body, init, (jnp.arange(len(xs)), xs))
 
 
 def test_truncate_matches_truncated_scan_on_parameter_gradients():

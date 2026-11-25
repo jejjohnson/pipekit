@@ -15,11 +15,6 @@ Public surface:
   methods so trained weights round-trip byte-identically through any
   ``pipekit_experiment.ModelRegistry`` via the registry's ``weights``
   blob.
-- `DiffraxForwardModel` — a `pipekit_cycle.ForwardModel` backed by a
-  diffrax ODE/SDE solve (behind the ``[diffrax]`` extra; imported
-  lazily).
-- `to_diffrax_adjoint` / `truncated_scan` — deprecated forwarders; the
-  adjoint maths for ``pipekit_cycle.adjoints`` lives in ``integrix.adjoint``.
 - `to_jax` / `JaxKernelOp` — a ``pipekit_array.KernelOp`` as a
   `JaxOperator` whose array parameters are leaves (behind the
   ``[array]`` extra; imported lazily).
@@ -37,19 +32,12 @@ caveat this package closes.
 from typing import Any
 
 from pipekit_jax import pytree as pytree  # registers Sequential / Graph
-from pipekit_jax.adjoints import to_diffrax_adjoint, truncated_scan
 from pipekit_jax.cycle import EnsembleScanCycle, Rollout, ScanCycle
 from pipekit_jax.model_op import JaxModelOp
 from pipekit_jax.operator import JaxOperator
 
 
 def __getattr__(name: str) -> Any:
-    # DiffraxForwardModel needs the [diffrax] extra; import lazily so the
-    # base package keeps working without it.
-    if name == "DiffraxForwardModel":
-        from pipekit_jax.diffrax_model import DiffraxForwardModel
-
-        return DiffraxForwardModel
     # to_jax / JaxKernelOp need the [array] extra (pipekit-array)
     if name in ("to_jax", "JaxKernelOp"):
         from pipekit_jax import kernel
@@ -59,16 +47,13 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
-    "DiffraxForwardModel",
     "EnsembleScanCycle",
     "JaxKernelOp",
     "JaxModelOp",
     "JaxOperator",
     "Rollout",
     "ScanCycle",
-    "to_diffrax_adjoint",
     "to_jax",
-    "truncated_scan",
 ]
 
 __version__ = "0.1.0"  # x-release-please-version

@@ -1,7 +1,7 @@
 [project]
 name = "pipekit-jax"
 version = "0.1.0"
-description = "JAX and Equinox integration for pipekit: JaxOperator, JaxModelOp with weight round-trip through a ModelRegistry, scan-based cycles and diffrax forward models."
+description = "JAX and Equinox integration for pipekit: JaxOperator, JaxModelOp with weight round-trip through a ModelRegistry, and scan-based cycles."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
@@ -19,13 +19,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# integrix computes the adjoint behind DiffraxForwardModel; it is not on PyPI, so
-# it is pinned by tag (sources in the workspace root do not travel with a git
-# install of this package).
-diffrax = [
-    "diffrax>=0.7",
-    "integrix @ git+https://github.com/jejjohnson/integrix.git@v0.0.3",
-]
 # `to_jax(op)`: a pipekit-array KernelOp as a JaxOperator (the edge pipekit-jax
 # already has through pipekit-cycle's [array] extra, declared here).
 array = ["pipekit-array>=0.1.0"]
@@ -33,9 +26,6 @@ array = ["pipekit-array>=0.1.0"]
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pipekit_jax"]
