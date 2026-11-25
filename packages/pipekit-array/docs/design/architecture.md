@@ -164,9 +164,11 @@ src/pipekit_array/
 ├── einx.py              # rearrange, reduce, einsum, repeat, Einx  ([einx])
 ├── functions.py         # namespace_of, floating_inputs, like, elementwise:
 │                        # plain functions (A23)          ([numpy,compat])
+├── hooks.py             # set_at, add_at, scan, vmap, pad, … (A27)
+├── checks.py            # check_values, require_floating   (A28)
 ├── kernel.py            # KernelSpec, KernelOp
 ├── xarray.py            # the xr.DataArray adapter, loaded lazily ([xarray])
-└── testing.py           # check_adapter, check_kernel_op
+└── testing/             # check_adapter, check_kernel_op, assert_backends_agree, …
 ```
 
 The module boundaries mirror `pipekit-ops` core's grouping (`combinators` with `pipekit_ops.combine`, `qc` with `pipekit_ops.qc`, and so on), so discovery is consistent.

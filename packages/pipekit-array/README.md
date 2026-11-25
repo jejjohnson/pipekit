@@ -270,7 +270,7 @@ The estimator sees a `(T Y X, B)` table, and the result comes back with the band
 | [`weighted`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#masked-and-weighted-reductions) | `weighted_sum`, `weighted_mean`, `Groups`, `reduction_inputs`, `used_weights` | masked, weighted sums and means, of an array and of static groups (`[numpy,compat]`) |
 | [`records`](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#records) | `register_record` | a frozen dataclass as a JAX pytree, once JAX loads |
 | `xarray` | the `xr.DataArray` adapter | loaded the first time a DataArray reaches `pipekit_ops.get_adapter` (`[xarray]`) |
-| `testing` | `check_adapter`, `check_kernel_op` | the test kit for carrier libraries that register their own adapter |
+| `testing` | `check_adapter`, `check_kernel_op`; `assert_backends_agree`, `assert_matches_oracle`, `assert_traces` and [seven more](https://jejjohnson.github.io/pipekit/reference/pipekit-array/#test-kit) | the test kit: for carrier libraries that register their own adapter, and for functions on any array library |
 
 `pipekit_array.__all__` has 68 names; `checks`, `einx`, `functions`, `hooks`, `weighted`, `records`, `xarray` and `testing` are imported as submodules.
 
