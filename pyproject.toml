@@ -37,9 +37,6 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "pre-commit>=4.5.1",
-    # diffrax backs the pipekit-jax [diffrax] extra; dev-installed so the
-    # adapter tests run in the workspace.
-    "diffrax>=0.7",
     # xarray backs the pipekit-array [xarray] extra; dask keeps its tests lazy.
     "xarray>=2024.6",
     "dask[array]>=2024",
@@ -66,8 +63,7 @@ dev = [
     "pipekit-experiment",
     "pipekit-evaluate",
     "pipekit-train",
-    # [diffrax] also brings integrix, which DiffraxForwardModel calls.
-    "pipekit-jax[diffrax]",
+    "pipekit-jax",
 ]
 # The pipekit-train extras that have test modules behind them. Only the test job
 # installs these: the typecheck job syncs the default `dev` group, and ty reports

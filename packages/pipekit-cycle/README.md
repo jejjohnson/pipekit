@@ -54,7 +54,7 @@ Both are libraries in their own right, which you can build on directly.
 ```
    your DA system (filterax, vardax, plumax, ...)
                      │
-   pipekit-jax ──────┤  (ScanCycle, DiffraxForwardModel)
+   pipekit-jax ──────┤  (ScanCycle, Rollout)
    pipekit-train ────┤  ([cycle] extra: SimulationDataset)
    pipekit-evaluate ─┤  ([cycle] extra: benchmark Task)
                      │
@@ -314,7 +314,7 @@ So choosing how gradients flow is configuration, not code.
 - Tutorials: [Run a DA cycle](https://jejjohnson.github.io/pipekit/da-cycle/), [Ensemble data assimilation](https://jejjohnson.github.io/pipekit/ensemble-da/), [Run pipelines under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/).
 - Design: [Latent data assimilation](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/latent.md); master plan [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md).
 - The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
-- Packages built on this one: [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (jit-native cycles, diffrax models), [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (emulators trained on simulations), [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) (benchmark tasks).
+- Packages built on this one: [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (jit-native cycles), [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (emulators trained on simulations), [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) (benchmark tasks).
 
 ## License
 

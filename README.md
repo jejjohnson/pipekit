@@ -71,7 +71,7 @@ pipekit-array is opt-in elsewhere, through the `[array]` extras of pipekit-cycle
 | <img src="docs/assets/packages/pipekit-train/icon.svg" width="28" alt=""> | [pipekit-train](packages/pipekit-train/README.md) | Training as an operator: `TrainingLoop`, datasets, losses, callbacks, `HyperSweep`; Equinox, NumPyro and BlackJAX backends | implemented | 0.2.0 |
 | <img src="docs/assets/packages/pipekit-experiment/icon.svg" width="28" alt=""> | [pipekit-experiment](packages/pipekit-experiment/README.md) | A content-addressed model registry and tracker protocols, with DVC, Hydra and Metaflow adapters | implemented | 0.1.0 |
 | <img src="docs/assets/packages/pipekit-evaluate/icon.svg" width="28" alt=""> | [pipekit-evaluate](packages/pipekit-evaluate/README.md) | A benchmark ladder, the `Unit × Lens × Stage` scorers and `EvaluationReport` | partial | 0.2.0 |
-| <img src="docs/assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](packages/pipekit-jax/README.md) | `JaxOperator`, `JaxModelOp` with registry round-trip, `ScanCycle`, `DiffraxForwardModel`, adjoints | implemented | 0.1.0 |
+| <img src="docs/assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](packages/pipekit-jax/README.md) | `JaxOperator`, `JaxModelOp` with registry round-trip, `ScanCycle`, `Rollout` | implemented | 0.1.0 |
 | <img src="docs/assets/icon.svg" width="28" alt=""> | [pipekit](packages/pipekit/README.md) | The umbrella: installs all seven, holds no code | n/a | 0.2.0 |
 
 Each README is that package's front door, with its install extras, a quickstart and its design notes.

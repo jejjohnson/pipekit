@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-**JAX and Equinox models as pipekit operators: weights that round-trip through a model registry, cycles that compile into one `jax.lax.scan`, and differentiable diffrax forward models.**
+**JAX and Equinox models as pipekit operators: weights that round-trip through a model registry, and cycles that compile into one `jax.lax.scan`.**
 
 <p align="center">
   <a href="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg"></a>
@@ -29,7 +29,7 @@ We want to store it and get back exactly the weights we validated, months later;
 A pipekit pipeline round-trips through JSON, but an `eqx.Module` is a pytree of arrays plus Python objects (activations, sizes) that JSON cannot carry.
 pipekit-jax closes that gap.
 `JaxModelOp` wraps a module as an operator whose weights travel as a separate, signed blob through any `ModelRegistry`.
-`ScanCycle` is the jit-native counterpart of `pipekit_cycle.Cycle`, and `DiffraxForwardModel` is a `ForwardModel` backed by an ODE or SDE solve, with the gradient strategy chosen by a pipekit-cycle adjoint spec.
+`ScanCycle` is the jit-native counterpart of `pipekit_cycle.Cycle`: it steps any `ForwardModel`, and `jax.grad` goes through the whole rollout.
 
 ## Where it sits
 
@@ -42,8 +42,7 @@ pipekit-ops and pipekit-array are libraries in their own right, which you can bu
           ┌──────────┴──────────┐
           │     pipekit-jax     │  ◀ this package
           │ JaxModelOp,         │
-          │ ScanCycle, diffrax, │
-          │ adjoint interpreters│
+          │ ScanCycle, Rollout  │
           └──────────┬──────────┘
         ┌────────────┼──────────────┐
         │            │              │
@@ -57,28 +56,27 @@ pipekit-ops and pipekit-array are libraries in their own right, which you can bu
          pipekit-ops
          (dependency: Operator, Sequential, Graph)
 
-   also: JAX, Equinox, jaxtyping (dependencies), diffrax ([diffrax] extra)
+   also: JAX, Equinox, jaxtyping (dependencies)
 ```
 
 - **pipekit-ops** is a required dependency.
   `JaxOperator` is both a `pipekit_ops.Operator` and an `eqx.Module`, and importing `pipekit_jax` registers `Sequential` and `Graph` as JAX pytrees, so `jax.grad` reaches the learnable leaves of operators inside a pipeline.
-- **pipekit-cycle** is a required dependency: `ScanCycle` takes a `ForwardModel`, `DiffraxForwardModel` is one, and the adjoint interpreters read pipekit-cycle's specs.
+- **pipekit-cycle** is a required dependency: `ScanCycle` takes a `ForwardModel`.
 - **pipekit-array** is optional: with the `[array]` extra, `to_jax` turns a `pipekit_array.KernelOp` into a `JaxKernelOp` whose array parameters are pytree leaves.
 
 ## Install
 
 ```bash
 uv add pipekit-jax
-uv add 'pipekit-jax[diffrax,array]'
+uv add 'pipekit-jax[array]'
 ```
 
 | Extra | What it adds | When you need it |
 | --- | --- | --- |
-| *(none)* | `pipekit-ops`, `pipekit-cycle`, `jax`, `equinox`, `jaxtyping` | `JaxOperator`, `JaxModelOp`, `ScanCycle`, `Rollout`, and the deprecated `truncated_scan` |
-| `diffrax` | `diffrax`, `integrix` | `DiffraxForwardModel`, `integrix.adjoint`, and the deprecated `to_diffrax_adjoint` |
+| *(none)* | `pipekit-ops`, `pipekit-cycle`, `jax`, `equinox`, `jaxtyping` | `JaxOperator`, `JaxModelOp`, `ScanCycle`, `Rollout` |
 | `array` | `pipekit-array` | `to_jax` and `JaxKernelOp` |
 
-`DiffraxForwardModel`, `to_jax` and `JaxKernelOp` are imported lazily, so `import pipekit_jax` works without either extra.
+`to_jax` and `JaxKernelOp` are imported lazily, so `import pipekit_jax` works without the extra.
 
 ## Quickstart
 
@@ -127,34 +125,39 @@ print(reloaded.serialize_weights() == trained.serialize_weights())  # True```
 
 ### A differentiable forecast
 
-Exponential decay, $\mathrm{d}\mathbf{x} / \mathrm{d}t = -k \mathbf{x}$ with $k = 0.1$ and $\mathbf{x} \in \mathbb{R}^{N}$, solved by diffrax and stepped 24 times inside one `jax.lax.scan`.
+Exponential decay, $\mathrm{d}\mathbf{x} / \mathrm{d}t = -k \mathbf{x}$ with $k = 0.1$ and $\mathbf{x} \in \mathbb{R}^{N}$, stepped 24 times by a fourth-order Runge–Kutta model inside one `jax.lax.scan`.
 For the cost $\mathcal{J}(\mathbf{x}_0) = \sum_i x_{24,i}$ the gradient is $\nabla_{\mathbf{x}_0} \mathcal{J} = e^{-2.4} \mathbf{1}_N$, which the block checks.
-It needs the `[diffrax]` extra.
 
 ```python
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import pipekit_cycle as pc
-from integrix.adjoint import to_diffrax_adjoint
-from pipekit_jax import DiffraxForwardModel, ScanCycle
+from pipekit_jax import ScanCycle
 
 # Shapes: N = 3 state variables
 
 
 # user
-# dx/dt = −k x, k = 0.1
-def decay(t, x, args):
-    return -0.1 * x                                       # (N,) → (N,)
+# dx/dt = −k x, k = 0.1;  x_t ↦ x_{t+1} by one RK4 step of length Δt
+class Decay(eqx.Module):
+    rate: jax.Array
+    dt: float = 1.0
+    state_signature = None                                # no shape contract
+
+    def step(self, x, dt):
+        def f(x):
+            return -self.rate * x                         # (N,) → (N,)
+
+        k1 = f(x)
+        k2 = f(x + dt / 2 * k1)
+        k3 = f(x + dt / 2 * k2)
+        k4 = f(x + dt * k3)
+        return x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)   # (N,)
 
 
-# today (pipekit-jax[diffrax])
-# x_t ↦ x_{t+1}: a Tsit5 solve over [0, Δt], Δt = 1, checkpointed adjoint
-model = DiffraxForwardModel(
-    vector_field=decay, dt=1.0, adjoint=pc.RecursiveCheckpointAdjoint()
-)
+model = Decay(jnp.asarray(0.1))
 print(isinstance(model, pc.ForwardModel))                 # True
-print(isinstance(model, pc.SupportsAdjoint))              # True
 
 # today (pipekit-jax)
 # x_0 ↦ x_24 inside one jax.lax.scan
@@ -170,16 +173,9 @@ def final_sum(x0):
 
 grad = eqx.filter_jit(jax.grad(final_sum))(jnp.ones(3))   # (N,)
 print(jnp.allclose(grad, jnp.exp(-2.4), rtol=1e-4))       # True
-
-# today (integrix, installed by pipekit-jax[diffrax])
-# swapping the gradient strategy is configuration
-backsolve = model.with_adjoint(pc.BacksolveAdjoint())
-print(type(to_diffrax_adjoint(backsolve.adjoint)).__name__)  # BacksolveAdjoint
-try:
-    to_diffrax_adjoint(pc.TruncatedAdjoint(k=1))
-except ValueError:
-    print("truncation belongs to the rollout")            # use integrix.adjoint.truncated_scan there
 ```
+
+A forward model that a diffrax solve computes, of an ODE or an SDE, is `integrix.march.DiffraxForwardModel`, in [integrix](https://github.com/jejjohnson/integrix).
 
 ## What ships
 
@@ -191,15 +187,13 @@ Every name below is exported from `pipekit_jax`, except `check_jax_operator`, wh
 | `operator` | `JaxOperator` | Base class for an operator that is also an `eqx.Module`: JSON config, pytree leaves, weight round trip |
 | `model_op` | `JaxModelOp` | Wrap any `eqx.Module` as an operator, with `serialize_weights`, `with_weights` and `from_registry` |
 | `cycle` | `ScanCycle`, `EnsembleScanCycle`, `Rollout` | Time stepping in one `jax.lax.scan`: per state, `vmap`-ed over members, or a carrier-only trajectory |
-| `diffrax_model` | `DiffraxForwardModel` | A `ForwardModel` and `SupportsAdjoint` backed by `diffrax.diffeqsolve` (`[diffrax]`) |
-| `adjoints` | `to_diffrax_adjoint`, `truncated_scan` | Deprecated forwarders to `integrix.adjoint`, kept for one release |
 | `kernel` | `to_jax`, `JaxKernelOp` | A pipekit-array `KernelOp` with its array parameters as leaves (`[array]`) |
 | `pytree` | (on import) | Registers `Sequential`, `Graph` and `JaxModelOp` as JAX pytrees |
 | `testing` | `check_jax_operator` | Assert the `JaxOperator` contract in a downstream test suite |
 
 ### Not built yet
 
-- **Interpreters for the inner-solve and cycle layers.** `integrix.adjoint.to_diffrax_adjoint` covers the dynamics layer, and `integrix.adjoint.truncated_scan` and `ScanCycle(truncate=k)` cover truncation; checkpointed and implicit adjoints for a variational solve live in the algorithm libraries (vardax, filterax).
+- **Interpreters for the inner-solve and cycle layers.** `integrix.adjoint` covers the dynamics layer, and `ScanCycle(truncate=k)` covers truncation; checkpointed and implicit adjoints for a variational solve live in the algorithm libraries (vardax, filterax).
 
 ## How it works
 
@@ -240,11 +234,8 @@ The [pipekit under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/)
 
 ### Adjoint specs, interpreted by integrix
 
-pipekit-cycle's adjoint specs carry no behaviour, and the adjoint maths lives in integrix: pipekit-jax composes the rollout and integrix computes the backward sweep.
-`DiffraxForwardModel` hands its spec to `integrix.adjoint.to_diffrax_adjoint`, which maps `RecursiveCheckpointAdjoint` (the default), `DirectAdjoint`, `BacksolveAdjoint` and `ImplicitAdjoint` onto the diffrax classes of the same name, and refuses `TruncatedAdjoint`, because truncation belongs to an outer rollout, where `integrix.adjoint.truncated_scan` does it.
-`pipekit_jax.to_diffrax_adjoint` and `pipekit_jax.truncated_scan` stay for one release and emit a `DeprecationWarning`; `truncated_scan` keeps its own copy, so the base install runs it without integrix.
-Specs are matched by class name and fields, so a structurally identical spec from a library that does not depend on pipekit works too.
-**Note**: `BacksolveAdjoint` (continuous adjoints) diverges for chaotic or stiff dynamics; never use it as a default.
+pipekit-cycle's adjoint specs carry no behaviour, and the adjoint maths lives in [integrix](https://github.com/jejjohnson/integrix): `integrix.adjoint.to_diffrax_adjoint` maps `RecursiveCheckpointAdjoint`, `DirectAdjoint`, `BacksolveAdjoint` and `ImplicitAdjoint` onto the diffrax classes of the same name, and `integrix.adjoint.truncated_scan` does what `TruncatedAdjoint` says for a rollout.
+Specs are matched by class name and fields, so integrix imports no pipekit package, and pipekit imports no library above it.
 
 ## Learn more
 

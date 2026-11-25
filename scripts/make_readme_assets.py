@@ -540,8 +540,8 @@ def packages_figure(theme: str) -> str:
         ),
         (
             "pipekit-jax",
-            "Equinox models · diffrax",
-            ["JaxModelOp", "DiffraxForwardModel"],
+            "Equinox models · cycles",
+            ["JaxModelOp", "ScanCycle"],
         ),
     ]
     cw, ch, gap, x0, y0 = 296, 132, 16, 20, 20

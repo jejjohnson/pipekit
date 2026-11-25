@@ -68,7 +68,7 @@ A library should depend on the package it imports instead, usually `pipekit-ops`
 | [`pipekit-experiment`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) | `pipekit_experiment` | Model registry and run tracking | 0.1.0 |
 | [`pipekit-evaluate`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) | `pipekit_evaluate` | Benchmarks and scoring | 0.2.0 |
 | [`pipekit-train`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) | `pipekit_train` | Training pipelines | 0.2.0 |
-| [`pipekit-jax`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `pipekit_jax` | Equinox models and diffrax forward models | 0.1.0 |
+| [`pipekit-jax`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `pipekit_jax` | Equinox models and cycles under `jit` | 0.1.0 |
 
 Extras stay with the package that owns them, so you add them by name: `uv add "pipekit-train[equinox]"`, `uv add "pipekit-array[xarray]"`.
 
