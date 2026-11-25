@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.6...pipekit-array-v0.2.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **array:** pipekit-array is six areas, each with one job ([#292](https://github.com/jejjohnson/pipekit/issues/292))
+
+### Bug Fixes
+
+* **ops:** import_optional names the extra behind a library's own error, and concrete copies CuPy arrays ([#293](https://github.com/jejjohnson/pipekit/issues/293)) ([d09db62](https://github.com/jejjohnson/pipekit/commit/d09db62524706a8c99b0ae5fb5cee3bc2e9bd3f3))
+
+
+### Code Refactoring
+
+* **array:** pipekit-array is six areas, each with one job ([#292](https://github.com/jejjohnson/pipekit/issues/292)) ([3aab7d8](https://github.com/jejjohnson/pipekit/commit/3aab7d85306ce667f96001b2e2331cacd6569d43))
+
 ## [0.1.6](https://github.com/jejjohnson/pipekit/compare/pipekit-array-v0.1.5...pipekit-array-v0.1.6) (2026-11-25)
 
 

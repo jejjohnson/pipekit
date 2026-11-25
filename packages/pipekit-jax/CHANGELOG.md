@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.2.0...pipekit-jax-v0.3.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **array:** pipekit-array is six areas, each with one job ([#292](https://github.com/jejjohnson/pipekit/issues/292))
+
+### Code Refactoring
+
+* **array:** pipekit-array is six areas, each with one job ([#292](https://github.com/jejjohnson/pipekit/issues/292)) ([3aab7d8](https://github.com/jejjohnson/pipekit/commit/3aab7d85306ce667f96001b2e2331cacd6569d43))
+
 ## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.1.0...pipekit-jax-v0.2.0) (2026-11-25)
 
 

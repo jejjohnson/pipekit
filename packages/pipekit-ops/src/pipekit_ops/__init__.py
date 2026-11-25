@@ -292,4 +292,4 @@ __all__ = [
     "upgrade_state",
 ]
 
-__version__ = "0.2.4"  # x-release-please-version
+__version__ = "0.3.0"  # x-release-please-version
