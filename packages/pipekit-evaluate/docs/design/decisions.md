@@ -3,7 +3,7 @@
 Each record states the decision, the alternatives it was weighed against, and why it wins.
 [benchmark_ladder.md](benchmark_ladder.md) is the design these records refine.
 
-## E1. Three areas, and the shared protocols at the bottom
+## E1. Three areas, and the shared protocols at the bottom (#298)
 
 **Decision (26 Nov 2026):** the package is `scoring`, `reports` and `benchmark`, and an area imports only from the ones before it.
 `Estimate`, `CovarianceEstimate`, `Scorer` and `ReferenceSource` (with `as_sources`) move from the benchmark into `scoring`, because the scorers and the report use them as much as the benchmark does.
