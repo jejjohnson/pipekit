@@ -106,18 +106,16 @@ packages/
 │   │   └── testing/          # check_adapter, assert_backends_agree, …
 │   │                         # an area imports only from the ones before it
 │   └── tests/
-├── pipekit-cycle/            # Time-stepping + DA on top of pipekit_ops.state
+├── pipekit-cycle/            # Time-stepping + DA on top of pipekit_ops.core
 │   ├── src/pipekit_cycle/
-│   │   ├── cycle.py          # Cycle, EnsembleCycle, WindowedCycle, Recurrence
-│   │   ├── da.py             # DACycle, EnsembleDACycle, SmootherCycle
-│   │   ├── bfn.py            # BFNCycle (back-and-forth nudging)
-│   │   ├── adjoints.py       # DirectAdjoint, TruncatedAdjoint, … (adjoint specs)
-│   │   ├── protocols.py      # ForwardModel, ObservationOperator, AnalysisStep,
-│   │   │                     # + ensemble/inversion seams (ObservationNoise, …),
-│   │   │                     # SupportsAdjoint
-│   │   ├── obs.py            # IdentityObs, LinearObs, CallableObs, CompositeObs
-│   │   ├── forward.py        # CallableForward, CompositeForward, NeuralForward
-│   │   └── state.py          # DAState, IterationState, WindowState
+│   │   ├── protocols/        # ForwardModel, ObservationOperator, AnalysisStep,
+│   │   │                     # + ensemble/inversion seams, SupportsAdjoint
+│   │   ├── cycles/           # Cycle, EnsembleCycle, WindowedCycle, Recurrence,
+│   │   │                     # DAState/IterationState/WindowState, adjoint specs
+│   │   ├── components/       # IdentityObs, LinearObs, CallableObs, CompositeObs,
+│   │   │                     # CallableForward, CompositeForward, NeuralForward
+│   │   └── assimilation/     # DACycle, EnsembleDACycle, SmootherCycle, BFNCycle
+│   │                         # an area imports only from the ones before it (C1)
 │   └── tests/
 ├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
 │   ├── src/pipekit_experiment/

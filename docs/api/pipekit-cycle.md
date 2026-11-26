@@ -1,20 +1,22 @@
 # pipekit-cycle
 
-Time-stepping, data assimilation, observation operators. Built on
-`pipekit_ops.core` (the `StatefulOperator` + `CarryState` primitives in
-pipekit core). Master plan reference: Report 10.
+Time-stepping, data assimilation, observation operators.
+Built on `pipekit_ops.core` (the `StatefulOperator` and `CarryState` primitives of pipekit core).
+Master plan reference: Report 10.
 
-## Cycle wrappers
-
-::: pipekit_cycle.cycle
+The package is four areas, each with one job, and an area imports only from the ones before it ([C1](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/decisions.md)).
 
 ## Protocols
 
+The seams that a library satisfies without importing pipekit-cycle.
+
 ::: pipekit_cycle.protocols
 
-## Adjoint strategy specs
+## Cycles
 
-A shared, declarative vocabulary for how gradients flow through the
+`pipekit_cycle.cycles` steps a model through time, with the states the cycles carry and the adjoint specs.
+
+The adjoint specs are a shared, declarative vocabulary for how gradients flow through the
 three nested rollouts of a differentiable DA system — the dynamics
 integration, the inner variational solve, and the assimilation cycle.
 Each execution layer interprets a spec into its native mechanism
@@ -29,20 +31,14 @@ adjoints in vardax, scan transforms in filterax):
 | `ImplicitAdjoint` | steady-state only | IFT at the fixed point | — |
 | `BacksolveAdjoint` | continuous adjoint ⚠ unstable for chaotic/stiff dynamics | — | — |
 
-::: pipekit_cycle.adjoints
+::: pipekit_cycle.cycles
 
-## Data-assimilation cycles
+## Components
 
-::: pipekit_cycle.da
+`pipekit_cycle.components` has the observation operators and the forward-model adapters.
 
-## Observation operators
+::: pipekit_cycle.components
 
-::: pipekit_cycle.obs
+## Data assimilation
 
-## Forward-model adapters
-
-::: pipekit_cycle.forward
-
-## Carry-state subclasses
-
-::: pipekit_cycle.state
+::: pipekit_cycle.assimilation

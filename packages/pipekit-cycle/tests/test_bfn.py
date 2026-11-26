@@ -1,4 +1,4 @@
-"""Tests for `pipekit_cycle.bfn.BFNCycle`.
+"""Tests for `pipekit_cycle.assimilation.BFNCycle`.
 
 The toy setup is an identity (time-reversible) forward model with
 `IdentityObs`, so a corrective nudge ``x <- x + K(y - x)`` pulls the state

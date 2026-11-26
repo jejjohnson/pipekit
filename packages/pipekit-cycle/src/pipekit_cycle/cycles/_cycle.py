@@ -22,7 +22,7 @@ from typing import Any, ClassVar
 from pipekit_ops import Operator, Sequential, StatefulOperator
 from pipekit_ops.core import nested_config
 
-from pipekit_cycle.protocols import ForwardModel
+from pipekit_cycle.protocols._protocols import ForwardModel
 
 
 class _ForwardModelAdapter(StatefulOperator):

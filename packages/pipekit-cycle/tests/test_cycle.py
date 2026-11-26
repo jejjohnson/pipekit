@@ -1,4 +1,4 @@
-"""Tests for `pipekit_cycle.cycle`."""
+"""Tests for `pipekit_cycle.cycles`."""
 
 from __future__ import annotations
 
