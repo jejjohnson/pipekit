@@ -3,7 +3,7 @@
 Each record states the decision, the alternatives it was weighed against, and why it wins.
 Master plan Report 12 is the design these records refine.
 
-## X1. The tool integrations are bridges
+## X1. The tool integrations are bridges (#304)
 
 **Decision (26 Nov 2026):** `pipekit_experiment.adapters` is `pipekit_experiment.bridges`, with one module per tool as before (`dvc`, `hydra`, `metaflow`).
 The other modules (`protocols`, `run`, `registry`, `artifacts`) keep their paths.
