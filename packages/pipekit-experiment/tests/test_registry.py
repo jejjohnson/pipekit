@@ -430,3 +430,22 @@ def test_hash_mismatch_error_is_a_value_error():
     from pipekit_experiment import HashMismatchError
 
     assert issubclass(HashMismatchError, ValueError)
+
+
+def test_registry_loads_an_entry_with_a_pipekit_exception_stored_before_the_areas(
+    registry_and_writer,
+):
+    from pipekit_ops import QCError, Try
+    from pipekit_ops.saving import sha256_hex, stable_json
+
+    reg, write_raw = registry_and_writer
+    op = Try(Identity(), Const(0), on=(QCError,))
+    # the modules of the flat layout, as stored before pipekit-ops 0.4.0
+    old = op.state
+    old["module"] = "pipekit_ops.control"
+    old["config"]["on"] = [{"exception": "pipekit_ops.qc.QCError"}]
+    text = stable_json(old)
+    h = sha256_hex(text, b"\x00", b"")
+    write_raw(text.encode(), h, "operator.json")
+
+    assert reg.load(h).state == op.state
