@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.3.0...pipekit-train-v0.3.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **deps:** each pipekit package asks for the releases whose areas it imports ([#306](https://github.com/jejjohnson/pipekit/issues/306)) ([e0a1384](https://github.com/jejjohnson/pipekit/commit/e0a1384186ce8523ba23ed4b9d0faf2f7732c730))
+
 ## [0.3.0](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.2.0...pipekit-train-v0.3.0) (2026-11-26)
 
 
