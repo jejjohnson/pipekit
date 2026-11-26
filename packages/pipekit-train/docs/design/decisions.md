@@ -462,7 +462,7 @@ doesn't shard evaluation yet; this makes that possible.
 
 ---
 
-## D17: Five areas, and backends that are areas of their own
+## D17: Five areas, and backends that are areas of their own (#297)
 
 **Status:** accepted
 
