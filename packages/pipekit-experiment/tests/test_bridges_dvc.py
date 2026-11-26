@@ -1,4 +1,4 @@
-"""Tests for `pipekit_experiment.adapters.dvc`.
+"""Tests for `pipekit_experiment.bridges.dvc`.
 
 The DVC adapter shells out to the ``dvc`` CLI. We don't require DVC
 to be installed in CI — the tests exercise the pointer-file parsing
@@ -9,7 +9,7 @@ calls.
 from __future__ import annotations
 
 import pytest
-from pipekit_experiment.adapters.dvc import DVCDatasetVersioning
+from pipekit_experiment.bridges.dvc import DVCDatasetVersioning
 
 
 def test_hash_reads_md5_from_pointer(tmp_path):

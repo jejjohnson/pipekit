@@ -1,4 +1,4 @@
-"""Tests for `pipekit_experiment.adapters.hydra`.
+"""Tests for `pipekit_experiment.bridges.hydra`.
 
 When hydra-core / hydra-zen are absent the adapter raises a clean
 ImportError at method invocation. Functional tests are gated with
@@ -8,7 +8,7 @@ ImportError at method invocation. Functional tests are gated with
 from __future__ import annotations
 
 import pytest
-from pipekit_experiment.adapters.hydra import HydraConfigLoader
+from pipekit_experiment.bridges.hydra import HydraConfigLoader
 from pipekit_ops import Const, Identity, Operator
 
 
