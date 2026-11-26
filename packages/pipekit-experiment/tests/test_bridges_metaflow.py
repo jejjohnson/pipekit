@@ -1,4 +1,4 @@
-"""Tests for `pipekit_experiment.adapters.metaflow`.
+"""Tests for `pipekit_experiment.bridges.metaflow`.
 
 We test the adapter without requiring metaflow itself — `run` and the
 ``decorate=False`` form of `as_step` don't touch metaflow.
@@ -9,7 +9,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from pipekit_experiment.adapters.metaflow import MetaflowStepAdapter
+from pipekit_experiment.bridges.metaflow import MetaflowStepAdapter
 from pipekit_ops import Const, Identity, Operator
 
 

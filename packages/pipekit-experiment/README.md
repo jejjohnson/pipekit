@@ -145,11 +145,11 @@ Version 0.1.0.
 | `protocols` | `ModelRegistry`, `ExperimentTracker` | Runtime-checkable seams for registries and trackers |
 | `run` | `Run`, `RunMetrics`, `RunArtifacts` | Plain records of a run, its metrics and its attached files |
 | `artifacts` | `TrainingArtifact`, `InferenceArtifact` | JSON records that pin what a training or inference run used |
-| `adapters.dvc` | `DVCDatasetVersioning` | Dataset hashes through the DVC CLI (`[dvc]`) |
-| `adapters.hydra` | `HydraConfigLoader` | Pipelines to and from Hydra configs, with a sandboxed loader (`[hydra]`) |
-| `adapters.metaflow` | `MetaflowStepAdapter` | An operator as a Metaflow `@step` (`[metaflow]`) |
+| `bridges.dvc` | `DVCDatasetVersioning` | Dataset hashes through the DVC CLI (`[dvc]`) |
+| `bridges.hydra` | `HydraConfigLoader` | Pipelines to and from Hydra configs, with a sandboxed loader (`[hydra]`) |
+| `bridges.metaflow` | `MetaflowStepAdapter` | An operator as a Metaflow `@step` (`[metaflow]`) |
 
-The top-level names are exported from `pipekit_experiment`; the adapters are imported from their modules.
+The top-level names are exported from `pipekit_experiment`; the bridges to other tools are imported from their modules under `pipekit_experiment.bridges`.
 
 ### Not built yet
 
@@ -194,7 +194,7 @@ The pattern for those models is to rebuild a skeleton in code and read the weigh
 `from_yaml` calls `hydra.utils.instantiate`, which will import any dotted path, so for YAML you did not write use `from_yaml_sandboxed`, which builds only the classes you registered with `pipekit_ops.register`:
 
 ```python
-from pipekit_experiment.adapters.hydra import HydraConfigLoader
+from pipekit_experiment.bridges.hydra import HydraConfigLoader
 from pipekit_ops import Get, Rename, Sequential, register
 
 # today (pipekit-ops)
@@ -216,7 +216,7 @@ print(HydraConfigLoader.from_yaml_sandboxed(text).state == wind.state)  # True
 
 ```python
 from metaflow import FlowSpec
-from pipekit_experiment.adapters.metaflow import MetaflowStepAdapter
+from pipekit_experiment.bridges.metaflow import MetaflowStepAdapter
 
 
 # today (pipekit-experiment)

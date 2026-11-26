@@ -4,19 +4,19 @@ The boundary between pipekit pipelines and external orchestration
 tools (DVC, Hydra, Metaflow, …). Two pieces:
 
 - **Protocols** (`protocols`): `ExperimentTracker`, `ModelRegistry`
-  — runtime-checkable seams that adapters satisfy structurally.
+  — runtime-checkable seams that tool integrations satisfy structurally.
 - **Run records** (`run`): `Run`, `RunMetrics`, `RunArtifacts`.
 - **Model registry** (`registry`): `LocalModelRegistry` (always
   available); `S3ModelRegistry` (behind ``[s3]`` extra, fsspec-backed);
   `HashMismatchError` when stored content no longer matches its hash.
 - **Artifacts** (`artifacts`): `TrainingArtifact`, `InferenceArtifact`.
 
-Adapters live under `pipekit_experiment.adapters.<tool>` and are
-gated behind their tool's optional extra:
+Bridges to other tools live under `pipekit_experiment.bridges.<tool>`,
+as in pipekit-array, and are gated behind their tool's optional extra:
 
-- `adapters.dvc.DVCDatasetVersioning` — ``[dvc]``.
-- `adapters.hydra.HydraConfigLoader` — ``[hydra]``.
-- `adapters.metaflow.MetaflowStepAdapter` — ``[metaflow]``.
+- `bridges.dvc.DVCDatasetVersioning` — ``[dvc]``.
+- `bridges.hydra.HydraConfigLoader` — ``[hydra]``.
+- `bridges.metaflow.MetaflowStepAdapter` — ``[metaflow]``.
 
 See master plan Report 12.
 """

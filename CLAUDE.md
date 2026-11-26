@@ -16,7 +16,7 @@ The packages, in dependency order:
 | `pipekit-ops`        | implemented   | Carrier-agnostic core (`pipekit_ops`): `Operator`, `Sequential`, `Graph`, control, flow limits, dict and iterable operators, `Map`, stores and `Cache`, observe, QC. |
 | `pipekit-array`      | partial       | Array-API dispatch, `MeanScalar`, `StackAlong` / `ConcatenateAlong`, `DimArray`, the dim functions and their operators, windows, `quantile` / `dot`, `KernelOp`, `Estimator`, `ApplyAlong`, `BatchAlong` (the array-shaped batched map), einx and xarray bridges; `StackAlong` and `ConcatenateAlong` take `dim=`. Pending from the v0.1 catalogue: the array QC asserts (`AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`), the array `Histogram`, `ModelOp`. `Subsample` was retired in favour of `isel` with a stepped slice. |
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, BFN, adjoint specs, observation/forward protocols.  |
-| `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow adapters. |
+| `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow bridges. |
 | `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule), scorer taxonomy, `MetricScorer`, `EvaluationReport`. |
 | `pipekit-train`      | implemented   | Training pipelines + Equinox, NumPyro and BlackJAX adapters. Design at `packages/pipekit-train/docs/design/`. |
 | `pipekit-jax`        | implemented   | `JaxOperator`, `JaxModelOp` (weight round-trip through `ModelRegistry`), `ScanCycle`, `Rollout`. The diffrax forward model and the adjoint maths are in integrix. |
@@ -117,13 +117,13 @@ packages/
 │   │   └── assimilation/     # DACycle, EnsembleDACycle, SmootherCycle, BFNCycle
 │   │                         # an area imports only from the ones before it (C1)
 │   └── tests/
-├── pipekit-experiment/       # Registry + tracker protocols + tool adapters
+├── pipekit-experiment/       # Registry + tracker protocols + tool bridges
 │   ├── src/pipekit_experiment/
 │   │   ├── protocols.py      # ExperimentTracker, ModelRegistry
 │   │   ├── run.py            # Run, RunMetrics, RunArtifacts
 │   │   ├── registry.py       # LocalModelRegistry, S3ModelRegistry
 │   │   ├── artifacts.py      # TrainingArtifact, InferenceArtifact
-│   │   └── adapters/         # dvc, hydra, metaflow (one module per tool)
+│   │   └── bridges/          # dvc, hydra, metaflow (one module per tool, X1)
 │   └── tests/
 ├── pipekit-evaluate/         # three areas (E1): scoring/ (Unit/Lens/Stage,
 │                             # MetricScorer, Estimate, Scorer, ReferenceSource),

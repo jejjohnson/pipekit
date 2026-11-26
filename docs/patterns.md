@@ -249,7 +249,7 @@ deserialise, registered or not.
 
 ```python
 import pipekit_ops as pk
-from pipekit_experiment.adapters.hydra import HydraConfigLoader
+from pipekit_experiment.bridges.hydra import HydraConfigLoader
 
 pk.register(pk.Sequential)
 pk.register(Threshold)
