@@ -3,7 +3,7 @@
 Each record states the decision, the alternatives it was weighed against, and why it wins.
 [latent.md](latent.md) is the design of the latent-space seams.
 
-## C1. Four areas, and a recorded module
+## C1. Four areas, and a recorded module (#303)
 
 **Decision (26 Nov 2026):** the package is `protocols`, `cycles`, `components` and `assimilation`, and an area imports only from the ones before it.
 `protocols` keeps its import path, so `from pipekit_cycle.protocols import ForwardModel` is unchanged.
