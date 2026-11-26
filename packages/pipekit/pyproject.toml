@@ -26,13 +26,13 @@ classifiers = [
 # Lower bounds are each package's first release that imports pipekit_ops:
 # an older release still imports `pipekit` and breaks against this umbrella.
 dependencies = [
-    "pipekit-ops>=0.2.0",
-    "pipekit-array>=0.1.0",
-    "pipekit-cycle>=0.1.0",
-    "pipekit-experiment>=0.1.0",
-    "pipekit-evaluate>=0.2.0",
-    "pipekit-train>=0.2.0",
-    "pipekit-jax>=0.1.0",
+    "pipekit-ops>=0.4.0",
+    "pipekit-array>=0.3.0",
+    "pipekit-cycle>=0.3.0",
+    "pipekit-experiment>=0.2.0",
+    "pipekit-evaluate>=0.3.0",
+    "pipekit-train>=0.3.0",
+    "pipekit-jax>=0.4.0",
 ]
 
 [project.urls]

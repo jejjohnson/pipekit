@@ -11,8 +11,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 3 - Alpha"]
 dependencies = [
-    "pipekit-ops>=0.2.0",
-    "pipekit-cycle>=0.1.0",
+    "pipekit-ops>=0.4.0",
+    "pipekit-cycle>=0.3.0",
     "equinox>=0.11",
     "jax>=0.4.30",
     "jaxtyping>=0.2",
@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 # `to_jax(op)`: a pipekit-array KernelOp as a JaxOperator (the edge pipekit-jax
 # already has through pipekit-cycle's [array] extra, declared here).
-array = ["pipekit-array>=0.1.0"]
+array = ["pipekit-array>=0.3.0"]
 
 [build-system]
 requires = ["hatchling>=1.27"]
