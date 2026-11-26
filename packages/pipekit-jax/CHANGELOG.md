@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.3.0...pipekit-jax-v0.4.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cycle:** pipekit-cycle is four areas, with the protocols where they were ([#303](https://github.com/jejjohnson/pipekit/issues/303))
+* **train:** pipekit-train is five areas, and each backend is an area of its own ([#297](https://github.com/jejjohnson/pipekit/issues/297))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295))
+
+### Code Refactoring
+
+* **cycle:** pipekit-cycle is four areas, with the protocols where they were ([#303](https://github.com/jejjohnson/pipekit/issues/303)) ([7268963](https://github.com/jejjohnson/pipekit/commit/7268963ddfe3efdd69b6804dc1426a754de46ee5))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295)) ([780fd27](https://github.com/jejjohnson/pipekit/commit/780fd27da51dbfe452da13fbb4268ab76cad6b26))
+* **train:** pipekit-train is five areas, and each backend is an area of its own ([#297](https://github.com/jejjohnson/pipekit/issues/297)) ([f2a144e](https://github.com/jejjohnson/pipekit/commit/f2a144e056849fde8a6f0c629f37a6a3f3948272))
+
 ## [0.3.0](https://github.com/jejjohnson/pipekit/compare/pipekit-jax-v0.2.0...pipekit-jax-v0.3.0) (2026-11-25)
 
 
