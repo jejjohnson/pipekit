@@ -107,7 +107,7 @@ import equinox as eqx
 import jax
 
 from pipekit_train import MSE, TrainingLoop
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 # today (pipekit-train)
 model_op = EquinoxModelOp(

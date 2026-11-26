@@ -22,7 +22,7 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit_ops import Operator
 from pipekit_train import MSE, IterableDataset, TrainingLoop
-from pipekit_train.adapters.bayes import NumpyroPredictiveOp, NumpyroTask, materialize
+from pipekit_train.backends._bayes import NumpyroPredictiveOp, NumpyroTask, materialize
 
 
 # --- fixtures -------------------------------------------------------------
@@ -456,7 +456,7 @@ def test_svi_with_a_custom_guide_says_it_cant_sample() -> None:
 
 def test_blackjax_samples_an_unsupervised_numpyro_task() -> None:
     pytest.importorskip("blackjax")
-    from pipekit_train.adapters.blackjax import BlackjaxTask
+    from pipekit_train.backends.blackjax import BlackjaxTask
 
     op, _ = _fit(
         BlackjaxTask(numpyro_task=_unsupervised_task(), num_warmup=100),

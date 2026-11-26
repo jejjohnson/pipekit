@@ -17,7 +17,7 @@ from pipekit_train import (
     SweepCarryState,
     SweepResult,
 )
-from pipekit_train.loop import TrainingLoop
+from pipekit_train.loop._loop import TrainingLoop
 
 
 # ---------------------------------------------------------------------
@@ -234,7 +234,7 @@ def test_hyper_sweep_rejects_non_trainingloop_return(monkeypatch):
 # the isinstance check via monkeypatch — keeps the test JAX-free.
 def test_hyper_sweep_orchestration_with_fake_loop(monkeypatch):
     """Mock the isinstance check; verify ranking + carry-state + sweep_id."""
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(
         sweep_mod, "TrainingLoop", _FakeLoop
@@ -263,7 +263,7 @@ def test_hyper_sweep_orchestration_with_fake_loop(monkeypatch):
 
 def test_hyper_sweep_select_mode_max(monkeypatch):
     """select_mode='max' inverts the ranking (for accuracy-like metrics)."""
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -286,7 +286,7 @@ def test_hyper_sweep_select_mode_max(monkeypatch):
 
 def test_hyper_sweep_n_trials_caps_iteration(monkeypatch):
     """n_trials=2 over a 5-cell grid runs only the first 2."""
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -310,7 +310,7 @@ def test_hyper_sweep_n_trials_caps_iteration(monkeypatch):
 
 def test_hyper_sweep_on_trial_callback_fires_per_trial(monkeypatch):
     """on_trial sees each completed SweepResult + the running SweepCarryState."""
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -338,7 +338,7 @@ def test_hyper_sweep_on_trial_callback_fires_per_trial(monkeypatch):
 
 
 def test_hyper_sweep_missing_metric_raises_clear_error(monkeypatch):
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -352,7 +352,7 @@ def test_hyper_sweep_missing_metric_raises_clear_error(monkeypatch):
 
 
 def test_hyper_sweep_empty_search_space_raises(monkeypatch):
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -366,7 +366,7 @@ def test_hyper_sweep_empty_search_space_raises(monkeypatch):
 
 
 def test_hyper_sweep_rejects_non_dict_param_yield(monkeypatch):
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -403,7 +403,7 @@ def test_resumed_sweep_uses_global_trial_indices(monkeypatch):
     state.best_trial_index must continue the global trial-stream
     numbering (state.completed at entry), not restart at 0.
     """
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 
@@ -439,7 +439,7 @@ def test_fresh_sweep_trial_indices_start_at_zero(monkeypatch):
     """Sanity: a fresh sweep (no incoming state) still numbers
     0, 1, 2, … so the regression above hasn't broken the base case.
     """
-    import pipekit_train.sweep as sweep_mod
+    import pipekit_train.sweep._sweep as sweep_mod
 
     monkeypatch.setattr(sweep_mod, "TrainingLoop", _FakeLoop)
 

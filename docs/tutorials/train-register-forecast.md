@@ -52,7 +52,7 @@ from pipekit_cycle import Cycle, NeuralForward
 from pipekit_experiment import LocalModelRegistry
 from pipekit_jax import JaxModelOp
 from pipekit_train import MSE, IterableDataset, TrainingLoop
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 
 # ── shapes ───────────────────────────────────────────────────────────────────

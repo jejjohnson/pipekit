@@ -1,4 +1,4 @@
-"""Tests for `pipekit_train.dataset`."""
+"""Tests for `pipekit_train.data`."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pytest
 from pipekit_ops import Lambda, Operator, StatefulOperator
-from pipekit_train.dataset import (
+from pipekit_train.data._datasets import (
     CachedDataset,
     IterableDataset,
     SimulationDataset,

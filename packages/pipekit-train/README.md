@@ -116,7 +116,7 @@ import jax
 import numpy as np
 import pipekit_cycle as pc
 from pipekit_ops import Lambda
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 from pipekit_train import MSE, SimulationDataset, TrainingLoop
 
 # Shapes: D_x = 2 inputs (Q, u); D_y = 4 downwind distances; N = 2,000 simulations
@@ -218,7 +218,7 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit_ops import Identity
 from pipekit_train import IterableDataset, TrainingLoop
-from pipekit_train.adapters.bayes import NumpyroTask
+from pipekit_train.backends.numpyro import NumpyroTask
 
 # Shapes: N = 60 (feature, enhancement) pairs from one source; θ = (Q, σ)
 rng = np.random.default_rng(0)
@@ -253,21 +253,18 @@ print(posterior_op(np.float32([0.25])).shape)             # (1,)
 ## What ships
 
 Version 0.2.0.
-The top-level names are exported from `pipekit_train`; each backend lives in its own module under `pipekit_train.adapters` and is imported only when a loop asks for it.
+The package is five areas, and an area imports only from the ones before it. The top-level names are exported from `pipekit_train`; each backend is an area of its own under `pipekit_train.backends`, behind its extra, and is imported only when a loop asks for it.
 
-| Module | Public names | Purpose |
+| Area | Public names | Purpose |
 | --- | --- | --- |
-| `loop` | `TrainingLoop`, `TrainerCarryState`, `ValidationStep` | The loop as a `StatefulOperator`; `run()` returns `(trained_op, artifact)` |
-| `dataset` | `TrainingDataset`, `IterableDataset`, `SimulationDataset`, `CachedDataset` | `(input, target)` pairs with a content hash and deterministic splits |
+| `data` | `TrainingDataset`, `IterableDataset`, `SimulationDataset`, `CachedDataset`, `Split`, `hash_config` | `(input, target)` pairs with a content hash and deterministic splits |
+| `losses` | `Loss`, `MSE`, `NLL`, `KL`, `Composite`, `call_loss` | The loss protocol and common losses, carrier-agnostic |
+| `loop` | `TrainingLoop`, `TrainerCarryState`, `ValidationStep`, the callbacks, `MetricWriter`, `JSONLWriter` | The loop as a `StatefulOperator`, with its hooks and its metric writers; `run()` returns `(trained_op, artifact)` |
 | `sweep` | `HyperSweep`, `ParameterGrid`, `SweepResult`, `SweepCarryState` | Run one loop per parameter set and rank the trials |
-| `loss` | `Loss`, `MSE`, `NLL`, `KL`, `Composite` | The loss protocol and common losses, carrier-agnostic |
-| `callbacks` | `Callback`, `EarlyStopping`, `Checkpoint`, `LogToExperiment` | Hooks on train, step, eval and epoch |
-| `writer` | `MetricWriter`, `JSONLWriter` | Where per-step metrics go when no tracker is attached |
-| `adapters.equinox` | `EquinoxModelOp`, `ShardingSpec`, `TrainState`, `TrainTask`, `train_step`, `save_state`, `restore_state` | The reference backend: Equinox, Optax, Orbax, Grain (`[equinox]`) |
-| `adapters.numpyro_svi`, `adapters.numpyro_mcmc` | `run` | NumPyro SVI and NUTS backends (`[numpyro]`) |
-| `adapters.bayes` | `NumpyroTask`, `NumpyroPredictiveOp` | The task and trained operator the NumPyro and BlackJAX backends share |
-| `adapters.blackjax` | `BlackjaxTask`, `BlackjaxPredictiveOp` | The BlackJAX backend, NUTS (`[blackjax]`) |
-| `adapters.keras` | `run` | A stub that raises `NotImplementedError` (`[keras]`) |
+| `backends.equinox` | `EquinoxModelOp`, `ShardingSpec`, `TrainState`, `TrainTask`, `train_step`, `save_state`, `restore_state`, `run` | The reference backend: Equinox, Optax, Orbax, Grain (`[equinox]`) |
+| `backends.numpyro` | `NumpyroTask`, `NumpyroPredictiveOp`, `run_svi`, `run_mcmc` | NumPyro SVI and NUTS backends (`[numpyro]`) |
+| `backends.blackjax` | `BlackjaxTask`, `BlackjaxPredictiveOp`, `run` | The BlackJAX backend, NUTS (`[blackjax]`) |
+| `backends.keras` | `run` | A stub that raises `NotImplementedError` (`[keras]`) |
 
 The backends, by the `backend=` string of `TrainingLoop`:
 
@@ -293,7 +290,7 @@ The backends, by the `backend=` string of `TrainingLoop`:
 
 ### A thin loop over existing tools
 
-`TrainingLoop` holds the model, data, loss and settings, and delegates the actual training to `pipekit_train.adapters.<backend>.run`, which it imports only when called.
+`TrainingLoop` holds the model, data, loss and settings, and delegates the actual training to the backend's area under `pipekit_train.backends`, which it imports only when called.
 The adapter owns the update step and the validation pass; the loop owns the callbacks and the artifact.
 `max_steps` counts optimiser steps, not epochs, and `optimizer_config` is a flat dict such as `{"name": "adamw", "lr": 3e-4}` (`lr` and `learning_rate` both work).
 For anything a `Loss` cannot say, pass `task=` instead: a `TrainTask` for Equinox, a `NumpyroTask` or `BlackjaxTask` for the Bayesian backends.

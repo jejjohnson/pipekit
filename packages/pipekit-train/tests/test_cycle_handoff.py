@@ -30,7 +30,7 @@ import jax
 from pipekit_cycle import Cycle, NeuralForward
 from pipekit_ops import Operator
 from pipekit_train import MSE, SimulationDataset, TrainingLoop
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 
 # ---------------------------------------------------------------------

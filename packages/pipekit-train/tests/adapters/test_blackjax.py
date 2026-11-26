@@ -22,8 +22,8 @@ import numpyro
 import numpyro.distributions as dist
 from pipekit_ops import Operator
 from pipekit_train import IterableDataset, TrainingLoop
-from pipekit_train.adapters.bayes import NumpyroTask
-from pipekit_train.adapters.blackjax import BlackjaxPredictiveOp, BlackjaxTask
+from pipekit_train.backends._bayes import NumpyroTask
+from pipekit_train.backends.blackjax import BlackjaxPredictiveOp, BlackjaxTask
 
 
 class _DummyModelOp(Operator):

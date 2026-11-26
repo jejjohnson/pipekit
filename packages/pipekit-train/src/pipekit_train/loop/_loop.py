@@ -23,9 +23,9 @@ from typing import Any, ClassVar, Literal
 from pipekit_ops import CarryState, Operator, StatefulOperator, dumps
 from pipekit_ops.saving import pipeline_hash
 
-from pipekit_train.dataset import TrainingDataset
-from pipekit_train.loss import Loss
-from pipekit_train.writer import MetricWriter
+from pipekit_train.data._datasets import TrainingDataset
+from pipekit_train.loop._writer import MetricWriter
+from pipekit_train.losses._losses import Loss
 
 
 # ---------------------------------------------------------------------
@@ -228,12 +228,13 @@ class _LocalArtifact:
 # ---------------------------------------------------------------------
 
 
-_BACKEND_MODULES: dict[str, str] = {
-    "equinox": "pipekit_train.adapters.equinox",
-    "keras": "pipekit_train.adapters.keras",
-    "numpyro-svi": "pipekit_train.adapters.numpyro_svi",
-    "numpyro-mcmc": "pipekit_train.adapters.numpyro_mcmc",
-    "blackjax": "pipekit_train.adapters.blackjax",
+#: each backend: the module of its area and the function that runs it
+_BACKEND_MODULES: dict[str, tuple[str, str]] = {
+    "equinox": ("pipekit_train.backends.equinox", "run"),
+    "keras": ("pipekit_train.backends.keras", "run"),
+    "numpyro-svi": ("pipekit_train.backends.numpyro", "run_svi"),
+    "numpyro-mcmc": ("pipekit_train.backends.numpyro", "run_mcmc"),
+    "blackjax": ("pipekit_train.backends.blackjax", "run"),
 }
 
 
@@ -241,7 +242,7 @@ class TrainingLoop(StatefulOperator):
     """Train a ``model_op`` on a ``dataset``, producing a trained model_op.
 
     The headline composable. Delegates the actual training to a
-    backend adapter (``pipekit_train.adapters.<backend>.run``). The
+    backend adapter (``pipekit_train.backends.<backend>.run``). The
     adapter sees the full loop config and is responsible for the
     per-step gradient update and the per-eval validation pass. The
     `TrainingLoop` itself owns the artifact assembly and the callback
@@ -273,7 +274,7 @@ class TrainingLoop(StatefulOperator):
             native checkpoint machinery here.
         sharding: Optional backend-specific sharding configuration for
             multi-device / multi-host training. For the Equinox backend
-            this is a ``pipekit_train.adapters.equinox.ShardingSpec``;
+            this is a ``pipekit_train.backends.equinox.ShardingSpec``;
             ``None`` keeps single-device behaviour. Typed loosely here so
             the carrier-agnostic core never imports JAX.
         seed: Master PRNG seed.
@@ -421,9 +422,9 @@ class TrainingLoop(StatefulOperator):
 
     def _run_adapter(self) -> tuple[Operator, dict[str, Any]]:
         """Resolve and call the configured backend adapter."""
-        module_name = _BACKEND_MODULES[self.backend]
+        module_name, function = _BACKEND_MODULES[self.backend]
         module = import_module(module_name)
-        return module.run(self)
+        return getattr(module, function)(self)
 
     # --- Artifact assembly --------------------------------------------
 

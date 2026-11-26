@@ -28,7 +28,7 @@ from pipekit_train import (
     TrainingLoop,
     JSONLWriter,
 )
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 ```
 
 We're training to fit `y = 2x + 1` — the world's simplest regression

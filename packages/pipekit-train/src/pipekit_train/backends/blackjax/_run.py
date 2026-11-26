@@ -24,11 +24,11 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 import numpy as np
 from pipekit_ops import Operator
 
-from pipekit_train.adapters import bayes
+from pipekit_train.backends import _bayes as bayes
 
 
 if TYPE_CHECKING:
-    from pipekit_train.loop import TrainingLoop
+    from pipekit_train.loop._loop import TrainingLoop
 
 _SUPPORTED_SAMPLERS: tuple[str, ...] = ("nuts",)
 _PLANNED_SAMPLERS: tuple[str, ...] = ("mclmc", "hmc", "sgld", "sghmc")
@@ -132,7 +132,7 @@ def _validate_task(loop: Any) -> BlackjaxTask:
     if task is None:
         raise ValueError(
             "The blackjax backend is task-first: pass a "
-            "pipekit_train.adapters.blackjax.BlackjaxTask as loop.task."
+            "pipekit_train.backends.blackjax.BlackjaxTask as loop.task."
         )
     if not isinstance(task, BlackjaxTask):
         raise TypeError(

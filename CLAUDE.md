@@ -139,21 +139,21 @@ packages/
 │       ├── kernel.py         # to_jax, JaxKernelOp ([array])
 │       ├── pytree.py         # registers Sequential, Graph, JaxModelOp as pytrees
 │       └── testing.py        # check_jax_operator
-└── pipekit-train/            # Training loop + adapters. Full design at
+└── pipekit-train/            # Training loop + backends. Full design at
                               # packages/pipekit-train/docs/design/.
     └── src/pipekit_train/
-        ├── loop.py           # TrainingLoop + backend dispatch
-        ├── dataset.py        # TrainingDataset, IterableDataset, SimulationDataset,
-        │                     # CachedDataset
-        ├── sweep.py          # HyperSweep + ParameterGrid
-        ├── loss.py           # Loss Protocol (carrier-agnostic)
-        ├── callbacks.py      # Callback Protocol + concrete callbacks
-        ├── writer.py         # MetricWriter Protocol + JSONLWriter
-        └── adapters/
-            ├── equinox.py    # reference backend (Equinox+Optax+Orbax+Grain)
-            ├── bayes.py      # shared NumPyro/BlackJAX seam (NumpyroTask, …)
-            ├── numpyro_svi.py / numpyro_mcmc.py / blackjax.py
-            └── keras.py      # v0.3; raises NotImplementedError
+        ├── data/             # TrainingDataset, IterableDataset, SimulationDataset,
+        │                     # CachedDataset, Split, hash_config
+        ├── losses/           # Loss Protocol, MSE, NLL, KL, Composite, call_loss
+        ├── loop/             # TrainingLoop + backend dispatch, callbacks, writers
+        ├── sweep/            # HyperSweep + ParameterGrid
+        └── backends/         # one area per backend, behind its extra (D17)
+            ├── equinox/      # reference backend (Equinox+Optax+Orbax+Grain),
+            │                 # _model/_sharding/_state/_batches/_evaluation/_run
+            ├── numpyro/      # run_svi, run_mcmc
+            ├── blackjax/     # BlackjaxTask, run
+            ├── keras/        # v0.3; raises NotImplementedError
+            └── _bayes.py     # shared NumPyro/BlackJAX seam (NumpyroTask, …)
 ```
 
 Each package's public API is re-exported through its

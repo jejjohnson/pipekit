@@ -45,7 +45,7 @@ class JaxModelOp(WeightsMixin, Operator):
     """Wrap an `eqx.Module` as a `pipekit_ops.Operator` with weight round-trip.
 
     Drop-in replacement for the in-package
-    ``pipekit_train.adapters.equinox.EquinoxModelOp`` stand-in.
+    ``pipekit_train.backends.equinox.EquinoxModelOp`` stand-in.
     Same constructor signature; same ``_apply`` shape (calls the
     module on the input); additionally supports
     `serialize_weights` / `with_weights` for byte-identical

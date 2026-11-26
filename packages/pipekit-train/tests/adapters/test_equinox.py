@@ -35,16 +35,15 @@ from pipekit_train import (
     JSONLWriter,
     TrainingLoop,
 )
-from pipekit_train.adapters.equinox import (
+from pipekit_train.backends.equinox import (
     EquinoxModelOp,
     TrainState,
     TrainTask,
-    _build_optimizer,
-    _SynthesisedTask,
     restore_state,
     save_state,
     train_step,
 )
+from pipekit_train.backends.equinox._state import _build_optimizer, _SynthesisedTask
 
 
 # --- Test fixtures --------------------------------------------------------
@@ -743,7 +742,7 @@ def test_finished_resume_does_not_construct_iterator(tmp_path):
 def test_batch_source_streaming_get_state_is_none():
     """BatchSource over an IterableDataset (no random access) has no
     iterator state — get_state() returns None; set_state(None) no-ops."""
-    from pipekit_train.adapters.equinox import _BatchSource
+    from pipekit_train.backends.equinox._batches import _BatchSource
 
     streaming_ds = IterableDataset(
         source=[(np.zeros(1), np.zeros(1))] * 4,
@@ -761,7 +760,7 @@ def test_batch_source_grain_get_state_is_dict():
     """BatchSource over an indexable dataset returns a Grain state
     dict from get_state() and round-trips through set_state()."""
     from pipekit_train import TrainingDataset
-    from pipekit_train.adapters.equinox import _BatchSource
+    from pipekit_train.backends.equinox._batches import _BatchSource
 
     class _Tiny(TrainingDataset):
         forbid_in_yaml = True
@@ -788,7 +787,7 @@ def test_batch_source_grain_get_state_is_dict():
     state = src.get_state()
     assert isinstance(state, dict)
     # Round-trip through json+base64 (mirrors the side-car path).
-    from pipekit_train.adapters.equinox import (
+    from pipekit_train.backends.equinox._state import (
         _jsonify_grain_state,
         _unjsonify_grain_state,
     )
@@ -806,7 +805,7 @@ def test_batch_source_grain_get_state_is_dict():
 
 def test_evaluate_weights_a_short_last_batch_by_its_size():
     """#122: 5 samples in batches of 2 → the metric is the mean of all 5."""
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     ys = [0.0, 0.0, 0.0, 0.0, 10.0]
     val = [(np.zeros(1, dtype=np.float32), np.float32(y)) for y in ys]
@@ -823,7 +822,7 @@ def test_evaluate_weights_a_short_last_batch_by_its_size():
 
 
 def test_evaluate_compiles_each_batch_shape_once_across_rounds():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     val = [(np.zeros(1, dtype=np.float32), np.float32(i)) for i in range(5)]
     traces = 0
@@ -845,7 +844,7 @@ def test_evaluate_compiles_each_batch_shape_once_across_rounds():
 
 
 def test_evaluate_gives_each_batch_its_own_key_under_jit():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     val = [(np.zeros(1, dtype=np.float32), np.float32(0.0)) for _ in range(4)]
 
@@ -868,7 +867,7 @@ def test_evaluate_gives_each_batch_its_own_key_under_jit():
 
 
 def test_compiled_evaluate_matches_the_eager_loop():
-    from pipekit_train.adapters.equinox import _eval_pass, _evaluate
+    from pipekit_train.backends.equinox._evaluation import _eval_pass, _evaluate
 
     model = _toy_mlp(jax.random.PRNGKey(0))
     val = _synthetic_regression(n=21)
@@ -1009,7 +1008,7 @@ def _targets(values: list[float]) -> list[tuple[np.ndarray, np.float32]]:
 
 
 def test_eval_fn_gives_the_exact_mean_with_a_short_last_batch():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     values = [0.0, 0.0, 0.0, 0.0, 10.0]
     metrics = _evaluate(None, _targets(values), 2, _MaskedMean(), jax.random.PRNGKey(0))
@@ -1017,7 +1016,7 @@ def test_eval_fn_gives_the_exact_mean_with_a_short_last_batch():
 
 
 def test_eval_fn_compiles_once_across_rounds():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     task = _MaskedMean()
     for _ in range(3):
@@ -1026,7 +1025,7 @@ def test_eval_fn_compiles_once_across_rounds():
 
 
 def test_pad_batch_copies_the_last_row_and_marks_it_invalid():
-    from pipekit_train.adapters.equinox import _pad_batch
+    from pipekit_train.backends.equinox._batches import _pad_batch
 
     x = jnp.arange(6.0).reshape(3, 2)
     y = jnp.array([1, 2, 3])
@@ -1039,7 +1038,7 @@ def test_pad_batch_copies_the_last_row_and_marks_it_invalid():
 
 
 def test_pad_batch_leaves_a_full_batch_alone():
-    from pipekit_train.adapters.equinox import _pad_batch
+    from pipekit_train.backends.equinox._batches import _pad_batch
 
     (padded,), valid = _pad_batch((jnp.ones((4, 1)),), 4)
     assert padded.shape == (4, 1)
@@ -1047,7 +1046,7 @@ def test_pad_batch_leaves_a_full_batch_alone():
 
 
 def test_a_task_without_eval_fn_keeps_the_ragged_path():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     shapes: list[tuple[int, ...]] = []
 
@@ -1065,7 +1064,7 @@ def test_a_task_without_eval_fn_keeps_the_ragged_path():
 
 
 def test_eval_fn_pads_a_streaming_validation_set():
-    from pipekit_train.adapters.equinox import _evaluate
+    from pipekit_train.backends.equinox._evaluation import _evaluate
 
     def stream():
         yield from _targets([0.0, 0.0, 0.0, 0.0, 10.0])

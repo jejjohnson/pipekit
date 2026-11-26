@@ -20,13 +20,13 @@ import functools
 import time
 from typing import TYPE_CHECKING, Any
 
-from pipekit_train.adapters import bayes
+from pipekit_train.backends import _bayes as bayes
 
 
 if TYPE_CHECKING:
     from pipekit_ops import Operator
 
-    from pipekit_train.loop import TrainingLoop
+    from pipekit_train.loop._loop import TrainingLoop
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:

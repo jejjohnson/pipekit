@@ -20,7 +20,7 @@ from pipekit_train import (
     TrainingLoop,
     ValidationStep,
 )
-from pipekit_train.loop import _LocalArtifact
+from pipekit_train.loop._loop import _LocalArtifact
 
 
 # --- Helpers --------------------------------------------------------------

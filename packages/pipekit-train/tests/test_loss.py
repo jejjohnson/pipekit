@@ -1,4 +1,4 @@
-"""Tests for `pipekit_train.loss` concrete operators."""
+"""Tests for `pipekit_train.losses` concrete operators."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pipekit_ops import Lambda
 from pipekit_train import KL, MSE, NLL, Composite, Loss
-from pipekit_train.loss import call_loss
+from pipekit_train.losses._losses import call_loss
 
 
 # --- MSE ----------------------------------------------------------------

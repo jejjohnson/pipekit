@@ -28,12 +28,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import numpy as np
 from pipekit_ops import Operator
 
-from pipekit_train.adapters import _common
-from pipekit_train.adapters._common import any_should_stop, dispatch  # noqa: F401
+from pipekit_train.backends import _common
+from pipekit_train.backends._common import any_should_stop, dispatch  # noqa: F401
 
 
 if TYPE_CHECKING:
-    from pipekit_train.dataset import TrainingDataset
+    from pipekit_train.data._datasets import TrainingDataset
 
 
 @dataclass
@@ -304,7 +304,7 @@ def validate_task(loop: Any) -> NumpyroTask:
     if task is None:
         raise ValueError(
             "The numpyro backends are task-first: pass a "
-            "pipekit_train.adapters.bayes.NumpyroTask as loop.task "
+            "pipekit_train.backends.numpyro.NumpyroTask as loop.task "
             "(a Loss does not define a probabilistic model)."
         )
     if not isinstance(task, NumpyroTask):
@@ -392,7 +392,7 @@ def build_optimizer(config: dict[str, Any]) -> Any:
 
 def carry_state(loop: Any, model_op: Operator, step: int, metrics: dict[str, float]):
     """Build a `TrainerCarryState` snapshot for callback dispatch."""
-    from pipekit_train.loop import TrainerCarryState
+    from pipekit_train.loop._loop import TrainerCarryState
 
     epoch = step // loop.steps_per_epoch if loop.steps_per_epoch else 0
     return TrainerCarryState(

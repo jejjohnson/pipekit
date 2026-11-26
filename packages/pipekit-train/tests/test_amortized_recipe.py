@@ -26,7 +26,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 from pipekit_train import NLL, SimulationDataset, TrainingLoop
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 
 class Prior(Operator):

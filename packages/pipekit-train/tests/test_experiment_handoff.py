@@ -30,7 +30,7 @@ from pipekit_train import (
     IterableDataset,
     TrainingLoop,
 )
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 
 # ---------------------------------------------------------------------
@@ -160,7 +160,7 @@ def test_run_falls_back_to_local_artifact_without_experiment(monkeypatch):
     import importlib
     import sys
 
-    from pipekit_train.loop import _LocalArtifact
+    from pipekit_train.loop._loop import _LocalArtifact
 
     real_import_module = importlib.import_module
 
@@ -171,7 +171,7 @@ def test_run_falls_back_to_local_artifact_without_experiment(monkeypatch):
 
     # Patch in both sites: importlib.import_module and the cached entry
     # in sys.modules so re-import goes through fake_import.
-    monkeypatch.setattr("pipekit_train.loop.import_module", fake_import)
+    monkeypatch.setattr("pipekit_train.loop._loop.import_module", fake_import)
     sys.modules.pop("pipekit_experiment.artifacts", None)
 
     loop = _make_loop(dataset=_synth_dataset())
