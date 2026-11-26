@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import ast
 import importlib
+import json
 import pickle
 from pathlib import Path
 
 import pipekit_ops
 import pytest
-from pipekit_ops import Operator, dumps, loads
+from pipekit_ops import Operator, dumps, loads, upgrade_state
 from pipekit_ops.core import resolve_loaded
 from pipekit_ops.testing import public_operators
 
@@ -124,6 +125,21 @@ def test_an_exception_saved_before_the_areas_loads() -> None:
     old = dumps(op).replace('"pipekit_ops.QCError"', '"pipekit_ops.qc.QCError"')
     assert "pipekit_ops.qc.QCError" in old
     assert loads(old).state == op.state
+
+
+@pytest.mark.parametrize("saved", ["pipekit_ops.qc.QCError", "pipekit.qc.QCError"])
+def test_upgrade_state_renames_the_module_of_an_exception_record(saved: str) -> None:
+    # a registry compares the upgraded stored state with the rebuilt one
+    op = pipekit_ops.Try(
+        pipekit_ops.Identity(), pipekit_ops.Const(0), on=(pipekit_ops.QCError,)
+    )
+    old = json.loads(dumps(op).replace('"pipekit_ops.QCError"', f'"{saved}"'))
+    assert upgrade_state(old) == json.loads(dumps(op))
+
+
+def test_upgrade_state_keeps_an_exception_from_elsewhere() -> None:
+    record = {"exception": "builtins.KeyError"}
+    assert upgrade_state(record) == record
 
 
 def test_a_class_is_recorded_only_where_the_module_holds_it() -> None:

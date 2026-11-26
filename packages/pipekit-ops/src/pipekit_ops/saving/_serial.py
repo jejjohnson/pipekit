@@ -113,7 +113,10 @@ def upgrade_state(state: Any) -> Any:
         return state
     out = {key: upgrade_state(value) for key, value in state.items()}
     if set(out) == {"exception"} and isinstance(out["exception"], str):
-        out["exception"] = current_module(out["exception"])
+        # the record is ``module.Name``: rename the module, keep the name
+        module, dot, name = out["exception"].rpartition(".")
+        if dot:
+            out["exception"] = f"{current_module(module)}.{name}"
     elif "class" in out and isinstance(out.get("module"), str):
         out["module"] = current_module(out["module"])
     return out
