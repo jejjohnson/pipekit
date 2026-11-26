@@ -21,9 +21,13 @@ import copy
 from typing import Any, Literal
 
 from pipekit_ops import Operator, StatefulOperator
-from pipekit_ops.core import nested_config
 
-from pipekit_cycle.protocols import AnalysisStep, ForwardModel, ObservationOperator
+from pipekit_cycle.components._config import _component_config
+from pipekit_cycle.protocols._protocols import (
+    AnalysisStep,
+    ForwardModel,
+    ObservationOperator,
+)
 
 
 ObsClock = Literal["call", "state"]
@@ -111,21 +115,6 @@ def _obs_err_config(obs_err_source: Any) -> dict[str, Any]:
     if obs_err_source is None:
         return {}
     return {"obs_err_source": _component_config(obs_err_source)}
-
-
-def _component_config(obj: Any) -> Any:
-    """Debug-config payload for a DA component.
-
-    Components are protocol objects (`ForwardModel`, `AnalysisStep`, …)
-    that need not be pipekit Operators; when one is, emit core's
-    canonical ``{"class", "config"}`` payload, otherwise fall back to
-    the bare class name.
-    """
-    if obj is None:
-        return None
-    if isinstance(obj, Operator):
-        return nested_config(obj)
-    return type(obj).__name__
 
 
 class DACycle(StatefulOperator):

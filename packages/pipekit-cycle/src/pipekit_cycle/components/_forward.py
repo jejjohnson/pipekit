@@ -21,8 +21,8 @@ from typing import Any, ClassVar
 from pipekit_ops import Operator
 from pipekit_ops.core import nested_config
 
-from pipekit_cycle.da import _component_config
-from pipekit_cycle.protocols import ForwardModel
+from pipekit_cycle.components._config import _component_config
+from pipekit_cycle.protocols._protocols import ForwardModel
 
 
 class CallableForward(Operator):

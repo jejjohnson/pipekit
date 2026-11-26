@@ -22,15 +22,15 @@ from typing import Any, ClassVar
 
 from pipekit_ops import Operator, StatefulOperator
 
-from pipekit_cycle.da import (
+from pipekit_cycle.assimilation._da import (
     ObsClock,
     _advance_da_state,
     _check_obs_clock,
     _obs_clock_config,
     _obs_offset,
 )
-from pipekit_cycle.forward import CompositeForward, NeuralForward
-from pipekit_cycle.protocols import ForwardModel, ObservationOperator
+from pipekit_cycle.components._forward import CompositeForward, NeuralForward
+from pipekit_cycle.protocols._protocols import ForwardModel, ObservationOperator
 
 
 class BFNCycle(StatefulOperator):

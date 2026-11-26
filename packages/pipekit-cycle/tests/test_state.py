@@ -1,4 +1,4 @@
-"""Tests for `pipekit_cycle.state` — DAState, IterationState, WindowState."""
+"""Tests for `pipekit_cycle.cycles` — DAState, IterationState, WindowState."""
 
 from __future__ import annotations
 
