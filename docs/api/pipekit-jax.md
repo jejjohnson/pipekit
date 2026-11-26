@@ -75,5 +75,5 @@ them (`pipekit-jax[array]`).
 ## What moved to integrix
 
 `integrix.march.DiffraxForwardModel` is a `pipekit_cycle.ForwardModel` backed by `diffrax.diffeqsolve`, for an ODE or an SDE, that also satisfies `SupportsAdjoint`.
-`integrix.adjoint.to_diffrax_adjoint` maps the specs of `pipekit_cycle.adjoints` onto diffrax adjoints, and `integrix.adjoint.truncated_scan` implements `TruncatedAdjoint` for a `jax.lax.scan`.
+`integrix.adjoint.to_diffrax_adjoint` maps the specs of `pipekit_cycle.cycles` onto diffrax adjoints, and `integrix.adjoint.truncated_scan` implements `TruncatedAdjoint` for a `jax.lax.scan`.
 They were here until pipekit-jax 0.1.0.

@@ -42,7 +42,7 @@ from pipekit_jax.operator import JaxOperator
 class _ForwardModelStep(StatefulOperator, JaxOperator):
     """A `ForwardModel` as a `StatefulOperator`: ``(c, s) -> (step(c, dt), s)``.
 
-    The JAX counterpart of ``pipekit_cycle.cycle._ForwardModelAdapter``:
+    The JAX counterpart of ``pipekit_cycle._ForwardModelAdapter``:
     the model is a pytree field, so its leaves stay visible to
     ``eqx.filter_grad`` through the cycle.
     """

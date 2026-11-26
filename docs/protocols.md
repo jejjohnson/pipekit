@@ -74,7 +74,7 @@ hierarchies satisfy these structurally.
 
 | Protocol | Contract | Role |
 |----------|----------|------|
-| `SupportsAdjoint` | `adjoint`, `with_adjoint(spec)` | A rollout component that says how gradients flow through it, with a spec from `pipekit_cycle.adjoints`; `integrix.adjoint.to_diffrax_adjoint` and `integrix.adjoint.truncated_scan` interpret it |
+| `SupportsAdjoint` | `adjoint`, `with_adjoint(spec)` | A rollout component that says how gradients flow through it, with a spec from `pipekit_cycle.cycles`; `integrix.adjoint.to_diffrax_adjoint` and `integrix.adjoint.truncated_scan` interpret it |
 
 ## Experiment tracking (`pipekit_experiment.protocols`)
 

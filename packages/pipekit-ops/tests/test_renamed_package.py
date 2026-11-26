@@ -56,7 +56,7 @@ def _as_saved_before_0_2(text: str) -> str:
         ("pipekit._base.sequential", "pipekit_ops"),
         ("pipekit_ops.control", "pipekit_ops"),
         ("pipekit_ops.testing", "pipekit_ops.testing"),
-        ("pipekit_cycle.cycle", "pipekit_cycle.cycle"),
+        ("mylib.ops", "mylib.ops"),
         ("pipekitish", "pipekitish"),
     ],
 )
