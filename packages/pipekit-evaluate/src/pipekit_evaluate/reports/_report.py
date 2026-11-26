@@ -24,9 +24,9 @@ from typing import Any
 
 from pipekit_ops.saving import sha256_hex, stable_json
 
-from pipekit_evaluate.benchmark.protocols import Scorer
-from pipekit_evaluate.benchmark.reference import ReferenceSource
-from pipekit_evaluate.taxonomy import Lens, ScorerTags, Stage, Unit, tags_of
+from pipekit_evaluate.scoring._protocols import Scorer
+from pipekit_evaluate.scoring._sources import ReferenceSource
+from pipekit_evaluate.scoring._taxonomy import Lens, ScorerTags, Stage, Unit, tags_of
 
 
 @dataclass(frozen=True)

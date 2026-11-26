@@ -13,9 +13,15 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from pipekit_evaluate.benchmark.protocols import Estimate
-from pipekit_evaluate.benchmark.reference import ReferenceSource, as_sources
-from pipekit_evaluate.taxonomy import DEFAULT_STAGES, Lens, ScorerTags, Stage, Unit
+from pipekit_evaluate.scoring._protocols import Estimate
+from pipekit_evaluate.scoring._sources import ReferenceSource, as_sources
+from pipekit_evaluate.scoring._taxonomy import (
+    DEFAULT_STAGES,
+    Lens,
+    ScorerTags,
+    Stage,
+    Unit,
+)
 
 
 #: The key of a metric value that carries no name of its own.

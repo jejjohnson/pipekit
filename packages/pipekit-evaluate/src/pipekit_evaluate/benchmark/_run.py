@@ -3,10 +3,10 @@
 :class:`Benchmark` realises ``benchmark_ladder.md`` §4.2 (the ``Benchmark``
 dataclass) and §4.3 (the reference rule). It is deliberately carrier- and
 scorer-agnostic: it fits each estimator, resolves the reference for that
-cell via :class:`~pipekit_evaluate.benchmark.reference.ReferenceRule`, and
+cell via :class:`~pipekit_evaluate.benchmark.ReferenceRule`, and
 delegates the actual critique to the supplied :class:`Scorer`s. Its
 :class:`BenchmarkReport` converts into the tagged, content-hashed
-:class:`~pipekit_evaluate.report.EvaluationReport` that a plain
+:class:`~pipekit_evaluate.reports.EvaluationReport` that a plain
 :func:`~pipekit_evaluate.report.evaluate` call returns. Writing a
 ``pipekit_experiment.Run`` per cell is left to a later slice.
 """
@@ -17,16 +17,17 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from pipekit_evaluate.benchmark.cube import Cell
-from pipekit_evaluate.benchmark.protocols import Estimate, Estimator, Scorer, Task
-from pipekit_evaluate.benchmark.reference import (
-    Axis,
-    ReferenceRule,
-    ReferenceSource,
-    as_sources,
+from pipekit_evaluate.benchmark._cube import Cell
+from pipekit_evaluate.benchmark._protocols import Estimator, Task
+from pipekit_evaluate.benchmark._reference import Axis, ReferenceRule
+from pipekit_evaluate.reports._report import (
+    EvaluationReport,
+    ReportEntry,
+    _check_scorer_names,
 )
-from pipekit_evaluate.report import EvaluationReport, ReportEntry, _check_scorer_names
-from pipekit_evaluate.taxonomy import ScorerTags, tags_of
+from pipekit_evaluate.scoring._protocols import Estimate, Scorer
+from pipekit_evaluate.scoring._sources import ReferenceSource, as_sources
+from pipekit_evaluate.scoring._taxonomy import ScorerTags, tags_of
 
 
 @dataclass(frozen=True)

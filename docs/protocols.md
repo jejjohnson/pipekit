@@ -91,7 +91,7 @@ hierarchies satisfy these structurally.
 | `Callback` | `pipekit_train.loop` | Training-loop hook points |
 | `MetricWriter` | `pipekit_train.loop` | Metric sink (`JSONLWriter` is the reference impl) |
 
-## Benchmarking (`pipekit_evaluate.benchmark.protocols`)
+## Benchmarking (`pipekit_evaluate.benchmark`, and `Estimate`, `CovarianceEstimate` and `Scorer` in `pipekit_evaluate.scoring`)
 
 | Protocol | Contract | Role |
 |----------|----------|------|

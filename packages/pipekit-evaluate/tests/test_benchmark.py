@@ -18,14 +18,16 @@ from pipekit_evaluate.benchmark import (
     Benchmark,
     Cell,
     CellResult,
-    CovarianceEstimate,
-    Estimate,
     Estimator,
     ReferenceRule,
-    ReferenceSource,
-    Scorer,
     Task,
     scores_against,
+)
+from pipekit_evaluate.scoring import (
+    CovarianceEstimate,
+    Estimate,
+    ReferenceSource,
+    Scorer,
 )
 
 
