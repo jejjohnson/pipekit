@@ -127,9 +127,10 @@ packages/
 │   │   ├── artifacts.py      # TrainingArtifact, InferenceArtifact
 │   │   └── adapters/         # dvc, hydra, metaflow (one module per tool)
 │   └── tests/
-├── pipekit-evaluate/         # Benchmark ladder (cube/protocols/reference/run),
-│                             # taxonomy.py (Unit/Lens/Stage), scorers.py,
-│                             # report.py (EvaluationReport, evaluate)
+├── pipekit-evaluate/         # three areas (E1): scoring/ (Unit/Lens/Stage,
+│                             # MetricScorer, Estimate, Scorer, ReferenceSource),
+│                             # reports/ (EvaluationReport, evaluate), benchmark/
+│                             # (cube, Task/Estimator/Oracle, ReferenceRule, run)
 ├── pipekit-jax/              # depends on pipekit-ops and pipekit-cycle
 │   └── src/pipekit_jax/
 │       ├── operator.py       # JaxOperator (an Operator that is an eqx.Module)

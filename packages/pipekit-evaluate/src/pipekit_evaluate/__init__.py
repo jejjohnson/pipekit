@@ -1,11 +1,17 @@
 """pipekit-evaluate — multidimensional evaluation framework.
 
-The ``benchmark`` subpackage ships the orchestration layer of the
-benchmark ladder (the ``level x rung x complexity`` cube, the
-carrier-agnostic protocols, and the reference rule). The ``taxonomy``
-module carries the ``Unit x Lens x Stage`` tags, ``scorers`` turns any
-metric operator into a tagged scorer, and ``report`` collects a run's
-tagged scores into a content-hashed :class:`EvaluationReport`.
+Three areas, each with one job. An area imports only from the ones before it.
+
+- `pipekit_evaluate.scoring`: the ``Unit x Lens x Stage`` tags, `MetricScorer`,
+  the `Estimate` and `Scorer` protocols, and `ReferenceSource`.
+- `pipekit_evaluate.reports`: `evaluate` and the content-hashed
+  `EvaluationReport`.
+- `pipekit_evaluate.benchmark`: the orchestration layer of the benchmark ladder,
+  the ``level x rung x complexity`` cube, the `Task`, `Estimator` and `Oracle`
+  protocols, the reference rule and `Benchmark`.
+
+This package re-exports the names it always has. Import a name from the
+package or from its area, never from a file in it.
 """
 
 from __future__ import annotations
@@ -17,21 +23,21 @@ from pipekit_evaluate.benchmark import (
     BenchmarkReport,
     Cell,
     CellResult,
-    CovarianceEstimate,
-    Estimate,
     Estimator,
     Oracle,
     Prior,
     ReferenceRule,
-    ReferenceSource,
-    Scorer,
     Task,
 )
-from pipekit_evaluate.report import EvaluationReport, ReportEntry, evaluate
-from pipekit_evaluate.scorers import MetricScorer
-from pipekit_evaluate.taxonomy import (
+from pipekit_evaluate.reports import EvaluationReport, ReportEntry, evaluate
+from pipekit_evaluate.scoring import (
     DEFAULT_STAGES,
+    CovarianceEstimate,
+    Estimate,
     Lens,
+    MetricScorer,
+    ReferenceSource,
+    Scorer,
     ScorerTags,
     Stage,
     Unit,

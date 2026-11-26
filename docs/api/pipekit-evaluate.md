@@ -1,38 +1,24 @@
 # pipekit-evaluate
 
-Multidimensional evaluation framework. The `benchmark` subpackage ships
-the orchestration layer of the benchmark ladder — the
-`level x rung x complexity` cube, the carrier-agnostic protocols, and
-the "simpler thing is ground truth" reference rule. The `taxonomy`
-module carries the `Unit x Lens x Stage` tags, `MetricScorer` turns
-any metric operator into a tagged scorer, and `evaluate` collects a run's
-tagged scores into a content-hashed `EvaluationReport`. Design doc:
-`packages/pipekit-evaluate/docs/design/benchmark_ladder.md`.
+Multidimensional evaluation framework.
+Design doc: `packages/pipekit-evaluate/docs/design/benchmark_ladder.md`.
 
-## Taxonomy
+The package is three areas, each with one job, and an area imports only from the ones before it ([E1](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/decisions.md)).
 
-::: pipekit_evaluate.taxonomy
+## Scoring
 
-## Scorers
+`pipekit_evaluate.scoring` carries the `Unit x Lens x Stage` tags, `MetricScorer`, which turns any metric operator into a tagged scorer, the `Estimate` and `Scorer` protocols, and `ReferenceSource`, which says where a score's ground truth comes from.
 
-::: pipekit_evaluate.scorers
+::: pipekit_evaluate.scoring
 
-## Evaluation report
+## Reports
 
-::: pipekit_evaluate.report
+`pipekit_evaluate.reports` collects a run's tagged scores into a content-hashed `EvaluationReport`.
 
-## Protocols
+::: pipekit_evaluate.reports
 
-::: pipekit_evaluate.benchmark.protocols
+## Benchmark
 
-## The cube
+`pipekit_evaluate.benchmark` is the orchestration layer of the benchmark ladder: the `level x rung x complexity` cube, the `Task`, `Estimator` and `Oracle` protocols, the "simpler thing is ground truth" reference rule, and `Benchmark`, which runs it.
 
-::: pipekit_evaluate.benchmark.cube
-
-## Reference rule
-
-::: pipekit_evaluate.benchmark.reference
-
-## Benchmark runner
-
-::: pipekit_evaluate.benchmark.run
+::: pipekit_evaluate.benchmark
