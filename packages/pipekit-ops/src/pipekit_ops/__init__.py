@@ -76,21 +76,32 @@ from pipekit_ops.core import (
     compose_left,
     juxt,
     pipe,
+    record_moves,
+    record_under,
 )
-from pipekit_ops.saving import (
-    DirectoryStore,
-    MemoryStore,
-    Store,
-    allowed,
-    dumps,
-    from_state_sandboxed,
-    loads,
-    loads_sandboxed,
-    pipeline_hash,
-    register,
-    store_scope,
-    unregister,
-    upgrade_state,
+from pipekit_ops.execution import (
+    AsyncMap,
+    BatchedMap,
+    Failed,
+    Fold,
+    Map,
+    MapError,
+    Prefetch,
+    ProcessMap,
+    ThreadMap,
+    check_pickleable,
+    executor_scope,
+)
+from pipekit_ops.observe import (
+    Histogram,
+    JitReport,
+    JitStep,
+    Log,
+    Profile,
+    ShapeTrace,
+    Snapshot,
+    Tap,
+    jit_report,
 )
 from pipekit_ops.operators import (
     AssertCallable,
@@ -139,31 +150,21 @@ from pipekit_ops.operators import (
     ValMap,
     Zip,
 )
-from pipekit_ops.execution import (
-    AsyncMap,
-    BatchedMap,
-    Failed,
-    Fold,
-    Map,
-    MapError,
-    Prefetch,
-    ProcessMap,
-    ThreadMap,
-    check_pickleable,
-    executor_scope,
+from pipekit_ops.saving import (
+    DirectoryStore,
+    MemoryStore,
+    Store,
+    allowed,
+    dumps,
+    from_state_sandboxed,
+    loads,
+    loads_sandboxed,
+    pipeline_hash,
+    register,
+    store_scope,
+    unregister,
+    upgrade_state,
 )
-from pipekit_ops.observe import (
-    Histogram,
-    JitReport,
-    JitStep,
-    Log,
-    Profile,
-    ShapeTrace,
-    Snapshot,
-    Tap,
-    jit_report,
-)
-from pipekit_ops.core import record_moves, record_under
 
 
 __all__ = [

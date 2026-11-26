@@ -1,6 +1,8 @@
 """Looking inside a running pipeline.
 
-The observers `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` and `Log` pass their input through and record something about it; `jit_report` says which steps of a pipeline run under ``jax.jit`` and why the others do not.
+The observers `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram` and `Log` pass
+their input through and record something about it; `jit_report` says which steps of a
+pipeline run under ``jax.jit`` and why the others do not.
 """
 
 from __future__ import annotations

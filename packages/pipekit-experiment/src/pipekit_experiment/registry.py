@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from pipekit_ops import Operator, upgrade_state
-from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_json
+from pipekit_ops.saving import pipeline_hash, sha256_hex, stable_json
 
 
 class HashMismatchError(ValueError):

@@ -19,7 +19,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from pipekit_ops import Operator
-from pipekit_ops._base.operator import nested_config
+from pipekit_ops.core import nested_config
 
 from pipekit_cycle.da import _component_config
 from pipekit_cycle.protocols import ForwardModel

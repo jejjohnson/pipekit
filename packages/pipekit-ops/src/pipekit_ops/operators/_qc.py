@@ -29,6 +29,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from pipekit_ops.carriers._adapters import get_adapter
+from pipekit_ops.carriers._signature import Signature, _parse_pattern
 from pipekit_ops.core._operator import (
     _MISSING,
     Operator,
@@ -36,8 +38,6 @@ from pipekit_ops.core._operator import (
     nested_config,
     require_operator,
 )
-from pipekit_ops.carriers._adapters import get_adapter
-from pipekit_ops.carriers._signature import Signature, _parse_pattern
 
 
 #: what `AssertSignature` does with a carrier that has no adapter

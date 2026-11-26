@@ -232,7 +232,7 @@ def test_registry_round_trip_keeps_hash_and_outputs(tmp_path):
     """Gate E1: a model restored from the registry has the hash it was
     stored under, and bitwise-equal outputs."""
     from pipekit_experiment import LocalModelRegistry
-    from pipekit_ops.hashing import pipeline_hash
+    from pipekit_ops.saving import pipeline_hash
 
     registry = LocalModelRegistry(tmp_path / "models")
     trained = JaxModelOp(_toy_mlp(key=0))

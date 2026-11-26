@@ -1,6 +1,11 @@
 """How code reaches a value: its carrier, its array backend and its shape.
 
-`NamedArrayAdapter` and its registry say how to work with a carrier that has dimension names; `backend_of` and `to_backend` say which array library a value sits on and move it; `Signature` describes a value's shape; `guard` reports data moving between NumPy and JAX; `is_traced` says whether a value holds a JAX tracer; `on_import` and `import_optional` run or load the code of an optional library. Nothing here knows what an operator is.
+`NamedArrayAdapter` and its registry say how to work with a carrier that has dimension
+names; `backend_of` and `to_backend` say which array library a value sits on and move
+it; `Signature` describes a value's shape; `guard` reports data moving between NumPy and
+JAX; `is_traced` says whether a value holds a JAX tracer; `on_import` and
+`import_optional` run or load the code of an optional library. Nothing here knows what
+an operator is.
 """
 
 from __future__ import annotations

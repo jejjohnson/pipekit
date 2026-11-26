@@ -271,7 +271,7 @@ class Holds(JaxOperator):
     inner: JaxOperator
 
     def get_config(self):
-        from pipekit_ops._base.operator import nested_config
+        from pipekit_ops.core import nested_config
 
         return {"inner": nested_config(self.inner)}
 
@@ -396,7 +396,7 @@ class Branches(JaxOperator):
     right: JaxOperator
 
     def get_config(self):
-        from pipekit_ops._base.operator import nested_config
+        from pipekit_ops.core import nested_config
 
         return {
             "branches": {
@@ -467,7 +467,7 @@ class HoldsWithBias(JaxOperator):
     bias: jax.Array
 
     def get_config(self):
-        from pipekit_ops._base.operator import nested_config
+        from pipekit_ops.core import nested_config
 
         return {"inner": nested_config(self.inner), "bias": jsonable(self.bias)}
 

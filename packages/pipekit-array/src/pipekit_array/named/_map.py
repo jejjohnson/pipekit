@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pipekit_ops import NamedArrayAdapter, is_traced
-from pipekit_ops.adapters import BackendError, backend_name
+from pipekit_ops.carriers import BackendError, backend_name
 
 from pipekit_array.named._dispatch import adapter_of, axes_of, fast_path
 from pipekit_array.named._join import _with_labels_of, stack

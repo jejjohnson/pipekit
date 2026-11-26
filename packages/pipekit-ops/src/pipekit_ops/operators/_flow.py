@@ -19,8 +19,8 @@ from collections import deque
 from concurrent.futures import Future, wait
 from typing import Any, ClassVar
 
-from pipekit_ops.core._operator import Operator, nested_config, require_operator
 from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
 
 
 __all__ = ["RateLimit", "Timeout", "Until"]

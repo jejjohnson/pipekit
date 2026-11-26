@@ -99,7 +99,7 @@ Set malformed records aside with `Quarantine`, and load with a `Sink` that write
 Run `check_pickleable(pipeline)` before fanning out: closures do not cross process boundaries.
 
 **Today.** All of it.
-`log_and_continue` reports each failure as a warning, with its traceback, on the `pipekit_ops.parallel` logger, so the run's logging setup decides where failures go.
+`log_and_continue` reports each failure as a warning, with its traceback, on the `pipekit_ops.execution` logger, so the run's logging setup decides where failures go.
 `on_error="collect"` instead leaves a `Failed(index, exception)` in each failed slot and raises one `MapError` at the end, holding every failure and the partial results.
 `Map` reads its input lazily and keeps at most `max_in_flight` items in flight, so a generator over a million keys does not land in memory.
 
@@ -403,8 +403,8 @@ sister packages, each in one place.
 | Concern | Lives in |
 |---|---|
 | Operators, composition, parallel maps, flow limits, nested JSON, the sandbox allowlist | `pipekit-ops` |
-| `pipeline_hash` and the hashing primitives | `pipekit_ops.hashing` |
-| Where a `Cache` keeps its entries (`MemoryStore`, `DirectoryStore`) | `pipekit_ops.store` |
+| `pipeline_hash` and the hashing primitives | `pipekit_ops.saving` |
+| Where a `Cache` keeps its entries (`MemoryStore`, `DirectoryStore`) | `pipekit_ops.saving` |
 | Content-addressed storage, tags, artifacts, YAML loading | `pipekit-experiment` |
 | Training loops and backends | `pipekit-train` |
 | Time stepping and assimilation | `pipekit-cycle` |

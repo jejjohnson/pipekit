@@ -214,7 +214,7 @@ def test_hash_framing_unchanged():
     import hashlib
 
     from pipekit_ops import Identity
-    from pipekit_ops.hashing import pipeline_hash, stable_json
+    from pipekit_ops.saving import pipeline_hash, stable_json
 
     op = Identity()
     h = hashlib.sha256()
@@ -232,7 +232,7 @@ def test_hash_framing_unchanged():
 def test_store_returns_pipeline_hash(tmp_path):
     """What the registry stores under is what `pipeline_hash` computes."""
     from pipekit_ops import Identity
-    from pipekit_ops.hashing import pipeline_hash
+    from pipekit_ops.saving import pipeline_hash
 
     registry = LocalModelRegistry(tmp_path)
     op = Identity() | Identity()
@@ -277,7 +277,7 @@ def _sequential() -> Operator:
     pytest.importorskip("pipekit_array")
     from pipekit_array import MeanScalar
     from pipekit_ops import Cache, Fanout
-    from pipekit_ops.qc import AssertShape
+    from pipekit_ops.operators import AssertShape
 
     return (
         Identity()
@@ -292,7 +292,7 @@ def _graph() -> Operator:
     pytest.importorskip("pipekit_array")
     from pipekit_array import MeanScalar
     from pipekit_ops import Graph, Input
-    from pipekit_ops.qc import AssertShape
+    from pipekit_ops.operators import AssertShape
 
     x = Input("x")
     checked = AssertShape((4, 3))(x)
@@ -317,7 +317,7 @@ def test_registry_round_trip_keeps_hash_and_outputs(
     registry_and_writer, build, weights
 ):
     import numpy as np
-    from pipekit_ops.hashing import pipeline_hash
+    from pipekit_ops.saving import pipeline_hash
 
     reg, _ = registry_and_writer
     op = build()
@@ -340,7 +340,7 @@ def test_registry_load_rejects_tampered_content(registry_and_writer, target):
         # A valid state for a different pipeline: it would load silently.
         tampered = _sequential()
         tampered.operators[1] = type(tampered.operators[1])((5, 3))
-        from pipekit_ops.hashing import stable_json
+        from pipekit_ops.saving import stable_json
 
         write_raw(stable_json(tampered.state).encode(), h, target)
     else:
@@ -353,6 +353,17 @@ def test_registry_load_rejects_tampered_content(registry_and_writer, target):
             reg.load_weights(ref)
 
 
+#: where the core's classes in `_sequential` and `_graph` lived before 0.2.0
+_FLAT = {
+    "AssertShape": "pipekit.qc",
+    "Cache": "pipekit.cache",
+    "Fanout": "pipekit.combine",
+    "Graph": "pipekit._base.graph",
+    "Identity": "pipekit.blocks",
+    "Sequential": "pipekit._base.sequential",
+}
+
+
 def _as_stored_before_0_2(state):
     """``state`` with the core's modules named ``pipekit.*``, as before 0.2.0."""
     if isinstance(state, list):
@@ -360,10 +371,8 @@ def _as_stored_before_0_2(state):
     if not isinstance(state, dict):
         return state
     out = {key: _as_stored_before_0_2(value) for key, value in state.items()}
-    for key in ("module", "exception"):
-        value = out.get(key)
-        if isinstance(value, str) and value.startswith("pipekit_ops"):
-            out[key] = "pipekit" + value.removeprefix("pipekit_ops")
+    if out.get("module") == "pipekit_ops":
+        out["module"] = _FLAT[out["class"]]
     return out
 
 
@@ -373,7 +382,7 @@ def test_registry_loads_an_entry_stored_before_the_rename(
     registry_and_writer, build, weights
 ):
     import numpy as np
-    from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_json
+    from pipekit_ops.saving import pipeline_hash, sha256_hex, stable_json
 
     reg, write_raw = registry_and_writer
     op = build()

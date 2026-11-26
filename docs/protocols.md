@@ -5,7 +5,7 @@ Every protocol except pipekit-train's `Callback` (whose hooks are all optional) 
 
 This page is the inventory: what each protocol is for, where it lives, and who satisfies it.
 
-## Core (`pipekit_ops.protocols`)
+## Core (`pipekit_ops.core`)
 
 Carrier-agnostic seams for model-inference wrappers.
 
@@ -16,7 +16,7 @@ Carrier-agnostic seams for model-inference wrappers.
 
 Models invoked via bare `__call__` (PyTorch modules, JAX functions) are covered by `callable(model)`; a `__call__`-only Protocol would match nearly everything, so pipekit deliberately doesn't define one.
 
-## Carriers and stores (`pipekit_ops.adapters`, `pipekit_ops.store`)
+## Carriers and stores (`pipekit_ops.carriers`, `pipekit_ops.saving`)
 
 | Protocol | Contract | Satisfied by |
 |----------|----------|--------------|

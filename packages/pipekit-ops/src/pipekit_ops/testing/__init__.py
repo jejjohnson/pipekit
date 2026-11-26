@@ -25,8 +25,8 @@ from types import ModuleType
 from typing import Any
 
 from pipekit_ops.core._operator import Operator
-from pipekit_ops.saving._hashing import pipeline_hash
 from pipekit_ops.execution._presets import check_pickleable
+from pipekit_ops.saving._hashing import pipeline_hash
 from pipekit_ops.saving._serial import dumps, loads
 
 

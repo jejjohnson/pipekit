@@ -1,8 +1,14 @@
 """The operator and the ways to put operators together.
 
-`Operator` and `ConfigMixin`; `Sequential` and `Graph` (with `Input` and `Node`); `StatefulOperator` and `CarryState` for operators that carry state from call to call; the structural seams `Predictor` and `FittableTransformer`; and `pipe`, `compose`, `compose_left`, `juxt` and `complement`.
+`Operator` and `ConfigMixin`; `Sequential` and `Graph` (with `Input` and `Node`);
+`StatefulOperator` and `CarryState` for operators that carry state from call to call;
+the structural seams `Predictor` and `FittableTransformer`; and `pipe`, `compose`,
+`compose_left`, `juxt` and `complement`.
 
-For libraries that write operators: `nested_config` is the config of an operator held by another, `require_operator` checks that a value is one, `resolve_loaded` finds a loaded operator class by name, `record_under` records classes under the module a library imports them from, and `record_moves` lets states saved under a former module load.
+For libraries that write operators: `nested_config` is the config of an operator held by
+another, `require_operator` checks that a value is one, `resolve_loaded` finds a loaded
+operator class by name, `record_under` records classes under the module a library
+imports them from, and `record_moves` lets states saved under a former module load.
 """
 
 from __future__ import annotations

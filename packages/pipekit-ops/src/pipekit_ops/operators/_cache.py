@@ -37,8 +37,8 @@ from __future__ import annotations
 import threading
 from typing import Any, ClassVar
 
-from pipekit_ops.core._operator import Operator, nested_config, require_operator
 from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
 from pipekit_ops.operators._dicts import require_child
 from pipekit_ops.saving._hashing import pipeline_hash, sha256_hex, stable_repr
 from pipekit_ops.saving._store import MemoryStore, Store, resolve_store

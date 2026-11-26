@@ -1,6 +1,9 @@
 """The ready-made operators.
 
-Blocks (`Identity`, `Const`, `Lambda`, `Sink`), dict plumbing (`Get` … `ValMap`), iterables (`Filter` … `SortBy`), `Fanout`, control flow (`Branch`, `Switch`, `Try`, `Coalesce`, `Retry`), flow limits (`Timeout`, `RateLimit`, `Until`), caching (`Cache`, `Memoize`) and quality control (`Quarantine` and the `Assert*` checks).
+Blocks (`Identity`, `Const`, `Lambda`, `Sink`), dict plumbing (`Get` … `ValMap`),
+iterables (`Filter` … `SortBy`), `Fanout`, control flow (`Branch`, `Switch`, `Try`,
+`Coalesce`, `Retry`), flow limits (`Timeout`, `RateLimit`, `Until`), caching (`Cache`,
+`Memoize`) and quality control (`Quarantine` and the `Assert*` checks).
 """
 
 from __future__ import annotations

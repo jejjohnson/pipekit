@@ -1,6 +1,9 @@
 """Running an operator over many inputs.
 
-`Map` is one engine over serial, thread, process and async execution and any borrowed `concurrent.futures.Executor`, with `executor_scope`, `Failed` and `MapError`; `ThreadMap`, `ProcessMap`, `AsyncMap` and `BatchedMap` are its presets; `Prefetch` and `Fold` stream and reduce; `check_pickleable` finds what a process pool cannot send.
+`Map` is one engine over serial, thread, process and async execution and any borrowed
+`concurrent.futures.Executor`, with `executor_scope`, `Failed` and `MapError`;
+`ThreadMap`, `ProcessMap`, `AsyncMap` and `BatchedMap` are its presets; `Prefetch` and
+`Fold` stream and reduce; `check_pickleable` finds what a process pool cannot send.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ import copy
 from typing import Any, Literal
 
 from pipekit_ops import Operator, StatefulOperator
-from pipekit_ops._base.operator import nested_config
+from pipekit_ops.core import nested_config
 
 from pipekit_cycle.protocols import AnalysisStep, ForwardModel, ObservationOperator
 

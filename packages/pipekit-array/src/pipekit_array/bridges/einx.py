@@ -32,7 +32,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
 from pipekit_ops import Operator, backend_of
-from pipekit_ops.adapters import BackendError
+from pipekit_ops.carriers import BackendError
 
 from pipekit_array.named._dispatch import adapter_of, join_backends
 from pipekit_array.named._shape import transpose

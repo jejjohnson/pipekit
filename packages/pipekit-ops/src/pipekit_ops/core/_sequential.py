@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pipekit_ops.carriers._adapters import signature_of
 from pipekit_ops.core._operator import (
     _MISSING,
     Carrier,
@@ -36,7 +37,6 @@ from pipekit_ops.core._operator import (
     nested_config,
     require_operator,
 )
-from pipekit_ops.carriers._adapters import signature_of
 
 
 class Sequential(Operator):

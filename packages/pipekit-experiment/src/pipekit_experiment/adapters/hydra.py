@@ -31,7 +31,7 @@ import sys
 from typing import Any
 
 from pipekit_ops import Operator, from_state_sandboxed
-from pipekit_ops._base.operator import resolve_loaded
+from pipekit_ops.core import resolve_loaded
 
 
 # Hydra's own keys: instructions to `instantiate`, not constructor arguments.

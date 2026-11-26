@@ -76,34 +76,23 @@ packages/
 ├── pipekit/                  # Umbrella: no code, installs every package below
 ├── pipekit-ops/              # Core framework (no internal deps), import pipekit_ops
 │   ├── src/pipekit_ops/
-│   │   ├── _base/            # Operator, Sequential, Graph, tracer detection
-│   │   ├── blocks.py         # Identity, Const, Lambda, Sink
-│   │   ├── compose.py        # pipe, compose, compose_left, juxt, complement
-│   │   ├── control.py        # Branch, Switch, Try, Coalesce, Retry
-│   │   ├── flow.py           # Timeout, RateLimit, Until
-│   │   ├── dicts.py          # Get, GetIn, Pick, Dissoc, Rename, Merge, Assoc,
-│   │   │                     # UpdateIn, ValMap
-│   │   ├── seq.py            # Not, Filter, Remove, Reduce, PartitionAll, Concat,
-│   │   │                     # Zip, GroupBy, CountBy, Count, Unique, Take, SortBy
-│   │   ├── observe.py        # Tap, Log, Snapshot, ShapeTrace, Profile, Histogram
-│   │   ├── combine.py        # Fanout
-│   │   ├── execution.py      # Map, executor_scope, MapError, Failed, Prefetch, Fold
-│   │   ├── parallel.py       # ThreadMap, ProcessMap, AsyncMap, BatchedMap (presets
-│   │   │                     # of Map), check_pickleable
-│   │   ├── store.py          # Store, MemoryStore, DirectoryStore, store_scope
-│   │   ├── cache.py          # Cache (in memory or in a named Store), Memoize
-│   │   ├── qc.py             # Quarantine, AssertShape, AssertDType, AssertThat,
-│   │   │                     # AssertSignature, …
-│   │   ├── signature.py      # Signature (shape inference)
-│   │   ├── adapters.py       # NamedArrayAdapter, register_adapter, backend_of, …
-│   │   ├── guards.py         # guard, guard_level, report_move, BackendWarning
-│   │   ├── imports.py        # on_import
-│   │   ├── jit.py            # jit_report, JitReport, JitStep
-│   │   ├── serial.py         # dumps, loads, register, loads_sandboxed
-│   │   ├── state.py          # StatefulOperator, CarryState
-│   │   ├── protocols.py      # Predictor, FittableTransformer (structural seams)
-│   │   ├── hashing.py        # pipeline_hash, stable_json, stable_repr, sha256_hex
-│   │   └── testing.py        # assert_round_trip
+│   │   ├── carriers/         # NamedArrayAdapter and its registry, backend_of,
+│   │   │                     # to_backend, Signature, guard, is_traced, on_import
+│   │   ├── core/             # Operator, Sequential, Graph, StatefulOperator,
+│   │   │                     # CarryState, Predictor, pipe/compose; nested_config,
+│   │   │                     # require_operator, resolve_loaded, record_under,
+│   │   │                     # record_moves for libraries that write operators
+│   │   ├── saving/           # dumps, loads, loads_sandboxed, pipeline_hash,
+│   │   │                     # stable_json, Store, MemoryStore, DirectoryStore
+│   │   ├── operators/        # Identity…Sink, dicts, iterables, Fanout, Branch…Retry,
+│   │   │                     # Timeout…Until, Cache, Memoize, Quarantine, Assert*
+│   │   ├── execution/        # Map, ThreadMap, ProcessMap, AsyncMap, BatchedMap,
+│   │   │                     # Prefetch, Fold, executor_scope, check_pickleable
+│   │   ├── observe/          # Tap, Snapshot, ShapeTrace, Profile, Histogram, Log,
+│   │   │                     # jit_report
+│   │   └── testing/          # assert_round_trip, public_operators
+│   │                         # an area imports only from the ones before it;
+│   │                         # public classes are recorded under pipekit_ops (O17)
 │   └── tests/
 ├── pipekit-array/            # Array-API operators and dim-level functions
 │   ├── src/pipekit_array/

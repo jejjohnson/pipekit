@@ -36,9 +36,14 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
-from pipekit_ops.carriers._tracing import is_traced
-from pipekit_ops.carriers._adapters import BackendError, backend_of, signature_of, to_backend
+from pipekit_ops.carriers._adapters import (
+    BackendError,
+    backend_of,
+    signature_of,
+    to_backend,
+)
 from pipekit_ops.carriers._guards import report_move
+from pipekit_ops.carriers._tracing import is_traced
 
 
 if TYPE_CHECKING:

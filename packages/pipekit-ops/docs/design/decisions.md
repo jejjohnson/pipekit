@@ -5,7 +5,7 @@ version: 0.1.0
 
 # Decisions
 
-IDs O1 to O16.
+IDs O1 to O17.
 Each row states the recommendation, the alternative it was weighed against, and why the recommendation wins.
 Phases P1 to P5 have shipped (see [roadmap.md](roadmap.md)), so every decision except O15 is built as recommended; O15 is built in part.
 The table keeps each decision as it was argued.
@@ -29,6 +29,7 @@ Where the build departed from it, the section "As built" after the table says wh
 | O14 | Two `BatchedMap`s | Recommended: the core class keeps `BatchedMap`; the planned pipekit-array class becomes `BatchAlong(inner, batch_size, dim)`, as the sibling proposal says. | Alternative: ADR A5 of pipekit-array: keep both names and let the import path disambiguate. | Hydra YAML and `from pipekit_ops import *` next to pipekit-array imports both see the bare class name; the core name has shipped since v0.1, the array one has not. |
 | O15 | Async composition | Recommended: sync wrappers (`Retry`, `Try`, `Cache`, `Timeout`, `RateLimit`, `Until`, the iterable ops) refuse a child with an `async def _apply` at construction; async-aware versions come later through an optional `_apply_async`. | Alternative: make every wrapper detect and await coroutines. | Today `Retry(async_op)` returns an un-awaited coroutine and retries nothing; an early `TypeError` fixes the silent bug now, and the full async path can be designed on its own. |
 | O16 | JAX tracers | Recommended: `Map(executor="serial")` accepts tracers; every pool, `Cache`, `Timeout`, `RateLimit` and `Prefetch` raise `TypeError` on a tracer via `is_traced`. | Alternative: refuse tracers everywhere in the execution group. | A serial loop under `jit` is just unrolled Python and is useful for small $n$; sending a tracer to a thread or process is never correct. |
+| O17 | Areas and the recorded module | Recommended: seven areas, `carriers`, `core`, `saving`, `operators`, `execution`, `observe` and `testing`, where an area imports only from the ones before it and a name is imported from the package or its area. Each public class is recorded under `pipekit_ops`, and `record_moves` makes `current_module` read a state saved under a flat module (`pipekit_ops.control`, `pipekit_ops._base.operator`, …) as `pipekit_ops`. | Alternative: keep each class recorded under its old file, so no `pipeline_hash` changes. | The flat list of 27 files hid what goes together, `execution` and `parallel` imported each other, and pipekit-cycle, pipekit-jax, pipekit-array and pipekit-experiment imported private helpers from `_base.operator`. Recording under the files would name modules that no longer exist and change every hash again at the next move; recorded under the package, the hashes change once, here. Because `current_module` is the one place that plain loads, sandboxed loads and exception records read a module name, one table covers all three. The loggers are named after their areas: `Map` logs on `pipekit_ops.execution` (it was `pipekit_ops.parallel`) and `Timeout` on `pipekit_ops.operators` (it was `pipekit_ops.flow`). |
 
 ## As built
 
@@ -77,7 +78,7 @@ Four departures from [api/operators.md](api/operators.md) fall under no decision
 
 - **`Timeout` starts a daemon thread per call, not a shared pool.**
   A pool's workers are joined at interpreter exit, so one call that hangs for good would stop the process from exiting, and a bounded pool full of hung workers would make later calls time out without ever running.
-  Abandoned calls are tracked process-wide; when more than `max_abandoned` are still running, a timeout logs a warning on `pipekit_ops.flow`.
+  Abandoned calls are tracked process-wide; when more than `max_abandoned` are still running, a timeout logs a warning on `pipekit_ops.operators` (`pipekit_ops.flow` before O17).
 - **`RateLimit` windows are half-open, $[t, t + T)$**, where $t \in \mathbb{R}$ is the oldest recorded start in seconds and $T \in \mathbb{R}_{>0}$ is `period`.
   A call that starts at $t_\text{now} \in \mathbb{R}$ is admitted when $t_\text{now} - t \ge T$; with a strict $>$, a fake clock spins forever on ties.
 - **`Until` returns rather than raises when `pred` holds after the last allowed call**, and `max_iter=0` only checks the input.

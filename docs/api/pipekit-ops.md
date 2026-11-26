@@ -1,108 +1,50 @@
 # pipekit-ops
 
-The pipekit core, imported as `pipekit_ops`: carrier-agnostic operators
-and operator graphs. Pure Python, no third-party dependencies. Until 0.2.0
-this package was `pipekit`. Master plan reference: Report 2.
+The pipekit core, imported as `pipekit_ops`: carrier-agnostic operators and operator graphs.
+Pure Python, no third-party dependencies.
+Until 0.2.0 this package was `pipekit`.
+Master plan reference: Report 2.
 
-## Foundations
+The package is seven areas, each with one job.
+Import a name from the package or from its area, never from a file in it.
+An area imports only from the ones before it, and `testing` from all of them ([O17](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/docs/design/decisions.md)).
 
-::: pipekit_ops._base.operator
+## Carriers
 
-::: pipekit_ops._base.sequential
+`pipekit_ops.carriers` is how code reaches a value: the named-array adapters and their registry, the array backend a value sits on, its `Signature`, the NumPy–JAX `guard`, tracer detection and optional imports.
 
-::: pipekit_ops._base.graph
+::: pipekit_ops.carriers
 
-## Composition convenience
+## Core
 
-::: pipekit_ops.compose
+`pipekit_ops.core` has `Operator`, `Sequential`, `Graph`, the state primitives, the structural protocols and the composition helpers.
+It also has the helpers for libraries that write operators: `nested_config`, `require_operator`, `resolve_loaded`, `record_under` and `record_moves`.
 
-## Building blocks
+::: pipekit_ops.core
 
-::: pipekit_ops.blocks
+## Saving
 
-## Control flow
+`pipekit_ops.saving` writes and reads a pipeline's state, hashes it, and holds the stores that `Cache` keeps its entries in.
 
-::: pipekit_ops.control
+::: pipekit_ops.saving
 
-## Flow limits
+## Operators
 
-::: pipekit_ops.flow
+`pipekit_ops.operators` has the ready-made operators: blocks, dict and iterable plumbing, `Fanout`, control flow, flow limits, caching and quality control.
 
-## Observers
-
-::: pipekit_ops.observe
-
-## Combination
-
-::: pipekit_ops.combine
-
-## Dict plumbing
-
-::: pipekit_ops.dicts
-
-## Iterables
-
-::: pipekit_ops.seq
-
-## Caching
-
-::: pipekit_ops.cache
-
-## Store
-
-::: pipekit_ops.store
-
-## Quality control
-
-::: pipekit_ops.qc
-
-## Shape inference
-
-::: pipekit_ops.signature
-
-## Named-array adapters
-
-::: pipekit_ops.adapters
-
-## Guards
-
-::: pipekit_ops.guards
-
-## Jittability
-
-::: pipekit_ops.jit
-
-## Tracing
-
-::: pipekit_ops._base.tracing
-
-## Optional imports
-
-::: pipekit_ops.imports
-
-## Parallelism
-
-::: pipekit_ops.parallel
+::: pipekit_ops.operators
 
 ## Execution
 
+`pipekit_ops.execution` runs an operator over many inputs: `Map`, its presets, `Prefetch` and `Fold`.
+
 ::: pipekit_ops.execution
 
-## Serialisation
+## Observe
 
-::: pipekit_ops.serial
+`pipekit_ops.observe` looks inside a running pipeline: the observers and `jit_report`.
 
-## State primitives
-
-::: pipekit_ops.state
-
-## Structural protocols
-
-::: pipekit_ops.protocols
-
-## Hashing primitives
-
-::: pipekit_ops.hashing
+::: pipekit_ops.observe
 
 ## Testing
 

@@ -28,7 +28,7 @@ from typing import Any
 import numpy as np
 import xarray as xr
 from pipekit_ops import Signature, backend_name, get_adapter, register_adapter
-from pipekit_ops.adapters import BackendError
+from pipekit_ops.carriers import BackendError
 
 from pipekit_array.kernels._run import anonymous, full_loop
 from pipekit_array.kernels._spec import KernelSpec, kernel_output_dims

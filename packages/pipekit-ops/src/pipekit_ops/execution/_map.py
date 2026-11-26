@@ -36,9 +36,9 @@ from concurrent.futures import (
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pipekit_ops.core._operator import Operator, nested_config, require_operator
-from pipekit_ops.carriers._tracing import is_traced
 from pipekit_ops.carriers._adapters import to_backend
+from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
 from pipekit_ops.saving._store import Store, bind_stores, bound_stores
 
 

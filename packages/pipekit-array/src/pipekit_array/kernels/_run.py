@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, cast
 
 from pipekit_ops import NamedArrayAdapter, get_adapter
-from pipekit_ops.adapters import BackendError, backend_name
+from pipekit_ops.carriers import BackendError, backend_name
 
 from pipekit_array.kernels._spec import KernelSpec, _RunsKernels, kernel_output_dims
 from pipekit_array.named._dispatch import join_backends, namespace_of

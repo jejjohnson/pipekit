@@ -21,7 +21,7 @@ from importlib import import_module
 from typing import Any, ClassVar, Literal
 
 from pipekit_ops import CarryState, Operator, StatefulOperator, dumps
-from pipekit_ops.hashing import pipeline_hash
+from pipekit_ops.saving import pipeline_hash
 
 from pipekit_train.dataset import TrainingDataset
 from pipekit_train.loss import Loss
