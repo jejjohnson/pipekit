@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.1.0...pipekit-experiment-v0.2.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **experiment:** the tool integrations of pipekit-experiment are bridges ([#304](https://github.com/jejjohnson/pipekit/issues/304))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295))
+
+### Code Refactoring
+
+* **experiment:** the tool integrations of pipekit-experiment are bridges ([#304](https://github.com/jejjohnson/pipekit/issues/304)) ([6d1251a](https://github.com/jejjohnson/pipekit/commit/6d1251a840453a579b38f2c6f02d62802fa97c93))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295)) ([780fd27](https://github.com/jejjohnson/pipekit/commit/780fd27da51dbfe452da13fbb4268ab76cad6b26))
+
 ## [0.1.0](https://github.com/jejjohnson/pipekit/compare/pipekit-experiment-v0.0.5...pipekit-experiment-v0.1.0) (2026-11-07)
 
 

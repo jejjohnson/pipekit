@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.2.0...pipekit-train-v0.3.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **train:** pipekit-train is five areas, and each backend is an area of its own ([#297](https://github.com/jejjohnson/pipekit/issues/297))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295))
+
+### Code Refactoring
+
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295)) ([780fd27](https://github.com/jejjohnson/pipekit/commit/780fd27da51dbfe452da13fbb4268ab76cad6b26))
+* **train:** pipekit-train is five areas, and each backend is an area of its own ([#297](https://github.com/jejjohnson/pipekit/issues/297)) ([f2a144e](https://github.com/jejjohnson/pipekit/commit/f2a144e056849fde8a6f0c629f37a6a3f3948272))
+
 ## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.1.5...pipekit-train-v0.2.0) (2026-11-07)
 
 

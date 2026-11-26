@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-jax"
-version = "0.3.0"
+version = "0.4.0"
 description = "JAX and Equinox integration for pipekit: JaxOperator, JaxModelOp with weight round-trip through a ModelRegistry, and scan-based cycles."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},

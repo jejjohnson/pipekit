@@ -1,6 +1,6 @@
 [project]
 name = "pipekit-cycle"
-version = "0.2.0"
+version = "0.3.0"
 description = "Time-stepping, data assimilation, and observation operators on top of pipekit-ops."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/pipekit/compare/pipekit-evaluate-v0.2.0...pipekit-evaluate-v0.3.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **evaluate:** pipekit-evaluate is three areas, with the shared protocols at the bottom ([#298](https://github.com/jejjohnson/pipekit/issues/298))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295))
+
+### Code Refactoring
+
+* **evaluate:** pipekit-evaluate is three areas, with the shared protocols at the bottom ([#298](https://github.com/jejjohnson/pipekit/issues/298)) ([461e068](https://github.com/jejjohnson/pipekit/commit/461e068ff276d595f556c07e03c74200b20dc931))
+* **ops:** pipekit-ops is seven areas, each with one job ([#295](https://github.com/jejjohnson/pipekit/issues/295)) ([780fd27](https://github.com/jejjohnson/pipekit/commit/780fd27da51dbfe452da13fbb4268ab76cad6b26))
+
 ## [0.2.0](https://github.com/jejjohnson/pipekit/compare/pipekit-evaluate-v0.1.1...pipekit-evaluate-v0.2.0) (2026-11-07)
 
 

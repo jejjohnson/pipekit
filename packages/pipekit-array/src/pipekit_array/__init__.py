@@ -106,7 +106,7 @@ from pipekit_array.operators import (
 )
 
 
-__version__ = "0.2.0"  # x-release-please-version
+__version__ = "0.3.0"  # x-release-please-version
 
 
 def _load_xarray_adapter() -> None:
