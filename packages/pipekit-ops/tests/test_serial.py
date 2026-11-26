@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.serial` — Group L."""
+"""Tests for `pipekit_ops.saving` — Group L."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pipekit_ops import (
     Lambda,
     Operator,
 )
-from pipekit_ops.serial import (
+from pipekit_ops.saving._serial import (
     allowed,
     dumps,
     loads,

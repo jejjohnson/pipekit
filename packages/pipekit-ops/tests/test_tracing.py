@@ -8,8 +8,8 @@ import warnings
 
 import pytest
 from pipekit_ops import Cache, Lambda, Sequential, is_concrete, is_traced
-from pipekit_ops.blocks import Sink
-from pipekit_ops.observe import Profile, ShapeTrace, Snapshot, Tap
+from pipekit_ops.operators._blocks import Sink
+from pipekit_ops.observe._observers import Profile, ShapeTrace, Snapshot, Tap
 
 
 jax = pytest.importorskip("jax")

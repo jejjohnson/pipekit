@@ -1,10 +1,10 @@
-"""Tests for the shared stable-hash primitives (`pipekit_ops.hashing`)."""
+"""Tests for the shared stable-hash primitives (`pipekit_ops.saving`)."""
 
 from __future__ import annotations
 
 import hashlib
 
-from pipekit_ops.hashing import sha256_hex, stable_json, stable_repr
+from pipekit_ops.saving._hashing import sha256_hex, stable_json, stable_repr
 
 
 def test_stable_json_sorts_keys() -> None:

@@ -15,11 +15,11 @@ from collections.abc import Iterator
 from types import ModuleType
 from typing import Any
 
-from pipekit_ops._base.graph import Graph, Node
-from pipekit_ops._base.operator import Operator
-from pipekit_ops._base.sequential import Sequential
-from pipekit_ops.adapters import BackendError
-from pipekit_ops.guards import guard
+from pipekit_ops.core._graph import Graph, Node
+from pipekit_ops.core._operator import Operator
+from pipekit_ops.core._sequential import Sequential
+from pipekit_ops.carriers._adapters import BackendError
+from pipekit_ops.carriers._guards import guard
 
 
 __all__ = ["JitReport", "JitStep", "jit_report"]

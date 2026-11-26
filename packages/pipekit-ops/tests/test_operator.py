@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops._base.operator` — Operator + ConfigMixin."""
+"""Tests for `pipekit_ops.core` — Operator + ConfigMixin."""
 
 from __future__ import annotations
 
@@ -170,7 +170,7 @@ def test_operator_rejects_mixed_node_and_literal_args(Scale_cls, TwoInput_cls):
     # Pure literals: eager path, normal _apply.
     assert op(1.0, 2.0) == 3.0
     # Pure Nodes: graph-construction path.
-    from pipekit_ops._base.graph import Node
+    from pipekit_ops.core._graph import Node
 
     assert isinstance(op(a, Input("b")), Node)
 

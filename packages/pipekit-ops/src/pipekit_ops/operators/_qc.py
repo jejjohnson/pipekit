@@ -29,15 +29,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import (
+from pipekit_ops.core._operator import (
     _MISSING,
     Operator,
     callable_name,
     nested_config,
     require_operator,
 )
-from pipekit_ops.adapters import get_adapter
-from pipekit_ops.signature import Signature, _parse_pattern
+from pipekit_ops.carriers._adapters import get_adapter
+from pipekit_ops.carriers._signature import Signature, _parse_pattern
 
 
 #: what `AssertSignature` does with a carrier that has no adapter
@@ -264,7 +264,7 @@ class AssertThat(Operator):
         >>> AssertThat(Const(False), "too cloudy")(x)
         Traceback (most recent call last):
         ...
-        pipekit_ops.qc.QCError: AssertThat(Const): too cloudy
+        pipekit_ops.QCError: AssertThat(Const): too cloudy
 
         The predicate composes like any operator:
 
@@ -295,7 +295,7 @@ class AssertSignature(Operator):
     """Pass-through; raise `QCError` unless the carrier's dims fit ``pattern``.
 
     The dims are read through the carrier's registered adapter
-    (`pipekit_ops.adapters.get_adapter`), never from the carrier itself.
+    (`pipekit_ops.carriers.get_adapter`), never from the carrier itself.
     The same check runs at build time in `compute_output_signature`, so
     `Sequential.summary` reports a mismatch before any data runs.
 

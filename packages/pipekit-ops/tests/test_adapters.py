@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.adapters` — the named-array adapter registry (#100)."""
+"""Tests for `pipekit_ops.carriers` — the named-array adapter registry (#100)."""
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ from pipekit_ops import (
     Operator,
     Sequential,
     Signature,
-    adapters as adapters_module,
     get_adapter,
     register_adapter,
     register_lazy_adapter,
     signature_of,
     unregister_adapter,
 )
+from pipekit_ops.carriers import _adapters as adapters_module
 
 
 @dataclasses.dataclass(frozen=True)

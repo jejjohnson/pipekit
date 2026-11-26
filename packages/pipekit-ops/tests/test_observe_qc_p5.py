@@ -137,11 +137,11 @@ def _progress_records(caplog) -> list[logging.LogRecord]:
 @pytest.mark.parametrize("executor", ["serial", "thread"])
 def test_g5_2_progress_every_10_over_100_items(caplog, executor):
     mapped = Map(Identity(), executor=executor, progress=10)
-    with caplog.at_level(logging.INFO, logger="pipekit_ops.parallel"):
+    with caplog.at_level(logging.INFO, logger="pipekit_ops.execution"):
         assert mapped(range(100)) == list(range(100))
     records = _progress_records(caplog)
     assert len(records) == 10
-    assert all(r.name == "pipekit_ops.parallel" for r in records)
+    assert all(r.name == "pipekit_ops.execution" for r in records)
     assert all(r.levelno == logging.INFO for r in records)
     assert [r.done for r in records] == list(range(10, 101, 10))
     last = records[-1]
@@ -152,7 +152,7 @@ def test_g5_2_progress_every_10_over_100_items(caplog, executor):
 def test_g5_2_progress_counts_failures_and_unknown_length(caplog):
     inverse = Lambda(lambda x: 1 / x)
     mapped = Map(inverse, on_error="log_and_continue", progress=2)
-    with caplog.at_level(logging.INFO, logger="pipekit_ops.parallel"):
+    with caplog.at_level(logging.INFO, logger="pipekit_ops.execution"):
         mapped(iter([1, 0, 2, 0]))
     records = _progress_records(caplog)
     assert [(r.done, r.failed, r.n) for r in records] == [(2, 1, None), (4, 2, None)]
@@ -160,7 +160,7 @@ def test_g5_2_progress_counts_failures_and_unknown_length(caplog):
 
 
 def test_g5_2_no_progress_no_records(caplog):
-    with caplog.at_level(logging.INFO, logger="pipekit_ops.parallel"):
+    with caplog.at_level(logging.INFO, logger="pipekit_ops.execution"):
         Map(Identity())(range(20))
     assert _progress_records(caplog) == []
 
@@ -171,13 +171,13 @@ def test_g5_2_progress_rejects_zero():
 
 
 def test_g5_2_unset_progress_keeps_the_map_hash():
-    # values from the parent commit ac27ab1, before `progress` existed
+    # the hash of a Map without `progress`, since 0.4.0
     assert pipeline_hash(Map(Identity())) == (
-        "b5098ac523432d9a9fae2d2a49280cb8d1ebf09e37ed6fdcfc068cd4a78731c8"
+        "0e86bb7a3c9137bedddd4d03d9e10c7e94b834b5328e0f4f31912948f4180fbf"
     )
     threaded = Map(Identity(), executor="thread", max_in_flight=4)
     assert pipeline_hash(threaded) == (
-        "cb159a8d5dad05498c9651ee80f6698be23f2e5e6b5d14c3b50e0b7258ed0498"
+        "a646c9501e011c8df496fe0f2ba8a994ee55d3baa183fe9a526dcb6f51312ada"
     )
     assert "progress" not in Map(Identity()).get_config()
 

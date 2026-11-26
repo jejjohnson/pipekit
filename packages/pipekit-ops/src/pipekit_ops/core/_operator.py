@@ -21,7 +21,7 @@ Operators that themselves hold non-serialisable runtime state — user
 closures (`Tap`, `Lambda`, `Branch`, …) or runtime arrays — set
 `forbid_in_yaml = True` to signal that `get_config()` is a debug repr,
 not a faithful round-trip; `from_state` refuses flagged classes, at any
-depth, and `parallel.check_pickleable` surfaces flagged instances as
+depth, and `check_pickleable` surfaces flagged instances as
 pickling hazards. Operators that merely *nest* other operators (`Cache`,
 `Try`, the parallel maps, …) do not set the flag: they round-trip, and
 nesting is discovered structurally by `check_pickleable`.
@@ -36,13 +36,13 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
-from pipekit_ops._base.tracing import is_traced
-from pipekit_ops.adapters import BackendError, backend_of, signature_of, to_backend
-from pipekit_ops.guards import report_move
+from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.carriers._adapters import BackendError, backend_of, signature_of, to_backend
+from pipekit_ops.carriers._guards import report_move
 
 
 if TYPE_CHECKING:
-    from pipekit_ops._base.sequential import Sequential
+    from pipekit_ops.core._sequential import Sequential
 
 
 # The carrier that flows through a pipeline. `Carrier = Any` because
@@ -128,7 +128,7 @@ class Operator(ConfigMixin):
         forbid_in_yaml: ``True`` on subclasses that *directly* hold
             non-serialisable user state (callables, closures, runtime
             arrays, RNGs). YAML loaders and `from_state` refuse to
-            instantiate flagged operators; `parallel.check_pickleable`
+            instantiate flagged operators; `check_pickleable`
             surfaces them as pickleability warnings. Operators that only
             nest other operators leave this ``False`` — the walker finds
             flagged children structurally. Default ``False``.
@@ -144,7 +144,7 @@ class Operator(ConfigMixin):
             comes back as JAX. `pipekit_ops.guard` reports each move. An
             input on any other backend, a mix with dask, or a traced input
             of an operator without ``"jax"`` raises
-            `pipekit_ops.adapters.BackendError` before ``_apply`` runs.
+            `pipekit_ops.carriers.BackendError` before ``_apply`` runs.
             Values with no backend (numbers, strings, tables) stay as they
             are.
         traceable: ``False`` on an operator that must not run inside
@@ -172,7 +172,7 @@ class Operator(ConfigMixin):
     traceable: ClassVar[bool] = True
     # Stateful-pipeline marker — `StatefulOperator` overrides to True; the
     # `Sequential` plumbing reads this to decide whether to thread state.
-    # See `pipekit_ops.state` (Group M).
+    # See `pipekit_ops.core` (Group M).
     _is_stateful: ClassVar[bool] = False
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -195,7 +195,7 @@ class Operator(ConfigMixin):
                 construction with a clear message.
         """
         # Lazy import to break the operator <-> graph circular dependency.
-        from pipekit_ops._base.graph import Node
+        from pipekit_ops.core._graph import Node
 
         if any(isinstance(a, Node) for a in args):
             non_node = [
@@ -263,7 +263,7 @@ class Operator(ConfigMixin):
 
         Handed a carrier instead of a signature, the default reads the
         carrier's `Signature` through its registered adapter
-        (`pipekit_ops.adapters.signature_of`), so ``Sequential.summary`` can
+        (`pipekit_ops.carriers.signature_of`), so ``Sequential.summary`` can
         start from data.
 
         The annotation is `Any` rather than `Signature | None` so domain
@@ -332,7 +332,7 @@ class Operator(ConfigMixin):
         ``a | (b | c)`` produces a single three-element `Sequential`.
         """
         # Lazy import — Sequential subclasses Operator.
-        from pipekit_ops._base.sequential import Sequential
+        from pipekit_ops.core._sequential import Sequential
 
         if not isinstance(other, Operator):
             return NotImplemented
@@ -498,15 +498,63 @@ def _decode(value: Any, resolve: Resolver, where: str) -> Any:
 
 
 def current_module(module_name: str) -> str:
-    """Today's name for a module saved before pipekit 0.2.0.
+    """Today's name for a module that a saved state names.
 
     The package was imported as ``pipekit`` until 0.2.0 and as ``pipekit_ops``
-    since, so a state saved earlier names ``pipekit.control`` where today's
-    says ``pipekit_ops.control``. Every other module name passes through.
+    since, so a state saved earlier names ``pipekit.control`` where a later one
+    says ``pipekit_ops.control``. A module that a library moved is renamed as
+    `record_moves` says, so ``pipekit_ops.control`` is now ``pipekit_ops``.
+    Every other module name passes through.
     """
     if module_name == "pipekit" or module_name.startswith("pipekit."):
-        return "pipekit_ops" + module_name.removeprefix("pipekit")
-    return module_name
+        module_name = "pipekit_ops" + module_name.removeprefix("pipekit")
+    return _MOVED.get(module_name, module_name)
+
+
+#: a module that states were saved under -> the module they load from now
+_MOVED: dict[str, str] = {}
+
+
+def record_moves(module: str, *former: str) -> None:
+    """Let states saved under the modules ``former`` load from ``module``.
+
+    The module of an operator is part of its saved state, so a state saved
+    before a library moved its code names a module that no longer exists.
+    `Operator.from_state`, `loads_sandboxed` and the exception records of
+    `Try` and `Retry` all read the name through `current_module`, so one call
+    covers every way a state is loaded.
+
+    Args:
+        module: Where the classes are recorded now, as `record_under` set it.
+        *former: The modules that states were saved under before.
+
+    Example:
+        >>> record_moves("mylib", "mylib.old_ops", "mylib.older_ops")
+    """
+    for name in former:
+        _MOVED[name] = module
+
+
+def record_under(module: str, *classes: type) -> None:
+    """Record ``classes`` under ``module``, wherever their code is.
+
+    A saved state and `pipeline_hash` name an operator by its module, so
+    recording it under the module that a library imports it from keeps both
+    the same when the code moves between files. ``module`` must hold each
+    class by its name, so that pickle finds it there too.
+
+    Args:
+        module: The module that a library imports the classes from.
+        *classes: The classes, operators and exceptions alike.
+
+    Raises:
+        ValueError: if ``module`` is imported and has no class of that name.
+    """
+    holder = sys.modules.get(module)
+    for cls in classes:
+        if holder is not None and getattr(holder, cls.__name__, None) is not cls:
+            raise ValueError(f"{module} has no {cls.__name__} to record it under.")
+        cls.__module__ = module
 
 
 def _resolve_exception(path: Any) -> type[BaseException]:

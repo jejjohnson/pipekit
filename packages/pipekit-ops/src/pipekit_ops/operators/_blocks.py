@@ -23,8 +23,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator
-from pipekit_ops._base.tracing import is_traced
+from pipekit_ops.core._operator import Operator
+from pipekit_ops.carriers._tracing import is_traced
 
 
 class Identity(Operator):

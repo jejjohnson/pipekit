@@ -1,7 +1,7 @@
 """Group G — caching.
 
 Hash-keyed memoisation as a composable operator, in memory by default
-or in a named `Store` (`pipekit_ops.store`), such as a `DirectoryStore`
+or in a named `Store` (`pipekit_ops.saving`), such as a `DirectoryStore`
 that survives a restart.
 
 - `Cache(inner, store=None, key=None)` — wraps any operator; caches
@@ -37,11 +37,11 @@ from __future__ import annotations
 import threading
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator, nested_config, require_operator
-from pipekit_ops._base.tracing import is_traced
-from pipekit_ops.dicts import require_child
-from pipekit_ops.hashing import pipeline_hash, sha256_hex, stable_repr
-from pipekit_ops.store import MemoryStore, Store, resolve_store
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
+from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.operators._dicts import require_child
+from pipekit_ops.saving._hashing import pipeline_hash, sha256_hex, stable_repr
+from pipekit_ops.saving._store import MemoryStore, Store, resolve_store
 
 
 class Cache(Operator):

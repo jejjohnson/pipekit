@@ -19,13 +19,13 @@ from collections import deque
 from concurrent.futures import Future, wait
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator, nested_config, require_operator
-from pipekit_ops._base.tracing import is_traced
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
+from pipekit_ops.carriers._tracing import is_traced
 
 
 __all__ = ["RateLimit", "Timeout", "Until"]
 
-log = logging.getLogger("pipekit_ops.flow")
+log = logging.getLogger("pipekit_ops.operators")
 
 ON_MAX = ("raise", "return")
 
@@ -88,7 +88,7 @@ class Timeout(Operator):
     That suits the case this exists for, a network read with no timeout of
     its own. When more than ``max_abandoned`` abandoned threads are still
     running in the process, each further timeout logs a warning on
-    ``pipekit_ops.flow``. A process-based timeout is a later phase.
+    ``pipekit_ops.operators``. A process-based timeout is a later phase.
 
     Args:
         op: The operator to bound.

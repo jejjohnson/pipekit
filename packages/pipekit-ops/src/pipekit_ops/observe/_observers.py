@@ -46,9 +46,9 @@ import warnings
 from collections.abc import Callable, Iterable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator, nested_config, require_operator
-from pipekit_ops._base.tracing import is_traced
-from pipekit_ops.adapters import MissingAdapterError, get_adapter
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
+from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.carriers._adapters import MissingAdapterError, get_adapter
 
 
 #: the fields a `Log` message may name

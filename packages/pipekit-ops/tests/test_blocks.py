@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.blocks` — Group C."""
+"""Tests for `pipekit_ops.operators` — Group C."""
 
 from __future__ import annotations
 

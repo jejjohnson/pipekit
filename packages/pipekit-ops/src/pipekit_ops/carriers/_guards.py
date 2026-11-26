@@ -20,7 +20,7 @@ import warnings
 from collections.abc import Iterator
 from typing import Literal, get_args
 
-from pipekit_ops.adapters import BackendError
+from pipekit_ops.carriers._adapters import BackendError
 
 
 __all__ = ["BackendWarning", "GuardLevel", "guard", "guard_level", "report_move"]

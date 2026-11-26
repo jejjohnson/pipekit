@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.combine` — Group F."""
+"""Tests for `pipekit_ops.operators` — Group F."""
 
 from __future__ import annotations
 

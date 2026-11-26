@@ -20,8 +20,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pipekit_ops._base.operator import Operator
-from pipekit_ops._base.sequential import Sequential
+from pipekit_ops.core._operator import Operator
+from pipekit_ops.core._sequential import Sequential
 
 
 def pipe(value: Any, *operators: Operator) -> Any:

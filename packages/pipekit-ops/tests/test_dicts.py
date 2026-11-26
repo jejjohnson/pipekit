@@ -26,7 +26,7 @@ from pipekit_ops import (
     dumps,
     loads,
 )
-from pipekit_ops.hashing import stable_json
+from pipekit_ops.saving._hashing import stable_json
 
 
 #: G1-1: 200 random inputs per operator, from a fixed seed.

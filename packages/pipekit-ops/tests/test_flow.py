@@ -27,9 +27,9 @@ from pipekit_ops import (
     Timeout,
     Until,
     dumps,
-    flow,
     loads,
 )
+from pipekit_ops.operators import _flow as flow
 
 
 # --- test operators ---------------------------------------------------------
@@ -265,12 +265,12 @@ def test_timeout_reraises_the_operators_own_error():
 def test_timeout_warns_when_abandoned_threads_pile_up(caplog):
     blocked = Blocked(n_hangs=2)
     timed = Timeout(blocked, seconds=0.01, max_abandoned=1)
-    with caplog.at_level(logging.WARNING, logger="pipekit_ops.flow"):
+    with caplog.at_level(logging.WARNING, logger="pipekit_ops.operators"):
         for _ in range(2):
             with pytest.raises(TimeoutError):
                 timed(1)
     blocked.unblock(n_blocked=2)
-    warnings = [r for r in caplog.records if r.name == "pipekit_ops.flow"]
+    warnings = [r for r in caplog.records if r.name == "pipekit_ops.operators"]
     # the first abandoned thread is within the limit, the second is not
     assert len(warnings) == 1
     assert "2 abandoned threads" in warnings[0].getMessage()

@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops._base.sequential` — Sequential."""
+"""Tests for `pipekit_ops.core` — Sequential."""
 
 from __future__ import annotations
 

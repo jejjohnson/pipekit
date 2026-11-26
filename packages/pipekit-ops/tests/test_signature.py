@@ -1,10 +1,10 @@
-"""Tests for `pipekit_ops.signature` — Group I."""
+"""Tests for `pipekit_ops.carriers` — Group I."""
 
 from __future__ import annotations
 
 import pytest
 from pipekit_ops import Operator, Sequential, Signature
-from pipekit_ops.signature import compute_output_signature
+from pipekit_ops.carriers._signature import compute_output_signature
 
 
 def test_signature_format():

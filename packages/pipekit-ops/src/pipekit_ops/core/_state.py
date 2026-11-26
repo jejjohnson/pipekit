@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator
+from pipekit_ops.core._operator import Operator
 
 
 class StatefulOperator(Operator):
