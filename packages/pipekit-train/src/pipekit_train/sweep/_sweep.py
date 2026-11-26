@@ -29,7 +29,7 @@ from typing import Any, ClassVar, Literal
 
 from pipekit_ops import CarryState, Operator, StatefulOperator
 
-from pipekit_train.loop import TrainingLoop
+from pipekit_train.loop._loop import TrainingLoop
 
 
 # ---------------------------------------------------------------------

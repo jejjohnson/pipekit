@@ -27,15 +27,15 @@ import jax.numpy as jnp
 import optax
 from jax.sharding import Mesh, PartitionSpec
 from pipekit_train import MSE, IterableDataset, TrainingDataset, TrainingLoop
-from pipekit_train.adapters.equinox import (
+from pipekit_train.backends.equinox import (
     EquinoxModelOp,
     ShardingSpec,
     TrainState,
-    _BatchSource,
     restore_state,
     save_state,
     shard_train_state,
 )
+from pipekit_train.backends.equinox._batches import _BatchSource
 
 
 if len(jax.devices()) < 2:
@@ -203,7 +203,7 @@ def test_sharded_checkpoint_roundtrip() -> None:
 
 @pytest.mark.parametrize("dataset_kind", ["grain", "streaming"])
 def test_sharded_training_converges(dataset_kind: str) -> None:
-    from pipekit_train.adapters.equinox import run as equinox_run
+    from pipekit_train.backends.equinox import run as equinox_run
 
     spec = _spec()
     pairs = _pairs(n=64)
@@ -246,7 +246,7 @@ def test_sharded_training_converges(dataset_kind: str) -> None:
 
 
 def test_sharded_training_runs_compiled_eval_with_a_short_last_batch() -> None:
-    from pipekit_train.adapters.equinox import run as equinox_run
+    from pipekit_train.backends.equinox import run as equinox_run
 
     class RecordEval:
         def __init__(self) -> None:

@@ -38,12 +38,8 @@ def _worker(process_id: int, num_processes: int, coordinator: str, q: Any) -> No
         import numpy as np
         import optax
         from jax.sharding import Mesh, PartitionSpec
-        from pipekit_train.adapters.equinox import (
-            ShardingSpec,
-            TrainState,
-            _BatchSource,
-            train_step,
-        )
+        from pipekit_train.backends.equinox import ShardingSpec, TrainState, train_step
+        from pipekit_train.backends.equinox._batches import _BatchSource
 
         jax.distributed.initialize(
             coordinator_address=coordinator,

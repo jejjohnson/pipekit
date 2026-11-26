@@ -1,4 +1,4 @@
-"""Tests for `pipekit_train.writer.JSONLWriter`."""
+"""Tests for `pipekit_train.loop.JSONLWriter`."""
 
 from __future__ import annotations
 

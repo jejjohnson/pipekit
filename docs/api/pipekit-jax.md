@@ -2,7 +2,7 @@
 
 JAX / Equinox carrier integration for `pipekit`. Ships `JaxModelOp`
 (the public counterpart of the in-package
-`pipekit_train.adapters.equinox.EquinoxModelOp`, adding byte-identical
+`pipekit_train.backends.equinox.EquinoxModelOp`, adding byte-identical
 weight round-trip through `pipekit_experiment.ModelRegistry` via the
 registry's `weights` blob), and `ScanCycle`, `EnsembleScanCycle` and
 `Rollout`, the jit-native cycles.

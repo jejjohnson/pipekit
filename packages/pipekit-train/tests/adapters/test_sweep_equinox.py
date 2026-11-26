@@ -31,7 +31,7 @@ from pipekit_train import (
     SweepResult,
     TrainingLoop,
 )
-from pipekit_train.adapters.equinox import EquinoxModelOp
+from pipekit_train.backends.equinox import EquinoxModelOp
 
 
 # ---------------------------------------------------------------------

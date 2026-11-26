@@ -87,9 +87,9 @@ hierarchies satisfy these structurally.
 
 | Protocol | Module | Contract |
 |----------|--------|----------|
-| `Loss` | `pipekit_train.loss` | Carrier-agnostic loss callable |
-| `Callback` | `pipekit_train.callbacks` | Training-loop hook points |
-| `MetricWriter` | `pipekit_train.writer` | Metric sink (`JSONLWriter` is the reference impl) |
+| `Loss` | `pipekit_train.losses` | Carrier-agnostic loss callable |
+| `Callback` | `pipekit_train.loop` | Training-loop hook points |
+| `MetricWriter` | `pipekit_train.loop` | Metric sink (`JSONLWriter` is the reference impl) |
 
 ## Benchmarking (`pipekit_evaluate.benchmark.protocols`)
 

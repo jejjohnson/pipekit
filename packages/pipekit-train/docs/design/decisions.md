@@ -459,6 +459,19 @@ the mask by accident, because `valid` is a required argument of `eval_fn`, where
 adding it to `loss_fn` would let a task silently average padded rows. The adapter
 doesn't shard evaluation yet; this makes that possible.
 
+
+---
+
+## D17: Five areas, and backends that are areas of their own (#297)
+
+**Status:** accepted
+
+**Context:** The package was six flat modules and an `adapters` package whose name meant something else in pipekit-ops (named-array adapters) and in pipekit-experiment (tool integrations). The Equinox adapter was one file of 1146 lines holding the model operator, the training state, sharding, batching, evaluation and the run. pipekit-ops (O17) and pipekit-array (A30) are already areas.
+
+**Decision:** The package is `data`, `losses`, `loop`, `sweep` and `backends`, and an area imports only from the ones before it. `backends` holds one area per backend, `equinox`, `numpyro`, `blackjax` and `keras`, each behind its extra, with the seam that NumPyro and BlackJAX share in `backends._bayes`. The Equinox area is six files (`_model`, `_sharding`, `_state`, `_batches`, `_evaluation`, `_run`), each with one job. `TrainingLoop` names each backend by its area and the function that runs it, so `numpyro-svi` and `numpyro-mcmc` are `run_svi` and `run_mcmc` of one area. The operators of the first four areas are recorded under `pipekit_train`, and each backend's under its area, with `record_under`; `record_moves` lets a state saved under a flat module (`pipekit_train.loss`, `pipekit_train.adapters.equinox`, …) load.
+
+**Consequences:** `from pipekit_train.adapters.equinox import EquinoxModelOp` becomes `from pipekit_train.backends.equinox import EquinoxModelOp`, without a deprecation window. The hash of a saved training pipeline changes once. `call_loss`, `Split` and `hash_config` are now public names of their areas. Importing pipekit-train still imports no backend.
+
 ---
 
 ## Resolved Questions

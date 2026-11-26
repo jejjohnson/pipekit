@@ -9,7 +9,7 @@ reference implementation and is tested in ``tests/adapters/test_equinox.py``.)
 from __future__ import annotations
 
 import pytest
-from pipekit_train.adapters import keras as keras_adapter
+from pipekit_train.backends import keras as keras_adapter
 
 
 def test_keras_adapter_run_raises_not_implemented():

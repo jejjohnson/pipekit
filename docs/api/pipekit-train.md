@@ -11,23 +11,20 @@ reference: Report 11.
 The full multi-file design lives in the package:
 [`packages/pipekit-train/docs/design/`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design).
 
+The package is five areas, each with one job, and an area imports only from the ones before it ([D17](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/decisions.md)).
+Each backend is an area of its own under `pipekit_train.backends`, behind its extra.
+
 ## Datasets
 
-::: pipekit_train.dataset
+::: pipekit_train.data
 
 ## Losses
 
-::: pipekit_train.loss
-
-## Callbacks
-
-::: pipekit_train.callbacks
-
-## Metric writers
-
-::: pipekit_train.writer
+::: pipekit_train.losses
 
 ## Training loop
+
+The loop, its callbacks and its metric writers.
 
 ::: pipekit_train.loop
 
@@ -35,14 +32,11 @@ The full multi-file design lives in the package:
 
 ::: pipekit_train.sweep
 
-## Backend adapters
+## Backends
 
-The Equinox+Optax+Orbax adapter is the v0.1 reference. The Keras
-adapter module ships as a scaffold that raises `NotImplementedError`
-on `run()` until v0.3 lands — see
-[`adapters.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/api/adapters.md)
-for the planned designs.
+The Equinox, Optax and Orbax backend is the v0.1 reference.
+The Keras backend ships as a scaffold that raises `NotImplementedError` on `run()` until v0.3 lands; see [`adapters.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/api/adapters.md) for the planned designs.
 
-### Equinox (v0.1 reference)
+### Equinox
 
-::: pipekit_train.adapters.equinox
+::: pipekit_train.backends.equinox
