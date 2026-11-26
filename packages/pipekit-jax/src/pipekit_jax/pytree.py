@@ -53,7 +53,7 @@ from typing import Any, NamedTuple
 
 import jax
 from pipekit_ops import Graph, Sequential
-from pipekit_ops._base.graph import Input, Node
+from pipekit_ops.core import Input, Node
 
 from pipekit_jax.model_op import JaxModelOp
 

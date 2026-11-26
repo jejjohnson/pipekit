@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops._base.graph` — Graph + Input + Node."""
+"""Tests for `pipekit_ops.core` — Graph + Input + Node."""
 
 from __future__ import annotations
 

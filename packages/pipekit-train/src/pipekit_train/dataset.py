@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable, Iterator
 from typing import Any, ClassVar, Literal, cast
 
 from pipekit_ops import CarryState, Operator
-from pipekit_ops.hashing import sha256_hex, stable_json, stable_repr
+from pipekit_ops.saving import sha256_hex, stable_json, stable_repr
 
 from pipekit_train._signatures import accepts_keyword
 

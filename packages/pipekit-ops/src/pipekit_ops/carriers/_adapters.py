@@ -41,7 +41,7 @@ import sys
 from collections.abc import Callable, Mapping
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from pipekit_ops.signature import Signature
+from pipekit_ops.carriers._signature import Signature
 
 
 __all__ = [

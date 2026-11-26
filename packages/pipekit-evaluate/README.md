@@ -54,7 +54,7 @@ Both are libraries in their own right, which you can build on directly.
 ```
 
 - **pipekit-ops** is a required dependency, beside NumPy and SciPy.
-  The report hash uses `pipekit_ops.hashing`, and a metric can be any callable, a pipekit operator included.
+  The report hash uses `pipekit_ops.saving`, and a metric can be any callable, a pipekit operator included.
 - **pipekit-array** is not a dependency and is not used.
 - **pipekit-cycle** is optional: a benchmark `Task` returns its `ForwardModel` and `ObservationOperator`, which this package names only for type checking.
 

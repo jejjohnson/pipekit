@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.state` — Group M (StatefulOperator + CarryState)."""
+"""Tests for `pipekit_ops.core` — Group M (StatefulOperator + CarryState)."""
 
 from __future__ import annotations
 

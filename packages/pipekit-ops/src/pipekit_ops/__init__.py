@@ -1,174 +1,170 @@
-"""pipekit — carrier-agnostic operator-graph framework.
+"""pipekit-ops — the carrier-agnostic operator-graph framework.
 
-The v0.1 public surface, grouped by module:
+Seven areas, each with one job. An area imports only from the ones before it,
+and `pipekit_ops.testing` from all of them.
 
-- **Group A — foundations** (`_base/`): `Operator`, `ConfigMixin`,
-  `Sequential`, `Graph` + `Input` + `Node`.
-- **Group B — composition convenience** (`compose`):
-  `pipe`, `compose`, `compose_left`, `complement`, `juxt`.
-- **Group C — building blocks** (`blocks`):
-  `Identity`, `Const`, `Lambda`, `Sink`.
-- **Group D — control flow** (`control`):
-  `Branch`, `Switch`, `Try`, `Coalesce`, `Retry`.
-- **Flow limits** (`flow`): `Timeout`, `RateLimit`, `Until`.
-- **Group E — observers** (`observe`):
-  `Tap`, `Snapshot`, `ShapeTrace`, `Profile`, `Histogram`, `Log`.
-- **Group F — combination** (`combine`): `Fanout`.
-- **Dict plumbing** (`dicts`): `Get`, `GetIn`, `Pick`, `Dissoc`, `Rename`,
-  `Merge`, `Assoc`, `UpdateIn`, `ValMap`.
-- **Iterables** (`seq`): `Not`, `Filter`, `Remove`, `Reduce`,
-  `PartitionAll`, `Concat`, `Zip`, `GroupBy`, `CountBy`, `Count`, `Unique`,
-  `Take`, `SortBy`.
-- **Group G — caching** (`cache`): `Cache`, `Memoize`.
-- **Group H — quality control** (`qc`): `Quarantine`, `AssertShape`,
-  `AssertDType`, `AssertHasAttribute`, `AssertCallable`, `AssertThat`,
-  `AssertSignature`, `QCError`.
-- **Group I — shape inference** (`signature`): `Signature`.
-- **Group J — parallelism** (`parallel`): `ThreadMap`, `ProcessMap`,
-  `AsyncMap`, `BatchedMap`, `check_pickleable`.
-- **Execution** (`execution`): `Map`, `executor_scope`, `MapError`,
-  `Failed`, `Prefetch`, `Fold` — one engine over serial, thread, process,
-  async and any borrowed `concurrent.futures.Executor`.
-- **Group K — stores** (`store`): `Store`, `MemoryStore`,
-  `DirectoryStore`, `store_scope` — where ``Cache(op, store=name)`` keeps
-  its entries, bound around the call; a `DirectoryStore` survives a
-  restart and is shared by processes on one file system.
-- **Group L — serialisation** (`serial`): `dumps`, `loads`,
-  `loads_sandboxed`, `from_state_sandboxed`, `register`, `unregister`,
-  `allowed`.
-- **Group M — state primitives** (`state`): `StatefulOperator`,
-  `CarryState`.
-- **Group N — structural protocols** (`protocols`): `Predictor`,
-  `FittableTransformer`.
-- **Named-array adapters** (`adapters`): `NamedArrayAdapter`,
-  `LabelledAdapter` (the optional ``relabel``), `ConvertingAdapter` (the
-  optional ``to_backend``), `MissingValueAdapter` (the optional
-  ``keep_missing``),
-  `register_adapter`, `register_lazy_adapter`, `unregister_adapter`,
-  `get_adapter`,
-  `signature_of`, `MissingAdapterError` — how carrier-agnostic code
-  reaches a carrier with named dims; `backend_of`, `backend_name` and
-  `BackendError` — the array backend an input sits on, which
-  ``Operator.backends`` is about; `to_backend` moves a value between NumPy
-  and JAX.
-- **Guards** (`guards`): `guard(level)` reports data moving between NumPy and
-  JAX, off by default; `report_move`, `guard_level` and `BackendWarning`.
-- **Jittability** (`jit`): `jit_report(op, x)` says which steps run under
-  ``jax.jit`` and why the others do not; `JitReport`, `JitStep`.
-- **Import hooks** (`imports`): `on_import(name, callback)` runs code once
-  a module is imported without importing it (JAX pytree registration);
-  `import_optional` imports a module of an extra, or says what to install.
-- **Tracing**: `is_traced` and `is_concrete` say whether a value has a JAX
-  tracer in it, without importing JAX.
+- `pipekit_ops.carriers`: how code reaches a value. `NamedArrayAdapter` and its
+  registry, `backend_of`, `to_backend`, `Signature`, `guard`, `is_traced`,
+  `on_import` and `import_optional`.
+- `pipekit_ops.core`: `Operator`, `ConfigMixin`, `Sequential`, `Graph`,
+  `StatefulOperator`, `CarryState`, `Predictor`, `pipe` and `compose`; and the
+  helpers for libraries that write operators (`nested_config`,
+  `require_operator`, `resolve_loaded`, `record_under`, `record_moves`).
+- `pipekit_ops.saving`: `dumps`, `loads`, `loads_sandboxed`, `pipeline_hash`
+  with `stable_json` and `sha256_hex`, and the stores that `Cache` keeps its
+  entries in.
+- `pipekit_ops.operators`: the ready-made operators. Blocks, dict and iterable
+  plumbing, `Fanout`, control flow, flow limits, `Cache` and quality control.
+- `pipekit_ops.execution`: `Map` and its presets (`ThreadMap`, `ProcessMap`,
+  `AsyncMap`, `BatchedMap`), `Prefetch` and `Fold`.
+- `pipekit_ops.observe`: the observers (`Tap`, `Snapshot`, `Profile`, …) and
+  `jit_report`.
+- `pipekit_ops.testing`: `assert_round_trip` and `public_operators`, for the
+  test suites of other libraries.
 
-Hashing: `pipeline_hash(op)` is the content hash of a whole pipeline,
-the one the pipekit-experiment registries store under. `pipekit_ops.hashing`
-also holds the stable-hash primitives (`stable_json`, `stable_repr`,
-`sha256_hex`) reused by `Cache` and the pipekit-train datasets.
+This package re-exports the names of the first six areas, so
+``import pipekit_ops as pk; pk.Map`` works as it always has. Import a name from
+the package or from its area, never from a file in an area.
 
-Testing: `pipekit_ops.testing.assert_round_trip(op, *inputs)` checks the
-config round-trip contract (same `pipeline_hash`, same output after
-``loads(dumps(op))``) from a library's own test suite.
-
-See the master plan (Report 2) for the full v0.1 inventory.
+A saved pipeline records each of these classes under ``pipekit_ops``, wherever
+its file is, and a state saved under a module of the flat layout before 0.4.0
+(``pipekit_ops.control``, ``pipekit_ops._base.operator``, …) still loads.
 """
 
-from pipekit_ops._base.graph import Graph, Input, Node
-from pipekit_ops._base.operator import Carrier, ConfigMixin, Operator
-from pipekit_ops._base.sequential import Sequential
-from pipekit_ops._base.tracing import is_concrete, is_traced
-from pipekit_ops.adapters import (
+from __future__ import annotations
+
+from pipekit_ops.carriers import (
     BackendError,
+    BackendWarning,
     ConvertingAdapter,
     LabelledAdapter,
     MissingAdapterError,
     MissingValueAdapter,
     NamedArrayAdapter,
+    Signature,
     backend_name,
     backend_of,
+    compute_output_signature,
     get_adapter,
+    guard,
+    guard_level,
+    import_optional,
+    is_concrete,
+    is_traced,
+    on_import,
     register_adapter,
     register_lazy_adapter,
+    report_move,
     signature_of,
     to_backend,
     unregister_adapter,
 )
-from pipekit_ops.blocks import Const, Identity, Lambda, Sink
-from pipekit_ops.cache import Cache, Memoize
-from pipekit_ops.combine import Fanout
-from pipekit_ops.compose import complement, compose, compose_left, juxt, pipe
-from pipekit_ops.control import Branch, Coalesce, Retry, Switch, Try
-from pipekit_ops.dicts import (
-    Assoc,
-    Dissoc,
-    Get,
-    GetIn,
-    Merge,
-    Pick,
-    Rename,
-    UpdateIn,
-    ValMap,
+from pipekit_ops.core import (
+    Carrier,
+    CarryState,
+    ConfigMixin,
+    FittableTransformer,
+    Graph,
+    Input,
+    Node,
+    Operator,
+    Predictor,
+    Sequential,
+    StatefulOperator,
+    complement,
+    compose,
+    compose_left,
+    juxt,
+    pipe,
+    record_moves,
+    record_under,
 )
 from pipekit_ops.execution import (
+    AsyncMap,
+    BatchedMap,
     Failed,
     Fold,
     Map,
     MapError,
     Prefetch,
-    executor_scope,
-)
-from pipekit_ops.flow import RateLimit, Timeout, Until
-from pipekit_ops.guards import BackendWarning, guard, guard_level, report_move
-from pipekit_ops.hashing import pipeline_hash
-from pipekit_ops.imports import import_optional, on_import
-from pipekit_ops.jit import JitReport, JitStep, jit_report
-from pipekit_ops.observe import Histogram, Log, Profile, ShapeTrace, Snapshot, Tap
-from pipekit_ops.parallel import (
-    AsyncMap,
-    BatchedMap,
     ProcessMap,
     ThreadMap,
     check_pickleable,
+    executor_scope,
 )
-from pipekit_ops.protocols import FittableTransformer, Predictor
-from pipekit_ops.qc import (
+from pipekit_ops.observe import (
+    Histogram,
+    JitReport,
+    JitStep,
+    Log,
+    Profile,
+    ShapeTrace,
+    Snapshot,
+    Tap,
+    jit_report,
+)
+from pipekit_ops.operators import (
     AssertCallable,
     AssertDType,
     AssertHasAttribute,
     AssertShape,
     AssertSignature,
     AssertThat,
-    QCError,
-    Quarantine,
-)
-from pipekit_ops.seq import (
+    Assoc,
+    Branch,
+    Cache,
+    Coalesce,
     Concat,
+    Const,
     Count,
     CountBy,
+    Dissoc,
+    Fanout,
     Filter,
+    Get,
+    GetIn,
     GroupBy,
+    Identity,
+    Lambda,
+    Memoize,
+    Merge,
     Not,
     PartitionAll,
+    Pick,
+    QCError,
+    Quarantine,
+    RateLimit,
     Reduce,
     Remove,
+    Rename,
+    Retry,
+    Sink,
     SortBy,
+    Switch,
     Take,
+    Timeout,
+    Try,
     Unique,
+    Until,
+    UpdateIn,
+    ValMap,
     Zip,
 )
-from pipekit_ops.serial import (
+from pipekit_ops.saving import (
+    DirectoryStore,
+    MemoryStore,
+    Store,
     allowed,
     dumps,
     from_state_sandboxed,
     loads,
     loads_sandboxed,
+    pipeline_hash,
     register,
+    store_scope,
     unregister,
     upgrade_state,
 )
-from pipekit_ops.signature import Signature, compute_output_signature
-from pipekit_ops.state import CarryState, StatefulOperator
-from pipekit_ops.store import DirectoryStore, MemoryStore, Store, store_scope
 
 
 __all__ = [
@@ -291,5 +287,48 @@ __all__ = [
     "unregister_adapter",
     "upgrade_state",
 ]
+
+
+#: the modules of the flat layout before 0.4.0, which saved states name
+_FORMER = (
+    "pipekit_ops._base",
+    "pipekit_ops._base.graph",
+    "pipekit_ops._base.operator",
+    "pipekit_ops._base.sequential",
+    "pipekit_ops._base.tracing",
+    "pipekit_ops.adapters",
+    "pipekit_ops.blocks",
+    "pipekit_ops.cache",
+    "pipekit_ops.combine",
+    "pipekit_ops.compose",
+    "pipekit_ops.control",
+    "pipekit_ops.dicts",
+    "pipekit_ops.execution",
+    "pipekit_ops.flow",
+    "pipekit_ops.guards",
+    "pipekit_ops.hashing",
+    "pipekit_ops.imports",
+    "pipekit_ops.jit",
+    "pipekit_ops.observe",
+    "pipekit_ops.parallel",
+    "pipekit_ops.protocols",
+    "pipekit_ops.qc",
+    "pipekit_ops.seq",
+    "pipekit_ops.serial",
+    "pipekit_ops.signature",
+    "pipekit_ops.state",
+    "pipekit_ops.store",
+)
+
+record_under(
+    __name__,
+    *(
+        value
+        for name in __all__
+        if isinstance(value := globals()[name], type)
+        and value.__module__.startswith(f"{__name__}.")
+    ),
+)
+record_moves(__name__, *_FORMER)
 
 __version__ = "0.3.0"  # x-release-please-version

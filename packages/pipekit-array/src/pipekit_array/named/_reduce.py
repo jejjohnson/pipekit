@@ -18,7 +18,7 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Any
 
-from pipekit_ops.adapters import backend_name
+from pipekit_ops.carriers import backend_name
 
 from pipekit_array.named._dispatch import (
     Reduction,

@@ -79,8 +79,7 @@ def test_to_yaml_round_trip():
 def test_to_yaml_writes_a_flat_operator_as_one_mapping():
     pytest.importorskip("yaml")
     assert (
-        HydraConfigLoader.to_yaml(Const(7))
-        == "_target_: pipekit_ops.blocks.Const\nvalue: 7\n"
+        HydraConfigLoader.to_yaml(Const(7)) == "_target_: pipekit_ops.Const\nvalue: 7\n"
     )
 
 

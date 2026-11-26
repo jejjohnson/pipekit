@@ -25,7 +25,7 @@ from pipekit_array.named._dispatch import adapter_of, axes_of, fast_path, namesp
 
 
 if TYPE_CHECKING:
-    from pipekit_ops.adapters import LabelledAdapter
+    from pipekit_ops.carriers import LabelledAdapter
 
 
 __all__ = [

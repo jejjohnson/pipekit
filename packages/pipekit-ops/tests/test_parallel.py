@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.parallel` — Group J."""
+"""Tests for `pipekit_ops.execution` — Group J."""
 
 from __future__ import annotations
 
@@ -84,14 +84,14 @@ def test_processmap_returns_results_in_order():
 
 def test_processmap_log_and_continue(caplog):
     op = ProcessMap(SometimesFail(), n_workers=2, on_error="log_and_continue")
-    with caplog.at_level("WARNING", logger="pipekit_ops.parallel"):
+    with caplog.at_level("WARNING", logger="pipekit_ops.execution"):
         out = op([1, -1, 2])
     assert out[0] == 1
     assert out[1] is None
     assert out[2] == 2
     # reported through logging, with the traceback, not printed to stderr
     (record,) = caplog.records
-    assert record.name == "pipekit_ops.parallel"
+    assert record.name == "pipekit_ops.execution"
     assert "item 1 failed with ValueError" in record.getMessage()
     assert record.exc_info is not None
 
@@ -227,7 +227,7 @@ def test_maps_are_not_forbid_in_yaml():
 
 
 def test_g2_6_preset_hashes_are_kept():
-    """Full digests recorded at ``903b0c3``, before the presets moved onto Map."""
+    """Full digests since 0.4.0, which records each class under ``pipekit_ops``."""
     presets = [
         ThreadMap(Identity(), n_workers=4),
         ProcessMap(Identity()),
@@ -235,10 +235,10 @@ def test_g2_6_preset_hashes_are_kept():
         BatchedMap(Identity()),
     ]
     assert [pipeline_hash(preset) for preset in presets] == [
-        "be9cbf3c8a67e2dca1aa8571b8945a5627f3e49bce6a1a3ba89582a7cf2420bd",
-        "df4f9dd1232c0a142f62627958e0d0c5e3459a9ea1ef2180c144ce72ad95765b",
-        "2132e0bfb39a71e00728523de07ec9d0dd72cebbe812abf1e56b6265a701b081",
-        "70dec7fb25292cc5a75b625f92ebe1c976d76dd4d8ea91f5596659d7d988bf90",
+        "511c937666610afc810e40cd90110b856b5738d58cf1bd2e9e55c3bc00b0d521",
+        "456e0cd58abc234aee3507871147d09c599e8116f23550191c1465da11e3fc56",
+        "1e2d7e196ed1f7511330f02539b04a364a904637af91b5d3090a97cf9b7f1860",
+        "ad880ae71378e29ed7ca4a65f5a24a91b22ebb4622749cc35121ecd4c2f8acc5",
     ]
 
 
@@ -278,7 +278,7 @@ def test_g2_3_processmap_fails_fast_wall_time():
 
 def test_processmap_log_keeps_its_prefix(caplog):
     op = ProcessMap(SometimesFail(), n_workers=2, on_error="log_and_continue")
-    with caplog.at_level("WARNING", logger="pipekit_ops.parallel"):
+    with caplog.at_level("WARNING", logger="pipekit_ops.execution"):
         op([-1])
     (record,) = caplog.records
     assert record.getMessage().startswith("ProcessMap: item 0 failed")

@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pipekit_ops._base.operator import Operator, build_operator, current_module
+from pipekit_ops.core._operator import Operator, build_operator, current_module
 
 
 def dumps(op: Operator) -> str:
@@ -86,11 +86,12 @@ _ALLOWED: dict[str, type[Operator]] = {}
 
 
 def upgrade_state(state: Any) -> Any:
-    """``state`` with module names saved before pipekit 0.2.0 renamed.
+    """``state`` with the module names of older releases renamed.
 
-    The core was imported as ``pipekit`` until 0.2.0, so a state saved
-    earlier names ``pipekit.control`` where today's says
-    ``pipekit_ops.control``. Loading accepts both; this rewrites the old
+    The core was imported as ``pipekit`` until 0.2.0, and its classes were
+    recorded under their files until 0.4.0, so a state saved earlier names
+    ``pipekit.control`` or ``pipekit_ops.control`` where today's says
+    ``pipekit_ops``. Loading accepts all three; this rewrites the old
     names in operator records (``module`` beside ``class``) and exception
     records (``{"exception": "module.Name"}``), so a stored state can be
     compared with ``op.state`` of the operator rebuilt from it. Everything
@@ -104,7 +105,7 @@ def upgrade_state(state: Any) -> Any:
 
     Examples:
         >>> upgrade_state({"module": "pipekit.blocks", "class": "Const", "config": {}})
-        {'module': 'pipekit_ops.blocks', 'class': 'Const', 'config': {}}
+        {'module': 'pipekit_ops', 'class': 'Const', 'config': {}}
     """
     if isinstance(state, list):
         return [upgrade_state(item) for item in state]
@@ -112,7 +113,10 @@ def upgrade_state(state: Any) -> Any:
         return state
     out = {key: upgrade_state(value) for key, value in state.items()}
     if set(out) == {"exception"} and isinstance(out["exception"], str):
-        out["exception"] = current_module(out["exception"])
+        # the record is ``module.Name``: rename the module, keep the name
+        module, dot, name = out["exception"].rpartition(".")
+        if dot:
+            out["exception"] = f"{current_module(module)}.{name}"
     elif "class" in out and isinstance(out.get("module"), str):
         out["module"] = current_module(out["module"])
     return out

@@ -1,4 +1,4 @@
-"""Tests for the Group N structural protocols (`pipekit_ops.protocols`)."""
+"""Tests for the Group N structural protocols (`pipekit_ops.core`)."""
 
 from __future__ import annotations
 

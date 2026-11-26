@@ -32,10 +32,10 @@ from pipekit_ops import (
     MapError,
     Operator,
     Prefetch,
-    execution as execution_module,
     executor_scope,
     pipeline_hash,
 )
+from pipekit_ops.execution import _map as execution_module
 
 from tests._execution_ops import (
     AddPair,
@@ -272,10 +272,10 @@ def test_iter_collect_yields_failed_records_then_raises():
 
 def test_g2_5_log_and_continue(caplog):
     mapped = Map(FailOn((3,)), executor="thread", on_error="log_and_continue")
-    with caplog.at_level(logging.WARNING, logger="pipekit_ops.parallel"):
+    with caplog.at_level(logging.WARNING, logger="pipekit_ops.execution"):
         out = mapped(range(10))
     assert out == [0, 1, 2, None, 4, 5, 6, 7, 8, 9]
-    records = [r for r in caplog.records if r.name == "pipekit_ops.parallel"]
+    records = [r for r in caplog.records if r.name == "pipekit_ops.execution"]
     assert len(records) == 1
     assert records[0].levelno == logging.WARNING
     assert "item 3" in records[0].getMessage()

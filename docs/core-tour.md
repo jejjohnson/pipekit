@@ -504,7 +504,7 @@ allowed by default, pipekit's own containers included.
 import pipekit_ops as pk
 
 pk.dumps(pk.Const(3))
-# → '{"class": "Const", "config": {"value": 3}, "module": "pipekit_ops.blocks"}'
+# → '{"class": "Const", "config": {"value": 3}, "module": "pipekit_ops"}'
 pk.loads(pk.dumps(Scale(2.0)))  # → Scale(factor=2.0)
 pk.loads_sandboxed(pk.dumps(Scale(2.0)))  # PermissionError: not registered
 pk.register(Scale)

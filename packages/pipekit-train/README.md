@@ -66,7 +66,7 @@ Both are libraries in their own right, which you can build on directly.
 ```
 
 - **pipekit-ops** is the one required dependency.
-  `TrainingLoop` and `HyperSweep` are `StatefulOperator`s, datasets and losses are `Operator`s, and the content hashes use `pipekit_ops.hashing`.
+  `TrainingLoop` and `HyperSweep` are `StatefulOperator`s, datasets and losses are `Operator`s, and the content hashes use `pipekit_ops.saving`.
 - **pipekit-array** is not a dependency and is not used; array carriers pass straight through to the backend.
 - **pipekit-cycle** and **pipekit-experiment** are optional siblings, behind the `[cycle]` and `[experiment]` extras.
   [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) is not an extra, but its `JaxModelOp` is the model wrapper to use when you want to reload trained weights from a registry.

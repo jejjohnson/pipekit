@@ -19,7 +19,7 @@ from pipekit_ops import (
     ThreadMap,
     Try,
 )
-from pipekit_ops.signature import common_signature
+from pipekit_ops.carriers._signature import common_signature
 
 
 class DropTime(Operator):

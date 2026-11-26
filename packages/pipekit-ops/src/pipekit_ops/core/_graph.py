@@ -32,8 +32,8 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from pipekit_ops._base.operator import _MISSING, Carrier, Operator
-from pipekit_ops.adapters import signature_of
+from pipekit_ops.carriers._adapters import signature_of
+from pipekit_ops.core._operator import _MISSING, Carrier, Operator
 
 
 class Node:

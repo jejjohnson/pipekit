@@ -19,21 +19,27 @@ from pipekit_ops import (
     unregister,
     upgrade_state,
 )
-from pipekit_ops._base.operator import current_module
+from pipekit_ops.core._operator import current_module
+
+
+#: where each class of `_pipeline` lived before 0.2.0, when the package was ``pipekit``
+_FLAT = {
+    "Const": "pipekit.blocks",
+    "Identity": "pipekit.blocks",
+    "Retry": "pipekit.control",
+    "Sequential": "pipekit._base.sequential",
+    "Try": "pipekit.control",
+}
 
 
 def _as_saved_before_0_2(text: str) -> str:
-    """Rewrite every module path from ``pipekit_ops…`` back to ``pipekit…``."""
+    """Rewrite every operator record to the module it was saved under before 0.2.0."""
 
     def rewrite(node: object) -> object:
         if isinstance(node, dict):
             out = {key: rewrite(value) for key, value in node.items()}
-            module = out.get("module")
-            if isinstance(module, str) and module.startswith("pipekit_ops"):
-                out["module"] = "pipekit" + module.removeprefix("pipekit_ops")
-            exception = out.get("exception")
-            if isinstance(exception, str) and exception.startswith("pipekit_ops."):
-                out["exception"] = "pipekit" + exception.removeprefix("pipekit_ops")
+            if out.get("module") == "pipekit_ops":
+                out["module"] = _FLAT[out["class"]]
             return out
         if isinstance(node, list):
             return [rewrite(value) for value in node]
@@ -46,8 +52,10 @@ def _as_saved_before_0_2(text: str) -> str:
     ("saved", "today"),
     [
         ("pipekit", "pipekit_ops"),
-        ("pipekit.control", "pipekit_ops.control"),
-        ("pipekit._base.sequential", "pipekit_ops._base.sequential"),
+        ("pipekit.control", "pipekit_ops"),
+        ("pipekit._base.sequential", "pipekit_ops"),
+        ("pipekit_ops.control", "pipekit_ops"),
+        ("pipekit_ops.testing", "pipekit_ops.testing"),
         ("pipekit_cycle.cycle", "pipekit_cycle.cycle"),
         ("pipekitish", "pipekitish"),
     ],

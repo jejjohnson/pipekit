@@ -29,16 +29,16 @@ import time
 from collections.abc import Callable, Hashable
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import (
+from pipekit_ops.carriers._signature import common_signature
+from pipekit_ops.core._operator import (
     Operator,
     callable_name,
     exception_config,
     nested_config,
     require_operator,
 )
-from pipekit_ops.blocks import Identity
-from pipekit_ops.flow import require_sync
-from pipekit_ops.signature import common_signature
+from pipekit_ops.operators._blocks import Identity
+from pipekit_ops.operators._flow import require_sync
 
 
 class Branch(Operator):

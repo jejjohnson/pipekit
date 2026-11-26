@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit_ops._base.operator import Operator, nested_config, require_operator
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
 
 
 class Fanout(Operator):

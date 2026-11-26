@@ -1,4 +1,4 @@
-"""Tests for `pipekit_ops.store` and the store-backed `Cache` — phase P4.
+"""Tests for `pipekit_ops.saving` and the store-backed `Cache` — phase P4.
 
 Gates G4-1 to G4-7 of ``packages/pipekit-ops/docs/design/roadmap.md``.
 The cross-process gates (G4-2, G4-3) run their work in spawned processes
@@ -35,8 +35,8 @@ from pipekit_ops import (
 from tests._store_ops import Payload, run_cached, write_all
 
 
-#: ``pipeline_hash(Cache(Identity()))`` before P4, computed at c16b7eb (G4-1)
-CACHE_IDENTITY_HASH = "24b9f307d9e6d72d942868cdd7d1f03edec714e12396e41abd6c7b4e78e30149"
+#: ``pipeline_hash(Cache(Identity()))`` with no store, since 0.4.0 (G4-1)
+CACHE_IDENTITY_HASH = "734933f6050acfda3951fe55c4accd1a658e61c71279038a37c6fb48a583d21f"
 
 
 class Counting(Operator):
@@ -90,7 +90,7 @@ def test_g4_1_default_hash_and_config_unchanged():
     op = Cache(Identity())
     assert pipeline_hash(op) == CACHE_IDENTITY_HASH
     assert op.get_config() == {
-        "inner": {"module": "pipekit_ops.blocks", "class": "Identity", "config": {}}
+        "inner": {"module": "pipekit_ops", "class": "Identity", "config": {}}
     }
 
 

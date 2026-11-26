@@ -30,8 +30,8 @@ import warnings
 from collections.abc import Iterable
 from typing import Any
 
-from pipekit_ops._base.operator import Operator, nested_config
-from pipekit_ops.execution import Map
+from pipekit_ops.core._operator import Operator, nested_config
+from pipekit_ops.execution._map import Map
 
 
 class ThreadMap(Map):
@@ -74,7 +74,7 @@ class ProcessMap(Map):
         on_error: ``"raise"`` (default) re-raises the first worker
             error and cancels the items not yet started;
             ``"log_and_continue"`` logs it as a warning on the
-            ``pipekit_ops.parallel`` logger (with the traceback) and
+            ``pipekit_ops.execution`` logger (with the traceback) and
             substitutes ``None`` for the failing item; ``"collect"`` as
             for `Map`.
 
@@ -226,7 +226,7 @@ def check_pickleable(op: Operator) -> list[Operator]:
     their attribute names here. Returns the flagged operators in
     encounter order (deduplicated by ``id``).
     """
-    from pipekit_ops._base.graph import Node
+    from pipekit_ops.core._graph import Node
 
     found: list[Operator] = []
     seen: set[int] = set()

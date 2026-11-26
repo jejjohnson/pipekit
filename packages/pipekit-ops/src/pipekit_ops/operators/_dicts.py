@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from pipekit_ops._base.operator import (
+from pipekit_ops.core._operator import (
     _MISSING,
     ConfigMixin,
     Operator,

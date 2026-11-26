@@ -34,7 +34,7 @@ import jax
 import jax.numpy as jnp
 from pipekit_cycle.protocols import ForwardModel
 from pipekit_ops import Operator, StatefulOperator
-from pipekit_ops._base.operator import nested_config
+from pipekit_ops.core import nested_config
 
 from pipekit_jax.operator import JaxOperator
 

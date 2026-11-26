@@ -33,8 +33,8 @@ import itertools
 from collections.abc import Iterable, Sized
 from typing import Any
 
-from pipekit_ops._base.operator import _MISSING, Operator
-from pipekit_ops.dicts import (
+from pipekit_ops.core._operator import _MISSING, Operator
+from pipekit_ops.operators._dicts import (
     Key,
     _ContainerOperator,
     lookup,

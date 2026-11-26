@@ -36,16 +36,16 @@ from concurrent.futures import (
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pipekit_ops._base.operator import Operator, nested_config, require_operator
-from pipekit_ops._base.tracing import is_traced
-from pipekit_ops.adapters import to_backend
-from pipekit_ops.store import Store, bind_stores, bound_stores
+from pipekit_ops.carriers._adapters import to_backend
+from pipekit_ops.carriers._tracing import is_traced
+from pipekit_ops.core._operator import Operator, nested_config, require_operator
+from pipekit_ops.saving._store import Store, bind_stores, bound_stores
 
 
 __all__ = ["Failed", "Fold", "Map", "MapError", "Prefetch", "executor_scope"]
 
 # The design names this logger for every map's failure log (§2.4).
-log = logging.getLogger("pipekit_ops.parallel")
+log = logging.getLogger("pipekit_ops.execution")
 
 EXECUTORS = ("serial", "thread", "process", "async", "scope")
 ON_ERROR = ("raise", "collect", "log_and_continue")
@@ -279,12 +279,12 @@ class Map(Operator):
         on_error: ``"raise"`` fails fast and cancels pending work;
             ``"collect"`` runs every item, then raises `MapError`;
             ``"log_and_continue"`` logs a warning on
-            ``pipekit_ops.parallel`` and puts ``None`` in the slot.
+            ``pipekit_ops.execution`` and puts ``None`` in the slot.
         chunksize: Items per task c. A chunk is pulled whole, so up to
             W + c - 1 items can be held.
         start_method: Process start method; default ``"spawn"``.
         progress: If set, every ``progress`` released items log one INFO
-            record on ``pipekit_ops.parallel`` whose ``done``, ``failed``,
+            record on ``pipekit_ops.execution`` whose ``done``, ``failed``,
             ``in_flight``, ``n`` (``None`` without ``len``) and ``rate``
             (items per second) attributes hold the counts so far.
 
@@ -320,6 +320,8 @@ class Map(Operator):
 
         Log progress every 2 items:
 
+        >>> import logging
+        >>> log = logging.getLogger("pipekit_ops.execution")
         >>> records = []
         >>> handler = logging.Handler()
         >>> handler.emit = records.append
@@ -888,8 +890,8 @@ def _default_workers(executor: str) -> int:
 
 def _require_pickleable(op: Operator, where: str) -> None:
     """Raise `TypeError` unless ``op`` can travel to another process."""
-    # imported here: the presets in `parallel` subclass `Map`
-    from pipekit_ops.parallel import check_pickleable
+    # imported here: the presets in `_presets` subclass `Map`
+    from pipekit_ops.execution._presets import check_pickleable
 
     flagged = check_pickleable(op)
     if flagged:

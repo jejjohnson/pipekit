@@ -114,7 +114,7 @@ def test_every_operator_is_recorded_under_the_package() -> None:
 
 @pytest.mark.parametrize(("name", "module"), FORMER.items())
 def test_a_state_saved_before_the_areas_loads(name: str, module: str) -> None:
-    from pipekit_ops._base.operator import resolve_loaded
+    from pipekit_ops.core import resolve_loaded
 
     cls = getattr(pipekit_array, name)
     assert resolve_loaded(f"pipekit_array.{module}", name) is cls
@@ -134,6 +134,6 @@ def test_a_saved_pipeline_names_the_package() -> None:
 
 def test_the_einx_operator_loads_from_its_former_module() -> None:
     from pipekit_array.bridges.einx import Einx
-    from pipekit_ops._base.operator import resolve_loaded
+    from pipekit_ops.core import resolve_loaded
 
     assert resolve_loaded("pipekit_array.einx", "Einx") is Einx

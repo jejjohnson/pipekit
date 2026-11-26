@@ -28,7 +28,7 @@ from pipekit_ops import (
     signature_of,
     unregister_adapter,
 )
-from pipekit_ops.adapters import BackendError
+from pipekit_ops.carriers import BackendError
 from pipekit_ops.testing import assert_round_trip
 
 

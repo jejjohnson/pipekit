@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 
 if TYPE_CHECKING:
-    from pipekit_ops._base.operator import Operator
+    from pipekit_ops.core._operator import Operator
 
 
 __all__ = ["pipeline_hash", "sha256_hex", "stable_json", "stable_repr"]

@@ -56,7 +56,7 @@ Both are libraries in their own right, which you can build on directly.
 ```
 
 - **pipekit-ops** is the one required dependency.
-  The registry stores `Operator.state`, rebuilds with `Operator.from_state`, and hashes with `pipekit_ops.hashing.pipeline_hash`, so anything that round-trips through `pipekit_ops.dumps` / `loads` can be stored.
+  The registry stores `Operator.state`, rebuilds with `Operator.from_state`, and hashes with `pipekit_ops.saving.pipeline_hash`, so anything that round-trips through `pipekit_ops.dumps` / `loads` can be stored.
 - **pipekit-array** is not a dependency and is not used; array-backed operators store like any other operator.
 
 ## Install

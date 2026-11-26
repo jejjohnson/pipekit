@@ -22,7 +22,7 @@ from pipekit_ops import (
     is_traced,
     report_move,
 )
-from pipekit_ops.adapters import BackendError
+from pipekit_ops.carriers import BackendError
 
 
 __all__ = ["array_namespace", "join_backends"]

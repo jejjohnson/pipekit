@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from pipekit_ops import Operator, Signature
-from pipekit_ops._base.operator import nested_config, require_operator
+from pipekit_ops.core import nested_config, require_operator
 
 from pipekit_array._recorded import recorded
 from pipekit_array.named import _map

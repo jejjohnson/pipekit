@@ -56,7 +56,7 @@ primitives.
 
 `toolz` also ships `itertoolz` (about 30 functions on iterables) and `dicttoolz` (about 15 on dicts).
 pipekit inherited from `functoolz` first.
-Since pipekit-ops 0.2.1 it also has operator counterparts of the `dicttoolz` and `itertoolz` functions that pipelines reach for (`pipekit_ops.dicts` and `pipekit_ops.seq`), so reshaping a dict or filtering a list no longer needs a `Lambda`.
+Since pipekit-ops 0.2.1 it also has operator counterparts of the `dicttoolz` and `itertoolz` functions that pipelines reach for (in `pipekit_ops.operators`), so reshaping a dict or filtering a list no longer needs a `Lambda`.
 
 ### The mental model
 

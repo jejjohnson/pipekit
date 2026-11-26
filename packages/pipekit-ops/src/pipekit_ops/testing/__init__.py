@@ -24,10 +24,10 @@ from collections.abc import Iterator, Mapping
 from types import ModuleType
 from typing import Any
 
-from pipekit_ops._base.operator import Operator
-from pipekit_ops.hashing import pipeline_hash
-from pipekit_ops.parallel import check_pickleable
-from pipekit_ops.serial import dumps, loads
+from pipekit_ops.core._operator import Operator
+from pipekit_ops.execution._presets import check_pickleable
+from pipekit_ops.saving._hashing import pipeline_hash
+from pipekit_ops.saving._serial import dumps, loads
 
 
 __all__ = ["assert_round_trip", "public_operators"]
