@@ -320,6 +320,8 @@ class Map(Operator):
 
         Log progress every 2 items:
 
+        >>> import logging
+        >>> log = logging.getLogger("pipekit_ops.execution")
         >>> records = []
         >>> handler = logging.Handler()
         >>> handler.emit = records.append
