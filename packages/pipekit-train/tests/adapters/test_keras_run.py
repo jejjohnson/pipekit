@@ -287,6 +287,19 @@ def test_errors_name_what_is_wrong() -> None:
         _loop(_model(), sharding=object()).run()
 
 
+def test_a_loss_that_needs_a_key_is_refused_and_one_that_may_take_it_trains() -> None:
+    def needs_key(predicted, target, *, key):
+        return ((predicted - target) ** 2).mean()
+
+    def may_take_key(predicted, target, key=None):
+        return ((predicted - target) ** 2).mean()
+
+    with pytest.raises(NotImplementedError, match="pipekit#330"):
+        _loop(_model(), loss=needs_key, max_steps=2).run()
+    _, artifact = _loop(_model(), loss=may_take_key, max_steps=2).run()
+    assert artifact.backend_info["final_step"] == 2
+
+
 def test_hyper_sweep_ranks_keras_trials_on_validation() -> None:
     def build(params: dict[str, Any]) -> TrainingLoop:
         return _loop(

@@ -14,7 +14,12 @@ from pipekit_ops import Operator
 from pipekit_train.backends import _common
 from pipekit_train.backends._batches import BatchSource, is_indexable, stack_pairs
 from pipekit_train.backends.keras._backend import import_keras
-from pipekit_train.backends.keras._losses import aux_metrics, aux_names, bridge_loss
+from pipekit_train.backends.keras._losses import (
+    aux_metrics,
+    aux_names,
+    bridge_loss,
+    requires_key,
+)
 from pipekit_train.backends.keras._model import KerasModelOp
 from pipekit_train.backends.keras._optim import build_keras_optimizer
 from pipekit_train.backends.keras._task import KerasTask
@@ -175,6 +180,12 @@ def _compile(
     if task.loss is not None:
         loss = task.loss
     else:
+        if requires_key(loop.loss):
+            raise NotImplementedError(
+                f"{type(loop.loss).__name__} needs a PRNG key, which a Keras loss "
+                "does not receive yet (pipekit#330). Use backend='equinox', or a "
+                "KerasTask with a Keras loss."
+            )
         x, y = first
         names = aux_names(loop.loss, model(x, training=False), y)
         loss = bridge_loss(loop.loss)

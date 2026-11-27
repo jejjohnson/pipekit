@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
+
+from pipekit_ops import Operator
 
 from pipekit_train.backends.keras._backend import import_keras
 from pipekit_train.losses import call_loss
@@ -13,6 +16,23 @@ def _scalar(value: Any) -> Any:
     keras = import_keras()
     value = keras.ops.convert_to_tensor(value)
     return keras.ops.mean(value) if len(value.shape) > 0 else value
+
+
+def requires_key(loss: Any) -> bool:
+    """True if ``loss`` cannot be called without a PRNG ``key``.
+
+    A Keras loss receives no key, so such a loss cannot train under this
+    backend yet (#330). A ``key`` that defaults to ``None``, as `KL`'s does for
+    its analytic divergence, is fine.
+    """
+    target = loss
+    if isinstance(loss, Operator) and type(loss).__call__ is Operator.__call__:
+        target = loss._apply
+    try:
+        parameter = inspect.signature(target).parameters.get("key")
+    except (TypeError, ValueError):
+        return False
+    return parameter is not None and parameter.default is inspect.Parameter.empty
 
 
 def bridge_loss(loss: Any) -> Any:
