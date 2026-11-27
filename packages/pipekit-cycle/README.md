@@ -1,34 +1,88 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-dark.svg">
-    <img alt="pipekit-cycle" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-light.svg" width="389">
-  </picture>
-</p>
+<div align="center">
 
-**Time stepping and data-assimilation cycles as pipekit operators, with the protocols that let any forward model, observation operator and analysis plug in.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-dark.svg">
+  <img alt="pipekit-cycle" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-cycle/logo-light.svg" width="389">
+</picture>
 
-<p align="center">
-  <a href="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-blue">
-  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
-</p>
+**Time stepping and data-assimilation cycles as pipeline operators for any array library: forecast, observe and analyse with any forward model, observation operator and analysis, on pipekit-ops and, through an extra, pipekit-array.**
 
-<p align="center">
-  <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/da-cycle/"><b>DA tutorial</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/ensemble-da/"><b>Ensemble tutorial</b></a>
-</p>
+[![Tests](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml)
+[![Lint](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml)
+[![Type Check](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml)
+[![Docs](https://github.com/jejjohnson/pipekit/actions/workflows/pages.yml/badge.svg)](https://jejjohnson.github.io/pipekit/)
+[![codecov](https://codecov.io/gh/jejjohnson/pipekit/branch/main/graph/badge.svg)](https://codecov.io/gh/jejjohnson/pipekit)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-## Why it exists
+📖 [Documentation](https://jejjohnson.github.io/pipekit/) ·
+🚀 [Quickstart](https://jejjohnson.github.io/pipekit/quickstart-cycle/) ·
+📚 [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/) ·
+🧭 [Design](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle/docs/design)
 
-Consider assimilating along-track sea surface height from an altimeter such as SWOT into an ocean model.
-Every few hours we run the model forward, compare the forecast with the passes that arrived, and pull the state toward them, which is the forecast, observe and analyse loop that every assimilation system repeats.
-The science lives in three pieces: the model, the observation operator and the analysis (an EnKF, a 3D-Var, a particle filter).
-However, most of the code in a real system is the loop around them: the clock, the cycle counter, which observations belong to which step, the history, and resuming a run where it stopped.
+</div>
 
-We write the state-space model as
+---
+
+Consider assimilating along-track sea surface height from an altimeter such as SWOT into an ocean model. Every few hours we run the model forward, compare the forecast with the passes that arrived, and pull the state toward them, which is the forecast, observe and analyse loop that every assimilation system repeats. The science lives in three pieces: the model, the observation operator and the analysis (an EnKF, a 3D-Var, a particle filter). However, most of the code in a real system is the loop around them: the clock, the cycle counter, which observations belong to which step, and resuming a run where it stopped. So pipekit-cycle owns the loop and nothing else, and its central object is one cycle,
+
+```math
+\mathbf{x}_{t \mid t} = a(f(\mathbf{x}_{t-1 \mid t-1}), \mathbf{y}_t; h, \boldsymbol{\Sigma}_\varepsilon)
+```
+
+where $`\mathbf{x}_{t \mid t} \in \mathbb{R}^{D_x}`$ is the analysis at cycle $`t`$, $`f: \mathbb{R}^{D_x} \to \mathbb{R}^{D_x}`$ is the forward model, so that $`f(\mathbf{x}_{t-1 \mid t-1}) = \mathbf{x}_{t \mid t-1}`$ is the forecast, $`\mathbf{y}_t \in \mathbb{R}^{D_y}`$ holds the observations of cycle $`t`$, $`h: \mathbb{R}^{D_x} \to \mathbb{R}^{D_y}`$ is the observation operator, $`\boldsymbol{\Sigma}_\varepsilon \in \mathbb{R}^{D_y \times D_y}`$ is the observation-error covariance, and $`a`$ is the analysis, which takes the forecast and the observations and returns the next state; $`h`$ and $`\boldsymbol{\Sigma}_\varepsilon`$ stay fixed while it runs. $`f`$, $`h`$ and $`a`$ are plain objects that satisfy three runtime-checkable protocols (`ForwardModel`, `ObservationOperator` and `AnalysisStep`), so the same cycle runs a toy model in a notebook and an ocean model in production, with an analysis from any library.
+
+```python
+# Shapes: D_x state elements; D_y observations; N_ℰ members; T cycles
+# (advect, obs_operator, obs_err_cov and the rest as in the quickstart below)
+
+# today (pipekit-cycle)
+# f, a ForwardModel made from a plain function
+forward = pc.CallableForward(advect, dt=1.0)
+# today (pipekit-cycle)
+# the cycle checks f, h and a against their protocols when it is built
+cycle = pc.EnsembleDACycle(
+    forward, obs_operator, analysis, obs_source, n_steps=10, n_members=20
+)
+# today (pipekit-cycle)
+# the clock at t = 0, carrying Σ_ε to the analysis
+start = pc.DAState(obs_err_cov=obs_err_cov)
+# today (pipekit-cycle)
+# x⁽ᵉ⁾_t∣t = a(f(x⁽ᵉ⁾_t−1∣t−1), y_t; h, Σ_ε), for t = 1, …, T
+members, state = cycle(prior, start)
+```
+
+None of it is a new framework. Every cycle is a [`pipekit-ops`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) `StatefulOperator` that takes and returns `(carrier, state)`, with a `CarryState` such as `DAState` holding the clock, so a cycle chains with `|` into a `Sequential` and sits inside a `Graph` like any other step. The observations come from any pipekit-ops `Operator` called with the step index, so a fetch, quality-control and bias-correction chain is one `Sequential`. pipekit-cycle imports nothing else, and its `array` extra installs [`pipekit-array`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) beside it for a forward model or an observation operator built from that package's Array API operators.
+
+## 🌟 Highlights
+
+- 🔁 **Eight cycles, one contract**: `Cycle`, `EnsembleCycle`, `WindowedCycle` and `Recurrence` step a model, and `DACycle`, `EnsembleDACycle`, `SmootherCycle` and `BFNCycle` assimilate; each takes `(carrier, state)` and returns `(carrier, state)`.
+- 🧩 **Seams by shape**: 14 runtime-checkable protocols, the core three plus the reduced-order, ensemble, iterative-inversion and adjoint seams, and the cycles check their components against them with `isinstance` when they are built, so an adapter that never imports pipekit-cycle (`filterax.pipekit`, `plumax.adapters`) plugs in.
+- 🛰️ **Observations on a clock**: `obs_source` and `obs_err_source` are operators called with the step index, and `obs_clock="state"` continues that index from `DAState.cycle_count`, so two calls of five cycles give the same analysis as one call of ten.
+- 🧱 **Ready-made components**: `IdentityObs`, `LinearObs`, `CallableObs` and `CompositeObs`, whose `linearize` composes the tangent linears by the chain rule, and `CallableForward`, `CompositeForward` and `NeuralForward` for a function, a chain or a trained emulator.
+- ↔️ **Assimilation without an adjoint**: `BFNCycle` nudges forth and back over a window until the back-pass initial states agree (Auroux and Blum, 2008).
+- 🧮 **Gradients as configuration**: five frozen adjoint specs, from `DirectAdjoint` to `TruncatedAdjoint`, with no behaviour of their own, which integrix, argminax, filterax and vardax translate into their own adjoints.
+- 🪶 **Pure Python**: the only dependency is pipekit-ops, which has none, and `LinearObs` needs only `@`, so the same cycle steps NumPy or JAX arrays.
+
+## 📐 Eight cycles over three seams
+
+Each cycle repeats one step, and the table says what that step is and which seams it calls. The ensemble cycles carry a list of $`N_{\mathcal{E}}`$ members $`\mathbf{x}^{(e)}`$, $`e \in \mathcal{E}`$, and $`W`$ is a window of forward steps.
+
+| Cycle | One step | Seams it calls | Area |
+|---|---|---|---|
+| `Cycle` | $`\mathbf{x}_t = f(\mathbf{x}_{t-1})`$ | `ForwardModel` or a stateful step | `cycles` |
+| `EnsembleCycle` | the same for each member | `ForwardModel` or a stateful step | `cycles` |
+| `WindowedCycle` | $`W`$ steps from each start of a stream | `ForwardModel` or a stateful step | `cycles` |
+| `Recurrence` | one step, until a condition holds | `ForwardModel` or a stateful step | `cycles` |
+| `DACycle` | $`\mathbf{x}_{t \mid t} = a(f(\mathbf{x}_{t-1 \mid t-1}), \mathbf{y}_t; h, \boldsymbol{\Sigma}_\varepsilon)`$ | all three | `assimilation` |
+| `EnsembleDACycle` | $`f`$ per member, one $`a`$ for the ensemble | all three | `assimilation` |
+| `SmootherCycle` | $`W`$ forecasts, one $`a`$ over the window | all three | `assimilation` |
+| `BFNCycle` | forth and back over $`W`$ steps, nudging | `ForwardModel`, `ObservationOperator`, a gain | `assimilation` |
+
+The three seams stand for the two halves of the state-space model, with the analysis $`a`$ as what estimates the state from both,
 
 ```math
 \mathbf{x}_t = f(\mathbf{x}_{t-1}) + \boldsymbol{\eta}_t
@@ -38,284 +92,281 @@ We write the state-space model as
 \mathbf{y}_t = h(\mathbf{x}_t) + \boldsymbol{\varepsilon}_t
 ```
 
+where $`\boldsymbol{\eta}_t \in \mathbb{R}^{D_x}`$ is the model noise and $`\boldsymbol{\varepsilon}_t \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_\varepsilon)`$ the observation noise. `ForwardModel` asks for `step(state, dt)`, `dt` and `state_signature`, `ObservationOperator` for `__call__(state)` and `linearize(state)`, and `AnalysisStep` for one call, `(forecast, obs, *, obs_op, obs_err_cov) -> analysis`. $`\boldsymbol{\Sigma}_\varepsilon`$ travels on `DAState.obs_err_cov` and reaches the analysis as `obs_err_cov`. pipekit-cycle ships no analysis: the quickstart writes an EnKF of its own, and filterax and vardax ship real ones.
+
+`BFNCycle` is the one row with no analysis step. On each pass it relaxes the state toward the observations,
+
 ```math
-\boldsymbol{\varepsilon}_t \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_\varepsilon)
+\mathbf{x} \leftarrow \mathbf{x} + \mathbf{K}(\mathbf{y}_t - h(\mathbf{x}))
 ```
 
-where $\mathbf{x}_t \in \mathbb{R}^{D_x}$ is the state at cycle $t$, $\mathbf{y}_t \in \mathbb{R}^{D_y}$ the observations, $f$ the forward model, $h$ the observation operator (the matrix $\mathbf{H} \in \mathbb{R}^{D_y \times D_x}$ when it is linear), $\boldsymbol{\eta}_t \in \mathbb{R}^{D_x}$ the model noise and $\boldsymbol{\Sigma}_\varepsilon \in \mathbb{R}^{D_y \times D_y}$ the observation-error covariance.
-pipekit-cycle owns the loop and nothing else.
-$f$, $h$ and the analysis are plain objects that satisfy three runtime-checkable protocols, so the same cycle runs a toy model in a notebook and an ocean model in production, with an analysis from any library.
+with the nudging gain $`\mathbf{K}`$ given as a function of the innovation, after each forward step and before each backward one, and it repeats the sweep until the initial state of the backward pass stops changing (Auroux and Blum, 2008).
 
-## Where it sits
+## 📥 Install
 
-pipekit-cycle is built on pipekit-ops; it uses pipekit-array through the `[array]` extra.
-Both are libraries in their own right, which you can build on directly.
-
-```
-   your DA system (filterax, vardax, plumax, ...)
-                     │
-   pipekit-jax ──────┤  (ScanCycle, Rollout)
-   pipekit-train ────┤  ([cycle] extra: SimulationDataset)
-   pipekit-evaluate ─┤  ([cycle] extra: benchmark Task)
-                     │
-          ┌──────────┴──────────┐
-          │    pipekit-cycle    │  ◀ this package
-          │  cycles, DA cycles, │
-          │      protocols      │
-          └──────────┬──────────┘
-            ┌────────┴────────┐
-            │                 │
-       pipekit-ops       pipekit-array
-       (dependency:      ([array] extra:
-        Operator,         Array API ops,
-        StatefulOperator, named dims)
-        CarryState)
-```
-
-- **pipekit-ops** is the one required dependency.
-  Every cycle is a `pipekit_ops.StatefulOperator` carrying a `pipekit_ops.CarryState`, so a cycle composes with `|` into a `Sequential`, sits inside a `Graph`, and wraps in a `Retry` or a `Tap` like any other operator.
-- **pipekit-array** is optional.
-  pipekit-cycle imports nothing from it; the `[array]` extra installs it beside, for when your forward model or observation operator is built from pipekit-array operators.
-
-## Install
+pipekit-cycle is not on PyPI, and neither is pipekit-ops, its one dependency, so install both from GitHub. pipekit-ops has no dependencies of its own, so the base install is pure Python; it needs Python 3.12 or newer.
 
 ```bash
-uv add pipekit-cycle
-uv add 'pipekit-cycle[array]'    # plus pipekit-array
+pip install \
+  "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" \
+  "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-cycle"
 ```
 
-From a checkout of the workspace, `uv sync` installs every package.
+The one extra, `array`, adds pipekit-array, for a forward model or an observation operator made of its Array API operators; pipekit-cycle itself imports nothing from it. The quickstart below also needs NumPy, einx and jaxtyping, which are not dependencies of the package.
 
-| Extra | What it adds | When you need it |
-| --- | --- | --- |
-| *(none)* | `pipekit-ops` | always; the core install is pure Python |
-| `array` | `pipekit-array` | your forward model or observation operator is made of pipekit-array operators |
+```bash
+pip install \
+  "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" \
+  "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-array" \
+  "pipekit-cycle[array] @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-cycle"
+```
 
-## Quickstart
+A project that depends on pipekit-cycle pins a release tag (the [changelog](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/CHANGELOG.md) lists them) and gives every pipekit package the same one. The packages are members of one uv workspace that point at each other at the same commit, so uv needs pipekit-ops from the commit pipekit-cycle came from, which is what this block in the project's `pyproject.toml` says:
 
-The blocks use NumPy, and the first one jaxtyping for its shape types; neither is a dependency of the package.
+```toml
+[tool.uv.sources]
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
+pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
+```
 
-### Forecast only
+## 🌊 Quickstart: an ensemble Kalman filter on a periodic channel
 
-A forecast is a `Cycle` around a forward model.
-Here the model is one explicit Euler step of exponential decay, $\mathrm{d}x / \mathrm{d}t = -k x$ with $k = 0.1$.
+The state is a sea-surface-height anomaly on $`D_x = 8`$ grid cells of a periodic channel, and each cycle the forward model moves it one cell east and damps it, $`f(\mathbf{x}) = \gamma \mathbf{S} \mathbf{x}`$, with the cyclic shift $`\mathbf{S} \in \mathbb{R}^{D_x \times D_x}`$ and $`\gamma = 0.98`$. We observe every other cell, $`h(\mathbf{x}) = \mathbf{H} \mathbf{x}`$ with the selection matrix $`\mathbf{H} \in \mathbb{R}^{D_y \times D_x}`$ and $`D_y = 4`$, with noise $`\boldsymbol{\Sigma}_\varepsilon = \sigma_\varepsilon^2 \mathbf{I}`$ and $`\sigma_\varepsilon = 0.1`$, for $`T = 10`$ cycles of a truth run that starts from one sine wave. The analysis $`a`$ is a perturbed-observation EnKF over $`N_{\mathcal{E}} = 20`$ members drawn from $`\mathcal{N}(\mathbf{0}, \mathbf{I})`$. It forms the anomalies $`\tilde{\mathbf{x}}^{(e)} = \mathbf{x}^{(e)} - \bar{\mathbf{x}}`$ and $`\tilde{\mathbf{y}}^{(e)} = h(\mathbf{x}^{(e)}) - \bar{\mathbf{y}}`$ about the ensemble means $`\bar{\mathbf{x}}`$ and $`\bar{\mathbf{y}}`$, from them the cross-covariance $`\boldsymbol{\Sigma}_{xy} \in \mathbb{R}^{D_x \times D_y}`$ and the covariance $`\boldsymbol{\Sigma}_y \in \mathbb{R}^{D_y \times D_y}`$ of the predicted observations plus $`\boldsymbol{\Sigma}_\varepsilon`$, and moves each member by the gain $`\mathbf{G} = \boldsymbol{\Sigma}_{xy} \boldsymbol{\Sigma}_y^{-1} \in \mathbb{R}^{D_x \times D_y}`$ times its innovation $`\mathbf{r}^{(e)} = \mathbf{y}^{(e)} - h(\mathbf{x}^{(e)})`$, where $`\mathbf{y}^{(e)} = \mathbf{y}_t + \boldsymbol{\varepsilon}^{(e)}`$ is a perturbed copy of the observations. The model and the analysis are ours (`# user`); the loop is the package's.
 
 ```python
+import einx
 import numpy as np
+import pipekit_cycle as pc
 from jaxtyping import Float
-
-import pipekit_cycle as pc
-
-# Shapes: N state variables
-State = Float[np.ndarray, " N"]
-
-
-# user
-def decay(x: State, dt: float) -> State:
-    """One explicit Euler step of dx/dt = −k x, with k = 0.1."""
-    # x_{t+1} = x_t − Δt · k · x_t
-    return x - dt * 0.1 * x
-
-
-# today (pipekit-cycle)
-# x_t ↦ x_{t+1}, Δt = 1
-step = pc.CallableForward(decay, dt=1.0)
-# today (pipekit-cycle)
-# x_0 ↦ x_24
-forecast = pc.Cycle(step_op=step, n_steps=24)
-
-# x₂₄ = (1 − 0.1)²⁴ x₀ ≈ 0.080 x₀
-x24, _ = forecast(np.ones(3), None)                   # (N,) → (N,)
-```
-
-Swap `CallableForward` for `NeuralForward` around a trained model from the registry and the same `Cycle` forecasts with an emulator.
-Add an observation operator and an analysis step and it assimilates (`DACycle`, `EnsembleDACycle`), which is the next block.
-
-### Forecast, observe, analyse
-
-A toy ensemble DA cycle.
-The state is a sea-surface-height anomaly on $D_x = 8$ grid cells of a periodic channel; each cycle the forward model moves it one cell east and damps it, $f(\mathbf{x}) = a \mathbf{S} \mathbf{x}$ with the shift $\mathbf{S}$ and $a = 0.98$.
-We observe every other cell ($D_y = 4$) with noise $\boldsymbol{\Sigma}_\varepsilon = 0.01 \mathbf{I}$, and assimilate with a perturbed-observation EnKF of $N_{\mathcal{E}} = 20$ members $\mathbf{x}^{(e)}$.
-The analysis uses the gain $\mathbf{G}_t = \boldsymbol{\Sigma}_{xy,t} \boldsymbol{\Sigma}_{y,t}^{-1} \in \mathbb{R}^{D_x \times D_y}$, where $\boldsymbol{\Sigma}_{xy,t}$ is the state-observation cross-covariance of the forecast ensemble and $\boldsymbol{\Sigma}_{y,t}$ the covariance of the predicted observations plus $\boldsymbol{\Sigma}_\varepsilon$.
-The model and the analysis are ours (`# user`); the loop is the package's.
-
-```python
-import numpy as np
-import pipekit_cycle as pc
 from pipekit_ops import Lambda
 
-# Shapes: D_x = 8 grid cells; D_y = 4 observed cells; N_E = 20 members; T = 10 cycles
-n_cells, n_members, n_cycles = 8, 20, 10
+
+# Shapes: D_x = 8 grid cells; D_y = 4 observed cells; N_ℰ = 20 members; T = 10 cycles
+State = Float[np.ndarray, " state"]
+Obs = Float[np.ndarray, " obs"]
+Covariance = Float[np.ndarray, "row col"]
+state_size, obs_size, num_members, num_cycles = 8, 4, 20, 10
 rng = np.random.default_rng(0)
 
 
 # user
-# f(x) = a S x: shift one cell east (periodic), damp by a = 0.98
-def advect(x, dt):
-    return 0.98 * np.roll(x, 1)                              # (D_x,) → (D_x,)
+# f(x) = γ S x: one cell east on the periodic channel, damped by γ = 0.98
+def advect(state: State, dt: float) -> State:
+    return 0.98 * np.roll(state, 1)
 
 
-# user
-# H picks every other cell
-H = np.eye(n_cells)[::2]                                     # (D_y, D_x)
-# Σ_ε = σ_ε² I, σ_ε = 0.1
-obs_err_cov = 0.01 * np.eye(4)                               # (D_y, D_y)
+# H, which keeps every other cell
+# → (D_y, D_x)
+obs_matrix = np.eye(state_size)[::2]
+# today (pipekit-cycle)
+# h(x) = H x
+obs_operator = pc.LinearObs(obs_matrix)
+# Σ_ε = σ_ε² I, with σ_ε = 0.1
+# → (D_y, D_y)
+obs_err_cov = 0.01 * np.eye(obs_size)
 
-# user
-# a truth run x_{0:T} and its observations y_t = H x_t + ε_t, ε_t ~ 𝒩(0, Σ_ε)
-truth = [np.sin(2 * np.pi * np.arange(n_cells) / n_cells)]  # (D_x,)
-for _ in range(n_cycles):
+# x_0,i = sin(2π i / D_x), for the cells i = 0, …, D_x − 1
+# → (D_x,)
+truth = [np.sin(2 * np.pi * np.arange(state_size) / state_size)]
+# x_t = f(x_t−1), for t = 1, …, T
+for _ in range(num_cycles):
     truth.append(advect(truth[-1], 1.0))
-noise = rng.multivariate_normal(np.zeros(4), obs_err_cov, size=n_cycles)  # (T, D_y)
-observations = [H @ x + e for x, e in zip(truth[1:], noise)]  # T × (D_y,)
+# ε_t ~ 𝒩(0, Σ_ε)
+# → (T, D_y)
+noise = rng.multivariate_normal(np.zeros(obs_size), obs_err_cov, size=num_cycles)
+# y_t = h(x_t) + ε_t
+# → T × (D_y,)
+observations = [obs_operator(x) + e for x, e in zip(truth[1:], noise, strict=True)]
 
 
-class StochasticEnKF:  # user
-    """Perturbed-observation EnKF; satisfies pc.AnalysisStep structurally."""
+# user
+class StochasticEnKF:
+    """Perturbed-observation EnKF; an `AnalysisStep` by its shape alone."""
 
-    def __init__(self, seed):
+    def __init__(self, seed: int) -> None:
         self.rng = np.random.default_rng(seed)
 
-    def __call__(self, forecast, obs, *, obs_op, obs_err_cov):
-        X = np.stack(forecast)                               # (N_E, D_x)
-        Y = np.stack([obs_op(x) for x in forecast])          # (N_E, D_y)
-        n = len(forecast)
-        # x̃⁽ᵉ⁾ = x⁽ᵉ⁾ − x̄,  ỹ⁽ᵉ⁾ = h(x⁽ᵉ⁾) − ȳ
-        X_anom = X - np.einsum("ed->d", X) / n               # (N_E, D_x)
-        Y_anom = Y - np.einsum("ed->d", Y) / n               # (N_E, D_y)
-        # Σ_xy = ∑ₑ x̃⁽ᵉ⁾ ỹ⁽ᵉ⁾ᵀ / (N_E − 1)
-        cov_xy = np.einsum("ei,ej->ij", X_anom, Y_anom) / (n - 1)  # (D_x, D_y)
-        # Σ_y = ∑ₑ ỹ⁽ᵉ⁾ ỹ⁽ᵉ⁾ᵀ / (N_E − 1) + Σ_ε
-        cov_y = np.einsum("ei,ej->ij", Y_anom, Y_anom) / (n - 1) + obs_err_cov
-        # G_t = Σ_xy Σ_y⁻¹  (Σ_y is symmetric, so solve Σ_y Gᵀ = Σ_xyᵀ)
-        gain = np.linalg.solve(cov_y, cov_xy.T).T            # (D_x, D_y)
-        # y⁽ᵉ⁾ = y + ε⁽ᵉ⁾,  ε⁽ᵉ⁾ ~ 𝒩(0, Σ_ε)
-        obs_draws = self.rng.multivariate_normal(obs, obs_err_cov, size=n)  # (N_E, D_y)
-        # x⁽ᵉ⁾_{t|t} = x⁽ᵉ⁾_{t|t−1} + G_t (y⁽ᵉ⁾ − h(x⁽ᵉ⁾_{t|t−1}))
-        return list(X + np.einsum("ij,ej->ei", gain, obs_draws - Y))  # N_E × (D_x,)
+    def __call__(
+        self,
+        forecast: list[State],
+        obs: Obs,
+        *,
+        obs_op: pc.ObservationOperator,
+        obs_err_cov: Covariance,
+    ) -> list[State]:
+        # N_ℰ
+        ensemble_size = len(forecast)
+        # x⁽ᵉ⁾_t∣t−1 and h(x⁽ᵉ⁾_t∣t−1), stacked over the members
+        # → (N_ℰ, D_x), (N_ℰ, D_y)
+        states = np.stack(forecast)
+        predicted = np.stack([obs_op(x) for x in forecast])
+        # x̄ and ȳ, the ensemble means
+        # → (D_x,), (D_y,)
+        state_mean = einx.mean("member state -> state", states)
+        predicted_mean = einx.mean("member obs -> obs", predicted)
+        # x̃⁽ᵉ⁾ = x⁽ᵉ⁾ − x̄ and ỹ⁽ᵉ⁾ = h(x⁽ᵉ⁾) − ȳ
+        # → (N_ℰ, D_x), (N_ℰ, D_y)
+        state_anom = einx.subtract("member state, state", states, state_mean)
+        obs_anom = einx.subtract("member obs, obs", predicted, predicted_mean)
+        # Σ_xyᵀ = ∑ₑ ỹ⁽ᵉ⁾ x̃⁽ᵉ⁾ᵀ / (N_ℰ − 1)
+        # → (D_y, D_x)
+        cross_products = einx.dot(
+            "member obs, member state -> obs state", obs_anom, state_anom
+        )
+        cross_cov_transposed = cross_products / (ensemble_size - 1)
+        # Σ_y = ∑ₑ ỹ⁽ᵉ⁾ ỹ⁽ᵉ⁾ᵀ / (N_ℰ − 1) + Σ_ε
+        # → (D_y, D_y)
+        obs_products = einx.dot("member row, member col -> row col", obs_anom, obs_anom)
+        obs_covariance = obs_products / (ensemble_size - 1) + obs_err_cov
+        # Gᵀ = Σ_y⁻¹ Σ_xyᵀ, by a solve, since Σ_y is symmetric
+        # → (D_y, D_x)
+        gain_transposed = np.linalg.solve(obs_covariance, cross_cov_transposed)
+        # y⁽ᵉ⁾ = y_t + ε⁽ᵉ⁾, with ε⁽ᵉ⁾ ~ 𝒩(0, Σ_ε)
+        # → (N_ℰ, D_y)
+        perturbed = self.rng.multivariate_normal(obs, obs_err_cov, size=ensemble_size)
+        # r⁽ᵉ⁾ = y⁽ᵉ⁾ − h(x⁽ᵉ⁾_t∣t−1)
+        # → (N_ℰ, D_y)
+        innovation = perturbed - predicted
+        # x⁽ᵉ⁾_t∣t = x⁽ᵉ⁾_t∣t−1 + G r⁽ᵉ⁾
+        # → (N_ℰ, D_x)
+        increment = einx.dot(
+            "obs state, member obs -> member state", gain_transposed, innovation
+        )
+        return list(states + increment)
+
+
+# user
+# RMSE(x̂, x) = √(∑ᵢ (x̂ᵢ − xᵢ)² / D_x)
+def rmse(estimate: State, reference: State) -> float:
+    error = estimate - reference
+    mean_square = einx.mean("state ->", error**2)
+    return float(np.sqrt(mean_square))
 
 
 # today (pipekit-cycle)
-da = pc.EnsembleDACycle(
-    forward_model=pc.CallableForward(advect, dt=1.0),
-    obs_op=pc.LinearObs(H),
-    analysis_step=StochasticEnKF(seed=1),
-    obs_source=Lambda(lambda t: observations[t]),
-    n_steps=n_cycles,
-    n_members=n_members,
+# f as a ForwardModel, with Δt = 1
+forward = pc.CallableForward(advect, dt=1.0)
+# today (pipekit-ops)
+# t ↦ y_t, called by the cycle with the step index
+obs_source = Lambda(lambda t: observations[t])
+# user
+# a, the perturbed-observation EnKF
+analysis = StochasticEnKF(seed=1)
+# today (pipekit-cycle)
+# x⁽ᵉ⁾_t∣t = a(f(x⁽ᵉ⁾_t−1∣t−1), y_t; h, Σ_ε), for t = 1, …, T
+cycle = pc.EnsembleDACycle(
+    forward_model=forward,
+    obs_op=obs_operator,
+    analysis_step=analysis,
+    obs_source=obs_source,
+    n_steps=num_cycles,
+    n_members=num_members,
 )
-prior = [rng.normal(0.0, 1.0, n_cells) for _ in range(n_members)]  # N_E × (D_x,)
-members, state = da(prior, pc.DAState(obs_err_cov=obs_err_cov))
 
-mean = np.einsum("ed->d", np.stack(members)) / n_members    # (D_x,)
-print(state.cycle_count, state.t)                            # 10 10.0
-print(np.sqrt(np.mean((mean - truth[-1]) ** 2)) < 0.1)       # True
+# x⁽ᵉ⁾_0∣0 ~ 𝒩(0, I), for e = 1, …, N_ℰ
+# → N_ℰ × (D_x,)
+prior = [rng.normal(0.0, 1.0, state_size) for _ in range(num_members)]
+# today (pipekit-cycle)
+# the clock at t = 0, with Σ_ε for the analysis
+start = pc.DAState(obs_err_cov=obs_err_cov)
+# today (pipekit-cycle)
+# T cycles: the analysis ensemble x⁽ᵉ⁾_T∣T and the advanced clock
+members, state = cycle(prior, start)
+
+# x̄_0∣0 and x̄_T∣T, the ensemble means before and after
+# → (D_x,), (D_x,)
+prior_mean = einx.mean("member state -> state", np.stack(prior))
+analysis_mean = einx.mean("member state -> state", np.stack(members))
+prior_error = rmse(prior_mean, truth[0])
+analysis_error = rmse(analysis_mean, truth[-1])
+print(state.cycle_count, state.t, f"{prior_error:.2f}", f"{analysis_error:.2f}")
 ```
 
-The prior ensemble starts about 0.77 (RMSE) from the truth and ends about 0.02 from it after ten cycles.
+This prints `10 10.0 0.77 0.02`: ten cycles done with the clock at $`t = 10`$, and the ensemble mean, 0.77 (RMSE) from the truth before the first cycle, ends 0.02 from it after the tenth. `StochasticEnKF` never imports pipekit-cycle, yet the cycle accepted it as an `AnalysisStep`, because the protocols are structural. So swapping `advect` for the step of an ocean model and `StochasticEnKF` for filterax's `FilterAnalysisStep` or a vardax method's `.as_analysis_step()` leaves the cycle as it is.
 
-The analysis never imported pipekit-cycle, yet it is an `AnalysisStep`, because the protocols are structural.
-Run the same cycle as two calls of five with `obs_clock="state"` and the second call reads $\mathbf{y}_6, \ldots, \mathbf{y}_{10}$, so the result matches the single run:
+The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-cycle/) takes this cycle further: a forecast with no observations, the protocol checks, resuming a run on the state's clock, the calling convention, the components, back-and-forth nudging and the adjoint specs.
 
-```python
-# today (pipekit-cycle)
-print(isinstance(StochasticEnKF(seed=1), pc.AnalysisStep))  # True
+## 🔬 What else is in the box
 
+Each public name sits on one rung of the GeoStack role ladder, by the job it does. The eight cycles are ⑥ recipes, the observation operators and forward models are ⑤ steps, the protocols are the contracts a ③ model satisfies, the adjoint specs are ② strategies, and the carry states are ⓪ structures; the ④ algorithm, the analysis itself, is left to the libraries that implement the protocols. The package has four areas, and `pipekit_cycle` re-exports every name below.
 
-# today (pipekit-cycle)
-# two calls of 5 cycles on obs_clock="state" read y_1..y_5, then y_6..y_10
-def half_cycle():
-    return pc.EnsembleDACycle(
-        forward_model=pc.CallableForward(advect, dt=1.0),
-        obs_op=pc.LinearObs(H),
-        analysis_step=StochasticEnKF(seed=1),
-        obs_source=Lambda(lambda t: observations[t]),
-        n_steps=5,
-        n_members=n_members,
-        obs_clock="state",
-    )
+| Area | Symbols | Notes |
+|---|---|---|
+| `pipekit_cycle.protocols` | `ForwardModel`, `ObservationOperator`, `AnalysisStep`, `TangentLinearModel`, `ReducedBasis`, `ErrorSubspace`, `ReducedOrderModel`, `LatentMap`, `ObservationNoise`, `CovarianceLocalizer`, `EnsembleInflator`, `IterativeProcess`, `StepScheduler`, `SupportsAdjoint` | The runtime-checkable seams |
+| `pipekit_cycle.cycles` | `Cycle`, `EnsembleCycle`, `WindowedCycle`, `Recurrence`, `DAState`, `IterationState`, `WindowState`, `AdjointSpec`, `DirectAdjoint`, `RecursiveCheckpointAdjoint`, `TruncatedAdjoint`, `ImplicitAdjoint`, `BacksolveAdjoint` | Time stepping, its carry states and the adjoint specs |
+| `pipekit_cycle.components` | `IdentityObs`, `LinearObs`, `CallableObs`, `CompositeObs`, `CallableForward`, `CompositeForward`, `NeuralForward` | Observation operators and forward models |
+| `pipekit_cycle.assimilation` | `DACycle`, `EnsembleDACycle`, `SmootherCycle`, `BFNCycle` | Forecast, observe, analyse |
 
+**The protocols** are the core three, then the reduced-order seams (`TangentLinearModel` to `LatentMap`), the ensemble seams (`ObservationNoise`, `CovarianceLocalizer`, `EnsembleInflator`), the iterative-inversion seams (`IterativeProcess`, `StepScheduler`) and `SupportsAdjoint`; the [protocols page](https://jejjohnson.github.io/pipekit/protocols/) gives the members each asks for.
 
-half = half_cycle()
-mid, mid_state = half(prior, pc.DAState(obs_err_cov=obs_err_cov))
-resumed, end_state = half(mid, mid_state)
-print(end_state.cycle_count)                                    # 10
-print(np.allclose(np.stack(resumed), np.stack(members)))        # True
+**The areas** import only from the ones before them, in the order of the table ([decision C1](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/decisions.md)). Every operator is recorded under `pipekit_cycle` whatever file it lives in, so a pipeline saved under the flat modules of earlier releases (`pipekit_cycle.da`, `pipekit_cycle.cycle`, …) still loads.
+
+## 📓 Tutorials
+
+| # | Tutorial | What it shows |
+|---|---|---|
+| 1 | [Run a DA cycle](https://jejjohnson.github.io/pipekit/da-cycle/) | a forecast-only `Cycle`, then an `EnsembleDACycle` with an analysis from another library |
+| 2 | [Ensemble data assimilation](https://jejjohnson.github.io/pipekit/ensemble-da/) | an EnKF on Lorenz-96 for 200 cycles, with observation pre-processing, quality control and verification |
+| 3 | [Pipelines under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/) | pipekit-jax's `ScanCycle` in place of `Cycle` under `jax.jit` |
+| 4 | [Cycle handoff](https://jejjohnson.github.io/pipekit/pipekit-train-cycle-handoff/) | an emulator trained with pipekit-train, then forecasting in a `Cycle` |
+
+## 📖 Documentation
+
+- **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-cycle/)**: the calling convention, the protocol checks, resuming a run, the components, back-and-forth nudging and the adjoint specs.
+- **[Protocols](https://jejjohnson.github.io/pipekit/protocols/)**: every seam of `pipekit_cycle.protocols`, with the members it asks for and the libraries that satisfy it.
+- **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/)**: every public name, generated from the docstrings.
+- **[Design](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle/docs/design)**: the decision behind the four areas, and the draft design of latent data assimilation; the package's original plan is [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md) of the master plan.
+
+## 🧩 Ecosystem
+
+pipekit-cycle is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core tier of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the loop, and composes the rest in:
+
+| Concern | Owner |
+|---|---|
+| `Operator`, `StatefulOperator`, `CarryState`, `Sequential` and `Graph` | [`pipekit-ops`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) |
+| Array API operators for a model or an observation operator (the `array` extra) | [`pipekit-array`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) |
+| Cycles under `jax.jit` (`ScanCycle`, `EnsembleScanCycle`, `Rollout`) | [`pipekit-jax`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) |
+| Ensemble and variational analyses | [`filterax`](https://github.com/jejjohnson/filterax), [`vardax`](https://github.com/jejjohnson/vardax) |
+| Reading an adjoint spec (`to_diffrax_adjoint`, `to_optimistix_adjoint`) | [`integrix`](https://github.com/jejjohnson/integrix), [`argminax`](https://github.com/jejjohnson/argminax) |
+
+Dependencies point one way: pipekit-cycle imports only pipekit-ops. On `main`, vardax imports it in its source (the core protocols, `DACycle` and `SmootherCycle`, and its own subclasses of `LinearObs` and `CallableObs`), and sesmax-experiment and somax run their models in chunks with `Cycle`. In the workspace, pipekit-jax takes `ForwardModel` for its scan cycles, and pipekit-evaluate's `cycle` extra takes `ForwardModel` and `ObservationOperator` for its benchmark tasks. filterax, plumax and xtremax satisfy the protocols by shape and import pipekit-cycle only in their tests, and integrix and argminax read the adjoint specs by class name without importing it.
+
+## 🌳 Repository layout
+
+```
+packages/pipekit-cycle/
+├── src/pipekit_cycle/
+│   ├── __init__.py      ← every public name, recorded under pipekit_cycle
+│   ├── protocols/       ← the runtime-checkable seams
+│   ├── cycles/          ← Cycle, EnsembleCycle, WindowedCycle, Recurrence, the states, the adjoint specs
+│   ├── components/      ← observation operators and forward models
+│   └── assimilation/    ← DACycle, EnsembleDACycle, SmootherCycle, BFNCycle
+├── tests/               ← each cycle and component, the protocols, the area import rule, config round trips
+└── docs/design/         ← decisions.md (the four areas) and latent.md (latent DA, a draft)
 ```
 
-## What ships
+## ⚙️ Development
 
-Version 0.1.0.
-Every name below is exported from `pipekit_cycle`.
+The package is developed inside the workspace, so clone the repository and run the tasks from its root.
 
-| Module | Public names | Purpose |
-| --- | --- | --- |
-| `cycle` | `Cycle`, `EnsembleCycle`, `WindowedCycle`, `Recurrence` | Repeat a step operator: $n$ steps, per member, over sliding windows, or until a condition holds |
-| `da` | `DACycle`, `EnsembleDACycle`, `SmootherCycle` | Forecast, observe and analyse for one state, an ensemble, or a 4D-Var-shaped window |
-| `bfn` | `BFNCycle` | Back-and-forth nudging (Auroux and Blum, 2008): an assimilation cycle that needs no adjoint |
-| `protocols` | `ForwardModel`, `ObservationOperator`, `AnalysisStep` | The core triple: predict, compare, update |
-| `protocols` | `ReducedBasis`, `TangentLinearModel`, `ErrorSubspace`, `ReducedOrderModel`, `LatentMap` | Reduced-order and variational seams |
-| `protocols` | `ObservationNoise`, `CovarianceLocalizer`, `EnsembleInflator` | Ensemble-method seams |
-| `protocols` | `IterativeProcess`, `StepScheduler` | Iterative-inversion seams (EKI, EKS, UKI) |
-| `protocols` | `SupportsAdjoint` | A component that says how gradients flow through it |
-| `obs` | `IdentityObs`, `LinearObs`, `CallableObs`, `CompositeObs` | Ready-made observation operators |
-| `forward` | `CallableForward`, `CompositeForward`, `NeuralForward` | Ready-made forward models: a function, a chain, a trained emulator |
-| `state` | `DAState`, `IterationState`, `WindowState` | Carry states for DA cycles, recurrences and windows |
-| `adjoints` | `AdjointSpec`, `DirectAdjoint`, `RecursiveCheckpointAdjoint`, `TruncatedAdjoint`, `ImplicitAdjoint`, `BacksolveAdjoint` | Declarative adjoint strategies, interpreted by pipekit-jax or an algorithm library |
+```bash
+git clone https://github.com/jejjohnson/pipekit.git
+cd pipekit
+make install                                        # every dependency group and the pre-commit hooks
+uv run pytest -o addopts= packages/pipekit-cycle/tests   # this package's tests
+make lint                                           # ruff check on the whole repo
+make typecheck                                      # ty check on every package
+make docs                                           # the MyST prose and the API reference, into public/
+```
 
-### Not built yet
+`make help` lists every task. The root [`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md) holds the rules for contributors and coding agents.
 
-- **Latent data assimilation.** `LatentDACycle`, the `Encoder`, `Decoder` and `LatentForwardModel` protocols, and `LatentDAState` are designed in [`docs/design/latent.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/latent.md) (draft v0.1); only the `LatentMap` protocol ships.
-- **A loop for the iterative-inversion seams.** `IterativeProcess` and `StepScheduler` are protocols only; no cycle drives them yet.
-- **Localisation and inflation inside the cycles.** `CovarianceLocalizer` and `EnsembleInflator` are protocols only; today an analysis step applies them itself.
+## 🎓 References
 
-## How it works
+- Auroux and Blum (2008). [A nudging-based data assimilation method: the Back and Forth Nudging (BFN) algorithm](https://doi.org/10.5194/npg-15-305-2008). *Nonlinear Processes in Geophysics*.
+- Bolte, Pauwels and Vaiter (2023). [One-step differentiation of iterative algorithms](https://arxiv.org/abs/2305.13768). *NeurIPS*.
+- Griewank (1992). [Achieving logarithmic growth of temporal and spatial complexity in reverse automatic differentiation](https://doi.org/10.1080/10556789208805505). *Optimization Methods and Software*.
 
-### The protocols are structural
-
-`ForwardModel` asks for `step(state, dt)`, a `dt` and a `state_signature`.
-`ObservationOperator` asks for `__call__(state)` and `linearize(state)`.
-`AnalysisStep` is one call, `(forecast, obs, *, obs_op, obs_err_cov) -> analysis`.
-All of them are `runtime_checkable`, so `isinstance(obj, pc.ForwardModel)` is true for any class with those members, and the cycles check their components this way when you build them.
-Algorithm libraries (filterx, vardax, plumax, ...) ship adapter classes that satisfy the protocols **without importing pipekit-cycle**; the usual place is `<libname>.adapters.pipekit`.
-
-### A cycle is a stateful operator
-
-Every cycle takes `(carrier, state)` and returns `(carrier, state)`.
-The carrier is whatever your model steps (an array, an xarray Dataset, a list of members); pipekit-cycle never looks inside it.
-The state is a `CarryState` such as `DAState(t, cycle_count, obs_err_cov, extras)`, and the cycles return an advanced copy rather than mutating it, so you can keep earlier states as snapshots.
-`Cycle(..., save_history=True)` and `DACycle` record per-step results on `self.history`, which each call overwrites.
-
-### Observations and their clock
-
-`obs_source` is any `pipekit_ops.Operator`, called with a step index, so a whole pre-processing chain (fetch, deduplicate, bias-correct, QC) can be one `Sequential`.
-By default the index restarts at 0 on every call (`obs_clock="call"`).
-With `obs_clock="state"` it continues from `state.cycle_count`, so calling a cycle again on its returned state reads the next observations and gives the same analysis as one uninterrupted run.
-`obs_err_source` works the same way for an observation-error covariance that changes per step.
-
-### The helpers in `obs.py` and `forward.py`
-
-`IdentityObs` and `LinearObs(H)` cover direct and linear measurements; `LinearObs` relies only on `@`, so it works for NumPy and JAX arrays alike.
-`CallableObs(fn, linearize_fn=None)` wraps a nonlinear operator such as a radiative transfer model, and `CompositeObs` chains operators and builds the composite tangent linear by the chain rule.
-On the model side, `CallableForward(fn, dt)` wraps a function, `CompositeForward` runs components in turn (its `dt` is their sum), and `NeuralForward(model_op, dt)` turns a trained emulator operator into a forward model at a fixed cadence.
-`CallableObs`, `LinearObs` and `CallableForward` hold closures or arrays, so they set `forbid_in_yaml = True` and do not round-trip through `dumps` / `loads`; rebuild them in code.
-
-### BFN and the adjoint specs
-
-`BFNCycle` integrates the window forward, then backward, nudging toward the observations on both passes with your gain, and repeats until the back-pass initial states agree within `tol`.
-It needs a model that steps with negative `dt` (or a `backward_model`), and it refuses `CompositeForward` and `NeuralForward` without one, because both ignore the sign of `dt`.
-The specs in `adjoints` (`DirectAdjoint`, `RecursiveCheckpointAdjoint`, `TruncatedAdjoint`, `ImplicitAdjoint`, `BacksolveAdjoint`) are frozen dataclasses with no behaviour.
-A component that satisfies `SupportsAdjoint` carries one, the cycles pass it through untouched, and an execution layer interprets it: `integrix.adjoint.to_diffrax_adjoint` for a diffrax solve, `integrix.adjoint.truncated_scan` for a truncated rollout.
-So choosing how gradients flow is configuration, not code.
-
-## Learn more
-
-- API reference: [pipekit-cycle](https://jejjohnson.github.io/pipekit/reference/pipekit-cycle/).
-- Tutorials: [Run a DA cycle](https://jejjohnson.github.io/pipekit/da-cycle/), [Ensemble data assimilation](https://jejjohnson.github.io/pipekit/ensemble-da/), [Run pipelines under jit](https://jejjohnson.github.io/pipekit/pipekit-under-jit/).
-- Design: [Latent data assimilation](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/docs/design/latent.md); master plan [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md).
-- The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
-- Packages built on this one: [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (jit-native cycles), [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (emulators trained on simulations), [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) (benchmark tasks).
-
-## License
+## 📄 License
 
 MIT. See [LICENSE](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/LICENSE).

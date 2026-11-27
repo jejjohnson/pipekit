@@ -49,6 +49,8 @@ project:
           title: pipekit-ops
         - file: quickstart/quickstart-array.md
           title: pipekit-array
+        - file: quickstart/quickstart-cycle.md
+          title: pipekit-cycle
     - title: Concepts
       children:
         - file: concepts.md
