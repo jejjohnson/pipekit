@@ -51,6 +51,8 @@ project:
           title: pipekit-array
         - file: quickstart/quickstart-cycle.md
           title: pipekit-cycle
+        - file: quickstart/quickstart-train.md
+          title: pipekit-train
     - title: Concepts
       children:
         - file: concepts.md
