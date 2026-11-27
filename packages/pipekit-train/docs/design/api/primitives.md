@@ -178,5 +178,5 @@ Keras's idiom is `model.compile(loss=..., optimizer=...)` +
 `model.fit(...)`. The Keras adapter maps `Loss` to a
 `keras.losses.Loss`, with its auxiliary terms as batch-weighted metrics,
 and configures `model.compile` from the rest of the `TrainingLoop`
-config. Documented in [adapters.md](adapters.md#keras-implemented) and
+config. Documented in [adapters.md](adapters.md) and
 [keras_adapter.md](../keras_adapter.md).
