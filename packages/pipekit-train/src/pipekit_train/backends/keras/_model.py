@@ -67,7 +67,8 @@ class KerasModelOp(Operator):
                 "The Keras model has no weights; build it (call it on an input) "
                 "before writing them."
             )
-        arrays = [np.ascontiguousarray(np.asarray(w)) for w in self.model.get_weights()]
+        # np.asarray(order='C') keeps a scalar weight 0-d; ascontiguousarray would not
+        arrays = [np.asarray(w, order="C") for w in self.model.get_weights()]
         header = json.dumps(
             [_describe(v.path, a) for v, a in zip(weights, arrays, strict=True)],
             sort_keys=True,

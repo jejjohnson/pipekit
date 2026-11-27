@@ -67,6 +67,27 @@ def test_blob_loads_into_a_skeleton_built_with_another_seed() -> None:
     assert loaded.serialize_weights() == trained.serialize_weights()
 
 
+def test_a_scalar_weight_keeps_its_shape() -> None:
+    class Scale(keras.layers.Layer):
+        def build(self, input_shape):
+            self.scale = self.add_weight(shape=(), initializer="ones", name="scale")
+
+        def call(self, x):
+            return x * self.scale
+
+    def build(seed: int) -> keras.Model:
+        keras.utils.set_random_seed(seed)
+        model = keras.Sequential([keras.Input((3,)), Scale(), keras.layers.Dense(1)])
+        model.layers[0].scale.assign(2.0 + seed)
+        return model
+
+    trained = KerasModelOp(build(0))
+    blob = trained.serialize_weights()
+    loaded = KerasModelOp(build(1)).with_weights(blob, copy=False)
+    assert float(loaded.model.layers[0].scale.numpy()) == 2.0
+    assert trained.with_weights(blob, copy=False).serialize_weights() == blob
+
+
 def test_copy_false_loads_into_the_skeleton_itself() -> None:
     trained = KerasModelOp(_model(0))
     skeleton = KerasModelOp(_model(123))
