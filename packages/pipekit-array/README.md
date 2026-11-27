@@ -56,6 +56,8 @@ None of it is a new array library. The arithmetic is the namespace's own (`xp.me
 
 pipekit-array is one of the two foundations of the pipekit workspace, next to pipekit-ops; the [workspace README](https://github.com/jejjohnson/pipekit#readme) introduces the other packages.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_overview/pipekit_array_overview.png" alt="pipekit-array in one picture: you supply data on a backend, a carrier with dim names, the dims to consume or your own function; one rule y_ℓ = f(x⁽¹⁾_ℓ, …) by dim name; six areas (named, kernels, operators, bridges, arrays and testing); out comes the same carrier on the same backend, its signature, and a pipekit pipeline; on pipekit-ops, the Array API and its extras" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🏷️ **Dims by name, never by position**: `sel`, `isel`, `reduce`, `quantile`, `window`, `coarsen`, `diff`, `shift`, `merge_dims`, `stack`, `map_over` and the rest of `pipekit_array.named` take dim names, on a `DimArray`, an `xr.DataArray` or any carrier whose library registers an adapter with pipekit-ops.
@@ -213,6 +215,13 @@ The [docs quickstart](https://jejjohnson.github.io/pipekit/quickstart-array/) ta
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_roles/pipekit_array_roles-dark.svg">
+    <img alt="pipekit-array on the GeoStack role ladder: ApplyAlong and BatchAlong as recipes, the operator twins, KernelOp, Einx and Estimator as steps, no algorithms or models of its own, kernel specs, policies and option sets as strategies, the named and plain-array functions as primitives, and DimArray, its adapters and layouts as structures, with the test kit and the registration functions beside it" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_roles/pipekit_array_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each public name sits on one rung of the GeoStack role ladder, by the job it does. `DimArray`, `Padded`, `RowLayout`, `Groups` and the adapters are structures (⓪), the named functions and the functions of plain arrays are primitives (①), and `KernelSpec`, which holds only the settings of a kernel, is a strategy (②). Each operator twin, `KernelOp`, `Einx` and `Estimator` is a step (⑤), and `ApplyAlong` and `BatchAlong`, which run another operator along a dim, are recipes (⑥). The table lists them by area.
 
 | Area | Symbols | Notes |
@@ -244,6 +253,13 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 - **[Documentation](https://jejjohnson.github.io/pipekit/)**: the whole workspace, with the tutorials of every package.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_ecosystem/pipekit_array_ecosystem-dark.svg">
+    <img alt="The 11 packages that import pipekit-array on their main branches, by layer, each with the areas it imports: pipekit-jax through its array extra, geotoolz's four packages, gridax, geophysix, radiomax, diagnostix and tracerax, and plumax; pipekit-array builds on pipekit-ops and the Array API" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_ecosystem/pipekit_array_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-array is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), at tier 0 of the [GeoStack](https://github.com/jejjohnson/geostack). It owns array operations by dim name and on any backend, and composes the rest in:
 
