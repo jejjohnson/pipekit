@@ -112,13 +112,15 @@ A project managed with [uv](https://docs.astral.sh/uv/) gives each pipekit packa
 
 ```toml
 [project]
-dependencies = ["pipekit-train[equinox,cycle]"]
+dependencies = ["pipekit-ops", "pipekit-cycle", "pipekit-train[equinox,cycle]"]"]
 
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
 pipekit-train = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-train", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 ## 🌫️ Quickstart: a plume emulator
 
