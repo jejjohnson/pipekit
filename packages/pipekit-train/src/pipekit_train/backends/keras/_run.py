@@ -78,6 +78,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             "backend='keras' does not shard yet; leave TrainingLoop.sharding unset."
         )
     task = _resolve_task(loop)
+    _check_model_op(loop.model_op)
     source = BatchSource(loop.dataset, loop.batch_size, loop.seed)
     first = source.next_batch()
     model, finish = _keras_model(keras, loop, task, first)
@@ -146,6 +147,28 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "final_eval_metrics": dict(bridge.last_eval_metrics),
     }
     return trained_model_op, backend_info
+
+
+def _check_model_op(model_op: Any) -> None:
+    """Refuse an operator the backend cannot train, before any data is read."""
+    if isinstance(model_op, KerasModelOp):
+        return
+    if isinstance(model_op, Operator) and _holds_equinox_module(model_op):
+        return
+    raise TypeError(
+        "backend='keras' trains a pipekit_train.backends.keras.KerasModelOp, "
+        "or an operator that is or holds an eqx.Module (JaxOperator, "
+        f"JaxModelOp, EquinoxModelOp); got {type(model_op).__name__}."
+    )
+
+
+def _holds_equinox_module(model_op: Any) -> bool:
+    """True if ``model_op`` is or holds an ``eqx.Module``; False without Equinox."""
+    try:
+        from pipekit_train.backends._equinox_ops import unwrap_module
+    except ImportError:
+        return False
+    return unwrap_module(model_op) is not None
 
 
 def _keras_model(
