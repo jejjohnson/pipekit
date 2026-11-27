@@ -6,13 +6,14 @@
   (`run_svi`, `run_mcmc`).
 - ``pipekit-train[blackjax]``: `pipekit_train.backends.blackjax`, NUTS from
   BlackJAX on NumPyro models.
-- ``pipekit-train[keras]``: `pipekit_train.backends.keras`, a v0.3 scaffold whose
-  ``run`` raises ``NotImplementedError``, so a CLI can branch on what is
-  installed without crashing on import.
+- ``pipekit-train[keras]``: `pipekit_train.backends.keras`, Keras 3's ``compile``
+  and ``fit`` on JAX (`KerasModelOp`, `KerasTask`). Importing it imports no
+  Keras, so a CLI can branch on what is installed without crashing on import.
 
 NumPyro and BlackJAX share the seam in ``_bayes`` (`NumpyroTask`,
-`NumpyroPredictiveOp`), and every backend shares the callback dispatch and the
-optax optimiser builder in ``_common``. Importing this package imports no backend.
+`NumpyroPredictiveOp`), every backend shares the callback dispatch and the
+optax optimiser builder in ``_common``, and the Equinox and Keras backends read
+their batches from ``_batches``. Importing this package imports no backend.
 
 See ``docs/design/api/adapters.md``.
 """
