@@ -11,8 +11,9 @@
   installed without crashing on import.
 
 NumPyro and BlackJAX share the seam in ``_bayes`` (`NumpyroTask`,
-`NumpyroPredictiveOp`), and every backend shares the callback dispatch and the
-optax optimiser builder in ``_common``. Importing this package imports no backend.
+`NumpyroPredictiveOp`), every backend shares the callback dispatch and the
+optax optimiser builder in ``_common``, and the Equinox and Keras backends read
+their batches from ``_batches``. Importing this package imports no backend.
 
 See ``docs/design/api/adapters.md``.
 """

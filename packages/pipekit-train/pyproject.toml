@@ -22,7 +22,15 @@ equinox   = [
     "orbax-checkpoint>=0.6",
     "jaxtyping>=0.2",
 ]
-keras     = ["keras>=3.0"]
+# Keras 3 on the JAX backend (ADRs D18 to D21). Grain reads the batches,
+# Orbax writes the checkpoints; an Equinox model also needs [equinox].
+keras     = [
+    "keras>=3.11",
+    "jax>=0.4.30",
+    "grain>=0.2",
+    "orbax-checkpoint>=0.6",
+    "numpy",
+]
 
 # Bayesian-inference backends (numpyro-svi / numpyro-mcmc). One extra, two
 # adapters (per ADR D13). JAX arrives via numpyro.
