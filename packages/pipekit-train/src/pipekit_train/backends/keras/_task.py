@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -28,5 +28,3 @@ class KerasTask:
     metrics: tuple[Any, ...] = ()
     keras_callbacks: tuple[Any, ...] = ()
     keep_compile: bool = False
-    #: the logged metrics that are means of per-step values, set by the backend
-    per_step_names: tuple[str, ...] = field(default=("loss",), repr=False)

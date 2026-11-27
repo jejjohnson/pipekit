@@ -72,8 +72,9 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     source = BatchSource(loop.dataset, loop.batch_size, loop.seed)
     first = source.next_batch()
+    per_step: tuple[str, ...] = ("loss",)
     if not task.keep_compile:
-        _compile(model, loop, task, first)
+        per_step = _compile(model, loop, task, first)
     elif loop.optimizer_config != _DEFAULT_OPTIMIZER:
         warnings.warn(
             "KerasTask(keep_compile=True) keeps the model's own optimiser, so "
@@ -93,9 +94,6 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         steps, batches = _validation_batches(loop.val_dataset, loop.batch_size)
         validation = {"validation_data": batches, "validation_steps": steps}
 
-    per_step = task.per_step_names if not task.keep_compile else ("loss",)
-    if task.loss is not None and not task.keep_compile:
-        per_step = ("loss",)
     bridge = _bridge(keras)(loop, period, per_step)
     try:
         model.fit(
@@ -154,9 +152,17 @@ def _resolve_task(loop: TrainingLoop) -> KerasTask:
     return task
 
 
-def _compile(model: Any, loop: TrainingLoop, task: KerasTask, first: Any) -> None:
-    """Compile ``model`` with the task's loss and the loop's optimiser."""
+def _compile(
+    model: Any, loop: TrainingLoop, task: KerasTask, first: Any
+) -> tuple[str, ...]:
+    """Compile ``model`` with the task's loss and the loop's optimiser.
+
+    Returns:
+        The logged metrics that are means of per-step values: the loss, and
+        the auxiliary terms of a bridged `pipekit_train.Loss`.
+    """
     metrics = list(task.metrics)
+    per_step: tuple[str, ...] = ("loss",)
     if task.loss is not None:
         loss = task.loss
     else:
@@ -164,13 +170,14 @@ def _compile(model: Any, loop: TrainingLoop, task: KerasTask, first: Any) -> Non
         names = aux_names(loop.loss, model(x, training=False), y)
         loss = bridge_loss(loop.loss)
         metrics = aux_metrics(loop.loss, names) + metrics
-        task.per_step_names = ("loss", *names)
+        per_step = ("loss", *names)
     model.compile(
         optimizer=build_keras_optimizer(loop.optimizer_config),
         loss=loss,
         metrics=metrics,
         steps_per_execution=1,
     )
+    return per_step
 
 
 def _train_batches(source: BatchSource, first: Any) -> Iterator[Any]:

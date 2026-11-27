@@ -63,7 +63,11 @@ class _Pairs(TrainingDataset):
 def _model(seed: int = 0) -> Any:
     keras.utils.set_random_seed(seed)
     return keras.Sequential(
-        [keras.Input((3,)), keras.layers.Dense(8, activation="tanh"), keras.layers.Dense(1)]
+        [
+            keras.Input((3,)),
+            keras.layers.Dense(8, activation="tanh"),
+            keras.layers.Dense(1),
+        ]
     )
 
 
@@ -167,7 +171,9 @@ def test_logged_losses_are_each_steps_own() -> None:
 def test_validation_is_the_per_sample_mean_over_a_ragged_set() -> None:
     model = _model()
     val = _Pairs(70, 2)
-    _, artifact = _loop(model, val_dataset=val, max_steps=20, eval_every_n_steps=20, batch_size=32).run()
+    _, artifact = _loop(
+        model, val_dataset=val, max_steps=20, eval_every_n_steps=20, batch_size=32
+    ).run()
     eval_metrics = artifact.backend_info["final_eval_metrics"]
     predicted = np.asarray(model(val.x, training=False))
     exact = float(np.mean((predicted - val.y) ** 2))
@@ -226,7 +232,11 @@ def test_streaming_datasets_train() -> None:
     pairs = list(zip(_Pairs(64, 3).x, _Pairs(64, 3).y, strict=True))
     dataset = IterableDataset(source=pairs, content_hash="stream-64")
     _, artifact = _loop(
-        _model(), dataset=dataset, val_dataset=dataset, max_steps=12, eval_every_n_steps=6
+        _model(),
+        dataset=dataset,
+        val_dataset=dataset,
+        max_steps=12,
+        eval_every_n_steps=6,
     ).run()
     assert artifact.backend_info["final_step"] == 12
 
