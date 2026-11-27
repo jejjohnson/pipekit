@@ -41,71 +41,35 @@ project:
           title: Installation
         - file: getting-started.md
           title: Getting started
-        - file: core-tour.md
-          title: Tour of the core
-    - title: Quickstarts
-      children:
-        - file: quickstart/quickstart-ops.md
-          title: pipekit-ops
-        - file: quickstart/quickstart-array.md
-          title: pipekit-array
-        - file: quickstart/quickstart-cycle.md
-          title: pipekit-cycle
-        - file: quickstart/quickstart-train.md
-          title: pipekit-train
-        - file: quickstart/quickstart-evaluate.md
-          title: pipekit-evaluate
-        - file: quickstart/quickstart-experiment.md
-          title: pipekit-experiment
-        - file: quickstart/quickstart-jax.md
-          title: pipekit-jax
-    - title: Concepts
-      children:
         - file: concepts.md
           title: Concepts
         - file: protocols.md
           title: Protocols
-        - file: patterns.md
-          title: Patterns
-        - file: guards.md
-          title: Guards
-        - file: background/toolz.md
-          title: "Background: toolz"
-    - title: Tutorials
-      children:
-        - file: tutorials/train-emulator.md
-          title: Train an emulator
-        - file: tutorials/da-cycle.md
-          title: Run a DA cycle
-        - file: tutorials/anomaly-graph.md
-          title: Build a bigger graph
         - file: tutorials/train-register-forecast.md
           title: Train, register, forecast
-        - file: tutorials/inference.md
-          title: Run inference
-        - file: tutorials/ensemble-da.md
-          title: Ensemble data assimilation
-        - file: tutorials/etl-regions.md
-          title: ETL over many regions
-        - file: tutorials/pipekit-under-jit.md
-          title: Pipelines under jit
-    - title: Notebooks (pipekit-train)
+    - title: Operators (pipekit-ops)
       children:
-        - file: notebooks/pipekit_train_quickstart.ipynb
-          title: Quickstart (MLP regression)
-        - file: notebooks/pipekit_train_cycle_handoff.ipynb
-          title: Cycle handoff
-        - file: notebooks/pipekit_train_numpyro_svi.ipynb
-          title: NumPyro SVI
-        - file: notebooks/pipekit_train_numpyro_mcmc.ipynb
-          title: NumPyro NUTS
-        - file: notebooks/pipekit_train_blackjax.ipynb
-          title: BlackJAX NUTS
-        - file: notebooks/pipekit_train_keras.ipynb
-          title: Keras backend
-    - title: Design
-      children:
-        - title: pipekit-ops
+        - file: quickstart/quickstart-ops.md
+          title: Quickstart
+        - file: core-tour.md
+          title: Tour of the core
+        - title: Guides
+          children:
+            - file: patterns.md
+              title: Patterns
+            - file: guards.md
+              title: Guards
+            - file: background/toolz.md
+              title: "Background: toolz"
+        - title: Tutorials
+          children:
+            - file: tutorials/anomaly-graph.md
+              title: Build a bigger graph
+            - file: tutorials/etl-regions.md
+              title: ETL over many regions
+            - file: tutorials/inference.md
+              title: Run inference
+        - title: Design
           children:
             - file: design-ops/README.md
               title: Overview
@@ -123,7 +87,43 @@ project:
               title: Decisions
             - file: design-ops/roadmap.md
               title: Roadmap and gates
-        - title: pipekit-train
+    - title: Named arrays (pipekit-array)
+      children:
+        - file: quickstart/quickstart-array.md
+          title: Quickstart
+    - title: Cycles (pipekit-cycle)
+      children:
+        - file: quickstart/quickstart-cycle.md
+          title: Quickstart
+        - title: Tutorials
+          children:
+            - file: tutorials/da-cycle.md
+              title: Run a DA cycle
+            - file: tutorials/ensemble-da.md
+              title: Ensemble data assimilation
+    - title: Training (pipekit-train)
+      children:
+        - file: quickstart/quickstart-train.md
+          title: Quickstart
+        - title: Tutorials
+          children:
+            - file: tutorials/train-emulator.md
+              title: Train an emulator
+        - title: Notebooks
+          children:
+            - file: notebooks/pipekit_train_quickstart.ipynb
+              title: MLP regression
+            - file: notebooks/pipekit_train_cycle_handoff.ipynb
+              title: Cycle handoff
+            - file: notebooks/pipekit_train_numpyro_svi.ipynb
+              title: NumPyro SVI
+            - file: notebooks/pipekit_train_numpyro_mcmc.ipynb
+              title: NumPyro NUTS
+            - file: notebooks/pipekit_train_blackjax.ipynb
+              title: BlackJAX NUTS
+            - file: notebooks/pipekit_train_keras.ipynb
+              title: Keras backend
+        - title: Design
           children:
             - file: design-train/README.md
               title: Overview
@@ -167,11 +167,26 @@ project:
                   title: Amortized inference
                 - file: design-train/examples/integration.md
                   title: Cross-package integration
+    - title: Evaluation (pipekit-evaluate)
+      children:
+        - file: quickstart/quickstart-evaluate.md
+          title: Quickstart
+    - title: Experiments (pipekit-experiment)
+      children:
+        - file: quickstart/quickstart-experiment.md
+          title: Quickstart
+    - title: JAX bridge (pipekit-jax)
+      children:
+        - file: quickstart/quickstart-jax.md
+          title: Quickstart
+        - title: Tutorials
+          children:
+            - file: tutorials/pipekit-under-jit.md
+              title: Pipelines under jit
     - title: Project
       children:
         - file: contributing.md
           title: Contributing
-
 site:
   title: pipekit
   template: book-theme
