@@ -73,7 +73,7 @@ Keras's loss tracker weights each batch by its size and gives the left side. A m
 | Weights | `Model.weights` (each with a `.path`, shape and dtype), `get_weights()`, `set_weights()` | the weight blob of `KerasModelOp` (D20) |
 | JAX models | `keras.layers.JaxLayer(call_fn, params, state, seed)`, with `call_fn(params, rng, inputs, training)` | an Equinox module as a Keras layer (D21) |
 | Functional call | `Model.stateless_call(trainable, non_trainable, x)` | not used by `fit`; a later JAX-native export of the trained model |
-| Distribution | `keras.distribution.DataParallel`, `ModelParallel`, `DeviceMesh` (JAX backend only) | not in the first release (§9) |
+| Distribution | `keras.distribution.DataParallel`, `ModelParallel`, `DeviceMesh` (JAX backend only) | not in the first release (§10) |
 | Precision | `keras.config.set_dtype_policy` | left to the user, as boundaries.md Q3 decides for every backend |
 
 Keras's own checkpointing does not fit the loop's contract. `BackupAndRestore` saves the weights and the epoch, but it cannot resume inside an epoch: it restarts the interrupted epoch from batch 0 with weights that were already updated, and it knows nothing of the data iterator. A `.keras` file is a zip whose `metadata.json` records the time it was saved, so two saves of the same weights differ in bytes and would give two registry hashes.
@@ -175,7 +175,7 @@ class KerasTask:
     keep_compile: bool = False
 ```
 
-With no task, the backend synthesises one from `loop.loss`, as the Equinox backend does. A `Loss` that takes a `key` (the sample-based fallback of `KL`) is refused in the first release with a message naming the limit, because a Keras loss has no key argument (§9).
+With no task, the backend synthesises one from `loop.loss`, as the Equinox backend does. A `Loss` that takes a `key` (the sample-based fallback of `KL`) is refused in the first release with a message naming the limit, because a Keras loss has no key argument (§10).
 
 ### 8.3 The loss bridge
 
@@ -226,7 +226,7 @@ flowchart LR
     E --> I[KerasModelOp + backend_info]
 ```
 
-1. **Backend.** If Keras is not imported, set `KERAS_BACKEND=jax` unless it is set; import Keras; raise if `keras.config.backend()` is not `"jax"` (D19). Raise if `loop.sharding` is set (§9).
+1. **Backend.** If Keras is not imported, set `KERAS_BACKEND=jax` unless it is set; import Keras; raise if `keras.config.backend()` is not `"jax"` (D19). Raise if `loop.sharding` is set (§10).
 2. **Model.** A `KerasModelOp` is used as it is. An operator that is an Equinox module (`JaxOperator`) or holds one in `.module` (`JaxModelOp`, `EquinoxModelOp`) is wrapped in a one-layer Keras model holding an `EquinoxLayer`, built by calling it on the first batch (§8.7). Anything else raises `TypeError` naming the accepted kinds.
 3. **Task.** Use `loop.task` if it is a `KerasTask`, else synthesise one from `loop.loss`; raise if neither is set.
 4. **Compile.** Unless `keep_compile`, call `model.compile(optimizer, loss, metrics, steps_per_execution=1)`. One step per execution keeps `on_train_batch_end` firing every step.
@@ -362,27 +362,94 @@ An Equinox-backed `model_op` needs both extras, `pipekit-train[keras,equinox]`; 
 
 ## 9. Example API usage
 
-The block uses only proposed names, so it has not been run; §5 is what was run.
+Each example shows the plain Keras code first, with `compile`, `fit` and `predict`, and then the same training through `TrainingLoop`. The plain Keras block of §9.1 uses only names that ship today and was run as written on Keras 3.15.1; the other blocks use proposed names and have not been run.
+
+### 9.1 A Keras model
+
+The data are toy regression pairs: inputs x drawn from a standard normal, and targets y = x w + b + ε with fixed weights w, offset b and noise ε. The first N rows train and the last N_val validate.
 
 ```python
-# Shapes: N = 512 samples; D_x = 3 inputs; D_y = 1 output; N_B = 32
+# Shapes: N = 512 training rows; N_val = 128 validation rows; D_x = 3; D_y = 1
+
+import os
+
+os.environ.setdefault("KERAS_BACKEND", "jax")
 
 import keras
-from pipekit_train import MSE, EarlyStopping, IterableDataset, JSONLWriter, TrainingLoop
+import numpy as np
+
+# user
+rng = np.random.default_rng(0)
+weights = np.array([[1.0], [-2.0], [0.5]], dtype="float32")
+# x ~ 𝒩(0, I)
+# → (N + N_val, D_x)
+inputs = rng.normal(size=(640, 3)).astype("float32")
+# y = x w + b + ε, ε ~ 𝒩(0, 0.1²)
+# (N + N_val, D_x) → (N + N_val, D_y)
+noise = 0.1 * rng.normal(size=(640, 1)).astype("float32")
+targets = inputs @ weights + 0.3 + noise
+x_train, y_train = inputs[:512], targets[:512]
+x_val, y_val = inputs[512:], targets[512:]
+
+# today (keras)
+model = keras.Sequential(
+    [
+        keras.Input((3,)),
+        keras.layers.Dense(64, activation="gelu"),
+        keras.layers.Dense(1),
+    ]
+)
+
+# today (keras)
+model.compile(optimizer=keras.optimizers.AdamW(learning_rate=1e-3), loss="mse")
+
+# today (keras)
+# θ after at most 125 epochs of 16 steps, 2,000 steps in all
+history = model.fit(
+    x_train,
+    y_train,
+    batch_size=32,
+    epochs=125,
+    validation_data=(x_val, y_val),
+    callbacks=[keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
+    verbose=0,
+)
+
+# today (keras)
+# ŷ = f_θ(x)
+# (N_val, D_x) → (N_val, D_y)
+predictions = model.predict(x_val, verbose=0)
+```
+
+Run as written, it stopped early after 60 of the 125 epochs, at a validation MSE of 0.0106.
+
+The same training through `TrainingLoop`. The optimiser and loss of `compile` become `optimizer_config` and `loss`, the epochs of `fit` become a step budget, and Keras's early stopping becomes the pipekit one on the validation metric. What the loop adds is the dataset's content hash, the metric log, checkpoints that resume, the `TrainingArtifact`, and an operator that goes into a pipeline and the registry.
+
+```python
+# Shapes: N = 512; N_val = 128; D_x = 3; D_y = 1; N_B = 32
+
+from pipekit_train import (
+    MSE,
+    EarlyStopping,
+    IterableDataset,
+    JSONLWriter,
+    TrainingLoop,
+)
 
 # proposed (D20)
 from pipekit_train.backends.keras import KerasModelOp
 
-# user
-model = keras.Sequential(
-    [keras.Input((3,)), keras.layers.Dense(64, activation="gelu"), keras.layers.Dense(1)]
+# today (pipekit-train)
+dataset = IterableDataset(
+    source=list(zip(x_train, y_train)), content_hash="linreg-train-512"
+)
+# today (pipekit-train)
+val_dataset = IterableDataset(
+    source=list(zip(x_val, y_val)), content_hash="linreg-val-128"
 )
 
-# today (pipekit-train)
-dataset = IterableDataset(source=pairs, content_hash="linreg-512")
-
 # proposed (D18)
-# θ_K after K = 2,000 steps of AdamW on ℓ = MSE
+# θ_K after K = 2,000 steps of AdamW on ℓ = MSE, validated every 200 steps
 trained_op, artifact = TrainingLoop(
     model_op=KerasModelOp(model),
     dataset=dataset,
@@ -400,9 +467,11 @@ trained_op, artifact = TrainingLoop(
 
 # proposed (D20)
 # ŷ = f_θ_K(x)
-# (N, D_x) → (N, D_y)
-predictions = trained_op(x_test)
+# (N_val, D_x) → (N_val, D_y)
+predictions = trained_op(x_val)
 ```
+
+### 9.2 A keras-fairkl model
 
 A keras-fairkl model keeps its own `compile`, because its penalty lives in `add_loss`, and its batches carry the sensitive attribute in the input dict:
 
@@ -424,29 +493,90 @@ TrainingLoop(
 
 With `keep_compile=True` the model's own optimiser stands and `optimizer_config` is not used; the backend says so in a warning when the config differs from the default.
 
-An Equinox emulator trained by both backends, for the benchmark builder's comparison. Each run returns a `JaxModelOp`:
+### 9.3 An Equinox emulator
+
+The emulator is an Equinox MLP written per sample, on the data of §9.1. In plain Keras it goes into a model as an `EquinoxLayer`, and the trained module is read back from the layer:
 
 ```python
-# Shapes: N = 512 samples; D_x = 3 inputs; D_y = 1 output
+# Shapes: N = 512; N_val = 128; D_x = 3; D_y = 1
 
 import equinox as eqx
 import jax
 
-# today (pipekit-jax)
-from pipekit_jax import JaxModelOp
+# proposed (D21)
+from pipekit_train.backends.keras import EquinoxLayer
 
 # user
 emulator = eqx.nn.MLP(3, 1, width_size=64, depth=2, key=jax.random.key(0))
 
-# today (pipekit-train): the reference Equinox backend
+# proposed (D21)
+emulator_layer = EquinoxLayer(emulator)
+# today (keras)
+keras_emulator = keras.Sequential([keras.Input((3,)), emulator_layer])
+
+# today (keras)
+keras_emulator.compile(
+    optimizer=keras.optimizers.AdamW(learning_rate=1e-3), loss="mse"
+)
+
+# today (keras)
+# θ after 2,000 steps
+keras_emulator.fit(
+    x_train,
+    y_train,
+    batch_size=32,
+    epochs=125,
+    validation_data=(x_val, y_val),
+    verbose=0,
+)
+
+# today (keras)
+# ŷ = f_θ(x)
+# (N_val, D_x) → (N_val, D_y)
+predictions = keras_emulator.predict(x_val, verbose=0)
+
+# proposed (D21)
+# the trained eqx.nn.MLP, rebuilt from the layer's weights
+trained_emulator = emulator_layer.module
+```
+
+The same emulator through `TrainingLoop`, under both backends, for the benchmark builder's comparison. The loop builds the `EquinoxLayer` itself, and each run returns a `JaxModelOp`:
+
+```python
+# Shapes: N = 512; N_val = 128; D_x = 3; D_y = 1
+
+# today (pipekit-jax)
+from pipekit_jax import JaxModelOp
+
+# today (pipekit-train)
+# the reference Equinox backend
 equinox_op, equinox_artifact = TrainingLoop(
-    model_op=JaxModelOp(emulator), dataset=dataset, loss=MSE(), backend="equinox"
+    model_op=JaxModelOp(emulator),
+    dataset=dataset,
+    val_dataset=val_dataset,
+    loss=MSE(),
+    optimizer_config={"name": "adamw", "lr": 1e-3},
+    max_steps=2_000,
+    backend="equinox",
 ).run()
 
-# proposed (D21): the same module through Keras fit, returned as a JaxModelOp
+# proposed (D21)
+# the same module through Keras fit, returned as a JaxModelOp
 keras_op, keras_artifact = TrainingLoop(
-    model_op=JaxModelOp(emulator), dataset=dataset, loss=MSE(), backend="keras"
+    model_op=JaxModelOp(emulator),
+    dataset=dataset,
+    val_dataset=val_dataset,
+    loss=MSE(),
+    optimizer_config={"name": "adamw", "lr": 1e-3},
+    max_steps=2_000,
+    backend="keras",
 ).run()
+
+# today (pipekit-jax)
+# ŷᵢ = f_θ_K(xᵢ) from each backend; the module is per sample, so map it
+# (N_val, D_x) → (N_val, D_y)
+equinox_predictions = jax.vmap(equinox_op)(x_val)
+keras_predictions = jax.vmap(keras_op)(x_val)
 ```
 
 ## 10. Plan
