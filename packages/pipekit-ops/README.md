@@ -54,6 +54,8 @@ again = pk.loads(pk.dumps(pipeline))
 
 None of it needs a third-party library. pipekit-ops declares `dependencies = []`, and `import pipekit_ops` loads only the standard library, so a library can build on it without pulling in NumPy, JAX or anything else. Its execution runs on [`concurrent.futures`](https://docs.python.org/3/library/concurrent.futures.html), [`asyncio`](https://docs.python.org/3/library/asyncio.html) and [`multiprocessing`](https://docs.python.org/3/library/multiprocessing.html), so a dask.distributed, Ray or loky executor plugs into `Map` through the standard `Executor` protocol without pipekit-ops importing it. Its vocabulary comes from [toolz](https://github.com/pytoolz/toolz): `Filter`, `CountBy`, `GetIn` and `PartitionAll` keep their toolz names and meanings, but each one is a class configured at construction (the constructor plays the part of `toolz.curry`) whose arguments are JSON values or other operators, so a pipeline built from them round-trips and hashes ([Background: toolz](https://jejjohnson.github.io/pipekit/toolz/)).
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_ops_overview/pipekit_ops_overview.png" alt="pipekit-ops in one picture: one Operator and the pipeline p = o_K ∘ … ∘ o_1, with each step's type and the content hash h(p); five areas act on it (compose in core, wrap in operators, map in execution, observe, save in saving); carriers and testing underneath, on the Python standard library" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🧱 **One class for any carrier**: an `Operator` has one method, `_apply`, and never inspects what it is given, so the same machinery runs on a NumPy array, an xarray Dataset, a dict of scene records or your own class.
@@ -189,6 +191,13 @@ The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-ops/) takes thi
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_ops_roles/pipekit_ops_roles-dark.svg">
+    <img alt="pipekit-ops on the GeoStack role ladder: Sequential, Graph, the wrappers, Map and the observers as recipes, Operator and the ready-made operators as steps, jit_report as an algorithm, no models or strategies of its own, saving, hashing and carrier functions as primitives, and signatures, adapters, stores and results as structures, with run-time context and setup beside the ladder" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_ops_roles/pipekit_ops_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each public name sits on one rung of the GeoStack role ladder, by the job it does. Most of pipekit-ops is the upper rungs: `Operator` and the ready-made operators (`Get`, `Filter`, `Identity`) are ⑤ steps, one transformation with its config, while `Sequential`, `Graph`, the wrappers (`Retry`, `Cache`, `Branch`) and `Map` compose steps into ⑥ recipes, and `dumps`, `loads` and `pipeline_hash` are ① primitives, one call each, that treat a recipe as data. Underneath sit the ⓪ structures the steps pass around and read: `Signature`, the named-array adapters and the stores.
 
 | Area | Symbols | Notes |
@@ -242,6 +251,13 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 - **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-ops/)**: every public symbol, generated from the docstrings.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_ops_ecosystem/pipekit_ops_ecosystem-dark.svg">
+    <img alt="The 16 packages that import pipekit-ops on their main branches, by layer, each with the areas it imports: the rest of the pipekit workspace, geotoolz's four packages, gridax and diagnostix, vardax, and plumax, radtrax, sesmax-core and sesmax-experiment; pipekit-ops builds on the standard library alone" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_ops_ecosystem/pipekit_ops_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-ops is the foundation of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core layer of the [GeoStack](https://github.com/jejjohnson/geostack). It extends no third-party library; what it does not write itself comes from the standard library:
 

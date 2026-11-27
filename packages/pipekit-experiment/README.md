@@ -55,6 +55,8 @@ record = pe.InferenceArtifact(pipeline_yaml, pinned_model_hashes={"prep": model_
 
 None of it is a new serialisation format. The registry stores `Operator.state` from [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops), rebuilds with `Operator.from_state` and addresses with `pipekit_ops.pipeline_hash`, so anything that round-trips through `pipekit_ops.dumps` and `loads` can be stored, and `pipeline_hash(op, weights)` is the address before you store it. `S3ModelRegistry` runs the same code on any [fsspec](https://github.com/fsspec/filesystem_spec) URI, with [s3fs](https://github.com/fsspec/s3fs) for `s3://`. The bridges hand pipelines to the tools that run them: `DVCDatasetVersioning` calls the [DVC](https://github.com/iterative/dvc) CLI for dataset hashes, `HydraConfigLoader` writes and reads [Hydra](https://github.com/facebookresearch/hydra) `_target_` configs (with [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) for `builds` specs), and `MetaflowStepAdapter` turns an operator into a [Metaflow](https://github.com/Netflix/metaflow) step. For [MLflow](https://github.com/mlflow/mlflow) and [W&B](https://github.com/wandb/wandb) the package gives the `ExperimentTracker` protocol and an extra that pins each library, and no adapter yet.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_overview/pipekit_experiment_overview.png" alt="pipekit-experiment in one picture: one content address for a model, built from the pipeline's state and its weights, and the five things done with it: store, verify, promote, record and hand over" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🔐 **Content addresses**: `store` returns `pipeline_hash(op, weights)`, so storing the same operator and weights twice is a no-op that merges their tags, and `b""` and `None` weights give the same address.
@@ -173,6 +175,13 @@ The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-experiment/) ta
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_roles/pipekit_experiment_roles-dark.svg">
+    <img alt="pipekit-experiment on the GeoStack role ladder: the registries and run records as structures, the registry calls as primitives, with orchestration and the protocols beside the ladder" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_roles/pipekit_experiment_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 The ten top-level names are exported from `pipekit_experiment` and listed in its `__all__`; the bridges are imported from their modules under `pipekit_experiment.bridges`, one module per tool. The package defines no Operator of its own: geostack's [pipekit shelf page](https://github.com/jejjohnson/geostack/blob/main/docs/design/skill_tree_pipekit.md) places it beside the role ladder, with orchestration, because it stores, records and hands over the steps and recipes that pipekit-ops builds.
 
 | Module | Symbols | Notes |
@@ -202,6 +211,13 @@ The ten top-level names are exported from `pipekit_experiment` and listed in its
 - **[Design decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-experiment/docs/design/decisions.md)**: why the tool integrations are bridges (X1).
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_ecosystem/pipekit_experiment_ecosystem-dark.svg">
+    <img alt="The package that imports pipekit-experiment on main: pipekit-train, through its experiment extra" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_ecosystem/pipekit_experiment_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-experiment is one package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core tier of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the address of a stored model and the records that point at it, and composes the rest in:
 
