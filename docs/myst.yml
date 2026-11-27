@@ -53,6 +53,8 @@ project:
           title: pipekit-cycle
         - file: quickstart/quickstart-train.md
           title: pipekit-train
+        - file: quickstart/quickstart-evaluate.md
+          title: pipekit-evaluate
     - title: Concepts
       children:
         - file: concepts.md
