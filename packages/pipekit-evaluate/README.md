@@ -100,13 +100,15 @@ Three extras add the rest: `cycle` brings in pipekit-cycle, to build or type-che
 
 ```toml
 [project]
-dependencies = ["pipekit-evaluate[cycle]"]
+dependencies = ["pipekit-ops", "pipekit-cycle", "pipekit-evaluate[cycle]"]"]
 
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
 pipekit-evaluate = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-evaluate", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 ## 🛰️ Quickstart: scoring a retrieved plume
 

@@ -99,12 +99,14 @@ A project that depends on it pins one tag of the pipekit repository for every pi
 
 ```toml
 [project]
-dependencies = ["pipekit-experiment[s3]"]
+dependencies = ["pipekit-ops", "pipekit-experiment[s3]"]"]
 
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-experiment = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-experiment", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 ## 🛰️ Quickstart: pin a plume detector's pre-processing
 
