@@ -29,7 +29,7 @@ The backend should be thin. Keras 3 already has a training loop, so the design w
 **One step.** With θ the trainable weights, B a minibatch of size N_B drawn from the dataset, f_θ the Keras model and ℓ the per-batch loss, step k applies the optimiser's update u to the gradient:
 
 ```math
-\boldsymbol{\theta}_{k+1} = \boldsymbol{\theta}_k - \eta\, u\big(\nabla_{\boldsymbol{\theta}}\, \ell(f_{\boldsymbol{\theta}_k}(\mathbf{X}_B), \mathbf{Y}_B)\big)
+\boldsymbol{\theta}_{k+1} = \boldsymbol{\theta}_k - \eta u\left(\nabla_{\boldsymbol{\theta}} \ell(f_{\boldsymbol{\theta}_k}(\mathbf{X}_B), \mathbf{Y}_B)\right)
 ```
 
 Here η is the learning rate, $\mathbf{X}_ B$ is the stacked batch of inputs with shape (N_B, …) and $\mathbf{Y}_ B$ the stacked targets. A Keras model is batch-first, so a `pipekit_train.Loss` sees the whole batch of predictions. The Equinox backend instead writes the model per sample and maps it over the batch with `jax.vmap`; for a loss that averages over the batch, such as `MSE`, the two give the same scalar.
@@ -37,7 +37,7 @@ Here η is the learning rate, $\mathbf{X}_ B$ is the stacked batch of inputs wit
 **The step budget.** `TrainingLoop` counts optimiser steps (D10), and Keras counts epochs of `steps_per_epoch` steps. The backend makes one Keras epoch one evaluation period of P = `eval_every_n_steps` steps, so with K = `max_steps` it calls `fit` for E Keras epochs and stops at step K:
 
 ```math
-E = \left\lceil K / P \right\rceil, \qquad k_{\text{stop}} = K
+E = \left\lceil K / P \right\rceil
 ```
 
 When P does not divide K, the last Keras epoch is cut short at step K by `stop_training`, and Keras still validates at the end of it, so validation runs at steps P, 2P, …, and K.
@@ -53,7 +53,7 @@ while the Equinox backend writes $\ell_ j$ itself. Resetting Keras's metrics aft
 **Validation.** The validation loss should be the per-sample mean over all N_val samples, with batches of size $n_ b$ and the last one ragged:
 
 ```math
-\ell_{\text{val}} = \frac{\sum_b n_b\, \ell_b}{\sum_b n_b} \neq \frac{1}{N_{\text{batch}}} \sum_b \ell_b
+\ell_{\text{val}} = \frac{\sum_b n_b \ell_b}{\sum_b n_b} \neq \frac{1}{N_{\text{batch}}} \sum_b \ell_b
 ```
 
 Keras's loss tracker weights each batch by its size and gives the left side. A metric function that returns an already-averaged scalar gives the right side, which is biased whenever the last batch is ragged (§5), so auxiliary metrics need a metric that weights by batch size.
