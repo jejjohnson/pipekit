@@ -474,6 +474,58 @@ doesn't shard evaluation yet; this makes that possible.
 
 ---
 
+## D18: The Keras backend wraps `compile` and `fit`
+
+**Status:** proposed
+
+**Context:** `backend="keras"` is a stub (D5). A Keras 3 model on the JAX backend can be trained two ways: by Keras's own `fit`, or by a JAX loop around `Model.stateless_call` that treats Keras only as the model definition. Users of the second user story in [`keras_adapter.md`](keras_adapter.md) rely on `compile`, `add_loss`, Keras callbacks and Keras Tuner. Measurements on Keras 3.15.1 (§5 of that page) show `fit` stopping at an exact step, validating at the end of a cut-short epoch, giving per-step losses after `reset_metrics()`, and resuming exactly from a period boundary.
+
+**Options:**
+- (A) Wrap `compile` and `fit`: one Keras epoch is one evaluation period, one Keras callback drives the pipekit callbacks, and checkpoints fall at period ends. Costs: metrics are reset after every step, and `Checkpoint.every_n_steps` must be a multiple of the period.
+- (B) A stateless JAX loop that reuses the Equinox machinery. Costs: the model's `compile`, Keras callbacks and Keras Tuner are ignored, and pipekit-train writes a second training loop, which D1 rules out.
+
+**Decision:** (A). It keeps what a Keras user comes for, and its two costs are stated limits, not wrong results. It refines D9's Keras line: the task is a `KerasTask` holding the loss and metrics, the user's Keras callbacks, and a switch to keep the model's own `compile`.
+
+**Consequences:**
+- A user's Keras callback that reads the training logs at an epoch's end sees the last step's values.
+- Data-parallel training goes through `keras.distribution`, later, not through the Equinox `ShardingSpec`.
+- The Grain batch pipeline moves out of the Equinox area so both backends read the same batches.
+
+---
+
+## D19: The Keras backend runs on JAX only
+
+**Status:** proposed
+
+**Context:** Keras 3 runs on JAX, TensorFlow and PyTorch, chosen once by `KERAS_BACKEND` at the first `import keras`. With no backend set and no TensorFlow installed, the import fails, because the default is TensorFlow. D15 removed PyTorch training, `keras.distribution` is implemented for JAX only, and the stack's arrays are JAX.
+
+**Options:**
+- (A) JAX only: set `KERAS_BACKEND=jax` when Keras is not yet imported, and raise when it was imported on another backend.
+- (B) Any Keras backend. Costs: the data path, the checkpoints and the tests would cover three array libraries, one of which D15 dropped.
+
+**Decision:** (A).
+
+**Consequences:** `pipekit-train[keras]` installs no TensorFlow. A TensorFlow or PyTorch user of Keras gets an error naming the backend rather than a partial run.
+
+---
+
+## D20: `KerasModelOp` lives in the Keras area, with its own weight blob
+
+**Status:** proposed
+
+**Context:** D7 says a trained model is an operator whose weights round-trip through a registry, and pipekit-array's A8 planned `pipekit_array.ModelOp` for Keras. That operator is not built, holds no weights by design, and pipekit-array takes no backend dependency. A `.keras` file is a zip whose metadata records the save time, so two saves of the same weights hash differently.
+
+**Options:**
+- (A) `KerasModelOp` in `pipekit_train.backends.keras`, writing a blob of a (path, shape, dtype) header and the raw arrays, loaded into a skeleton, as `pipekit_jax.JaxModelOp` does for Equinox.
+- (B) Build `pipekit_array.ModelOp` first and return it. Costs: no weights in the registry, and the backend waits on another package's phase D.
+- (C) A new `pipekit-keras` package. Costs: a package for one class.
+
+**Decision:** (A). The blob was measured byte-stable and its round trip exact.
+
+**Consequences:** pipekit-array's `api/inference.md` and A8 are corrected to point at `KerasModelOp`. A portable `.keras` file stays available through `op.model.save`, outside the registry's hash.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |

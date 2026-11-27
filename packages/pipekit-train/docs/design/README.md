@@ -24,6 +24,8 @@ docs/design/
 │                          # + numpyro-mcmc. Companion to api/adapters.md.
 ├── blackjax_adapter.md    # Full design — the BlackJAX sampler backend
 │                          # (NUTS / SG-MCMC). Sibling to numpyro_adapter.md.
+├── keras_adapter.md       # Full design — the Keras 3 backend on JAX
+│                          # (compile/fit, KerasModelOp) and its plan.
 ├── api/
 │   ├── README.md          # Core abstractions (TrainingDataset,
 │   │                      # Loss, TrainingLoop, Callback, MetricWriter).
