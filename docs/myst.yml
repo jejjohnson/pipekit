@@ -145,6 +145,8 @@ project:
               title: NumPyro adapters (SVI and MCMC)
             - file: design-train/blackjax_adapter.md
               title: BlackJAX adapter
+            - file: design-train/keras_adapter.md
+              title: Keras adapter
             - title: Examples
               children:
                 - file: design-train/examples/README.md
