@@ -21,9 +21,11 @@ class KerasModelOp(Operator):
 
     Calling the operator calls the model in inference mode. Its weights are
     written by `serialize_weights` as one blob: a header that lists each
-    weight's path, shape and dtype, then the raw arrays in that order. The
+    weight's name, shape and dtype, then the raw arrays in that order. The
     bytes depend only on the weights, so a registry gives one trained model one
     hash; a ``.keras`` file would not, because it records the time it was saved.
+    The names are the weights' own (``kernel``, ``bias``), without the layer
+    names Keras numbers per process (``dense_2``).
 
     A blob loads back into a model of the same architecture, the skeleton, with
     `with_weights` or `from_registry`: the architecture is Python, not bytes.
@@ -53,7 +55,7 @@ class KerasModelOp(Operator):
         """Return the model's weights as a blob.
 
         Layout: ``b"PKKRW1\\n"``, the header's length as 8 little-endian bytes,
-        the header as JSON (one ``{"path", "shape", "dtype"}`` per weight, in
+        the header as JSON (one ``{"name", "shape", "dtype"}`` per weight, in
         the order of ``model.weights``), then each array's bytes in C order.
 
         Raises:
@@ -128,8 +130,17 @@ class KerasModelOp(Operator):
         return {"model_class": type(self.model).__qualname__}
 
 
+def _weight_name(path: str) -> str:
+    """The last part of a weight's path: ``kernel`` of ``sequential/dense_2/kernel``."""
+    return path.rsplit("/", 1)[-1]
+
+
 def _describe(path: str, array: np.ndarray) -> dict[str, Any]:
-    return {"path": path, "shape": list(array.shape), "dtype": array.dtype.name}
+    return {
+        "name": _weight_name(path),
+        "shape": list(array.shape),
+        "dtype": array.dtype.name,
+    }
 
 
 def _dtype(name: str) -> np.dtype:
@@ -162,11 +173,7 @@ def _read_blob(blob: bytes) -> tuple[list[dict[str, Any]], list[np.ndarray]]:
 
 
 def _check_matches(header: list[dict[str, Any]], weights: list[Any]) -> None:
-    """Raise unless the skeleton's weights match the header, one by one.
-
-    Paths are compared by their last part (``kernel``, ``bias``), because a
-    model built apart from the one that was trained gets other layer names.
-    """
+    """Raise unless the skeleton's weights match the header, one by one."""
     if not weights:
         raise ValueError(
             "The skeleton has no weights; build it (call it on an input) first."
@@ -176,14 +183,13 @@ def _check_matches(header: list[dict[str, Any]], weights: list[Any]) -> None:
             f"The blob holds {len(header)} weights and the skeleton {len(weights)}."
         )
     for entry, variable in zip(header, weights, strict=True):
-        name = entry["path"].rsplit("/", 1)[-1]
         if (
-            variable.path.rsplit("/", 1)[-1] != name
+            _weight_name(variable.path) != entry["name"]
             or list(variable.shape) != entry["shape"]
             or np.dtype(variable.dtype).name != entry["dtype"]
         ):
             raise ValueError(
-                f"The blob's weight {entry['path']} {entry['shape']} "
+                f"The blob's weight {entry['name']} {entry['shape']} "
                 f"{entry['dtype']} does not match the skeleton's {variable.path} "
                 f"{list(variable.shape)} {np.dtype(variable.dtype).name}."
             )
