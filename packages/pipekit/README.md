@@ -41,7 +41,7 @@ pip install \
   "pipekit @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit"
 ```
 
-The umbrella asks for each package by name, and pip cannot find those names on PyPI, so the command gives every package's git URL, all at one tag. A uv project names the same eight in its `[tool.uv.sources]`, as the [workspace README](https://github.com/jejjohnson/pipekit#-install) shows. Extras stay with the package that owns them, so you add them by name, for example `pipekit-train[equinox]` or `pipekit-array[xarray]`.
+The umbrella asks for each package by name, and pip cannot find those names on PyPI, so the command gives every package's git URL, all at one tag. A uv project lists the same eight in its `dependencies` and in its `[tool.uv.sources]`, because uv applies a source only to a direct dependency, as the [workspace README](https://github.com/jejjohnson/pipekit#-install) shows. Extras stay with the package that owns them, so you add them by name, for example `pipekit-train[equinox]` or `pipekit-array[xarray]`.
 
 ## 🔬 The packages
 
