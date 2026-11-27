@@ -164,11 +164,24 @@ def _iter_streaming(
     batch_size: int,
     stack: Callable[[list[tuple[Any, Any]]], tuple[Any, Any]],
 ) -> Iterator[tuple[Any, Any]]:
-    """Iterate a dataset without random access, restarting when it runs out."""
+    """Iterate a dataset without random access, restarting when it runs out.
+
+    Raises:
+        ValueError: If one pass over the dataset holds fewer than ``batch_size``
+            samples, which would otherwise loop forever.
+    """
     while True:
         batch: list[tuple[Any, Any]] = []
+        seen = 0
         for x, y in dataset:
             batch.append((x, y))
+            seen += 1
             if len(batch) == batch_size:
                 yield stack(batch)
                 batch = []
+        if seen < batch_size:
+            raise ValueError(
+                f"The streaming dataset has {seen} samples per pass but "
+                f"batch_size={batch_size}; no full batch can be read. Reduce "
+                "batch_size or grow the dataset."
+            )

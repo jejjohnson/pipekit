@@ -6,7 +6,7 @@ import copy
 import math
 import time
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 
 from pipekit_ops import Operator
@@ -45,17 +45,27 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     log matches the Equinox backend's. Other Keras metrics are logged as Keras
     reports them.
 
+    ``loop.model_op`` is a `KerasModelOp`, or an operator that is or holds an
+    Equinox module (``pipekit_jax.JaxOperator``, ``pipekit_jax.JaxModelOp``,
+    `EquinoxModelOp`), which trains as an `EquinoxLayer` (ADR D21). The
+    operator the loop's callbacks see during training is ``loop.model_op``: a
+    `KerasModelOp`'s model is trained in place, while an Equinox-backed
+    operator keeps its weights until the end.
+
     Returns:
         ``(trained_model_op, backend_info)``. ``trained_model_op`` is a copy of
-        ``loop.model_op`` holding the trained model (Keras trains it in place).
+        ``loop.model_op`` holding the trained model: the Keras model, trained in
+        place, or the Equinox module rebuilt from its layer, in the wrapper
+        ``loop.model_op`` had.
         ``backend_info`` has ``backend``, ``keras_version``, ``keras_backend``,
         ``jax_version``, ``devices``, ``total_seconds``, ``final_step``,
         ``final_metrics`` (the last step) and ``final_eval_metrics`` (the last
         validation, empty without a ``val_dataset``).
 
     Raises:
-        TypeError: If ``loop.model_op`` is not a `KerasModelOp`, or
-            ``loop.task`` is not a `KerasTask`.
+        TypeError: If ``loop.model_op`` is neither a `KerasModelOp` nor
+            Equinox-backed, or ``loop.task`` is not a `KerasTask`.
+        ImportError: For an Equinox-backed operator without Equinox.
         ValueError: If there is nothing to compile the model with.
         NotImplementedError: If ``loop.sharding`` is set.
     """
@@ -67,16 +77,11 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         raise NotImplementedError(
             "backend='keras' does not shard yet; leave TrainingLoop.sharding unset."
         )
-    if not isinstance(loop.model_op, KerasModelOp):
-        raise TypeError(
-            "backend='keras' trains a pipekit_train.backends.keras.KerasModelOp; "
-            f"got {type(loop.model_op).__name__}."
-        )
-    model = loop.model_op.model
     task = _resolve_task(loop)
-
+    _check_model_op(loop.model_op)
     source = BatchSource(loop.dataset, loop.batch_size, loop.seed)
     first = source.next_batch()
+    model, finish = _keras_model(keras, loop, task, first)
     per_step: tuple[str, ...] = ("loss",)
     if not task.keep_compile:
         per_step = _compile(model, loop, task, first)
@@ -122,7 +127,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         if loop.metric_writer is not None:
             loop.metric_writer.close()
 
-    trained_model_op = copy.copy(loop.model_op)
+    trained_model_op = finish()
     final_step = int(model.optimizer.iterations.numpy()) - offset
     _common.dispatch(
         loop.callbacks,
@@ -142,6 +147,62 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         "final_eval_metrics": dict(bridge.last_eval_metrics),
     }
     return trained_model_op, backend_info
+
+
+def _check_model_op(model_op: Any) -> None:
+    """Refuse an operator the backend cannot train, before any data is read."""
+    if isinstance(model_op, KerasModelOp):
+        return
+    if isinstance(model_op, Operator) and _holds_equinox_module(model_op):
+        return
+    raise TypeError(
+        "backend='keras' trains a pipekit_train.backends.keras.KerasModelOp, "
+        "or an operator that is or holds an eqx.Module (JaxOperator, "
+        f"JaxModelOp, EquinoxModelOp); got {type(model_op).__name__}."
+    )
+
+
+def _holds_equinox_module(model_op: Any) -> bool:
+    """True if ``model_op`` is or holds an ``eqx.Module``; False without Equinox."""
+    try:
+        from pipekit_train.backends._equinox_ops import unwrap_module
+    except ImportError:
+        return False
+    return unwrap_module(model_op) is not None
+
+
+def _keras_model(
+    keras: Any, loop: TrainingLoop, task: KerasTask, first: Any
+) -> tuple[Any, Callable[[], Operator]]:
+    """The Keras model to fit, and how to wrap it once trained."""
+    model_op = loop.model_op
+    if isinstance(model_op, KerasModelOp):
+        return model_op.model, lambda: copy.copy(model_op)
+    try:
+        from pipekit_train.backends._equinox_ops import rewrap_module, unwrap_module
+    except ImportError as exc:
+        raise ImportError(
+            f"backend='keras' trains this {type(model_op).__name__} as an Equinox "
+            "module, which needs `pip install pipekit-train[keras,equinox]`."
+        ) from exc
+    module = unwrap_module(model_op)
+    if module is None:
+        raise TypeError(
+            "backend='keras' trains a pipekit_train.backends.keras.KerasModelOp, "
+            "or an operator that is or holds an eqx.Module (JaxOperator, "
+            f"JaxModelOp, EquinoxModelOp); got {type(model_op).__name__}."
+        )
+    if task.keep_compile:
+        raise ValueError(
+            "KerasTask(keep_compile=True) keeps a Keras model's own compile, and an "
+            "Equinox module has none; use a KerasModelOp, or drop keep_compile."
+        )
+    from pipekit_train.backends.keras._equinox import EquinoxLayer
+
+    layer = EquinoxLayer(module, seed=loop.seed)
+    model = keras.Sequential([layer])
+    model(first[0])
+    return model, lambda: rewrap_module(model_op, layer.module)
 
 
 def _resolve_task(loop: TrainingLoop) -> KerasTask:

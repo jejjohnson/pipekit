@@ -86,6 +86,13 @@ def test_streaming_dataset_has_no_state_and_restarts() -> None:
     assert ys == [[0.0, 1.0], [2.0, 3.0], [0.0, 1.0]]
 
 
+def test_a_streaming_dataset_smaller_than_a_batch_raises() -> None:
+    pairs = [(np.zeros(1), np.zeros(1))] * 3
+    source = BatchSource(IterableDataset(source=pairs, content_hash="s3"), 4, 0)
+    with pytest.raises(ValueError, match="3 samples per pass"):
+        source.next_batch()
+
+
 def test_errors_keep_their_messages() -> None:
     with pytest.raises(ValueError, match="batch_size=32"):
         BatchSource(_Indexed(), batch_size=32, seed=0)
