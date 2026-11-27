@@ -185,3 +185,38 @@ def _iter_streaming(
                 f"batch_size={batch_size}; no full batch can be read. Reduce "
                 "batch_size or grow the dataset."
             )
+
+
+def _jsonify_grain_state(state: Any) -> Any:
+    """Make a Grain iterator state dict JSON-serialisable.
+
+    Grain's `iterator.get_state()` may include bytes (np serialised
+    integers, prefetch buffer markers). We base64-encode bytes leaves
+    and tag them so `_unjsonify_grain_state` can round-trip back.
+    """
+    import base64
+
+    if isinstance(state, dict):
+        return {k: _jsonify_grain_state(v) for k, v in state.items()}
+    if isinstance(state, list):
+        return [_jsonify_grain_state(v) for v in state]
+    if isinstance(state, tuple):
+        return {"__tuple__": [_jsonify_grain_state(v) for v in state]}
+    if isinstance(state, bytes):
+        return {"__bytes_b64__": base64.b64encode(state).decode("ascii")}
+    return state
+
+
+def _unjsonify_grain_state(state: Any) -> Any:
+    """Inverse of `_jsonify_grain_state`."""
+    import base64
+
+    if isinstance(state, dict):
+        if "__bytes_b64__" in state:
+            return base64.b64decode(state["__bytes_b64__"])
+        if "__tuple__" in state:
+            return tuple(_unjsonify_grain_state(v) for v in state["__tuple__"])
+        return {k: _unjsonify_grain_state(v) for k, v in state.items()}
+    if isinstance(state, list):
+        return [_unjsonify_grain_state(v) for v in state]
+    return state

@@ -8,6 +8,7 @@ Equinox adapter both build on these.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -58,3 +59,37 @@ def dispatch(callbacks: tuple[Any, ...], hook: str, *args: Any) -> None:
 def any_should_stop(callbacks: tuple[Any, ...]) -> bool:
     """True if any callback signals ``should_stop`` (e.g. EarlyStopping)."""
     return any(getattr(cb, "should_stop", False) for cb in callbacks)
+
+
+def resolve_checkpoint_dir(checkpoint_dir: str | None, callback: Any) -> str | None:
+    """Return the absolute directory for checkpoints, or ``None`` for no saving.
+
+    Args:
+        checkpoint_dir: ``TrainingLoop.checkpoint_dir``.
+        callback: The loop's `Checkpoint` callback, if any; its ``save_dir`` is
+            used when the loop sets no directory.
+
+    Returns:
+        The absolute local path, or ``None`` if neither sets a directory.
+
+    Raises:
+        ValueError: If the two name different directories, or either is a URI,
+            because the data-iterator side-car is written with local paths.
+    """
+    save_dir = getattr(callback, "save_dir", None)
+    for candidate in (checkpoint_dir, save_dir):
+        if candidate and "://" in candidate:
+            raise ValueError(
+                f"Checkpoint directories must be local paths; got {candidate!r}."
+            )
+    directory = checkpoint_dir or save_dir
+    if not directory:
+        return None
+    resolved = os.path.abspath(directory)
+    if checkpoint_dir and save_dir and os.path.abspath(save_dir) != resolved:
+        raise ValueError(
+            f"TrainingLoop.checkpoint_dir ({checkpoint_dir!r}) and "
+            f"Checkpoint.save_dir ({save_dir!r}) name different directories. "
+            "Set one of them."
+        )
+    return resolved

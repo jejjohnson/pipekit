@@ -13,6 +13,7 @@ from pipekit_ops import Operator
 
 from pipekit_train.backends import _common
 from pipekit_train.backends._batches import BatchSource, is_indexable, stack_pairs
+from pipekit_train.backends.keras import _checkpoint
 from pipekit_train.backends.keras._backend import import_keras
 from pipekit_train.backends.keras._losses import (
     aux_metrics,
@@ -79,8 +80,9 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         )
     task = _resolve_task(loop)
     _check_model_op(loop.model_op)
-    source = BatchSource(loop.dataset, loop.batch_size, loop.seed)
-    first = source.next_batch()
+    # A batch from a source of its own: the shapes to build and compile with,
+    # while the training source stays where a checkpoint may put it.
+    first = BatchSource(loop.dataset, loop.batch_size, loop.seed).next_batch()
     model, finish = _keras_model(keras, loop, task, first)
     per_step: tuple[str, ...] = ("loss",)
     if not task.keep_compile:
@@ -103,32 +105,53 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             "model must be compiled with steps_per_execution=1; got "
             f"{model.steps_per_execution}."
         )
-    # A model compiled before may arrive with steps already taken; the loop's
-    # budget and cadences count this run's steps.
-    offset = int(model.optimizer.iterations.numpy())
 
     period = loop.eval_every_n_steps
-    validation: dict[str, Any] = {}
-    if loop.val_dataset is not None:
-        steps, batches = _validation_batches(loop.val_dataset, loop.batch_size)
-        validation = {"validation_data": batches, "validation_steps": steps}
-
-    bridge = _bridge(keras)(loop, period, per_step, offset)
+    mngr = _checkpoint.manager(loop, period)
+    source = BatchSource(loop.dataset, loop.batch_size, loop.seed)
+    start = 0
+    if mngr is not None:
+        restored = _checkpoint.restore(mngr, model)
+        if restored is not None:
+            start, data_state = restored
+            source.set_state(data_state)
+    # A model may arrive with optimiser steps taken (a kept compile, or a
+    # restored checkpoint); the loop's budget and cadences count this run's.
+    offset = int(model.optimizer.iterations.numpy()) - start
+    feed = _checkpoint.Feed(source, start)
+    bridge = _bridge(keras)(loop, period, per_step, feed, mngr, offset)
     try:
-        model.fit(
-            _train_batches(source, first),
-            steps_per_epoch=period,
-            epochs=math.ceil(loop.max_steps / period),
-            callbacks=[bridge, *task.keras_callbacks],
-            verbose=0,
-            **validation,
-        )
+        for steps, epochs, initial_epoch in _fit_calls(start, loop.max_steps, period):
+            fit_kwargs: dict[str, Any] = {}
+            if loop.val_dataset is not None:
+                n_val, val_batches = _validation_batches(
+                    loop.val_dataset, loop.batch_size
+                )
+                fit_kwargs = {"validation_data": val_batches, "validation_steps": n_val}
+            model.fit(
+                feed.batches(),
+                steps_per_epoch=steps,
+                epochs=epochs,
+                initial_epoch=initial_epoch,
+                callbacks=[bridge, *task.keras_callbacks],
+                verbose=0,
+                **fit_kwargs,
+            )
+            if model.stop_training and _common.any_should_stop(loop.callbacks):
+                break
+        bridge.begin()
+        final_step = int(model.optimizer.iterations.numpy()) - offset
+        if mngr is not None and final_step > start and mngr.latest_step() != final_step:
+            _checkpoint.save(
+                mngr, model, final_step, feed.state_at(final_step), force=True
+            )
     finally:
+        if mngr is not None:
+            mngr.wait_until_finished()
         if loop.metric_writer is not None:
             loop.metric_writer.close()
 
     trained_model_op = finish()
-    final_step = int(model.optimizer.iterations.numpy()) - offset
     _common.dispatch(
         loop.callbacks,
         "on_train_end",
@@ -261,15 +284,25 @@ def _compile(
     return per_step
 
 
-def _train_batches(source: BatchSource, first: Any) -> Iterator[Any]:
-    """The training batches, starting with the one read to find the metrics.
+def _fit_calls(start: int, max_steps: int, period: int) -> list[tuple[int, int, int]]:
+    """The ``fit`` calls from step ``start`` to ``max_steps``.
 
-    ``fit`` reads exactly one batch per step, so the source's position after
-    step k is k batches in.
+    Each is ``(steps_per_epoch, epochs, initial_epoch)``. A run that starts on
+    the period grid is one call of ``ceil(max_steps / period)`` epochs, stopped
+    at ``max_steps`` by the bridge. A run resumed off the grid (from the final
+    checkpoint of a run whose ``max_steps`` the period did not divide) first
+    trains one short epoch back onto the grid.
     """
-    yield first
-    while True:
-        yield source.next_batch()
+    calls: list[tuple[int, int, int]] = []
+    if start >= max_steps:
+        return calls
+    if start % period:
+        catch_up = min(period - start % period, max_steps - start)
+        calls.append((catch_up, 1, 0))
+        start += catch_up
+    if start < max_steps:
+        calls.append((period, math.ceil(max_steps / period), start // period))
+    return calls
 
 
 def _validation_batches(dataset: Any, batch_size: int) -> tuple[int, Iterator[Any]]:
@@ -321,6 +354,8 @@ def _bridge(keras: Any) -> type:
             loop: TrainingLoop,
             period: int,
             per_step: tuple[str, ...],
+            feed: _checkpoint.Feed,
+            mngr: Any,
             offset: int = 0,
         ) -> None:
             super().__init__()
@@ -328,6 +363,9 @@ def _bridge(keras: Any) -> type:
             self.loop = loop
             self.period = period
             self.per_step = per_step
+            self.feed = feed
+            self.mngr = mngr
+            self._begun = False
             self.last_metrics: dict[str, float] = {}
             self.last_eval_metrics: dict[str, float] = {}
             self._means: dict[str, float] = {}
@@ -339,14 +377,29 @@ def _bridge(keras: Any) -> type:
         def _state(self, metrics: dict[str, float]) -> Any:
             return _carry(self.loop.model_op, self._step(), self.loop, metrics)
 
+        def begin(self) -> None:
+            """Fire the loop's ``on_train_begin`` once, however many fit calls."""
+            if not self._begun:
+                self._begun = True
+                _common.dispatch(
+                    self.loop.callbacks,
+                    "on_train_begin",
+                    self.loop,
+                    _carry(self.loop.model_op, self.feed.trained, self.loop, {}),
+                )
+
         def on_train_begin(self, logs: Any = None) -> None:
-            _common.dispatch(
-                self.loop.callbacks, "on_train_begin", self.loop, self._state({})
-            )
+            self.begin()
+
+        def on_epoch_end(self, epoch: int, logs: Any = None) -> None:
+            step = self._step()
+            if self.mngr is not None and self.mngr.should_save(step):
+                _checkpoint.save(self.mngr, self.model, step, self.feed.state_at(step))
 
         def on_train_batch_end(self, batch: int, logs: Any = None) -> None:
             loop = self.loop
             step = self._step()
+            self.feed.trained_through(step)
             means = {name: float(value) for name, value in (logs or {}).items()}
             metrics = self._own_values(batch, means)
             self.last_metrics = metrics
