@@ -69,7 +69,7 @@ dev = [
 # installs these: the typecheck job syncs the default `dev` group, and ty reports
 # new diagnostics once it can see these libraries.
 train-extras = [
-    "pipekit-train[equinox,numpyro,blackjax,cache]",
+    "pipekit-train[equinox,numpyro,blackjax,cache,keras]",
 ]
 lint = [
     "ruff>=0.15.11",

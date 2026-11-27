@@ -3964,7 +3964,7 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/pipekit" }
 dependencies = [
     { name = "pipekit-array" },
@@ -3989,7 +3989,7 @@ requires-dist = [
 
 [[package]]
 name = "pipekit-array"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4041,7 +4041,7 @@ provides-extras = ["numpy", "jax", "torch", "cupy", "dask", "xarray", "sklearn",
 
 [[package]]
 name = "pipekit-cycle"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/pipekit-cycle" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4061,7 +4061,7 @@ provides-extras = ["array"]
 
 [[package]]
 name = "pipekit-evaluate"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/pipekit-evaluate" }
 dependencies = [
     { name = "numpy" },
@@ -4093,7 +4093,7 @@ provides-extras = ["cycle", "xskill", "proper"]
 
 [[package]]
 name = "pipekit-experiment"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/pipekit-experiment" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4137,7 +4137,7 @@ provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "packages/pipekit-jax" }
 dependencies = [
     { name = "equinox" },
@@ -4206,7 +4206,7 @@ lint = [
     { name = "ruff" },
 ]
 train-extras = [
-    { name = "pipekit-train", extra = ["blackjax", "cache", "equinox", "numpyro"] },
+    { name = "pipekit-train", extra = ["blackjax", "cache", "equinox", "keras", "numpyro"] },
 ]
 typecheck = [
     { name = "ty" },
@@ -4249,7 +4249,7 @@ docs = [
     { name = "zensical", specifier = ">=0.0.74" },
 ]
 lint = [{ name = "ruff", specifier = ">=0.15.11" }]
-train-extras = [{ name = "pipekit-train", extras = ["equinox", "numpyro", "blackjax", "cache"], editable = "packages/pipekit-train" }]
+train-extras = [{ name = "pipekit-train", extras = ["equinox", "numpyro", "blackjax", "cache", "keras"], editable = "packages/pipekit-train" }]
 typecheck = [{ name = "ty", specifier = ">=0.0.31" }]
 
 [[package]]
@@ -4259,7 +4259,7 @@ source = { editable = "packages/pipekit-ops" }
 
 [[package]]
 name = "pipekit-train"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/pipekit-train" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4294,7 +4294,11 @@ gcs = [
     { name = "zarr" },
 ]
 keras = [
+    { name = "grain" },
+    { name = "jax" },
     { name = "keras" },
+    { name = "numpy" },
+    { name = "orbax-checkpoint" },
 ]
 numpyro = [
     { name = "numpyro" },
@@ -4314,15 +4318,19 @@ requires-dist = [
     { name = "fsspec", marker = "extra == 's3'", specifier = ">=2024.0" },
     { name = "gcsfs", marker = "extra == 'gcs'", specifier = ">=2024.0" },
     { name = "grain", marker = "extra == 'equinox'", specifier = ">=0.2" },
+    { name = "grain", marker = "extra == 'keras'", specifier = ">=0.2" },
     { name = "jax", marker = "extra == 'equinox'", specifier = ">=0.4.30" },
+    { name = "jax", marker = "extra == 'keras'", specifier = ">=0.4.30" },
     { name = "jaxtyping", marker = "extra == 'equinox'", specifier = ">=0.2" },
-    { name = "keras", marker = "extra == 'keras'", specifier = ">=3.0" },
+    { name = "keras", marker = "extra == 'keras'", specifier = ">=3.11" },
+    { name = "numpy", marker = "extra == 'keras'" },
     { name = "numpyro", marker = "extra == 'blackjax'", specifier = ">=0.15" },
     { name = "numpyro", marker = "extra == 'numpyro'", specifier = ">=0.15" },
     { name = "optax", marker = "extra == 'blackjax'", specifier = ">=0.2" },
     { name = "optax", marker = "extra == 'equinox'", specifier = ">=0.2" },
     { name = "optax", marker = "extra == 'numpyro'", specifier = ">=0.2" },
     { name = "orbax-checkpoint", marker = "extra == 'equinox'", specifier = ">=0.6" },
+    { name = "orbax-checkpoint", marker = "extra == 'keras'", specifier = ">=0.6" },
     { name = "pipekit-cycle", marker = "extra == 'cycle'", editable = "packages/pipekit-cycle" },
     { name = "pipekit-experiment", marker = "extra == 'experiment'", editable = "packages/pipekit-experiment" },
     { name = "pipekit-ops", editable = "packages/pipekit-ops" },
