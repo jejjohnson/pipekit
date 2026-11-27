@@ -3964,7 +3964,7 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.3.1"
+version = "0.3.0"
 source = { editable = "packages/pipekit" }
 dependencies = [
     { name = "pipekit-array" },
@@ -3989,7 +3989,7 @@ requires-dist = [
 
 [[package]]
 name = "pipekit-array"
-version = "0.3.1"
+version = "0.3.0"
 source = { editable = "packages/pipekit-array" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4041,7 +4041,7 @@ provides-extras = ["numpy", "jax", "torch", "cupy", "dask", "xarray", "sklearn",
 
 [[package]]
 name = "pipekit-cycle"
-version = "0.3.1"
+version = "0.3.0"
 source = { editable = "packages/pipekit-cycle" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4061,7 +4061,7 @@ provides-extras = ["array"]
 
 [[package]]
 name = "pipekit-evaluate"
-version = "0.3.1"
+version = "0.3.0"
 source = { editable = "packages/pipekit-evaluate" }
 dependencies = [
     { name = "numpy" },
@@ -4093,7 +4093,7 @@ provides-extras = ["cycle", "xskill", "proper"]
 
 [[package]]
 name = "pipekit-experiment"
-version = "0.2.1"
+version = "0.2.0"
 source = { editable = "packages/pipekit-experiment" }
 dependencies = [
     { name = "pipekit-ops" },
@@ -4137,7 +4137,7 @@ provides-extras = ["mlflow", "wandb", "dvc", "hydra", "metaflow", "s3"]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.4.1"
+version = "0.4.0"
 source = { editable = "packages/pipekit-jax" }
 dependencies = [
     { name = "equinox" },
@@ -4259,7 +4259,7 @@ source = { editable = "packages/pipekit-ops" }
 
 [[package]]
 name = "pipekit-train"
-version = "0.3.1"
+version = "0.3.0"
 source = { editable = "packages/pipekit-train" }
 dependencies = [
     { name = "pipekit-ops" },
