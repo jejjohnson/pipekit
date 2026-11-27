@@ -113,7 +113,9 @@ def test_a_finished_run_does_not_train_again(tmp_path) -> None:
 def test_keep_last_retains_that_many_checkpoints(tmp_path) -> None:
     import orbax.checkpoint as ocp
 
-    _run(400, callbacks=(Checkpoint(every_n_steps=100, keep_last=2, save_dir=tmp_path),))
+    _run(
+        400, callbacks=(Checkpoint(every_n_steps=100, keep_last=2, save_dir=tmp_path),)
+    )
     assert ocp.CheckpointManager(tmp_path).all_steps() == [300, 400]
 
 
