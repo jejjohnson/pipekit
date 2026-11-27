@@ -134,22 +134,34 @@ def test_stops_at_max_steps_and_validates_at_each_period_and_the_end() -> None:
 
 
 def test_logged_losses_are_each_steps_own() -> None:
-    """With metrics reset after each step, the log is not Keras's running mean."""
+    """Each logged loss is the step's batch at the weights before the step.
+
+    Keras logs the running mean since the period began, and so does
+    ``train_on_batch``, so the reference is computed by hand.
+    """
     recorder = _Recorder()
     model = _model()
     initial = model.get_weights()
     _loop(model, max_steps=6, eval_every_n_steps=3, callbacks=(recorder,)).run()
     logged = [m["loss"] for m in recorder.step_metrics]
 
-    # the same batches, one train_on_batch each, from the same start
     from pipekit_train.backends._batches import BatchSource
 
     replay = _model()
     replay.set_weights(initial)
-    replay.compile(optimizer=build_keras_optimizer({"name": "adam", "lr": 1e-2}), loss="mse")
+    replay.compile(
+        optimizer=build_keras_optimizer({"name": "adam", "lr": 1e-2}), loss="mse"
+    )
     source = BatchSource(_Pairs(128, 0), 16, 0)
-    expected = [float(replay.train_on_batch(*source.next_batch())) for _ in range(6)]
+    expected = []
+    for _ in range(6):
+        x, y = source.next_batch()
+        expected.append(float(np.mean((np.asarray(replay(x)) - y) ** 2)))
+        replay.train_on_batch(x, y)
     np.testing.assert_allclose(logged, expected, rtol=1e-5)
+    # the loop and the replay trained the same weights
+    for a, b in zip(model.get_weights(), replay.get_weights(), strict=True):
+        np.testing.assert_array_equal(a, b)
 
 
 def test_validation_is_the_per_sample_mean_over_a_ragged_set() -> None:

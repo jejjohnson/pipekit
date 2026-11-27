@@ -270,9 +270,9 @@ def _bridge(keras: Any) -> type:
             """Each step's own value of the metrics that Keras averages.
 
             Keras reports the running mean m_j after the j-th step of an epoch,
-            so the j-th value is j m_j - (j - 1) m_{j-1}. Resetting Keras's
-            metrics from a callback instead changes the training on the JAX
-            backend: Adam's run then differs from train_on_batch's.
+            so the j-th value is j m_j - (j - 1) m_{j-1}. Reading it off the
+            means leaves Keras's own metrics alone, so its epoch logs, which a
+            user's Keras callbacks read, stay the means of the epoch.
             """
             j = batch + 1
             values = dict(means)
