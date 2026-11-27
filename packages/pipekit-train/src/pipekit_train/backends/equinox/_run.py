@@ -14,6 +14,7 @@ from pipekit_ops import Operator
 from pipekit_train.backends import _common
 from pipekit_train.backends.equinox._batches import _BatchSource
 from pipekit_train.backends.equinox._evaluation import _evaluate
+from pipekit_train.backends._equinox_ops import unwrap_module
 from pipekit_train.backends.equinox._model import EquinoxModelOp, _wrap_trained_model
 from pipekit_train.backends.equinox._sharding import ShardingSpec, _sharding_info
 from pipekit_train.backends.equinox._state import (
@@ -112,14 +113,8 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
     t0 = time.time()
     # --- Unwrap the model ----------------------------------------------
     model_op = loop.model_op
-    if isinstance(model_op, EquinoxModelOp):
-        eqx_module = model_op.module
-    elif isinstance(model_op, eqx.Module):
-        eqx_module = model_op
-    elif hasattr(model_op, "module") and isinstance(model_op.module, eqx.Module):
-        # pipekit_jax.JaxModelOp (or anything module-shaped) lands here.
-        eqx_module = model_op.module
-    else:
+    eqx_module = unwrap_module(model_op)
+    if eqx_module is None:
         raise TypeError(
             "Equinox adapter expects loop.model_op to be a pipekit_train."
             "adapters.equinox.EquinoxModelOp (or any operator exposing "

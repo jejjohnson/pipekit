@@ -15,6 +15,7 @@ from typing import Any, ClassVar, cast
 
 import equinox as eqx
 from pipekit_ops import Operator
+from pipekit_ops.core import record_under
 
 
 class EquinoxModelOp(Operator):
@@ -104,3 +105,7 @@ def rewrap_module(model_op: Any, trained: eqx.Module) -> Operator:
         wrapped.module = trained
         return wrapped
     return EquinoxModelOp(trained)
+
+
+# Saved states name it by the area users import it from, wherever its code is.
+record_under("pipekit_train.backends.equinox", EquinoxModelOp)
