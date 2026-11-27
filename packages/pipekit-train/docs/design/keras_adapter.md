@@ -101,6 +101,7 @@ Five scripts, run on Keras 3.15.1, JAX 0.12.1, Equinox 0.13.8, optax and Grain o
 | Three one-period `fit` calls on one model | 1.06 s, 0.23 s and 0.26 s: the train function is compiled once |
 | `optimizer_config` defaults | Keras `Adam` and `AdamW` take `epsilon=1e-7`, optax `eps=1e-8`; Keras `AdamW` takes `weight_decay=0.004`, optax `1e-4` |
 | 200 steps of one Equinox MLP on the same batches, optax against Keras | SGD: weights identical; Adam with `eps=1e-8` on both: largest difference 4.8e-7; AdamW with matched settings: 1.3e-6; Adam with Keras's default `epsilon`: 8.1e-6 (weights up to 0.88) |
+| One step, then 100 and 2,000 steps, of a 64-wide Equinox MLP under `backend="equinox"` and `backend="keras"` with ε matched (#320) | 2.5e-4, 9.6e-4 and 1.0e-1 apart: Keras adds ε before the bias correction, which matters where gradients are small; with ε scaled by √(1−β₂ᵗ), a 64-wide Keras MLP matches optax to 2e-6 over 100 steps |
 | An `eqx.nn.MLP` in a `JaxLayer`, as a flat list of array leaves | one SGD step equals the hand-written JAX step to 3.0e-8; after 300 steps the module rebuilt from the layer is an `MLP` and predicts what the Keras model predicts, difference 0.0 |
 | The same module given to `JaxLayer` without copying its arrays | after one step its arrays are deleted (`RuntimeError: Array has been deleted`): Keras donates the buffers it trains. With copied arrays the original module stays usable |
 | An Equinox module behind a Keras `Dense` layer | trains: loss 4.75 to 3.81 in 20 epochs |
@@ -214,7 +215,7 @@ The auxiliary keys are read by calling the loss once on the first batch before `
 
 ### 8.4 `optimizer_config`
 
-The backend translates `optimizer_config` with the same names as every other backend (`OPTIMIZER_NAMES`: `adam`, `adamw`, `sgd`, `rmsprop`). `lr` becomes `learning_rate`, optax's `b1`, `b2`, `eps` and `decay` become Keras's `beta_1`, `beta_2`, `epsilon` and `rho`, and a value the config leaves out takes optax's default (`eps=1e-8`; `weight_decay=1e-4` for `adamw`). One config therefore means one optimiser on both backends, where Keras's own defaults would differ (§5).
+The backend translates `optimizer_config` with the same names as every other backend (`OPTIMIZER_NAMES`: `adam`, `adamw`, `sgd`, `rmsprop`). `lr` becomes `learning_rate`, optax's `b1`, `b2`, `eps` and `decay` become Keras's `beta_1`, `beta_2`, `epsilon` and `rho`, and a value the config leaves out takes optax's default (`eps=1e-8`; `weight_decay=1e-4` for `adamw`). Keras's Adam and AdamW also add ε before the bias correction, which on optax's scale is ε/√(1−β₂ᵗ), about 32 times larger at the first step, so the backend scales ε by √(1−β₂ᵗ) at each step (#320). One config therefore means one optimiser on both backends, where Keras's own defaults and ε would differ (§5). RMSprop needs nothing: both add ε inside the square root.
 
 ### 8.5 What `run(loop)` does
 
