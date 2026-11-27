@@ -15,11 +15,12 @@ end to end — 4DVar windows, rollout training.
 - `Rollout` — the carrier-only form most PDE use needs:
   ``carrier -> trajectory`` sampled every ``save_every`` steps.
 
-Both accept a pipekit operator or a `pipekit_cycle.ForwardModel` as the
-step, are `JaxOperator` s (so learnable leaves of the step are reachable
-by ``eqx.filter_grad``), and handle arbitrary pytree carriers — dicts,
-``eqx.Module`` states, custom carriers — by stacking with
-``jax.tree.map``.
+`ScanCycle` takes a `StatefulOperator` or a `pipekit_cycle.ForwardModel`
+as its step, and `Rollout` takes a carrier-only operator or a
+`ForwardModel`. Both are `JaxOperator` s (so learnable leaves of the
+step are reachable by ``eqx.filter_grad``), and handle arbitrary
+pytree carriers — dicts, ``eqx.Module`` states, custom carriers — by
+stacking with ``jax.tree.map``.
 """
 
 from __future__ import annotations
