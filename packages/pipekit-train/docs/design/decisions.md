@@ -526,6 +526,26 @@ doesn't shard evaluation yet; this makes that possible.
 
 ---
 
+## D21: Equinox models train under the Keras backend and come back in their own wrapper
+
+**Status:** proposed
+
+**Context:** A user may want Keras's loop, Keras Tuner or Keras layers around a model written in Equinox, and the cross-backend comparison in [`keras_adapter.md`](keras_adapter.md) trains one Equinox model under both backends. Keras 3 runs JAX code as a layer through `keras.layers.JaxLayer`. Measured on Keras 3.15.1 and Equinox 0.13.8: an `eqx.nn.MLP` in a `JaxLayer` takes the same SGD step as hand-written JAX (to 3.0e-8), the trained module is rebuilt exactly, and Keras deletes the arrays it was given unless they are copied first, because it donates the buffers it trains.
+
+**Options:**
+- (A) Accept an operator that is or holds an Equinox module (`JaxOperator`, `JaxModelOp`, `EquinoxModelOp`), train it as an `EquinoxLayer` over copies of its array leaves, and return the trained module in a copy of the operator given.
+- (B) Refuse them, so Equinox models train only with `backend="equinox"`. Costs: no Keras tooling for Equinox models, and the comparison needs two models.
+- (C) Accept them but return a `KerasModelOp`. Costs: `JaxModelOp`'s registry round trip is lost, and the class of the trained model depends on the backend.
+
+**Decision:** (A). The output class follows the input, as the Equinox backend already does, so a `JaxModelOp` keeps its registry round trip whichever backend trained it.
+
+**Consequences:**
+- `backend="keras"` with an Equinox-backed operator needs `pipekit-train[keras,equinox]`.
+- The unwrap and rewrap helpers move out of the Equinox area to `backends/_equinox_ops`, because one backend area does not import another (D17).
+- An Equinox `TrainTask`, a module with `eqx.nn.State` and sharding stay with `backend="equinox"`, which remains the reference for Equinox models.
+
+---
+
 ## Resolved Questions
 
 | Question                            | Resolution                                         |

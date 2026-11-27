@@ -5,9 +5,9 @@ version: 0.1.0
 
 # Design: the Keras 3 backend (`backend="keras"`)
 
-`backend="keras"` trains a Keras 3 model through the same `TrainingLoop` that trains Equinox models, and returns a `KerasModelOp` whose weights round-trip through a `ModelRegistry`. Keras's own `compile` and `fit` do the training (D1), on the JAX backend only (D19), and pipekit-train adds the parts Keras does not have: the step budget, the callbacks and metric writer, checkpoints that resume the data position, and the `TrainingArtifact`.
+`backend="keras"` trains a Keras 3 model through the same `TrainingLoop` that trains Equinox models, and returns a `KerasModelOp` whose weights round-trip through a `ModelRegistry`. Keras's own `compile` and `fit` do the training (D1), on the JAX backend only (D19), and pipekit-train adds the parts Keras does not have: the step budget, the callbacks and metric writer, checkpoints that resume the data position, and the `TrainingArtifact`. The same backend also trains an Equinox model given as a `JaxModelOp`, an `EquinoxModelOp` or a `JaxOperator`: the module runs inside Keras as a `JaxLayer`, and the trained module comes back in the wrapper it was given (D21).
 
-This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18, D19 and D20 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the three scripts listed in §5; none of the names it proposes exists yet.
+This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18 to D21 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the five scripts listed in §5; none of the names it proposes exists yet.
 
 ## 1. Motivation
 
@@ -21,7 +21,8 @@ The backend should be thin. Keras 3 already has a training loop, so the design w
 
 - **The Keras modeller.** A researcher with a Keras model and a `TrainingDataset` of `(x, y)` pairs wants to train it with `TrainingLoop(..., backend="keras")`, log its metrics with the same `JSONLWriter`, stop early on validation loss, and get back an operator to put in a `Sequential` and in the registry.
 - **The fairness researcher.** A keras-fairkl user trains a `FairModelWrapper` whose penalty is added inside `call` with `add_loss`. The batch input is the dict `{"x": X, "q": q}`. They need the backend to keep the model's own `compile` and to pass the dict through untouched.
-- **The benchmark builder.** Someone comparing an Equinox emulator with a Keras one wants both under one `HyperSweep`, ranked on the same `final_eval_metrics`, with the same `optimizer_config` meaning the same optimiser on both backends.
+- **The benchmark builder.** Someone comparing an Equinox emulator with a Keras one wants both under one `HyperSweep`, ranked on the same `final_eval_metrics`, with the same `optimizer_config` meaning the same optimiser on both backends. They also want to train the Equinox emulator itself under both backends, to tell a difference of model from a difference of training loop.
+- **The Equinox user with Keras tooling.** Someone with a `JaxModelOp` wants Keras Tuner, or Keras preprocessing layers in front of their Equinox module, and wants a `JaxModelOp` back so the trained weights still round-trip through the registry and the model still drops into `NeuralForward`.
 - **The preempted job.** A long run on a shared machine is killed; restarting it with the same `checkpoint_dir` must continue from the last checkpoint and finish with the same weights an uninterrupted run would have.
 
 ## 3. Background maths
@@ -32,7 +33,7 @@ The backend should be thin. Keras 3 already has a training loop, so the design w
 \boldsymbol{\theta}_{k+1} = \boldsymbol{\theta}_k - \eta u\left(\nabla_{\boldsymbol{\theta}} \ell(f_{\boldsymbol{\theta}_k}(\mathbf{X}_B), \mathbf{Y}_B)\right)
 ```
 
-Here η is the learning rate, $\mathbf{X}_ B$ is the stacked batch of inputs with shape (N_B, …) and $\mathbf{Y}_ B$ the stacked targets. A Keras model is batch-first, so a `pipekit_train.Loss` sees the whole batch of predictions. The Equinox backend instead writes the model per sample and maps it over the batch with `jax.vmap`; for a loss that averages over the batch, such as `MSE`, the two give the same scalar.
+Here η is the learning rate, $\mathbf{X}_ B$ is the stacked batch of inputs with shape (N_B, …) and $\mathbf{Y}_ B$ the stacked targets. A Keras model is batch-first, so a `pipekit_train.Loss` sees the whole batch of predictions. The Equinox backend instead writes the model per sample and maps it over the batch with `jax.vmap`; for a loss that averages over the batch, such as `MSE`, the two give the same scalar. An Equinox module trained by the Keras backend keeps the Equinox convention: it is written per sample and mapped over the batch inside its layer (D21).
 
 **The step budget.** `TrainingLoop` counts optimiser steps (D10), and Keras counts epochs of `steps_per_epoch` steps. The backend makes one Keras epoch one evaluation period of P = `eval_every_n_steps` steps, so with K = `max_steps` it calls `fit` for E Keras epochs and stops at step K:
 
@@ -70,6 +71,7 @@ Keras's loss tracker weights each batch by its size and gives the left side. A m
 | Optimisers | `keras.optimizers.Adam`, `AdamW`, `SGD`, `RMSprop`; `optimizer.iterations`, `optimizer.variables` | `optimizer_config`, the step counter and checkpoints |
 | Callbacks | `keras.callbacks.Callback`: `on_train_batch_end`, `on_test_end`, `on_epoch_end`; `self.model.stop_training = True` | the bridge to the pipekit callbacks |
 | Weights | `Model.weights` (each with a `.path`, shape and dtype), `get_weights()`, `set_weights()` | the weight blob of `KerasModelOp` (D20) |
+| JAX models | `keras.layers.JaxLayer(call_fn, params, state, seed)`, with `call_fn(params, rng, inputs, training)` | an Equinox module as a Keras layer (D21) |
 | Functional call | `Model.stateless_call(trainable, non_trainable, x)` | not used by `fit`; a later JAX-native export of the trained model |
 | Distribution | `keras.distribution.DataParallel`, `ModelParallel`, `DeviceMesh` (JAX backend only) | not in the first release (§9) |
 | Precision | `keras.config.set_dtype_policy` | left to the user, as boundaries.md Q3 decides for every backend |
@@ -78,7 +80,7 @@ Keras's own checkpointing does not fit the loop's contract. `BackupAndRestore` s
 
 ## 5. What was measured
 
-Three scripts, run on Keras 3.15.1, JAX 0.12.1 and Grain on CPU, in a scratch environment outside the repo. They used an 8-unit dense model on toy data.
+Five scripts, run on Keras 3.15.1, JAX 0.12.1, Equinox 0.13.8, optax and Grain on CPU, in a scratch environment outside the repo. They used an 8-unit dense model, or an `eqx.nn.MLP` of width 8, on toy data.
 
 | Check | Result |
 |---|---|
@@ -94,8 +96,14 @@ Three scripts, run on Keras 3.15.1, JAX 0.12.1 and Grain on CPU, in a scratch en
 | `stateless_call` under `jax.jit` against `model(x)` | largest difference 2.4e-7 |
 | Three one-period `fit` calls on one model | 1.06 s, 0.23 s and 0.26 s: the train function is compiled once |
 | `optimizer_config` defaults | Keras `Adam` and `AdamW` take `epsilon=1e-7`, optax `eps=1e-8`; Keras `AdamW` takes `weight_decay=0.004`, optax `1e-4` |
+| 200 steps of one Equinox MLP on the same batches, optax against Keras | SGD: weights identical; Adam with `eps=1e-8` on both: largest difference 4.8e-7; AdamW with matched settings: 1.3e-6; Adam with Keras's default `epsilon`: 8.1e-6 (weights up to 0.88) |
+| An `eqx.nn.MLP` in a `JaxLayer`, as a flat list of array leaves | one SGD step equals the hand-written JAX step to 3.0e-8; after 300 steps the module rebuilt from the layer is an `MLP` and predicts what the Keras model predicts, difference 0.0 |
+| The same module given to `JaxLayer` without copying its arrays | after one step its arrays are deleted (`RuntimeError: Array has been deleted`): Keras donates the buffers it trains. With copied arrays the original module stays usable |
+| An Equinox module behind a Keras `Dense` layer | trains: loss 4.75 to 3.81 in 20 epochs |
+| An Equinox dropout model through `JaxLayer`'s `rng` and `training` | trains; `rng` is `None` when Keras infers shapes and at inference, where `eqx.nn.inference_mode` gives deterministic outputs |
+| `model.save` and `load_model` of a model holding a `JaxLayer` | `TypeError`: it does not deserialise |
 
-The scripts are `keras_spike.py`, `keras_resume_spike.py` and `keras_metrics_spike.py`. They are not in the repo; the tests of §10 assert the same facts.
+The scripts are `keras_spike.py`, `keras_resume_spike.py`, `keras_metrics_spike.py`, `keras_eqx_spike.py` and `keras_optax_parity.py`. They are not in the repo; the tests of §10 assert the same facts.
 
 ## 6. What it builds on
 
@@ -111,23 +119,27 @@ Most of what the backend needs exists in pipekit-train or in Keras. The gaps are
 | Checkpoint cadence and registry hand-off | `Checkpoint` (`pipekit_train.loop`) | today; `on_train_end` stores `serialize_weights()` when the model has it |
 | Weight blob into a registry | `ModelRegistry.store(op, weights=...)`, `load_weights` (`pipekit_experiment`) | today |
 | Model selection | `HyperSweep` reads `backend_info["final_metrics"]` and `["final_eval_metrics"]` | today |
+| Unwrapping an Equinox-backed operator and wrapping the trained module the same way | `_wrap_trained_model` and the unwrap in `run` (`pipekit_train.backends.equinox`) | today, but private to the Equinox area |
+| Operators that hold an Equinox module | `JaxModelOp`, `JaxOperator` (`pipekit_jax`), `EquinoxModelOp` (`pipekit_train.backends.equinox`) | today; the backend finds the module by duck typing, as the Equinox backend does, and imports neither package |
 | A generic trained-model operator | `pipekit_array.inference.ModelOp` | not built (pipekit-array phase D); D20 does not wait for it |
 
 The gaps, each with its owner:
 
 - **A shared batch pipeline.** The Grain chain in `_BatchSource` moves to `pipekit_train.backends._batches` and returns NumPy batches; the Equinox area keeps converting and placing them on devices. Owner: pipekit-train (step 1).
 - **`KerasModelOp`** with a weight blob, in `pipekit_train.backends.keras` (D20). Owner: pipekit-train (step 2).
-- **pipekit-array's design pages** (`api/inference.md`, A8) say the Keras backend returns `pipekit_array.ModelOp`. They change to point at `KerasModelOp` once D20 is accepted. Owner: pipekit-array, same repo (step 5).
+- **Shared Equinox unwrap and rewrap.** The two helpers move out of the Equinox area to `pipekit_train.backends._equinox_ops`, because one backend area does not import another (D17). Owner: pipekit-train (step 4).
+- **pipekit-array's design pages** (`api/inference.md`, A8) say the Keras backend returns `pipekit_array.ModelOp`. They change to point at `KerasModelOp` once D20 is accepted. Owner: pipekit-array, same repo (step 6).
 
-What stays local to the backend: the loss bridge, the batch-weighted metric for auxiliary terms, the translation of `optimizer_config`, and the one Keras callback that drives the pipekit callbacks.
+What stays local to the backend: the loss bridge, the batch-weighted metric for auxiliary terms, the translation of `optimizer_config`, the one Keras callback that drives the pipekit callbacks, and `EquinoxLayer`.
 
 ## 7. Decisions
 
-Three choices had real alternatives. Each is a record in [`decisions.md`](decisions.md); this is the summary.
+Four choices had real alternatives. Each is a record in [`decisions.md`](decisions.md); this is the summary.
 
 - **D18: wrap `compile` and `fit`.** The alternative was a stateless JAX loop that treats Keras only as a model definition and reuses the Equinox loop. That loop would match the Equinox backend step for step, but it would ignore the model's `compile`, skip Keras callbacks and Keras Tuner, and write a second training loop, which D1 rules out. `fit` gives exact step counts and exact resumes in the measurements of §5, so its cost is two semantics the design states: metrics are reset after each step, and checkpoints fall on period boundaries.
 - **D19: the JAX backend only.** Keras also runs on TensorFlow and PyTorch, but D15 removed PyTorch training, the stack's arrays are JAX, `keras.distribution` is JAX-only, and every measurement above is on JAX. The backend sets `KERAS_BACKEND=jax` when Keras is not yet imported and raises when Keras was imported on another backend.
 - **D20: `KerasModelOp` lives in the Keras area, with its own weight blob.** `pipekit_array.ModelOp` is not built, holds no weights by design (A8), and pipekit-array takes no backend dependency. The `.keras` file is not byte-stable. So the operator writes a blob of a signature header and the raw arrays, as `pipekit_jax.JaxModelOp` does for Equinox.
+- **D21: Equinox models train under the Keras backend and come back in their own wrapper.** The alternatives were to refuse them, which leaves Equinox users without Keras Tuner or Keras layers and makes the cross-backend comparison need two models, or to return a `KerasModelOp`, which would lose `JaxModelOp`'s registry round trip and make the output class depend on the backend. The module runs as an `EquinoxLayer`, a `JaxLayer` over copies of its array leaves, and `backend="equinox"` stays the reference for Equinox models.
 
 ## 8. API proposal
 
@@ -215,13 +227,13 @@ flowchart LR
 ```
 
 1. **Backend.** If Keras is not imported, set `KERAS_BACKEND=jax` unless it is set; import Keras; raise if `keras.config.backend()` is not `"jax"` (D19). Raise if `loop.sharding` is set (§9).
-2. **Model.** `loop.model_op` must be a `KerasModelOp`; anything else raises `TypeError` naming it.
+2. **Model.** A `KerasModelOp` is used as it is. An operator that is an Equinox module (`JaxOperator`) or holds one in `.module` (`JaxModelOp`, `EquinoxModelOp`) is wrapped in a one-layer Keras model holding an `EquinoxLayer`, built by calling it on the first batch (§8.7). Anything else raises `TypeError` naming the accepted kinds.
 3. **Task.** Use `loop.task` if it is a `KerasTask`, else synthesise one from `loop.loss`; raise if neither is set.
 4. **Compile.** Unless `keep_compile`, call `model.compile(optimizer, loss, metrics, steps_per_execution=1)`. One step per execution keeps `on_train_batch_end` firing every step.
 5. **Data.** Build the shared batch source over `loop.dataset` with `loop.batch_size` and `loop.seed`, and pass `fit` a generator over it. The validation set is a finite generator of ragged batches, with `validation_steps` = ⌈N_val / N_B⌉.
 6. **Resume.** If `checkpoint_dir` (or `Checkpoint.save_dir`) holds a checkpoint, restore the weights, the optimiser variables, the iterator state and the step k₀.
 7. **Fit.** `model.fit(batches, steps_per_epoch=P, epochs=E, initial_epoch=k₀ // P, validation_data=…, callbacks=[bridge, checkpoint, *task.keras_callbacks], verbose=0)`.
-8. **Wrap.** Return the trained model in a copy of the `KerasModelOp` the loop was given, fire `on_train_end`, and return `backend_info`.
+8. **Wrap.** Return the trained model in a copy of the operator the loop was given: a `KerasModelOp` holds the trained Keras model, and an Equinox-backed operator holds the module rebuilt from its layer. Fire `on_train_end` and return `backend_info`.
 
 The bridge is one Keras callback:
 
@@ -281,11 +293,58 @@ class KerasModelOp(Operator):
 
 `with_weights` clones the skeleton with `keras.models.clone_model`, checks the header's paths, shapes and dtypes against it, and loads with `set_weights`, so a blob never lands in a model of another shape. Like `JaxModelOp`, the skeleton is needed because a model's architecture is Python, not bytes. A user who wants a portable file calls `model.save` on `op.model`; that file is not what the registry hashes.
 
-### 8.7 `TrainingLoop` fields
+### 8.7 Equinox models: `EquinoxLayer` (D21)
+
+`EquinoxLayer` puts an Equinox module inside Keras. With θ the inexact-array leaves of the module and the rest of it (activations, sizes, flags) kept as Python, the layer trains θ and calls the module per sample, as the Equinox backend does:
+
+```python
+# Shapes: N_B = batch_size samples per step
+
+import equinox as eqx
+import jax
+import keras
+import numpy as np
+
+
+# proposed (D21)
+class EquinoxLayer(keras.layers.JaxLayer):
+    """An Equinox module as a Keras layer; `.module` is the module as trained."""
+
+    def __init__(self, module: eqx.Module, *, per_sample: bool = True, seed=None):
+        # θ, rest = partition(module): arrays train, everything else stays Python
+        params, self._static = eqx.partition(module, eqx.is_inexact_array)
+        leaves, self._treedef = jax.tree.flatten(params)
+        # copies, because Keras donates the buffers it trains (§5)
+        leaves = [np.array(leaf) for leaf in leaves]
+        super().__init__(self._call, params=leaves, seed=seed)
+        self._per_sample = per_sample
+
+    def _call(self, params, rng, inputs, training):
+        net = eqx.combine(jax.tree.unflatten(self._treedef, params), self._static)
+        # dropout and friends switch off outside training
+        net = eqx.nn.inference_mode(net, not training)
+        # f_θ(X_B) = [f_θ(x_i)]_i, with a key per sample when the module takes one
+        # (N_B, …) → (N_B, …)
+        ...
+
+    @property
+    def module(self) -> eqx.Module:
+        """The module rebuilt from the layer's current weights."""
+```
+
+The backend uses it for an Equinox-backed `model_op`, and a user can put it in their own Keras model, for instance behind preprocessing layers; that model is then a `KerasModelOp` like any other. Because its weights are Keras variables, checkpoints, resume and `KerasModelOp`'s blob work unchanged; only the `.keras` file does not, which D20 does not use. What the layer does not take, in the first release:
+
+- an Equinox `TrainTask` with its own `loss_fn`; a custom objective is a Keras loss here, or the task goes to `backend="equinox"`;
+- a module with `eqx.nn.State` (BatchNorm), which waits for #16 and would use `JaxLayer`'s `state` argument;
+- inputs that are not one array or one pytree of arrays, which is `JaxLayer`'s own limit.
+
+An Equinox-backed `model_op` needs both extras, `pipekit-train[keras,equinox]`; without Equinox, `run` raises an `ImportError` naming them.
+
+### 8.8 `TrainingLoop` fields
 
 | Field | Keras backend |
 |---|---|
-| `model_op` | a `KerasModelOp` |
+| `model_op` | a `KerasModelOp`, or an Equinox-backed operator (`JaxModelOp`, `EquinoxModelOp`, `JaxOperator`) |
 | `task` | a `KerasTask`, or none to bridge `loss` |
 | `loss` | bridged to a Keras loss; aux terms become batch-weighted metrics |
 | `optimizer_config` | translated with optax's defaults (§8.4) |
@@ -365,17 +424,43 @@ TrainingLoop(
 
 With `keep_compile=True` the model's own optimiser stands and `optimizer_config` is not used; the backend says so in a warning when the config differs from the default.
 
+An Equinox emulator trained by both backends, for the benchmark builder's comparison. Each run returns a `JaxModelOp`:
+
+```python
+# Shapes: N = 512 samples; D_x = 3 inputs; D_y = 1 output
+
+import equinox as eqx
+import jax
+
+# today (pipekit-jax)
+from pipekit_jax import JaxModelOp
+
+# user
+emulator = eqx.nn.MLP(3, 1, width_size=64, depth=2, key=jax.random.key(0))
+
+# today (pipekit-train): the reference Equinox backend
+equinox_op, equinox_artifact = TrainingLoop(
+    model_op=JaxModelOp(emulator), dataset=dataset, loss=MSE(), backend="equinox"
+).run()
+
+# proposed (D21): the same module through Keras fit, returned as a JaxModelOp
+keras_op, keras_artifact = TrainingLoop(
+    model_op=JaxModelOp(emulator), dataset=dataset, loss=MSE(), backend="keras"
+).run()
+```
+
 ## 10. Plan
 
-Five PRs, stacked in this order, under epic [#147](https://github.com/jejjohnson/pipekit/issues/147). None depends on #16 (stateful Equinox layers), which touches `_state.py`, not `_batches.py`, so the two can proceed in either order.
+Six PRs, stacked in this order, under epic [#147](https://github.com/jejjohnson/pipekit/issues/147). None depends on #16 (stateful Equinox layers), which touches `_state.py`, not `_batches.py`, so the two can proceed in either order.
 
 1. **refactor(train): one batch pipeline for every backend.** Move the Grain chain of `_BatchSource` to `pipekit_train.backends._batches`, returning NumPy; the Equinox area keeps the conversion to JAX and the device placement. Test: the Equinox tests pass unchanged, and the shared source yields the same batches for the same seed.
 2. **feat(train): `KerasModelOp` with a weight blob (D20).** The operator, `serialize_weights`, `with_weights` with the signature check, and `from_registry`; `[keras]` extra and `train-extras` updated. Test: the blob is byte-stable, the round trip is exact, a skeleton of another shape is refused, and a `LocalModelRegistry` stores and reloads it.
 3. **feat(train): the Keras backend (D18, D19).** `KerasTask`, the loss bridge and `_AuxMetric`, the optimiser translation, the bridge callback, validation, and `backend_info`; the stub's tests are replaced. Test: the step count is exactly `max_steps` when P does not divide it, per-step logs equal `train_on_batch`, the validation loss equals the per-sample mean on a ragged set, `EarlyStopping` stops at a period's end, a non-JAX backend raises, and `HyperSweep` ranks two Keras trials.
-4. **feat(train): Keras checkpoints that resume.** The Orbax checkpoint callback and the resume path. Test: a run stopped and resumed on a period boundary ends with the weights of an uninterrupted run, and an `every_n_steps` that is not a multiple of P raises.
-5. **docs(train): the Keras backend.** A notebook in `docs/notebooks/`, the Keras rows of the README and of `api/adapters.md`, `installation.md`, and pipekit-array's `api/inference.md` and A8 pointed at `KerasModelOp`.
+4. **feat(train): Equinox models under the Keras backend (D21).** `EquinoxLayer`, the shared unwrap and rewrap helpers in `backends/_equinox_ops`, and the Equinox branch of `run`. Test: one SGD step equals the hand-written JAX step, the loop's own `model_op` is still usable after training, a `JaxModelOp` comes back as a `JaxModelOp` that round-trips through the registry, `JaxOperator` and `EquinoxModelOp` come back as themselves, a dropout module trains and predicts deterministically, and over 200 Adam steps the Keras and Equinox backends agree to float32 rounding.
+5. **feat(train): Keras checkpoints that resume.** The Orbax checkpoint callback and the resume path. Test: a run stopped and resumed on a period boundary ends with the weights of an uninterrupted run, and an `every_n_steps` that is not a multiple of P raises.
+6. **docs(train): the Keras backend.** A notebook in `docs/notebooks/`, the Keras rows of the README and of `api/adapters.md`, `installation.md`, and pipekit-array's `api/inference.md` and A8 pointed at `KerasModelOp`.
 
-Left for later, each an issue once the five land: data-parallel training through `keras.distribution` behind `loop.sharding`; losses that take a `key`, through a `keras.random.SeedGenerator`; and other Keras backends, if D19 is ever revisited.
+Left for later, each an issue once the six land: Equinox modules with `eqx.nn.State`, after #16; data-parallel training through `keras.distribution` behind `loop.sharding`; losses that take a `key`, through a `keras.random.SeedGenerator`; and other Keras backends, if D19 is ever revisited.
 
 ## 11. Open questions
 
@@ -383,6 +468,7 @@ Left for later, each an issue once the five land: data-parallel training through
 2. **The seed.** `keras.utils.set_random_seed(loop.seed)` would make dropout and other seeded layers reproducible, but it also reseeds Python's and NumPy's global generators in the caller's process. The proposal does not call it and documents that layers seed themselves; the alternative calls it and documents the side effect.
 3. **Checkpoint cadence.** The proposal raises when `every_n_steps` is not a multiple of P. Rounding it up to the next multiple, with a warning, is the alternative.
 4. **The version floor of Keras.** Keras 3.11 is the first release that reads Grain datasets in `fit`, but the backend passes a generator and does not need that. The floor is whatever CI passes on.
+5. **Is `EquinoxLayer` public?** The proposal exports it from `pipekit_train.backends.keras`, so a user can mix an Equinox module with Keras layers. Keeping it private would limit D21 to whole Equinox models.
 
 ## 12. References
 
@@ -395,12 +481,13 @@ Left for later, each an issue once the five land: data-parallel training through
 - Customising `train_step` on JAX (`stateless_call`, `compute_loss_and_updates`): <https://keras.io/guides/custom_train_step_in_jax/>
 - Distribution API: <https://keras.io/guides/distribution/>
 - Dtype policies: <https://keras.io/api/mixed_precision/policy/>
+- `JaxLayer` and `FlaxLayer`: <https://github.com/keras-team/keras/blob/master/keras/src/utils/jax_layer.py>
 - Release notes (Grain support in 3.11.0): <https://github.com/keras-team/keras/releases>
 
 **pipekit.**
 
 - [`api/adapters.md`](api/adapters.md): the per-backend reference.
-- [`decisions.md`](decisions.md): D1 (thin orchestration), D5 (extras), D7 (trained models are operators), D9 (per-backend task), D10 (per-step), D15 (no Lightning), D16 (padded evaluation), and D18 to D20 (this backend).
+- [`decisions.md`](decisions.md): D1 (thin orchestration), D5 (extras), D7 (trained models are operators), D9 (per-backend task), D10 (per-step), D15 (no Lightning), D16 (padded evaluation), and D18 to D21 (this backend).
 - pipekit-array `docs/design/api/inference.md` and A8: the generic `ModelOp` and why it holds no weights.
-- pipekit-jax `weights.py`: the signature-header blob that `KerasModelOp` mirrors.
+- pipekit-jax `weights.py`: the signature-header blob that `KerasModelOp` mirrors, and `model_op.py`: the `JaxModelOp` that D21 returns.
 - keras-fairkl `models/fair_wrapper.py`: the `add_loss` model of the second user story.
