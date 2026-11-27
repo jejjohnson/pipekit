@@ -57,7 +57,7 @@ None of it is a new trainer. `TrainingLoop` and `HyperSweep` are [pipekit-ops](h
 
 pipekit-train is one package of the pipekit workspace; the [workspace README](https://github.com/jejjohnson/pipekit/blob/main/README.md) introduces the others.
 
-<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_overview/pipekit_train_overview.png" alt="pipekit-train in one picture: you supply a dataset, a model, a loss and the settings; TrainingLoop runs one training over a backend (Equinox with optax, NumPyro, BlackJAX, and a Keras slot); out comes the trained model as an operator, its artifact, checkpoints and logs" width="100%"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_overview/pipekit_train_overview.png" alt="pipekit-train in one picture: you supply a dataset, a model, a loss and the settings; TrainingLoop runs one training over a backend (Equinox with optax, NumPyro, BlackJAX and Keras 3); out comes the trained model as an operator, its artifact, checkpoints and logs" width="100%"></p>
 
 ## 🌟 Highlights
 
