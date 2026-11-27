@@ -12,9 +12,9 @@ import numpy as np
 from pipekit_ops import Operator
 
 from pipekit_train.backends import _common
+from pipekit_train.backends._equinox_ops import unwrap_module
 from pipekit_train.backends.equinox._batches import _BatchSource
 from pipekit_train.backends.equinox._evaluation import _evaluate
-from pipekit_train.backends._equinox_ops import unwrap_module
 from pipekit_train.backends.equinox._model import EquinoxModelOp, _wrap_trained_model
 from pipekit_train.backends.equinox._sharding import ShardingSpec, _sharding_info
 from pipekit_train.backends.equinox._state import (

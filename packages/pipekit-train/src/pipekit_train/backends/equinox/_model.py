@@ -6,8 +6,10 @@
 
 from __future__ import annotations
 
-from pipekit_train.backends._equinox_ops import EquinoxModelOp
-from pipekit_train.backends._equinox_ops import rewrap_module as _wrap_trained_model
+from pipekit_train.backends._equinox_ops import (
+    EquinoxModelOp,
+    rewrap_module as _wrap_trained_model,
+)
 
 
 __all__ = ["EquinoxModelOp", "_wrap_trained_model"]
