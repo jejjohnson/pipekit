@@ -109,12 +109,17 @@ pip install \
 pipekit-jax names pipekit-ops and pipekit-cycle as ordinary requirements, and neither is on PyPI either, so a project that depends on pipekit-jax tells uv where each pipekit package lives. Pin every pipekit package to the same release tag: all the packages of one release share one commit, and two different tags for the same package make uv report conflicting URLs.
 
 ```toml
+[project]
+dependencies = ["pipekit-ops", "pipekit-cycle", "pipekit-array", "pipekit-jax[array]"]
+
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
 pipekit-jax = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-jax", tag = "pipekit-array-v0.3.1" }
 pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 The `pipekit-array` line is needed only with the `array` extra. The `pipekit` umbrella distribution installs pipekit-jax with the other six packages.
 

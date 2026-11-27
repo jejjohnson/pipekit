@@ -126,10 +126,15 @@ pip install \
 A project that depends on pipekit-cycle pins a release tag (the [changelog](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-cycle/CHANGELOG.md) lists them) and gives every pipekit package the same one. The packages are members of one uv workspace that point at each other at the same commit, so uv needs pipekit-ops from the commit pipekit-cycle came from, which is what this block in the project's `pyproject.toml` says:
 
 ```toml
+[project]
+dependencies = ["pipekit-ops", "pipekit-cycle"]
+
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 ## 🌊 Quickstart: an ensemble Kalman filter on a periodic channel
 
