@@ -88,13 +88,20 @@ where $`\mathbf{J}_t = \partial \mathbf{x}_t / \partial \mathbf{x}_{t-1} \in \ma
 pipekit-jax is not on PyPI, so install it from the GitHub repository. It brings in pipekit-ops, pipekit-cycle, JAX, Equinox and jaxtyping, and needs Python 3.12 or newer.
 
 ```bash
-pip install "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-jax"
+pip install \
+  "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" \
+  "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-cycle" \
+  "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-jax"
 ```
 
 The one extra, `array`, adds pipekit-array for `to_jax` and `JaxKernelOp`; both are imported lazily, so `import pipekit_jax` works without it.
 
 ```bash
-pip install "pipekit-jax[array] @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-jax"
+pip install \
+  "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" \
+  "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-cycle" \
+  "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-array" \
+  "pipekit-jax[array] @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-jax"
 ```
 
 pipekit-jax names pipekit-ops and pipekit-cycle as ordinary requirements, and neither is on PyPI either, so a project that depends on pipekit-jax tells uv where each pipekit package lives. Pin every pipekit package to the same release tag: all the packages of one release share one commit, and two different tags for the same package make uv report conflicting URLs.
@@ -171,7 +178,7 @@ grad_initial, grad_rate = gradients
 print(grad_initial.round(4), round(float(grad_rate), 3))
 ```
 
-This prints `[0.0907 0.0907 0.0907] -6.532`: each element of $`\mathbf{x}_0`$ reaches the final sum with weight $`e^{-2.4} = 0.0907`$, and the sum falls by 6.532 per unit increase of $`\lambda`$, against $`-72 e^{-2.4} = -6.532`$ for the exact solution. Both gradients went back through all 24 Runge–Kutta steps inside one compiled scan. Nothing here is specific to decay, so a learned emulator wrapped in `JaxModelOp`, a finite-volume step written as a `JaxOperator` or a pipekit `Graph` of them steps and differentiates the same way.
+This prints `[0.0907 0.0907 0.0907] -6.532`: each element of $`\mathbf{x}_0`$ reaches the final sum with weight $`e^{-2.4} = 0.0907`$, and the sum falls by 6.532 per unit increase of $`\lambda`$, against $`-72 e^{-2.4} = -6.532`$ for the exact solution. Both gradients went back through all 24 Runge–Kutta steps inside one compiled scan. Nothing here is specific to decay, so any `ForwardModel` (an object with `step`, `dt` and `state_signature`, such as a finite-volume step) scans and differentiates the same way under `ScanCycle`, which also takes a `StatefulOperator`. A carrier-to-carrier operator, such as a learned emulator in a `JaxModelOp` or a `Graph` of `JaxOperator`s, steps through `Rollout` instead, since `ScanCycle` refuses it with a `TypeError`.
 
 The [docs quickstart](https://jejjohnson.github.io/pipekit/quickstart-jax/) carries the rest: storing a trained emulator and reloading it from a registry, the signed weight blob, writing and checking a `JaxOperator`, gradients through a pipeline, the history, checkpointing and truncation of a cycle, `to_jax`, and how each of them works.
 
