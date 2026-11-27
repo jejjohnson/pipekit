@@ -7,7 +7,7 @@ version: 0.2.0
 
 `backend="keras"` trains a Keras 3 model through the same `TrainingLoop` that trains Equinox models, and returns a `KerasModelOp` whose weights round-trip through a `ModelRegistry`. Keras's own `compile` and `fit` do the training (D1), on the JAX backend only (D19), and pipekit-train adds the parts Keras does not have: the step budget, the callbacks and metric writer, checkpoints that resume the data position, and the `TrainingArtifact`. The same backend also trains an Equinox model given as a `JaxModelOp`, an `EquinoxModelOp` or a `JaxOperator`: the module runs inside Keras as a `JaxLayer`, and the trained module comes back in the wrapper it was given (D21).
 
-This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18 to D21 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the five scripts listed in §5; the names it proposes ship in pipekit-train since #325, #327, #329, #331 and the PRs that close #322 and #323, and the sketches below are marked `today` where a name ships.
+This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18 to D21 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the five scripts listed in §5; every name it proposes ships, built under epic #317, and the sketches below are marked `today`.
 
 ## 1. Motivation
 
