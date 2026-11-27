@@ -88,6 +88,36 @@ def test_a_scalar_weight_keeps_its_shape() -> None:
     assert trained.with_weights(blob, copy=False).serialize_weights() == blob
 
 
+def test_a_functional_model_copies_its_layers_through_their_clone_hook() -> None:
+    class Held(keras.layers.Layer):
+        """A layer holding a runtime object, so its config cannot rebuild it."""
+
+        def __init__(self, scale, **kwargs):
+            super().__init__(**kwargs)
+            self.held = scale
+
+        def build(self, input_shape):
+            self.w = self.add_weight(shape=(3, 1), initializer="ones", name="w")
+
+        def call(self, x):
+            return self.held(x @ self.w)
+
+        def _pipekit_clone(self):
+            return Held(self.held)
+
+    def build(seed: int) -> keras.Model:
+        keras.utils.set_random_seed(seed)
+        inputs = keras.Input((3,))
+        outputs = Held(lambda x: 2.0 * x)(keras.layers.Dense(3)(inputs))
+        return keras.Model(inputs, outputs)
+
+    trained = KerasModelOp(build(0))
+    loaded = KerasModelOp(build(1)).with_weights(trained.serialize_weights())
+    np.testing.assert_array_equal(
+        np.asarray(loaded(_inputs())), np.asarray(trained(_inputs()))
+    )
+
+
 def test_copy_false_loads_into_the_skeleton_itself() -> None:
     trained = KerasModelOp(_model(0))
     skeleton = KerasModelOp(_model(123))

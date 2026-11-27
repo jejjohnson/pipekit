@@ -204,6 +204,17 @@ def _clone_layer(layer: Any) -> Any:
     return layer.__class__.from_config(layer.get_config())
 
 
+def _functional_class() -> type:
+    """Keras's class of models built from inputs and outputs, ``keras.Model(i, o)``.
+
+    Keras 3 exports no name for it, and does not set the ``_is_graph_network``
+    flag that Keras 2 did, so it is read from where Keras 3 defines it.
+    """
+    from keras.src.models.functional import Functional  # ty: ignore[unresolved-import]
+
+    return Functional
+
+
 def _copy_model(model: Any) -> Any:
     """A copy of ``model`` with its own weights, built like ``model``.
 
@@ -211,9 +222,7 @@ def _copy_model(model: Any) -> Any:
         TypeError: If Keras cannot copy the model, naming ``copy=False``.
     """
     keras = import_keras()
-    is_graph = isinstance(model, keras.Sequential) or getattr(
-        model, "_is_graph_network", False
-    )
+    is_graph = isinstance(model, (keras.Sequential, _functional_class()))
     try:
         if is_graph:
             clone = keras.models.clone_model(model, clone_function=_clone_layer)
