@@ -1,298 +1,255 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-dark.svg">
-    <img alt="pipekit-evaluate" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-light.svg" width="457">
-  </picture>
-</p>
+<div align="center">
 
-**Tagged scores, content-hashed evaluation reports and a benchmark ladder that scores each inference rung against the simpler one below it.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-dark.svg">
+  <img alt="pipekit-evaluate" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-evaluate/logo-light.svg" width="457">
+</picture>
 
-<p align="center">
-  <a href="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-blue">
-  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
-</p>
+**Tagged scores, content-hashed evaluation reports and a benchmark ladder that scores each inference rung against the simpler one below it, for any carrier, on pipekit-ops and the protocols of pipekit-cycle.**
 
-<p align="center">
-  <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/"><b>API</b></a> ·
-  <a href="https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md"><b>Benchmark ladder</b></a>
-</p>
+[![Tests](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml)
+[![Lint](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml)
+[![Type Check](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml)
+[![Docs](https://github.com/jejjohnson/pipekit/actions/workflows/pages.yml/badge.svg)](https://jejjohnson.github.io/pipekit/)
+[![codecov](https://codecov.io/gh/jejjohnson/pipekit/branch/main/graph/badge.svg)](https://codecov.io/gh/jejjohnson/pipekit)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-## Why it exists
+📖 [Documentation](https://jejjohnson.github.io/pipekit/) ·
+🚀 [Quickstart](https://jejjohnson.github.io/pipekit/quickstart-evaluate/) ·
+📚 [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/) ·
+🧭 [Design](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate/docs/design)
 
-Consider a methane plume retrieval, then an emission-rate estimate on top of it.
-We have an exact but slow posterior for the source rate (MCMC on a plume model), and a network that gives an answer in milliseconds.
-An RMSE against the truth tells us very little here: a field can match pixel for pixel and get the plume's shape wrong, a posterior can have the right mean and the wrong spread, and the fast network should first be judged against the slow posterior it replaces, then against the truth.
+</div>
 
-pipekit-evaluate gives every score three tags (what it scores, what failure it can see, where in a model's life it may run) and collects a run's scores into one report you can filter, diff and hash.
-On top of that sits the benchmark ladder: a cube of data level × inference rung × complexity step, where each cell is scored against the "simpler thing" below it, as data rather than as five separate scripts.
-The metrics themselves stay in the carrier libraries (`xrops.metrics`, `geotoolz`), which never import this package.
+---
 
-## Where it sits
+Consider a methane plume retrieval, and then an emission-rate estimate on top of it. We have an exact but slow posterior for the source rate (MCMC on a plume model) and a network that gives an answer in milliseconds. An RMSE against the truth tells us very little here: a field can match pixel for pixel and get the plume's shape wrong, a posterior can have the right mean and the wrong spread, and the fast network should first be judged against the slow posterior it replaces, and only then against the truth. So pipekit-evaluate treats an evaluation as a set of tagged values, one for every value every scorer returns,
 
-pipekit-evaluate is built on pipekit-ops; it does not use pipekit-array.
-Both are libraries in their own right, which you can build on directly.
-
-```
-   domain packages (plumax, somax, xtremax, ...): a Task, Estimators
-   carrier libraries (xrops.metrics, geotoolz): the metrics
-                     │
-          ┌──────────┴──────────┐
-          │  pipekit-evaluate   │  ◀ this package
-          │ taxonomy, scorers,  │
-          │ reports, benchmark  │
-          └──────────┬──────────┘
-            ┌────────┴────────┬──────────────────┐
-            │                 │                  │
-       pipekit-ops       pipekit-array      pipekit-cycle
-       (dependency:      (not used)         ([cycle] extra:
-        hashing)                             ForwardModel and
-                                             ObservationOperator
-                                             for a Task)
+```math
+\mathcal{R}(\hat{\mathbf{y}}, \mathbf{y}_\text{ref}) = \left\{ \left( k, m, s_{k,m}(\hat{\mathbf{y}}, \mathbf{y}_\text{ref}), \tau_k \right) : k \in \mathcal{K}, \ m \in \mathcal{M}_k \right\}
 ```
 
-- **pipekit-ops** is a required dependency, beside NumPy and SciPy.
-  The report hash uses `pipekit_ops.saving`, and a metric can be any callable, a pipekit operator included.
-- **pipekit-array** is not a dependency and is not used.
-- **pipekit-cycle** is optional: a benchmark `Task` returns its `ForwardModel` and `ObservationOperator`, which this package names only for type checking.
+where $`\hat{\mathbf{y}}`$ is the prediction and $`\mathbf{y}_\text{ref}`$ the reference, in whatever carrier the scorers take (an array, an xarray Dataset, an estimate with a posterior), $`\mathcal{K}`$ is the set of scorers, $`\mathcal{M}_k`$ the names of the values scorer $`k`$ returns, $`s_{k,m}(\hat{\mathbf{y}}, \mathbf{y}_\text{ref}) \in \mathbb{R}`$ one of those values, and $`\tau_k = (u_k, \ell_k, \mathcal{S}_k)`$ the scorer's tags: the unit $`u_k`$ it scores, the lens $`\ell_k`$ it looks through and the set of stages $`\mathcal{S}_k`$ at which it may run. $`\mathcal{R}`$ is the `EvaluationReport`, which we can filter on any tag, diff against an earlier run and identify by a content hash. On top of it sits the benchmark ladder, which decides for every cell of a level × rung × complexity cube which reference $`\mathbf{y}_\text{ref}`$ is.
 
-## Install
+```python
+# Shapes: H × W = 32 × 32 pixels; N = 25 per-pass estimates of one source rate
+# (rmse, pattern_corr, retrieved and truth as in the quickstart below; the ladder's
+# scorer, task and estimators as in the docs quickstart)
+
+# today (pipekit-evaluate)
+# s_k with τ_k; an untagged scorer is a point-wise field score
+scorers = [pev.MetricScorer(rmse), pev.MetricScorer(pattern_corr, lens="structural")]
+# today (pipekit-evaluate)
+# ℛ(ŷ, y_ref), one tagged entry per value, under one content hash
+report = pev.evaluate(retrieved, truth, scorers)
+# today (pipekit-evaluate)
+# each cell scored against the reference its rung names, as the same kind of report
+ladder = pev.Benchmark(task, estimators, [scorer]).run().to_report()
+```
+
+None of it is a new metrics library. The metrics stay in the carrier libraries ([`xrops.metrics`](https://github.com/jejjohnson/geotoolz/tree/main/packages/xrtoolz-ops) for xarray, [`geotoolz`](https://github.com/jejjohnson/geotoolz) for GeoTensors), which never import this package, and `MetricScorer` wraps any of them, or any other `(prediction, reference) -> result` callable, with its tags. The content hash is [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops)'s (`pipekit_ops.saving`), so a report is identified the way a pipeline is. And a benchmark `Task` returns [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle)'s `ForwardModel` and `ObservationOperator` as its simulator and observation operator, so a benchmark is built from the same parts as a `DACycle`; this package names them for type checking only, so pipekit-cycle is an extra.
+
+## 🌟 Highlights
+
+- 🏷️ **Three tags on every scorer**: `Unit`, `Lens` and `Stage` are read off any scorer as `ScorerTags` by `tags_of`, so a scorer with only a `name` is a point-wise field score for validation and final evaluation.
+- 🔌 **Any metric becomes a scorer**: `MetricScorer` wraps a `(prediction, reference) -> result` callable and flattens a Dataset, a mapping or a scalar into named floats, and it rejects a value that still has a dimension.
+- 🎲 **No uncertainty dropped silently**: handed an `Estimate`, a probabilistic `MetricScorer` refuses to score its point unless `from_estimate=` says what to take (`lambda e: e.sample(100)`).
+- 🧾 **Reports to filter, diff and hash**: `EvaluationReport.filter` cuts along unit, lens, stage, scorer, cell or reference, `diff` returns what changed against a baseline, and `content_hash` ignores entry order and the timestamp.
+- 🪜 **The benchmark ladder as data**: `Benchmark` fills the cells of a level × rung × complexity cube, and the tables of `ReferenceRule` say what each cell is scored against, so a domain overrides a table and not a code branch.
+- 🎯 **Several references per cell**: the amortized rung is scored against the oracle's posterior and, by the scorers that ask for it in `references`, against the known truth in the same run.
+- 🧩 **Protocols, not inheritance**: `Task`, `Estimator`, `Estimate`, `CovarianceEstimate`, `Prior`, `Oracle` and `Scorer` are runtime-checkable, so a domain package satisfies them without importing pipekit-evaluate.
+
+## 📐 Three axes on the scorer, three on the cell
+
+A score is placed twice. The scorer that made it carries three tags, and a benchmark run puts it in one cell of a cube with three more axes.
+
+| Axis | Values | Says | Name |
+|---|---|---|---|
+| Unit | field, statistic, trajectory, event, budget | what is scored | `Unit` |
+| Lens | point-wise, probabilistic, spectral, structural, detection, physical | what failure it can see | `Lens` |
+| Stage | training, validation, final, monitoring | when it may run | `Stage` |
+| Level | `L0` to `L4` | how processed the data are | `Cell.level` |
+| Rung | 1 to 6 | which inference stage | `Cell.rung` |
+| Complexity | 0, 1, 2, … | how rich the method on its rung | `Cell.complexity` |
+
+Because the stage bounds how cheap and differentiable a scorer must be, an untagged scorer is not assumed fit for training or monitoring, and runs at validation and final evaluation only (`DEFAULT_STAGES`). The levels run from unstructured observations (`L0`) to reanalysis and forecast (`L4`), and the rungs from a simple model (1) through model-based inference (2), an emulator (3), emulator-based inference (4) and an amortized predictor (5) to improving any of them (6).
+
+In a benchmark run each value is
+
+```math
+v_{c,\rho,k,m} = s_{k,m}(q_c, \mathbf{y}_\rho)
+```
+
+where $`c = (L, r, j)`$ is a cell with level $`L`$, rung $`r`$ and complexity step $`j`$, $`q_c`$ is the estimate the estimator in that cell returned (a point, a posterior or both), $`\rho`$ is a reference source and $`\mathbf{y}_\rho`$ what it resolves to. The rule is that the simpler thing is the ground truth. Along the staged axis, rung 2 is scored against the task's known parameters $`\boldsymbol{\theta}`$, rung 3 against the simulator's output, rungs 4 and 5 against the posterior of the rung-2 oracle, and rung 6 against the best validated rung below it, while rung 1 is generative and not scored; along the complexity axis, a richer step on rungs 1 to 4 is scored against the simpler step on its rung. The docs quickstart has both tables and the further references.
+
+## 📥 Install
+
+pipekit-evaluate is not on PyPI, and neither is pipekit-ops, which it needs, so install both from GitHub. It brings in pipekit-ops, NumPy and SciPy (no module of the package imports NumPy or SciPy yet), and needs Python 3.12 or newer.
 
 ```bash
-uv add pipekit-evaluate
-uv add 'pipekit-evaluate[cycle]'    # plus pipekit-cycle
+pip install "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" "pipekit-evaluate @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-evaluate"
 ```
 
-| Extra | What it adds | When you need it |
-| --- | --- | --- |
-| *(none)* | `pipekit-ops`, `numpy`, `scipy` | the taxonomy, scorers, reports and benchmark ladder |
-| `cycle` | `pipekit-cycle` | building or type-checking a `Task` against the concrete `ForwardModel` and `ObservationOperator` |
-| `xskill` | `xskillscore` | your scorers wrap xskillscore metrics; this package imports nothing from it |
-| `proper` | `properscoring` | your scorers wrap proper scores (CRPS); this package imports nothing from it |
+Three extras add the rest: `cycle` brings in pipekit-cycle, to build or type-check a `Task` against the concrete `ForwardModel` and `ObservationOperator`; `xskill` brings in xskillscore and `proper` brings in properscoring, for scorers written around their metrics, since this package imports nothing from either. `EvaluationReport.to_pandas` needs pandas, which no extra installs. A project that depends on pipekit-evaluate tells uv where each pipekit package lives, because none of them is on PyPI, and pins them all to one release tag (a tag names one commit of the whole workspace, so one tag serves every package):
 
-## Quickstart
+```toml
+[project]
+dependencies = ["pipekit-evaluate[cycle]"]
 
-Score a retrieved plume of XCH₄ enhancement $\hat{\alpha}(\mathbf{s})$ against the true one $\alpha(\mathbf{s})$ (both in ppm·m on a 32 × 32 scene) with a point-wise RMSE and a structural pattern correlation.
+[tool.uv.sources]
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
+pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-array-v0.3.1" }
+pipekit-evaluate = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-evaluate", tag = "pipekit-array-v0.3.1" }
+```
+
+## 🛰️ Quickstart: scoring a retrieved plume
+
+A retrieved plume of XCH₄ enhancement $`\hat{\alpha}(\mathbf{s})`$ against the true one $`\alpha(\mathbf{s})`$, both in ppm·m on a $`32 \times 32`$ scene, where $`\mathbf{s} = (\text{row}, \text{col})`$ is a pixel. The truth is a Gaussian plume of amplitude $`A = 800`$ ppm·m, and the retrieval has the amplitude 760 ppm·m plus noise $`\varepsilon(\mathbf{s}) \sim \mathcal{N}(0, 40^2)`$ in each pixel, so $`\hat{\mathbf{y}} = \hat{\alpha}`$ and $`\mathbf{y}_\text{ref} = \alpha`$. Two scorers look at it: a point-wise RMSE, and the pattern correlation $`r`$, which sees the plume's shape, computed from the departures $`\hat{\alpha}'`$ and $`\alpha'`$ of each field from its scene mean.
 
 ```python
 import numpy as np
 import pipekit_evaluate as pev
 
-# Shapes: H, W = 32 × 32 pixels of one scene
+
+# Shapes: H × W = 32 × 32 pixels of one scene
+
 rng = np.random.default_rng(0)
-yy, xx = np.mgrid[0:32, 0:32]                                # (H, W) each
+# s = (row, col), the pixel coordinates
+# → (H, W) each
+rows, cols = np.mgrid[0:32, 0:32]
 
 
 # user
-# a Gaussian plume of XCH₄ enhancement α(s) [ppm·m], and a retrieval of it
-def plume(amplitude):
-    return amplitude * np.exp(-((xx - 12) ** 2 / 40 + (yy - 16) ** 2 / 8))  # (H, W)
+# α(s) = A exp(−(col − 12)² / 40 − (row − 16)² / 8), XCH₄ enhancement in ppm·m
+def plume(amplitude: float) -> np.ndarray:
+    return amplitude * np.exp(-((cols - 12) ** 2) / 40 - (rows - 16) ** 2 / 8)
 
 
-truth = plume(800.0)                                         # (H, W)
-retrieved = plume(760.0) + rng.normal(0.0, 40.0, (32, 32))  # (H, W)
+# α, the true plume, with A = 800 ppm·m
+# → (H, W)
+truth = plume(800.0)
+# α̂ = α(s; A = 760) + ε(s), with ε(s) ~ 𝒩(0, 40²) in each pixel
+# → (H, W)
+retrieved = plume(760.0) + rng.normal(0.0, 40.0, size=(32, 32))
 
 
 # user
-# RMSE = √(mean (α̂ − α)²)
-def rmse(pred, ref):
-    return float(np.sqrt(np.mean((pred - ref) ** 2)))       # → ()
+# RMSE = √(mean_s (α̂(s) − α(s))²)
+def rmse(prediction: np.ndarray, reference: np.ndarray) -> float:
+    return float(np.sqrt(np.mean((prediction - reference) ** 2)))
 
 
 # user
-# ρ = corr(α̂, α) over the pixels, the plume's shape
-def pattern_corr(pred, ref):
-    return float(np.corrcoef(pred.ravel(), ref.ravel())[0, 1])  # → ()
+# r = Σ_s α̂′(s) α′(s) / √(Σ_s α̂′(s)² Σ_s α′(s)²), with ′ the departure from the mean
+def pattern_corr(prediction: np.ndarray, reference: np.ndarray) -> float:
+    prediction_anomaly = prediction - np.mean(prediction)
+    reference_anomaly = reference - np.mean(reference)
+    covariance = np.sum(prediction_anomaly * reference_anomaly)
+    variances = np.sum(prediction_anomaly**2) * np.sum(reference_anomaly**2)
+    return float(covariance / np.sqrt(variances))
 
 
 # today (pipekit-evaluate)
+# RMSE untagged, so a point-wise field score for validation and final evaluation;
+# r tagged structural, for the final evaluation only
 scorers = [
     pev.MetricScorer(rmse),
     pev.MetricScorer(pattern_corr, lens="structural", stages="final"),
 ]
-report = pev.evaluate(retrieved, truth, scorers, model_ref="plume-net@3f2a")
-print(sorted(report.values))          # ['pattern_corr.value', 'rmse.value']
-print(list(report.filter(lens="structural").values))  # ['pattern_corr.value']
-print(list(pev.evaluate(retrieved, truth, scorers, stage="validation").values))
-# ['rmse.value']
-again = pev.evaluate(retrieved, truth, scorers, model_ref="plume-net@3f2a")
-print(again.content_hash == report.content_hash, again.diff(report))  # True {}
-```
-
-Now the ladder, for the source rate $\theta = Q$ [kg/h] behind that plume.
-We have $N = 25$ per-pass estimates $y_n = \theta + \varepsilon_n$ with $\varepsilon_n \sim \mathcal{N}(0, \sigma^2)$, $\sigma = 20$ kg/h, and a prior $\theta \sim \mathcal{N}(\mu_0, \sigma_0^2)$ with $\mu_0 = 100$ and $\sigma_0 = 50$ kg/h.
-Rung 2 is the exact conjugate posterior; rung 5 is a cheap amortized head.
-The ladder scores rung 2 against the known truth and rung 5 against rung 2's posterior, and, because the scorer asks for it, against the truth as well.
-This block uses the `[cycle]` extra for the task's simulator.
-
-```python
-import pipekit_cycle as pc
-
-# Shapes: N = 25 per-pass estimates of one source rate θ = Q [kg/h]
-theta_true = 120.0
-obs = theta_true + rng.normal(0.0, 20.0, 25)                 # (N,)
-
-
-class PlumeTask:  # user: satisfies pev.Task
-    name, domain = "single-source", "plume"
-
-    def prior(self):
-        return None  # user: a Prior with sample / log_prob
-
-    def simulator(self):
-        return pc.CallableForward(lambda q, dt: q, dt=1.0)
-
-    def observation_operator(self):
-        return pc.IdentityObs()
-
-    def datasets(self):
-        return {"obs": obs, "theta": theta_true}
-
-
-class Gaussian:  # user: satisfies pev.CovarianceEstimate
-    def __init__(self, mean, var):
-        self.mean, self.var = mean, var
-
-    def point(self):
-        return self.mean
-
-    def sample(self, n, *, key=None):
-        return np.random.default_rng(key).normal(self.mean, np.sqrt(self.var), n)
-
-    def log_prob(self, theta):
-        return -0.5 * (theta - self.mean) ** 2 / self.var
-
-    def covariance(self):
-        return np.array([[self.var]])
-
-
-class ConjugateOracle:  # user: rung 2, the exact posterior
-    rung, complexity = 2, 0
-
-    def fit(self, task):
-        return self
-
-    def __call__(self, y):
-        # θ ~ 𝒩(μ₀, σ₀²), yₙ ~ 𝒩(θ, σ²):  σ_post⁻² = σ₀⁻² + N σ⁻²
-        prec = 1 / 50.0**2 + len(y) / 20.0**2                 # → ()
-        # μ_post = σ_post² (μ₀ σ₀⁻² + ∑ₙ yₙ σ⁻²)
-        mean = (100.0 / 50.0**2 + y.sum() / 20.0**2) / prec   # → ()
-        return Gaussian(mean, 1 / prec)
-
-
-class MedianHead:  # user: rung 5, a cheap amortized point estimate
-    rung, complexity = 5, 0
-
-    def fit(self, task):
-        return self
-
-    def __call__(self, y):
-        return Gaussian(float(np.median(y)), 4.0)
-
-
-# user
-# |θ̂ − θ_ref|
-def abs_error(pred, ref):
-    return abs(pred - ref)                                    # → ()
-
-
 # today (pipekit-evaluate)
-bench = pev.Benchmark(
-    task=PlumeTask(),
-    estimators=[ConjugateOracle(), MedianHead()],
-    scorers=[pev.MetricScorer(abs_error, references={"oracle_posterior", "known_theta"})],
+# ℛ(α̂, α), one tagged entry per value
+report = pev.evaluate(retrieved, truth, scorers, model_ref="plume-net@3f2a")
+# today (pipekit-evaluate)
+# the entries whose scorer sees structural failures
+structural = report.filter(lens="structural")
+# today (pipekit-evaluate)
+# a validation pass runs only the scorers tagged for validation
+validation = pev.evaluate(retrieved, truth, scorers, stage="validation")
+# today (pipekit-evaluate)
+# the same scores of the same model hash equal, whenever they were made
+again = pev.evaluate(retrieved, truth, scorers, model_ref="plume-net@3f2a")
+
+print(
+    {key: round(value, 3) for key, value in report.values.items()},
+    list(structural.values),
+    list(validation.values),
+    again.content_hash == report.content_hash,
 )
-result = bench.run()
-for label, cell in result.to_dict()["cells"].items():
-    print(label, cell["reference"], sorted(cell["scores"]))
-# L4/r2/c0 known_theta ['known_theta']
-# L4/r5/c0 oracle_posterior ['known_theta', 'oracle_posterior']
-truth_view = result.to_report().filter(reference="known_theta")
-print(sorted(truth_view.values))
-# ['L4/r2/c0:known_theta:abs_error.value', 'L4/r5/c0:known_theta:abs_error.value']
 ```
 
-## What ships
+This prints `{'rmse.value': 39.624, 'pattern_corr.value': 0.95} ['pattern_corr.value'] ['rmse.value'] True`: an RMSE of 39.6 ppm·m, about the noise we added, and a pattern correlation of 0.95, so the retrieval has the plume's shape; then the one structural entry, the one scorer a validation pass runs, and two reports of the same scores with the same hash, though they were made at different times. Each entry is keyed `"<scorer>.<metric>"` and carries its scorer's tags. Nothing here is specific to plumes, so swapping the two functions for `xrops.metrics` operators on a DataArray, or the arrays for estimates with a posterior, gives the same report.
 
-Version 0.2.0.
-Every name below is exported from `pipekit_evaluate`, except where the table names `pipekit_evaluate.benchmark`.
+The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-evaluate/) takes this further: the benchmark ladder for the source rate behind this plume, with an exact conjugate posterior as the rung-2 oracle and an amortized head on rung 5 scored against it and against the truth, the reference rule in full, and how scorers, reports and estimates behave at their edges.
 
-| Module | Public names | Purpose |
-| --- | --- | --- |
-| `taxonomy` | `Unit`, `Lens`, `Stage`, `ScorerTags`, `tags_of`, `DEFAULT_STAGES` | The Unit × Lens × Stage tags, read off any scorer with defaults |
-| `scorers` | `MetricScorer` | Turn any `(prediction, reference) -> result` metric into a tagged scorer |
-| `report` | `evaluate`, `EvaluationReport`, `ReportEntry` | Run scorers once; filter, diff and hash the result |
-| `benchmark.cube` | `Cell` (`LEVEL_NAMES`, `RUNG_NAMES` in `pipekit_evaluate.benchmark`) | One level × rung × complexity cell |
-| `benchmark.protocols` | `Task`, `Estimator`, `Estimate`, `CovarianceEstimate`, `Prior`, `Oracle`, `Scorer` | Runtime-checkable contracts that domain packages satisfy |
-| `benchmark.reference` | `ReferenceRule`, `ReferenceSource`, `Axis` (`DEFAULT_STAGED`, `DEFAULT_COMPLEXITY`, `DEFAULT_ALSO`, `as_sources` in `pipekit_evaluate.benchmark`) | The "simpler thing is ground truth" rule, as tables |
-| `benchmark.run` | `Benchmark`, `BenchmarkReport`, `CellResult` (`scores_against` in `pipekit_evaluate.benchmark`) | Fit every estimator, resolve each cell's references, score |
+## 🔬 What else is in the box
 
-### Not built yet
+Each public name sits on one rung of the GeoStack role ladder, by the job it does: the scorers are strategies (②), the estimates and estimators models (③), `evaluate` an algorithm (④) and `Benchmark` a recipe (⑥), while the tags, the cells and the reports are the structures (⓪) the rest act on. The table lists them by area.
 
-The build order is §7 of the [benchmark ladder design](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md); step 1 has landed, with the level × rung × complexity report of step 6.
+| Area | Symbols | Notes |
+|---|---|---|
+| `pipekit_evaluate.scoring` | `Unit`, `Lens`, `Stage`, `ScorerTags`, `tags_of`, `DEFAULT_STAGES`, `MetricScorer`, `Scorer`, `Estimate`, `CovarianceEstimate`, `ReferenceSource`, `as_sources` | The tags read off any scorer, the scorer of any metric, the protocols of what a method returns and what grades it, and where a score's ground truth comes from |
+| `pipekit_evaluate.reports` | `evaluate`, `EvaluationReport`, `ReportEntry` | One run of every scorer, collected under a content hash, with `filter`, `diff`, `to_dict`, `to_records` and `to_pandas` |
+| `pipekit_evaluate.benchmark` | `Cell`, `LEVEL_NAMES`, `RUNG_NAMES`, `Task`, `Estimator`, `Prior`, `Oracle`, `Axis`, `ReferenceRule`, `DEFAULT_STAGED`, `DEFAULT_COMPLEXITY`, `DEFAULT_ALSO`, `Benchmark`, `BenchmarkReport`, `CellResult`, `scores_against` | The cube, the contracts a domain satisfies, the reference rule as tables, and the runner, whose result becomes an `EvaluationReport` |
 
-- **Probabilistic scorers**: simulation-based calibration ranks, coverage, CRPS.
-- **Posterior-distance scorers** to the oracle: C2ST, MMD, sliced Wasserstein.
-- **Physical-constraint scorers** (mass and flux budgets, balance laws); these belong with the domain operators.
-- **A pluggable oracle.** The `Oracle` protocol exists but `Benchmark` does not consume it yet; it takes `reference=` or the richest rung-2 estimator.
-- **Per-cell runs.** `Benchmark` does not write a `pipekit_experiment.Run` per cell yet.
-- **The pilot tasks** in the design docs; a domain joins by shipping its own `Task`, outside this package.
+An area imports only from the ones before it, in the order of the table ([E1](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/decisions.md)). `pipekit_evaluate` re-exports every name above except `as_sources`, `LEVEL_NAMES`, `RUNG_NAMES`, the three `DEFAULT_*` tables of the reference rule and `scores_against`, which are imported from their area.
 
-## How it works
+## 📖 Documentation
 
-### Unit × Lens × Stage
+- **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-evaluate/)**: the benchmark ladder worked through, the reference rule in full, and the calling conventions of the scorers, the reports and the runner.
+- **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/)**: every public name, generated from the docstrings.
+- **[Protocols](https://jejjohnson.github.io/pipekit/protocols/)**: the members of every benchmark protocol, beside the other protocols of the workspace.
+- **[The benchmark ladder](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md)**: the domain-independent design, with its build order and its open questions.
+- **The four pilots**, each working the ladder for one domain: [plume](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/plume_pilot.md) (methane retrieval through emission inference to persistency forecasts, the recommended first pilot), [ocean](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/ocean_pilot.md) (SSH, SST, SSS and ocean colour), [land extremes](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/land_extremes_pilot.md) (the Event unit, the Detection lens and tail calibration) and [fusion](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/fusion_pilot.md) (GEO, LEO and in-situ observations merged into one L3 analysis).
+- **[Decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/decisions.md)**: why the package is three areas, with the shared protocols at the bottom.
+- **[Report 14 of the GeoStack](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md)**: why the metrics stay with their carriers while this package orchestrates them, and the tags and the report of its workstream A.
 
-A scorer places itself on three axes.
-**Unit** is what is scored: field, statistic, trajectory, event or budget.
-**Lens** is what kind of failure it can see: point-wise, probabilistic, spectral, structural, detection or physical constraint.
-**Stage** is where it may run: training, validation, final or monitoring, which bounds how cheap and differentiable it has to be.
-The tags are optional attributes on the scorer (`unit`, `lens`, `stages`, `differentiable`), not on the metric, and `tags_of(scorer)` fills in the defaults, so a scorer with only a `name` is a point-wise field score for validation and final evaluation.
+## 🧩 Ecosystem
 
-### `MetricScorer`
+pipekit-evaluate is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in Core tier 0 of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the tags, the report and the ladder, and composes the rest in:
 
-`MetricScorer(metric, lens=..., stages=...)` wraps any callable and flattens its result into named floats: one per data variable of a Dataset, one per key of a mapping, or a single value.
-Every value must be a scalar with no dimensions, so a metric with a lead-time or region dimension is reduced first.
-Handed an `Estimate`, it passes the metric the estimate's point by default.
-A probabilistic scorer refuses that, because a point would drop the uncertainty it is meant to score, so you say what to take with `from_estimate=` (for example `lambda e: e.sample(100)`).
-Because the values become Python floats, a `MetricScorer` is never differentiable; a scorer meant for use as a loss implements `Scorer` itself.
+| Concern | Owner |
+|---|---|
+| The content hash (`sha256_hex`, `stable_json`) | [`pipekit-ops`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) |
+| The simulator and observation operator of a `Task` (the `cycle` extra) | [`pipekit-cycle`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) |
+| The metrics a scorer wraps | [`xrops.metrics`](https://github.com/jejjohnson/geotoolz/tree/main/packages/xrtoolz-ops) and [`geotoolz`](https://github.com/jejjohnson/geotoolz) |
+| Gridded and ensemble verification (the `xskill` extra) | [`xskillscore`](https://github.com/xarray-contrib/xskillscore) |
+| Proper scores such as CRPS (the `proper` extra) | [`properscoring`](https://github.com/properscoring/properscoring) |
 
-### `EvaluationReport`
+Dependencies point one way: pipekit-evaluate imports pipekit-ops, and pipekit-cycle only for type checking, and the carrier libraries whose metrics it wraps do not import it. No package of the stack imports pipekit-evaluate on its `main` today; the GeoStack's report notebooks 14, 15 and 17 do, for the benchmark and scoring areas.
 
-`evaluate(prediction, reference, scorers)` returns one `ReportEntry` per value, keyed `"<scorer>.<metric>"`, each carrying its tags.
-`filter(unit=, lens=, stage=, scorer=, cell=, reference=)` cuts the report along any axis, and `diff(baseline)` returns the keys whose value changed, as `(before, after)`.
-`content_hash` is a sha256 over the entries, `model_ref`, `dataset_ref` and the config; it ignores entry order and the timestamp, so two runs that score the same values hash equal.
-The config is snapshotted as JSON when the report is made, so changing your dict afterwards changes neither the report nor its hash.
+## 🌳 Repository layout
 
-### The benchmark ladder
+```
+packages/pipekit-evaluate/
+├── src/pipekit_evaluate/
+│   ├── __init__.py   ← re-exports the names of the three areas
+│   ├── scoring/      ← the tags, MetricScorer, Estimate, Scorer, ReferenceSource
+│   ├── reports/      ← evaluate, EvaluationReport, ReportEntry
+│   └── benchmark/    ← the cube, Task, Estimator, Oracle, ReferenceRule, Benchmark
+├── tests/            ← one file per area, and the import rule between areas
+└── docs/design/      ← the benchmark ladder, the four pilots and the decisions
+```
 
-A `Cell` is a data level (`L0` unstructured observations to `L4` reanalysis and forecast), an inference rung (1 simple model, 2 model-based inference, 3 emulator, 4 emulator-based inference, 5 amortized predictor, 6 improve) and a complexity step on that rung (0 is the simplest).
-The `ReferenceRule` says what each cell is scored against.
-Along the staged axis, rung 2 is scored against the known θ, rung 3 against the simulator output, rungs 4 and 5 against the rung-2 oracle's posterior, and rung 6 against the best validated rung below it.
-Along the complexity axis, a richer step is scored against the simpler step on its rung.
-These are tables on the rule, not code branches, so a domain without an oracle overrides a table.
-Beside its primary reference, a rung may name further ones: rung 5 is also scored against the known θ, but only by scorers that list it in their `references`, so a scorer written for a posterior is never handed the raw truth.
-`CellResult.by_reference` holds a cell's scores against each reference, and `BenchmarkReport.to_report()` turns a run into the same `EvaluationReport`, keyed `"<cell>:<reference>:<scorer>.<metric>"`.
+## ⚙️ Development
 
-### Protocols, not inheritance
+The package is developed inside the workspace, so clone the repository and run the tasks from its root.
 
-`Task`, `Estimator`, `Estimate`, `CovarianceEstimate`, `Prior`, `Oracle` and `Scorer` are runtime-checkable, in the style of `pipekit_cycle.protocols`.
-Domain packages (`plumax`, `somax`, `xtremax`) satisfy them without importing pipekit-evaluate, and a `Task` reuses pipekit-cycle's `ForwardModel` and `ObservationOperator` as its simulator and observation operator, so a benchmark is built from the same parts as a `DACycle`.
+```bash
+git clone https://github.com/jejjohnson/pipekit.git
+cd pipekit
+make install                                    # uv sync --all-groups except train-extras, + pre-commit hooks
+uv run pytest packages/pipekit-evaluate/tests   # this package's tests
+make lint                                       # ruff check on the whole repo
+make typecheck                                  # ty on every package
+make docs-serve                                 # build the docs site and serve it locally
+```
 
-## Learn more
+`make help` lists every task. [`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md) holds the rules for contributors and coding agents.
 
-- API reference: [pipekit-evaluate](https://jejjohnson.github.io/pipekit/reference/pipekit-evaluate/).
-- Design: [the benchmark ladder](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/benchmark_ladder.md), the domain-independent framework.
-- The four pilots, each working the ladder for one domain:
-  - [Plume](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/plume_pilot.md): methane retrieval through emission inference to persistency forecasts; the recommended first pilot.
-  - [Ocean](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/ocean_pilot.md): SSH, SST, SSS and ocean colour; a new domain joins by shipping one `Task`.
-  - [Land extremes](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/land_extremes_pilot.md): the Event unit, the Detection lens and tail calibration.
-  - [Fusion](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/docs/design/fusion_pilot.md): merging GEO, LEO and in-situ observations into one L3 analysis.
-- Report 14 of the GeoStack: [pipekit-evaluate](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md), workstream A.
-- The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
-- Siblings: [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) (the simulator and observation protocols), [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) (registry and run records).
-
-## License
+## 📄 License
 
 MIT. See [LICENSE](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-evaluate/LICENSE).
