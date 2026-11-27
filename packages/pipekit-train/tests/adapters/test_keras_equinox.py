@@ -54,11 +54,15 @@ class _Pairs(TrainingDataset):
 
 
 def _mlp(seed: int = 0) -> Any:
-    return eqx.nn.MLP(3, 1, width_size=8, depth=1, activation=jnp.tanh, key=jax.random.key(seed))
+    return eqx.nn.MLP(
+        3, 1, width_size=8, depth=1, activation=jnp.tanh, key=jax.random.key(seed)
+    )
 
 
 def _leaves(module: Any) -> list[np.ndarray]:
-    return [np.asarray(leaf) for leaf in jax.tree.leaves(eqx.filter(module, eqx.is_array))]
+    return [
+        np.asarray(leaf) for leaf in jax.tree.leaves(eqx.filter(module, eqx.is_array))
+    ]
 
 
 def _loop(model_op: Any, backend: str = "keras", **kwargs: Any) -> TrainingLoop:
@@ -140,7 +144,12 @@ def test_a_jax_operator_comes_back_as_itself() -> None:
             return x @ self.weight + self.bias
 
     op = Affine(weight=np.zeros((3, 1), np.float32), bias=np.zeros(1, np.float32))
-    trained, _ = _loop(op, max_steps=200, eval_every_n_steps=100).run()
+    trained, _ = _loop(
+        op,
+        optimizer_config={"name": "adam", "lr": 0.1},
+        max_steps=300,
+        eval_every_n_steps=100,
+    ).run()
     assert type(trained) is Affine
     np.testing.assert_allclose(
         np.asarray(trained.weight)[:, 0], [1.0, -2.0, 0.5], atol=0.1
@@ -204,4 +213,6 @@ def test_errors_name_what_is_wrong() -> None:
     with pytest.raises(TypeError, match="eqx.Module"):
         EquinoxLayer(object())
     with pytest.raises(ValueError, match="keep_compile"):
-        _loop(EquinoxModelOp(_mlp()), loss=None, task=KerasTask(keep_compile=True)).run()
+        _loop(
+            EquinoxModelOp(_mlp()), loss=None, task=KerasTask(keep_compile=True)
+        ).run()
