@@ -43,7 +43,7 @@ def test_calls_the_model_in_inference_mode() -> None:
 
 
 def test_rejects_what_is_not_a_keras_model() -> None:
-    with pytest.raises(TypeError, match="keras.Model"):
+    with pytest.raises(TypeError, match=r"keras\.Model"):
         KerasModelOp(object())
 
 
@@ -104,8 +104,7 @@ def test_round_trip_through_a_local_registry(tmp_path) -> None:
 
 def test_importing_the_area_imports_no_keras() -> None:
     code = (
-        "import sys; import pipekit_train.backends.keras; "
-        "print('keras' in sys.modules)"
+        "import sys; import pipekit_train.backends.keras; print('keras' in sys.modules)"
     )
     out = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
