@@ -47,7 +47,8 @@ class EquinoxLayer(keras.layers.JaxLayer):
     ) -> None:
         if not isinstance(module, eqx.Module):
             raise TypeError(
-                f"EquinoxLayer.module must be an eqx.Module; got {type(module).__name__}."
+                "EquinoxLayer.module must be an eqx.Module; got "
+                f"{type(module).__name__}."
             )
         params, static = eqx.partition(module, eqx.is_inexact_array)
         leaves, treedef = jax.tree.flatten(params)

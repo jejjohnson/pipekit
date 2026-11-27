@@ -210,7 +210,7 @@ def test_a_keras_model_holding_an_equinox_layer_round_trips_its_blob() -> None:
 def test_errors_name_what_is_wrong() -> None:
     from pipekit_train.backends.keras import KerasTask
 
-    with pytest.raises(TypeError, match="eqx.Module"):
+    with pytest.raises(TypeError, match=r"eqx\.Module"):
         EquinoxLayer(object())
     with pytest.raises(ValueError, match="keep_compile"):
         _loop(
