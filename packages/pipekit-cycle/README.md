@@ -57,6 +57,8 @@ members, state = cycle(prior, start)
 
 None of it is a new framework. Every cycle is a [`pipekit-ops`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) `StatefulOperator` that takes and returns `(carrier, state)`, with a `CarryState` such as `DAState` holding the clock, so a cycle chains with `|` into a `Sequential` and sits inside a `Graph` like any other step. The observations come from any pipekit-ops `Operator` called with the step index, so a fetch, quality-control and bias-correction chain is one `Sequential`. pipekit-cycle imports nothing else, and its `array` extra installs [`pipekit-array`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) beside it for a forward model or an observation operator built from that package's Array API operators.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_cycle_overview/pipekit_cycle_overview.png" alt="pipekit-cycle in one picture: you supply a forward model f, an observation operator h, an analysis a and the observations; one cycle x_t∣t = a(f(x_t−1∣t−1), y_t; h, Σ_ε) repeated on a clock; four areas (protocols, cycles, components, assimilation); out comes the analysis, its carry state, the history and a step of a pipeline; on pipekit-ops, with the analyses from filterax and vardax" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🔁 **Eight cycles, one contract**: `Cycle`, `EnsembleCycle`, `WindowedCycle` and `Recurrence` step a model, and `DACycle`, `EnsembleDACycle`, `SmootherCycle` and `BFNCycle` assimilate; each takes `(carrier, state)` and returns `(carrier, state)`.
@@ -288,6 +290,13 @@ The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-cycle/) takes t
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_cycle_roles/pipekit_cycle_roles-dark.svg">
+    <img alt="pipekit-cycle on the GeoStack role ladder: the eight cycles as recipes, the observation operators and forward models as steps, the analysis left to filterax and vardax, the protocols as the contracts of a model, the adjoint specs as strategies, and the carry states as structures" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_cycle_roles/pipekit_cycle_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each public name sits on one rung of the GeoStack role ladder, by the job it does. The eight cycles are ⑥ recipes, the observation operators and forward models are ⑤ steps, the protocols are the contracts a ③ model satisfies, the adjoint specs are ② strategies, and the carry states are ⓪ structures; the ④ algorithm, the analysis itself, is left to the libraries that implement the protocols. The package has four areas, and `pipekit_cycle` re-exports every name below.
 
 | Area | Symbols | Notes |
@@ -318,6 +327,13 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 - **[Design](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle/docs/design)**: the decision behind the four areas, and the draft design of latent data assimilation; the package's original plan is [Report 10](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_8_pipekit_cycle.md) of the master plan.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_cycle_ecosystem/pipekit_cycle_ecosystem-dark.svg">
+    <img alt="The packages that import pipekit-cycle on their main branches, by layer, each with the areas it imports: pipekit-jax, vardax, sesmax-experiment and somax; pipekit-cycle builds on pipekit-ops alone" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_cycle_ecosystem/pipekit_cycle_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-cycle is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core tier of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the loop, and composes the rest in:
 
