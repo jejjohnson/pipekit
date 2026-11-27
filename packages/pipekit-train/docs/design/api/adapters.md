@@ -229,6 +229,8 @@ test_equinox_sharding.py`) and a scripted 2-process `jax.distributed` smoke
 
 v0.1 ships with the same `NotImplementedError` stub.
 
+The design below is superseded by the full design in [`../keras_adapter.md`](../keras_adapter.md) (D18 to D20): the backend wraps `compile` and `fit` on the JAX backend only, reads the shared Grain batches rather than `tf.data`, and returns a `KerasModelOp` with a weight blob rather than `pipekit-array.ModelOp`.
+
 ### Planned design
 
 When v0.3 lands, the adapter will:
