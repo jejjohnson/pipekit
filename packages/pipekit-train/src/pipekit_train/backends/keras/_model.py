@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, ClassVar
 
 import numpy as np
@@ -25,7 +26,7 @@ class KerasModelOp(Operator):
     bytes depend only on the weights, so a registry gives one trained model one
     hash; a ``.keras`` file would not, because it records the time it was saved.
     The names are the weights' own (``kernel``, ``bias``), without the layer
-    names Keras numbers per process (``dense_2``).
+    names and counters Keras numbers per process (``dense_2``, ``variable_7``).
 
     A blob loads back into a model of the same architecture, the skeleton, with
     `with_weights` or `from_registry`: the architecture is Python, not bytes.
@@ -132,8 +133,13 @@ class KerasModelOp(Operator):
 
 
 def _weight_name(path: str) -> str:
-    """The last part of a weight's path: ``kernel`` of ``sequential/dense_2/kernel``."""
-    return path.rsplit("/", 1)[-1]
+    """A weight's own name, without the numbers Keras gives per process.
+
+    The last part of the path (``kernel`` of ``sequential/dense_2/kernel``),
+    without a trailing ``_<n>``, because a ``JaxLayer``'s weights are named
+    ``variable_<n>`` with a counter shared by the process.
+    """
+    return re.sub(r"_\d+$", "", path.rsplit("/", 1)[-1])
 
 
 def _describe(path: str, array: np.ndarray) -> dict[str, Any]:
