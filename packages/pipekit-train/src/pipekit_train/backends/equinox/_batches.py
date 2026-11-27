@@ -57,6 +57,7 @@ class _BatchSource:
             seed,
             process_index=jax.process_index() if sharded else 0,
             process_count=jax.process_count() if sharded else 1,
+            stack=_stack_pair,
         )
         self._kind = self._source.kind
 

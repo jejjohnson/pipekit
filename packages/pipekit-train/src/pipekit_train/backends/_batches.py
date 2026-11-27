@@ -9,7 +9,7 @@ backend hands them to ``fit``.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -45,6 +45,8 @@ class BatchSource:
             disjoint shard of an indexable dataset and batches
             ``batch_size // process_count`` samples, so the local batches
             assemble into a global batch of ``batch_size``.
+        stack: How a streaming dataset's samples become one batch; NumPy's
+            `stack_pairs` by default. The Equinox backend stacks with JAX.
 
     Raises:
         ValueError: If an indexable dataset is smaller than ``batch_size``, or
@@ -60,6 +62,7 @@ class BatchSource:
         *,
         process_index: int = 0,
         process_count: int = 1,
+        stack: Callable[[list[tuple[Any, Any]]], tuple[Any, Any]] = stack_pairs,
     ) -> None:
         self.batch_size = batch_size
         self.seed = seed
@@ -82,14 +85,14 @@ class BatchSource:
                     "single-process. Materialise the dataset or wrap it as an "
                     "indexable TrainingDataset."
                 )
-            self._inner = _iter_streaming(dataset, batch_size)
+            self._inner = _iter_streaming(dataset, batch_size, stack)
             self.kind = "streaming"
 
     def next_batch(self) -> tuple[Any, Any]:
         """Return the next ``(x, y)`` batch.
 
-        Grain and streaming batches are NumPy arrays; a dataset's own iterator
-        returns whatever it yields.
+        Grain batches are NumPy arrays, streaming batches are what ``stack``
+        returns, and a dataset's own iterator returns whatever it yields.
         """
         batch = next(self._inner)
         return batch[0], batch[1]
@@ -156,12 +159,16 @@ def _grain_iter(
     return iter(map_ds.to_iter_dataset())
 
 
-def _iter_streaming(dataset: Any, batch_size: int) -> Iterator[tuple[Any, Any]]:
+def _iter_streaming(
+    dataset: Any,
+    batch_size: int,
+    stack: Callable[[list[tuple[Any, Any]]], tuple[Any, Any]],
+) -> Iterator[tuple[Any, Any]]:
     """Iterate a dataset without random access, restarting when it runs out."""
     while True:
         batch: list[tuple[Any, Any]] = []
         for x, y in dataset:
             batch.append((x, y))
             if len(batch) == batch_size:
-                yield stack_pairs(batch)
+                yield stack(batch)
                 batch = []
