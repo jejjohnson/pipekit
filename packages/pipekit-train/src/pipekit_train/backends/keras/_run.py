@@ -33,9 +33,12 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
 
     One Keras epoch is one evaluation period of ``loop.eval_every_n_steps``
     steps, and a Keras callback stops ``fit`` at exactly ``loop.max_steps``. The
-    same callback drives the loop's callbacks and metric writer, and resets
-    Keras's metrics after each step, so the logged loss is the step's own and
-    not the running mean since the period began.
+    same callback drives the loop's callbacks and metric writer. Keras logs the
+    running mean of each metric since the period began; for the loss and the
+    auxiliary terms of a bridged `pipekit_train.Loss`, which are means, the
+    callback recovers each step's own value from two successive means, so the
+    log matches the Equinox backend's. Other Keras metrics are logged as Keras
+    reports them.
 
     Returns:
         ``(trained_model_op, backend_info)``. ``trained_model_op`` is a copy of
@@ -90,7 +93,10 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         steps, batches = _validation_batches(loop.val_dataset, loop.batch_size)
         validation = {"validation_data": batches, "validation_steps": steps}
 
-    bridge = _bridge(keras)(loop, period)
+    per_step = task.per_step_names if not task.keep_compile else ("loss",)
+    if task.loss is not None and not task.keep_compile:
+        per_step = ("loss",)
+    bridge = _bridge(keras)(loop, period, per_step)
     try:
         model.fit(
             _train_batches(source, first),
@@ -158,6 +164,7 @@ def _compile(model: Any, loop: TrainingLoop, task: KerasTask, first: Any) -> Non
         names = aux_names(loop.loss, model(x, training=False), y)
         loss = bridge_loss(loop.loss)
         metrics = aux_metrics(loop.loss, names) + metrics
+        task.per_step_names = ("loss", *names)
     model.compile(
         optimizer=build_keras_optimizer(loop.optimizer_config),
         loss=loss,
@@ -221,12 +228,16 @@ def _bridge(keras: Any) -> type:
     """The Keras callback that drives the loop (a class, since Keras is lazy)."""
 
     class _PipekitBridge(keras.callbacks.Callback):
-        def __init__(self, loop: TrainingLoop, period: int) -> None:
+        def __init__(
+            self, loop: TrainingLoop, period: int, per_step: tuple[str, ...]
+        ) -> None:
             super().__init__()
             self.loop = loop
             self.period = period
+            self.per_step = per_step
             self.last_metrics: dict[str, float] = {}
             self.last_eval_metrics: dict[str, float] = {}
+            self._means: dict[str, float] = {}
 
         def _step(self) -> int:
             return int(self.model.optimizer.iterations.numpy())
@@ -242,14 +253,10 @@ def _bridge(keras: Any) -> type:
         def on_train_batch_end(self, batch: int, logs: Any = None) -> None:
             loop = self.loop
             step = self._step()
-            metrics = {name: float(value) for name, value in (logs or {}).items()}
+            means = {name: float(value) for name, value in (logs or {}).items()}
+            metrics = self._own_values(batch, means)
             self.last_metrics = metrics
             stop = step >= loop.max_steps
-            # Keras logs the running mean since the epoch began; resetting makes
-            # the next step log its own loss. The last step of an epoch keeps its
-            # metrics, so Keras's epoch logs hold that step's values, not zeros.
-            if not stop and batch + 1 < self.period:
-                self.model.reset_metrics()
             if loop.metric_writer is not None and step % loop.log_every_n_steps == 0:
                 loop.metric_writer.write(step, metrics)
             state = self._state(metrics)
@@ -258,6 +265,25 @@ def _bridge(keras: Any) -> type:
                 _common.dispatch(loop.callbacks, "on_epoch_end", loop, state, metrics)
             if stop or _common.any_should_stop(loop.callbacks):
                 self.model.stop_training = True
+
+        def _own_values(self, batch: int, means: dict[str, float]) -> dict[str, float]:
+            """Each step's own value of the metrics that Keras averages.
+
+            Keras reports the running mean m_j after the j-th step of an epoch,
+            so the j-th value is j m_j - (j - 1) m_{j-1}. Resetting Keras's
+            metrics from a callback instead changes the training on the JAX
+            backend: Adam's run then differs from train_on_batch's.
+            """
+            j = batch + 1
+            values = dict(means)
+            for name in self.per_step:
+                if name not in means:
+                    continue
+                previous = self._means.get(name) if batch > 0 else None
+                if previous is not None:
+                    values[name] = j * means[name] - (j - 1) * previous
+                self._means[name] = means[name]
+            return values
 
         def on_test_end(self, logs: Any = None) -> None:
             loop = self.loop
