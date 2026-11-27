@@ -7,13 +7,12 @@ import sys
 
 import numpy as np
 import pytest
-
 from pipekit_train import IterableDataset, TrainingDataset
 
 
 pytest.importorskip("grain")
 
-from pipekit_train.backends._batches import BatchSource, is_indexable  # noqa: E402
+from pipekit_train.backends._batches import BatchSource, is_indexable
 
 
 class _Indexed(TrainingDataset):
