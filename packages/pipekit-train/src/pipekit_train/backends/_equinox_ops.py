@@ -15,7 +15,6 @@ from typing import Any, ClassVar, cast
 
 import equinox as eqx
 from pipekit_ops import Operator
-from pipekit_ops.core import record_under
 
 
 class EquinoxModelOp(Operator):
@@ -108,4 +107,6 @@ def rewrap_module(model_op: Any, trained: eqx.Module) -> Operator:
 
 
 # Saved states name it by the area users import it from, wherever its code is.
-record_under("pipekit_train.backends.equinox", EquinoxModelOp)
+# The Equinox area also records it with `record_under` once it holds the name;
+# setting it here keeps the name when only the Keras backend imported this.
+EquinoxModelOp.__module__ = "pipekit_train.backends.equinox"
