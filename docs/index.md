@@ -100,10 +100,10 @@ From `git clone` to your first pipeline, first DA cycle, and first registered mo
 The 10-minute mental model. What's an `Operator`? Why carrier-agnostic? How does dispatch work?
 :::
 
-:::{card} Tutorials
-:link: tutorials/train-emulator.md
+:::{card} Train, register, forecast
+:link: tutorials/train-register-forecast.md
 
-End-to-end walkthroughs. Train an emulator. Run a DA cycle. Persist via the registry.
+One worked example across the packages: clean an archive, train an emulator, store it in a registry, and run it as a cycle's forward model. The other tutorials sit with their package in the sidebar.
 :::
 
 :::{card} Installation
@@ -121,24 +121,24 @@ Per-package install matrix. Every extra spelled out.
 :::{card} Notebooks
 :link: notebooks/pipekit_train_quickstart.ipynb
 
-Executed Jupyter notebooks: an MLP quickstart, and the train → forecast handoff on a toy oscillator.
+Executed notebooks for pipekit-train: an MLP, the handoff to a cycle, and the NumPyro, BlackJAX and Keras backends.
 :::
 
 ::::
 
 ## The packages
 
-Each package has its own README on GitHub, which is also its PyPI page.
+Each package has a section in the sidebar that starts with its quickstart, and its own README on GitHub, which is also its PyPI page.
 
-| | Package | Purpose | Status | Version |
+| | Package | Its operators | Start from | Version |
 |---|---|---|---|---|
-| <img src="assets/packages/pipekit-ops/icon.svg" width="28" alt=""> | [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) | **Foundation.** The operator core: `Operator`, `Sequential`, `Graph`, control and flow limits, dict and iterable operators, `Map`, `Cache` and stores, observe, QC. | ✅ implemented | 0.2.1 |
-| <img src="assets/packages/pipekit-array/icon.svg" width="28" alt=""> | [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) | **Foundation.** Array API dispatch, `DimArray`, dim functions and their operators, `ApplyAlong`, `BatchAlong`, `KernelOp`, `Estimator`; the array QC asserts, the array `Histogram` and `ModelOp` are still to come. | 🚧 partial | 0.1.1 |
-| <img src="assets/packages/pipekit-cycle/icon.svg" width="28" alt=""> | [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) | Time-stepping, DA cycles, observation/forward protocols. | ✅ implemented | 0.1.0 |
-| <img src="assets/packages/pipekit-experiment/icon.svg" width="28" alt=""> | [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) | Content-addressed model registry, tracker protocols, tool adapters. | ✅ implemented | 0.1.0 |
-| <img src="assets/packages/pipekit-evaluate/icon.svg" width="28" alt=""> | [pipekit-evaluate](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-evaluate) | Benchmark ladder; `Unit × Lens × Stage` scorers; `EvaluationReport`. | 🚧 partial | 0.2.0 |
-| <img src="assets/packages/pipekit-train/icon.svg" width="28" alt=""> | [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) | Training pipelines: datasets, losses, the loop, Equinox, NumPyro and BlackJAX adapters. | ✅ implemented | 0.2.0 |
-| <img src="assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) | `JaxModelOp` (an `eqx.Module` wrapper with registry weight round-trip), `JaxOperator`, `ScanCycle`. | ✅ implemented | 0.1.0 |
+| <img src="assets/packages/pipekit-ops/icon.svg" width="28" alt=""> | [pipekit-ops](quickstart/quickstart-ops.md) | any step, and every way of combining steps | `Operator`, `Sequential`, `Graph`, `Map` | 0.4.0 |
+| <img src="assets/packages/pipekit-array/icon.svg" width="28" alt=""> | [pipekit-array](quickstart/quickstart-array.md) | array operations by dim name | `DimArray`, `Reduce`, `Coarsen`, `KernelOp` | 0.3.1 |
+| <img src="assets/packages/pipekit-cycle/icon.svg" width="28" alt=""> | [pipekit-cycle](quickstart/quickstart-cycle.md) | a forecast and an analysis, repeated on a clock | `Cycle`, `DACycle`, `EnsembleDACycle` | 0.3.1 |
+| <img src="assets/packages/pipekit-train/icon.svg" width="28" alt=""> | [pipekit-train](quickstart/quickstart-train.md) | a fit that returns a trained model | `TrainingLoop`, `HyperSweep` | 0.3.1 |
+| <img src="assets/packages/pipekit-evaluate/icon.svg" width="28" alt=""> | [pipekit-evaluate](quickstart/quickstart-evaluate.md) | a score against a reference | `MetricScorer`, `evaluate`, `Benchmark` | 0.3.1 |
+| <img src="assets/packages/pipekit-experiment/icon.svg" width="28" alt=""> | [pipekit-experiment](quickstart/quickstart-experiment.md) | a model stored under its hash | `LocalModelRegistry`, `S3ModelRegistry` | 0.2.1 |
+| <img src="assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [pipekit-jax](quickstart/quickstart-jax.md) | operators that are JAX pytrees | `JaxOperator`, `JaxModelOp`, `ScanCycle` | 0.4.1 |
 
 ## Links
 
