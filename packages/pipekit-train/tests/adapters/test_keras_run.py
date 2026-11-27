@@ -251,7 +251,7 @@ def test_errors_name_what_is_wrong() -> None:
         _loop(None, model_op=EquinoxModelOp(module)).run()
     with pytest.raises(TypeError, match="KerasTask"):
         _loop(_model(), task=object()).run()
-    with pytest.raises(ValueError, match="loop.loss or loop.task"):
+    with pytest.raises(ValueError, match=r"loop\.loss or loop\.task"):
         _loop(_model(), loss=None).run()
     with pytest.raises(ValueError, match="compiled model"):
         _loop(_model(), loss=None, task=KerasTask(keep_compile=True)).run()
