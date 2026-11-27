@@ -57,6 +57,8 @@ project:
           title: pipekit-evaluate
         - file: quickstart/quickstart-experiment.md
           title: pipekit-experiment
+        - file: quickstart/quickstart-jax.md
+          title: pipekit-jax
     - title: Concepts
       children:
         - file: concepts.md
