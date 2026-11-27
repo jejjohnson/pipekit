@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -51,38 +50,7 @@ _dispatch = _common.dispatch
 _any_should_stop = _common.any_should_stop
 
 
-def _resolve_checkpoint_dir(checkpoint_dir: str | None, callback: Any) -> str | None:
-    """Return the absolute directory for checkpoints, or ``None`` for no saving.
-
-    Args:
-        checkpoint_dir: ``TrainingLoop.checkpoint_dir``.
-        callback: The loop's `Checkpoint` callback, if any; its ``save_dir`` is
-            used when the loop sets no directory.
-
-    Returns:
-        The absolute local path, or ``None`` if neither sets a directory.
-
-    Raises:
-        ValueError: If the two name different directories, or either is a URI,
-            because the data-iterator side-car is written with local paths.
-    """
-    save_dir = getattr(callback, "save_dir", None)
-    for candidate in (checkpoint_dir, save_dir):
-        if candidate and "://" in candidate:
-            raise ValueError(
-                f"Checkpoint directories must be local paths; got {candidate!r}."
-            )
-    directory = checkpoint_dir or save_dir
-    if not directory:
-        return None
-    resolved = os.path.abspath(directory)
-    if checkpoint_dir and save_dir and os.path.abspath(save_dir) != resolved:
-        raise ValueError(
-            f"TrainingLoop.checkpoint_dir ({checkpoint_dir!r}) and "
-            f"Checkpoint.save_dir ({save_dir!r}) name different directories. "
-            "Set one of them."
-        )
-    return resolved
+_resolve_checkpoint_dir = _common.resolve_checkpoint_dir
 
 
 def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
