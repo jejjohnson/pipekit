@@ -6,11 +6,12 @@ The SVGs are generated; edit this script and re-run it::
 
 It writes the icon (``icon.svg``), the logo (``logo-{light,dark}.svg``),
 one operator and its four shapes (``operator-{light,dark}.svg``), the
-workspace (``packages-{light,dark}.svg``), who builds on it
-(``ecosystem-{light,dark}.svg``) and a bigger graph, the README's anomaly
-detector (``graph-{light,dark}.svg``). Standard library only; the style follows the
-stack's other READMEs (gaussx, radtrax): a rounded square with a gradient
-and a white glyph, chips in a monospace face.
+workspace (``packages-{light,dark}.svg``) and a bigger graph, the anomaly
+detector of the tutorials (``graph-{light,dark}.svg``). The README's overview
+and dependency figures are drawn in geostack (``docs/images/libraries/``).
+Standard library only; the style follows the stack's other READMEs (gaussx,
+radtrax): a rounded square with a gradient and a white glyph, chips in a
+monospace face.
 """
 
 from __future__ import annotations
@@ -639,161 +640,6 @@ def packages_figure(theme: str) -> str:
 # ── who builds on it ─────────────────────────────────────────────────────────
 
 
-def ecosystem(theme: str) -> str:
-    t = THEMES[theme]
-    W, H = 1100, 520
-    gid = f"eco-{theme}"
-    b = [
-        f"<defs>{gradient(gid)}{arrowhead('ea', t['edge'])}"
-        f"{arrowhead('eb', t['accent'])}</defs>"
-    ]
-
-    # pipekit in the middle
-    px, py, pw, ph = 390, 200, 320, 96
-    b.append(rect(px, py, pw, ph, rx=18, fill=t["chip"], stroke=t["accent"], sw=2.6))
-    b.append(
-        f'<g transform="translate({px + 14} {py + 14}) scale(0.53)">'
-        + tile(0, 0, gid)
-        + "</g>"
-    )
-    b.append(
-        f'<text x="{px + 96}" y="{py + 48}" font-family="{SANS}" font-size="28" '
-        f'font-weight="700" fill="{t["ink"]}">pipe'
-        f'<tspan fill="{t["accent"]}">kit</tspan></text>'
-    )
-    b.append(
-        text(px + 96, py + 74, "operators for any carrier", size=13, fill=t["muted"])
-    )
-
-    def panel(x, y, w, h, title, sub, dashed=False):
-        b.append(
-            rect(
-                x,
-                y,
-                w,
-                h,
-                rx=18,
-                fill=t["panel"],
-                stroke=t["edge"] if dashed else t["panel_stroke"],
-                dash="6 5" if dashed else "",
-            )
-        )
-        b.append(text(x + 20, y + 30, title, size=16, fill=t["ink"], weight=700))
-        b.append(text(x + 20, y + 50, escape(sub), size=12.5, fill=t["muted"]))
-
-    def node(x, y, w, name, sub, *, dashed=False):
-        b.append(
-            rect(
-                x,
-                y,
-                w,
-                52,
-                rx=10,
-                fill=t["chip"],
-                stroke=t["edge"] if dashed else t["accent"],
-                sw=1.6,
-                dash="6 5" if dashed else "",
-            )
-        )
-        b.append(
-            text(
-                x + 14,
-                y + 22,
-                escape(name),
-                size=14,
-                fill=t["ink"],
-                weight=700,
-                family=MONO,
-            )
-        )
-        b.append(text(x + 14, y + 41, escape(sub), size=12, fill=t["muted"]))
-
-    # Left: the GeoStack today.
-    panel(20, 20, 340, 480, "In the GeoStack today", "packages that build on pipekit")
-    geo = [
-        ("geotoolz", "Operators on GeoTensors"),
-        ("xrtoolz", "Operators on xarray"),
-        ("vardax", "variational DA: cycle, train, jax"),
-        ("plumax", "plume models: cycle"),
-        ("radtrax[geo]", "retrievals on GeoTensors"),
-    ]
-    for i, (n, s) in enumerate(geo):
-        y = 92 + i * 78
-        node(40, y, 300, n, s)
-        b.append(
-            path(
-                f"M340 {y + 26} L365 {y + 26} L365 {py + ph / 2} "
-                f"L{px - 6} {py + ph / 2}",
-                stroke=t["accent"],
-                sw=2,
-                marker="eb",
-            )
-        )
-
-    # Right: any science with a carrier (illustrative).
-    panel(
-        740,
-        20,
-        340,
-        480,
-        "Any science with a carrier",
-        "illustrative: bring your own",
-        dashed=True,
-    )
-    other = [
-        ("genomics", "AnnData, DataFrame"),
-        ("astronomy", "astropy Table, FITS cube"),
-        ("climate · ocean", "xarray Dataset"),
-        ("imaging · microscopy", "ndarray, torch.Tensor"),
-        ("simulation · ML", "dict of arrays, pytree"),
-    ]
-    for i, (n, s) in enumerate(other):
-        y = 92 + i * 78
-        node(760, y, 300, n, s, dashed=True)
-        b.append(
-            path(
-                f"M760 {y + 26} L735 {y + 26} L735 {py + ph / 2} "
-                f"L{px + pw + 6} {py + ph / 2}",
-                stroke=t["edge"],
-                sw=2,
-                dash="6 5",
-                marker="ea",
-            )
-        )
-
-    # Below: what the core promises, kept between the two buses.
-    for k, line in enumerate(
-        (
-            "carrier-agnostic core:",
-            "domain packages narrow the carrier,",
-            "and algorithm libraries can satisfy",
-            "its Protocols without importing it",
-        )
-    ):
-        b.append(
-            text(
-                px + pw / 2,
-                py + ph + 52 + 22 * k,
-                line,
-                size=13,
-                fill=t["muted"],
-                anchor="middle",
-            )
-        )
-    return svg(
-        W,
-        H,
-        "".join(b),
-        "pipekit in the middle: on the left the GeoStack packages that build on it "
-        "today (geotoolz, xrtoolz, vardax, plumax, radtrax's geo extra); on the "
-        "right, illustrative carriers from other sciences (genomics, astronomy, "
-        "climate, imaging, simulation)",
-    )
-
-
-# ── a bigger graph: the anomaly detector ─────────────────────────────────────
-
-
 def graph_figure(theme: str) -> str:
     t = THEMES[theme]
     W, H = 900, 1110
@@ -1102,7 +948,6 @@ def main() -> None:
         out[f"logo-{th}.svg"] = logo(th)
         out[f"operator-{th}.svg"] = operator_figure(th)
         out[f"packages-{th}.svg"] = packages_figure(th)
-        out[f"ecosystem-{th}.svg"] = ecosystem(th)
         out[f"graph-{th}.svg"] = graph_figure(th)
     for name, s in out.items():
         (OUT / name).write_text(s, encoding="utf-8")
