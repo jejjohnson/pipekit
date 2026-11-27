@@ -286,12 +286,21 @@ def test_optimizer_config_trains_as_optax_does() -> None:
     jnp = jax.numpy
 
     data = _Pairs(64, 4)
-    model = _model()
+    # wide enough that some gradients are small, where ε's placement matters
+    keras.utils.set_random_seed(0)
+    model = keras.Sequential(
+        [
+            keras.Input((3,)),
+            keras.layers.Dense(64, activation="gelu"),
+            keras.layers.Dense(64, activation="gelu"),
+            keras.layers.Dense(1),
+        ]
+    )
     start = [np.array(w) for w in model.trainable_weights]
-    config = {"name": "adam", "lr": 1e-2}
+    config = {"name": "adam", "lr": 1e-3}
     model.compile(optimizer=build_keras_optimizer(config), loss="mse")
 
-    optimizer = optax.adam(1e-2)
+    optimizer = optax.adam(1e-3)
     params = [jnp.asarray(w) for w in start]
     state = optimizer.init(params)
 
@@ -299,7 +308,7 @@ def test_optimizer_config_trains_as_optax_does() -> None:
         predicted, _ = model.stateless_call(params, [], x)
         return jnp.mean((predicted - y) ** 2)
 
-    for k in range(50):
+    for k in range(100):
         rows = slice((k * 16) % 64, (k * 16) % 64 + 16)
         x, y = data.x[rows], data.y[rows]
         model.train_on_batch(x, y)
@@ -308,7 +317,7 @@ def test_optimizer_config_trains_as_optax_does() -> None:
         params = optax.apply_updates(params, updates)
 
     for keras_weight, optax_weight in zip(model.trainable_weights, params, strict=True):
-        np.testing.assert_allclose(np.asarray(keras_weight), optax_weight, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(keras_weight), optax_weight, atol=2e-6)
 
 
 def test_unknown_optimizer_names_are_refused() -> None:
