@@ -27,13 +27,21 @@ A library should depend on the package it imports instead, usually `pipekit-ops`
 
 ## 📥 Install
 
-The packages are not on PyPI, so install the umbrella from the repository. It needs Python 3.12 or newer.
+The packages are not on PyPI, so install the umbrella and the seven packages from the repository. It needs Python 3.12 or newer.
 
 ```bash
-pip install "pipekit @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit"
+pip install \
+  "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-ops" \
+  "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-array" \
+  "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-cycle" \
+  "pipekit-train @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-train" \
+  "pipekit-evaluate @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-evaluate" \
+  "pipekit-experiment @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-experiment" \
+  "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-jax" \
+  "pipekit @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit"
 ```
 
-The umbrella asks for each package by name, and pip and uv cannot find those names on PyPI, so name every package with the same tag in your `[tool.uv.sources]`, as the [workspace README](https://github.com/jejjohnson/pipekit#-install) shows. Extras stay with the package that owns them, so you add them by name, for example `pipekit-train[equinox]` or `pipekit-array[xarray]`.
+The umbrella asks for each package by name, and pip cannot find those names on PyPI, so the command gives every package's git URL, all at one tag. A uv project names the same eight in its `[tool.uv.sources]`, as the [workspace README](https://github.com/jejjohnson/pipekit#-install) shows. Extras stay with the package that owns them, so you add them by name, for example `pipekit-train[equinox]` or `pipekit-array[xarray]`.
 
 ## 🔬 The packages
 
