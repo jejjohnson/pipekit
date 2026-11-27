@@ -148,7 +148,7 @@ def _dtype(name: str) -> np.dtype:
     try:
         return np.dtype(name)
     except TypeError:
-        import ml_dtypes  # ty: ignore[unresolved-import]
+        import ml_dtypes
 
         return np.dtype(getattr(ml_dtypes, name))
 
