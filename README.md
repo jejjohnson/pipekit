@@ -52,6 +52,8 @@ again = pk.loads(pk.dumps(pipeline))
 
 Two packages are foundations, usable on their own. [pipekit-ops](packages/pipekit-ops/README.md) is the operator graph, in pure Python with no dependencies, so a library can build on it without pulling in NumPy or JAX. [pipekit-array](packages/pipekit-array/README.md) writes array operations by dim name on the [Python Array API standard](https://data-apis.org/array-api/latest/), so one operator runs on [NumPy](https://numpy.org/), [JAX](https://github.com/jax-ml/jax), [CuPy](https://cupy.dev/), [PyTorch](https://pytorch.org/) or [dask](https://www.dask.org/) arrays, and on an [`xr.DataArray`](https://xarray.dev/). The other five build on them and hand the real work to the libraries that own it: training to [Equinox](https://github.com/patrick-kidger/equinox) and [optax](https://github.com/google-deepmind/optax), [NumPyro](https://github.com/pyro-ppl/numpyro) and [BlackJAX](https://github.com/blackjax-devs/blackjax), JIT compilation and gradients to JAX, and run tracking to [DVC](https://dvc.org/), [Hydra](https://hydra.cc/) and [Metaflow](https://metaflow.org/), each behind an extra.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_workspace_overview/pipekit_workspace_overview.png" alt="pipekit in one picture: you bring a carrier, your steps, the seams and a model to fit; one pipeline p = o_K ∘ … ∘ o_1, with the stateful operator and the content hash h(p); seven packages, each supplying operators of one kind, pipekit-ops and pipekit-array as the two foundations; out comes the result, its shape before it runs, its configuration as JSON, a registered model and a report; on the standard library, the Array API, the training and inference libraries and the run trackers" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🧱 **One contract for every step**: an `Operator` has one method, `_apply`, and `|`, `Graph`, `Retry`, `Cache`, `Map` and the cycles each take operators and return one, so a step written for one package composes with the steps of all the others.
@@ -183,7 +185,14 @@ The [getting-started guide](https://jejjohnson.github.io/pipekit/getting-started
 | <img src="docs/assets/packages/pipekit-jax/icon.svg" width="28" alt=""> | [`pipekit-jax`](packages/pipekit-jax/README.md) | `pipekit_jax` | `JaxOperator`, `JaxModelOp` with its registry round trip, `ScanCycle`, `Rollout` |
 | <img src="docs/assets/icon.svg" width="28" alt=""> | [`pipekit`](packages/pipekit/README.md) | none | the umbrella: installs all seven and holds no code |
 
-Each package has its own [version and release notes](https://github.com/jejjohnson/pipekit/releases). Dependencies point one way: every package imports pipekit-ops, pipekit-jax also imports pipekit-cycle, pipekit-train works with pipekit-cycle and pipekit-experiment through its `cycle` and `experiment` extras, and neither foundation imports any of the other five.
+Each package has its own [version and release notes](https://github.com/jejjohnson/pipekit/releases). Dependencies point one way: every package imports pipekit-ops, pipekit-jax also imports pipekit-cycle, two imports go through an extra (pipekit-jax's `array` extra for pipekit-array, pipekit-train's `experiment` extra for pipekit-experiment), and neither foundation imports any of the other five.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_workspace_ecosystem/pipekit_workspace_ecosystem-dark.svg">
+    <img alt="The seven pipekit packages and the umbrella, with an arrow for each import between them: every package imports pipekit-ops, pipekit-jax imports pipekit-cycle, and through extras pipekit-jax imports pipekit-array and pipekit-train imports pipekit-experiment; each card names the libraries it builds on, and a strip names the GeoStack libraries that import the workspace" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_workspace_ecosystem/pipekit_workspace_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 ## 📓 Tutorials
 
