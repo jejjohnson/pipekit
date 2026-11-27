@@ -103,7 +103,7 @@ uv add pipekit-train                    # core training surface (no backend)
 uv add 'pipekit-train[equinox]'         # Equinox + Optax + Grain + Orbax adapter
 uv add 'pipekit-train[numpyro]'         # NumPyro SVI and MCMC adapters
 uv add 'pipekit-train[blackjax]'        # BlackJAX adapter
-uv add 'pipekit-train[keras]'           # Keras 3 adapter (v0.3, pending)
+uv add 'pipekit-train[keras]'           # Keras 3 adapter (compile and fit on JAX)
 uv add 'pipekit-train[cycle]'           # SimulationDataset over pipekit-cycle
 uv add 'pipekit-train[experiment]'      # LogToExperiment callback
 uv add 'pipekit-train[cache]'           # local-fs CachedDataset (zarr)

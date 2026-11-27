@@ -18,7 +18,7 @@ The packages, in dependency order:
 | `pipekit-cycle`      | implemented   | Time-stepping, DA cycles, BFN, adjoint specs, observation/forward protocols.  |
 | `pipekit-experiment` | implemented   | Content-addressed model registry, tracker protocols, DVC/Hydra/Metaflow bridges. |
 | `pipekit-evaluate`   | partial       | Benchmark ladder (cube, protocols, reference rule), scorer taxonomy, `MetricScorer`, `EvaluationReport`. |
-| `pipekit-train`      | implemented   | Training pipelines + Equinox, NumPyro and BlackJAX adapters. Design at `packages/pipekit-train/docs/design/`. |
+| `pipekit-train`      | implemented   | Training pipelines + Equinox, NumPyro, BlackJAX and Keras 3 adapters. Design at `packages/pipekit-train/docs/design/`. |
 | `pipekit-jax`        | implemented   | `JaxOperator`, `JaxModelOp` (weight round-trip through `ModelRegistry`), `ScanCycle`, `Rollout`. The diffrax forward model and the adjoint maths are in integrix. |
 
 The master plan lives in
@@ -151,7 +151,8 @@ packages/
             │                 # _model/_sharding/_state/_batches/_evaluation/_run
             ├── numpyro/      # run_svi, run_mcmc
             ├── blackjax/     # BlackjaxTask, run
-            ├── keras/        # v0.3; raises NotImplementedError
+            ├── keras/        # Keras 3 compile/fit on JAX: KerasModelOp,
+            │                 # KerasTask, EquinoxLayer, run
             └── _bayes.py     # shared NumPyro/BlackJAX seam (NumpyroTask, …)
 ```
 
