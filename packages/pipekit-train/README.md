@@ -5,7 +5,7 @@
   <img alt="pipekit-train" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-train/logo-light.svg" width="373">
 </picture>
 
-**Training as a pipekit operator: hashed datasets, losses, a loop that hands back the trained model as an operator with a record of how it was made, and sweeps, on pipekit-ops, with backends on Equinox and optax, NumPyro and BlackJAX, and a slot for Keras.**
+**Training as a pipekit operator: hashed datasets, losses, a loop that hands back the trained model as an operator with a record of how it was made, and sweeps, on pipekit-ops, with backends on Equinox and optax, NumPyro, BlackJAX and Keras 3.**
 
 [![Tests](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml)
 [![Lint](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml)
@@ -53,7 +53,7 @@ trained, artifact = loop.run()
 bayes_loop = TrainingLoop(Identity(), passes, task=task, backend="numpyro-mcmc")
 ```
 
-None of it is a new trainer. `TrainingLoop` and `HyperSweep` are [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) `StatefulOperator`s, the datasets and losses are `Operator`s, and the content hashes come from `pipekit_ops.saving`, so a training run composes, hashes and serialises like any other pipekit step. The `equinox` backend trains an [Equinox](https://github.com/patrick-kidger/equinox) module with an [optax](https://github.com/google-deepmind/optax) optimiser, reads its batches through [Grain](https://github.com/google/grain) and checkpoints with [Orbax](https://github.com/google/orbax). `numpyro-svi` and `numpyro-mcmc` fit a [NumPyro](https://github.com/pyro-ppl/numpyro) model with NumPyro's own SVI and NUTS, and `blackjax` samples the same model with the NUTS of [BlackJAX](https://github.com/blackjax-devs/blackjax). `keras` is the slot for [Keras 3](https://github.com/keras-team/keras); its `run` raises `NotImplementedError` today. Each backend sits behind its own extra and is imported only when a loop runs it, so importing pipekit-train imports none of them.
+None of it is a new trainer. `TrainingLoop` and `HyperSweep` are [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) `StatefulOperator`s, the datasets and losses are `Operator`s, and the content hashes come from `pipekit_ops.saving`, so a training run composes, hashes and serialises like any other pipekit step. The `equinox` backend trains an [Equinox](https://github.com/patrick-kidger/equinox) module with an [optax](https://github.com/google-deepmind/optax) optimiser, reads its batches through [Grain](https://github.com/google/grain) and checkpoints with [Orbax](https://github.com/google/orbax). `numpyro-svi` and `numpyro-mcmc` fit a [NumPyro](https://github.com/pyro-ppl/numpyro) model with NumPyro's own SVI and NUTS, and `blackjax` samples the same model with the NUTS of [BlackJAX](https://github.com/blackjax-devs/blackjax). `keras` trains with [Keras 3](https://github.com/keras-team/keras)'s own `compile` and `fit` on JAX: a Keras model wrapped in a `KerasModelOp`, or an Equinox model, which comes back in the wrapper it was given. Each backend sits behind its own extra and is imported only when a loop runs it, so importing pipekit-train imports none of them.
 
 pipekit-train is one package of the pipekit workspace; the [workspace README](https://github.com/jejjohnson/pipekit/blob/main/README.md) introduces the others.
 
@@ -63,7 +63,7 @@ pipekit-train is one package of the pipekit workspace; the [workspace README](ht
 
 - 🔁 **The trained model is an operator**: `TrainingLoop.run()` returns the trained model as a `pipekit_ops.Operator`, in the wrapper you passed in or as a `NumpyroPredictiveOp`. Beside it comes an artifact with the pipeline's config, the dataset's content hash, the trained model's hash, the backend's final metrics and, where uv is installed, the environment's `uv pip freeze`.
 - 🧾 **Datasets that know what they hold**: every `TrainingDataset` has a `content_hash()`. `SimulationDataset` draws one seeded input per sample from a prior and runs a forward model or a whole `Cycle` on it, with train, validation and test splits on disjoint seeds, and `CachedDataset` stores what another dataset produced as zarr (on disk, S3 or GCS), keyed by that hash.
-- 🎛️ **One loop, five backends**: the `backend=` string picks Equinox with optax, NumPyro SVI, NumPyro NUTS, BlackJAX NUTS or the Keras slot, and one `NumpyroTask` serves all three Bayesian backends (BlackJAX takes it inside a `BlackjaxTask`).
+- 🎛️ **One loop, five backends**: the `backend=` string picks Equinox with optax, NumPyro SVI, NumPyro NUTS, BlackJAX NUTS or Keras's `compile` and `fit`, and one `NumpyroTask` serves all three Bayesian backends (BlackJAX takes it inside a `BlackjaxTask`).
 - 🧮 **Losses as operators**: `MSE` works on NumPy and JAX arrays alike, `NLL` and `KL` take distribution-shaped predictions, `Composite` sums weighted losses and reports each part, and a loss that takes a `key` gets a fresh PRNG key per batch.
 - 🪝 **Callbacks and writers**: `EarlyStopping` on a validation metric, `Checkpoint` for the Orbax cadence and for storing the final model in a registry by hash, `LogToExperiment` for any tracker, and `JSONLWriter` for one line of metrics per step.
 - 🧭 **Sweeps**: `HyperSweep` runs one loop per point of a `ParameterGrid` (or of any iterable of parameter dicts) and ranks the trials on a validation metric.
@@ -88,7 +88,7 @@ The dataset says what the pairs are, and the backend says what is done with them
 p(\boldsymbol{\theta} \mid \mathcal{D}) \propto p(\boldsymbol{\theta}) \prod_{n=1}^{N} p(\mathbf{y}_n \mid \mathbf{x}_n, \boldsymbol{\theta})
 ```
 
-with $`p(\boldsymbol{\theta})`$ its priors and $`p(\mathbf{y}_n \mid \mathbf{x}_n, \boldsymbol{\theta})`$ its likelihood, and it reaches the loop inside a `NumpyroTask`. `numpyro-svi` fits a guide $`q(\boldsymbol{\theta}; \boldsymbol{\nu})`$, by default NumPyro's `AutoNormal` (Kucukelbir et al., 2017), by minimising $`\mathcal{L}_\text{ELBO}(\boldsymbol{\nu}) = -\mathrm{ELBO}(\boldsymbol{\nu})`$ over the whole dataset at every step (Hoffman et al., 2013); `numpyro-mcmc` and `blackjax` draw from the posterior with NUTS (Hoffman and Gelman, 2014). The trained operator is a `NumpyroPredictiveOp` (a `BlackjaxPredictiveOp` for a BlackJAX run on a bare log-density), whose call returns the posterior-predictive mean of one site, with the draws behind it from `posterior_samples()` and `predictive_draws(x)`. `backend="keras"` takes a `Loss` and raises `NotImplementedError`.
+with $`p(\boldsymbol{\theta})`$ its priors and $`p(\mathbf{y}_n \mid \mathbf{x}_n, \boldsymbol{\theta})`$ its likelihood, and it reaches the loop inside a `NumpyroTask`. `numpyro-svi` fits a guide $`q(\boldsymbol{\theta}; \boldsymbol{\nu})`$, by default NumPyro's `AutoNormal` (Kucukelbir et al., 2017), by minimising $`\mathcal{L}_\text{ELBO}(\boldsymbol{\nu}) = -\mathrm{ELBO}(\boldsymbol{\nu})`$ over the whole dataset at every step (Hoffman et al., 2013); `numpyro-mcmc` and `blackjax` draw from the posterior with NUTS (Hoffman and Gelman, 2014). The trained operator is a `NumpyroPredictiveOp` (a `BlackjaxPredictiveOp` for a BlackJAX run on a bare log-density), whose call returns the posterior-predictive mean of one site, with the draws behind it from `posterior_samples()` and `predictive_draws(x)`. `backend="keras"` takes a `Loss`, or a `KerasTask` holding a Keras loss, and logs each step's own loss rather than Keras's running mean.
 
 ## 📥 Install
 
@@ -100,7 +100,7 @@ pip install \
   "pipekit-train @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.3.1#subdirectory=packages/pipekit-train"
 ```
 
-Nine extras add the rest. Four are backends: `equinox` for the reference backend (Equinox, optax, JAX, Grain, Orbax and jaxtyping), `numpyro` for `numpyro-svi` and `numpyro-mcmc` (NumPyro and optax), `blackjax` for `blackjax` (BlackJAX, with NumPyro as the bridge from a model to its log-density), and `keras` for Keras 3, which no backend runs yet. `cycle` brings pipekit-cycle's forward models and cycles, and `experiment` brings pipekit-experiment's `TrainingArtifact`, registries and trackers; with either, name that package at the same tag too. `cache`, `s3` and `gcs` are for `CachedDataset` (zarr, plus fsspec with s3fs or gcsfs). The quickstart needs `equinox` and `cycle`.
+Nine extras add the rest. Four are backends: `equinox` for the reference backend (Equinox, optax, JAX, Grain, Orbax and jaxtyping), `numpyro` for `numpyro-svi` and `numpyro-mcmc` (NumPyro and optax), `blackjax` for `blackjax` (BlackJAX, with NumPyro as the bridge from a model to its log-density), and `keras` for the Keras backend (Keras 3, JAX, Grain and Orbax; an Equinox model also needs `equinox`). `cycle` brings pipekit-cycle's forward models and cycles, and `experiment` brings pipekit-experiment's `TrainingArtifact`, registries and trackers; with either, name that package at the same tag too. `cache`, `s3` and `gcs` are for `CachedDataset` (zarr, plus fsspec with s3fs or gcsfs). The quickstart needs `equinox` and `cycle`.
 
 ```bash
 pip install \
@@ -241,7 +241,7 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 | `pipekit_train.backends.equinox` | `EquinoxModelOp`, `TrainState`, `TrainTask`, `train_step`, `save_state`, `restore_state`, `ShardingSpec`, `shard_train_state`, `run` | The reference backend (`equinox` extra) |
 | `pipekit_train.backends.numpyro` | `NumpyroTask`, `NumpyroPredictiveOp`, `run_svi`, `run_mcmc` | SVI and NUTS (`numpyro` extra) |
 | `pipekit_train.backends.blackjax` | `BlackjaxTask`, `BlackjaxPredictiveOp`, `run` | NUTS, from a NumPyro model or a bare log-density (`blackjax` extra) |
-| `pipekit_train.backends.keras` | `run` | A stub that raises `NotImplementedError`; the area has no `__all__` |
+| `pipekit_train.backends.keras` | `KerasModelOp`, `KerasTask`, `EquinoxLayer`, `build_keras_optimizer`, `import_keras`, `run` | Keras 3's `compile` and `fit` on JAX (`keras` extra) |
 
 ## 📓 Tutorials
 
@@ -252,12 +252,13 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 | 3 | [NumPyro SVI](https://jejjohnson.github.io/pipekit/pipekit-train-numpyro-svi/), [NumPyro NUTS](https://jejjohnson.github.io/pipekit/pipekit-train-numpyro-mcmc/) and [BlackJAX NUTS](https://jejjohnson.github.io/pipekit/pipekit-train-blackjax/) | one Bayesian linear regression under the three Bayesian backends |
 | 4 | [Train an emulator](https://jejjohnson.github.io/pipekit/train-emulator/) | an MLP emulator trained, used as the model of a pipekit-cycle forecast and stored in pipekit-experiment's `ModelRegistry` |
 | 5 | [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/) | a Lorenz-96 archive cleaned, an emulator trained on it, stored with its preprocessing, reloaded as a cycle's forward model and verified |
+| 6 | [The Keras backend](https://jejjohnson.github.io/pipekit/pipekit-train-keras/) | a Keras model trained with plain Keras and then through `TrainingLoop`, and one Equinox emulator under the Keras and Equinox backends |
 
 ## 📖 Documentation
 
 - **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-train/)**: the emulator above in full, a sweep, a Bayesian fit under two engines, the backends, the calling conventions and what is not built yet.
-- **[Design](https://jejjohnson.github.io/pipekit/readme-2/)**: the vision, the architecture, the boundaries, the API layer by layer, the NumPyro and BlackJAX backend designs and worked examples of the three training shapes, also [on GitHub](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design).
-- **[Decisions](https://jejjohnson.github.io/pipekit/decisions-1/)**: the ADRs D1 to D17, from the thin loop over existing tools to the five areas.
+- **[Design](https://jejjohnson.github.io/pipekit/readme-2/)**: the vision, the architecture, the boundaries, the API layer by layer, the NumPyro, BlackJAX and Keras backend designs and worked examples of the three training shapes, also [on GitHub](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design).
+- **[Decisions](https://jejjohnson.github.io/pipekit/decisions-1/)**: the ADRs D1 to D21, from the thin loop over existing tools to the Keras backend.
 - **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-train/)**: every public name, generated from the docstrings.
 - **[Getting started](https://jejjohnson.github.io/pipekit/getting-started/)**: the workspace's first trained model, stored in a registry and run in a cycle.
 - **[`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md)**: the rules for contributors and coding agents.
@@ -282,7 +283,7 @@ pipekit-train is a package of the pipekit [uv workspace](https://docs.astral.sh/
 | Checkpoints | [Orbax](https://github.com/google/orbax) |
 | SVI, NUTS, `Predictive`, models to log-densities | [NumPyro](https://github.com/pyro-ppl/numpyro) |
 | NUTS on a log-density (`blackjax` backend) | [BlackJAX](https://github.com/blackjax-devs/blackjax) |
-| Keras 3 models (`keras` slot, a stub) | [Keras](https://github.com/keras-team/keras) |
+| `compile`, `fit` and Keras models (`keras` backend) | [Keras](https://github.com/keras-team/keras) |
 | Forward models and cycles (`cycle` extra) | [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) |
 | Training artifacts, registries, trackers (`experiment` extra) | [pipekit-experiment](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment) |
 | The dataset cache (`cache`, `s3`, `gcs` extras) | [zarr](https://github.com/zarr-developers/zarr-python) and [fsspec](https://github.com/fsspec/filesystem_spec) |

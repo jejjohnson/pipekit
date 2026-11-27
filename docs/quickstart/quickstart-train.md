@@ -22,7 +22,7 @@ The README has the install commands. This is what each extra adds and when it is
 | `equinox` | equinox, optax, jax, grain, orbax-checkpoint, jaxtyping | `backend="equinox"`, the reference backend |
 | `numpyro` | numpyro, optax | `backend="numpyro-svi"` and `backend="numpyro-mcmc"` |
 | `blackjax` | blackjax, numpyro, optax | `backend="blackjax"`, with NumPyro as the bridge from a model to its log-density |
-| `keras` | keras | nothing yet: `backend="keras"` raises `NotImplementedError` |
+| `keras` | keras, jax, grain, orbax-checkpoint, numpy | `backend="keras"`: Keras 3's `compile` and `fit` on JAX (an Equinox model also needs `equinox`) |
 | `cycle` | pipekit-cycle | the forward models and cycles that `SimulationDataset` runs |
 | `experiment` | pipekit-experiment | a real `TrainingArtifact` from `run()`, `Checkpoint(registry=...)` and `LogToExperiment` |
 | `cache` | zarr | `CachedDataset` on a local directory |
@@ -327,13 +327,13 @@ The `backend=` string of `TrainingLoop` names the area that trains, which the lo
 | `"numpyro-svi"` | a `NumpyroTask` (model, guide, ELBO) | `NumpyroPredictiveOp` | ships |
 | `"numpyro-mcmc"` | a `NumpyroTask` (model, NUTS) | `NumpyroPredictiveOp` | ships |
 | `"blackjax"` | a `BlackjaxTask` (a `NumpyroTask`, or a log-density) | `NumpyroPredictiveOp`, or `BlackjaxPredictiveOp` for a log-density | ships, NUTS only |
-| `"keras"` | a `Loss` | none | raises `NotImplementedError` |
+| `"keras"` | a `Loss`, or a `KerasTask` | the wrapper passed in: `KerasModelOp`, or an Equinox wrapper (`EquinoxModelOp`, `JaxModelOp`, `JaxOperator`) | ships, on JAX only |
 
 ## How it works
 
 ### A thin loop over existing tools
 
-`TrainingLoop` holds the model, the data, the loss and the settings, and delegates the training to the backend's area under `pipekit_train.backends`, which it imports only when called. The backend owns the update step and the validation pass; the loop owns the callbacks and the artifact. `max_steps` counts optimiser steps, not epochs (ADR D10), and `optimizer_config` is a flat dict such as `{"name": "adamw", "lr": 3e-4}`, which is also the default. The names are `adam`, `adamw`, `sgd` and `rmsprop`, `lr` and `learning_rate` both work, and the other keys go to the optax constructor. For anything a `Loss` cannot say, pass `task=` instead: a `TrainTask` for Equinox, a `NumpyroTask` or a `BlackjaxTask` for the Bayesian backends. The Equinox backend also takes a `ShardingSpec` (`sharding=`) for multi-device and multi-host data-parallel training (ADR D12).
+`TrainingLoop` holds the model, the data, the loss and the settings, and delegates the training to the backend's area under `pipekit_train.backends`, which it imports only when called. The backend owns the update step and the validation pass; the loop owns the callbacks and the artifact. `max_steps` counts optimiser steps, not epochs (ADR D10), and `optimizer_config` is a flat dict such as `{"name": "adamw", "lr": 3e-4}`, which is also the default. The names are `adam`, `adamw`, `sgd` and `rmsprop`, `lr` and `learning_rate` both work, and the other keys go to the optax constructor. For anything a `Loss` cannot say, pass `task=` instead: a `TrainTask` for Equinox, a `KerasTask` (a Keras loss and metrics, Keras callbacks, or the model's own `compile`) for Keras, a `NumpyroTask` or a `BlackjaxTask` for the Bayesian backends. The Keras backend translates `optimizer_config` into the Keras optimiser optax would build, ε placement included, so one config trains the same way on both. The Equinox backend also takes a `ShardingSpec` (`sharding=`) for multi-device and multi-host data-parallel training (ADR D12).
 
 ### Datasets are hashed, not just iterated
 
@@ -353,7 +353,7 @@ A `TrainingDataset` yields `(input, target)` pairs and has a `content_hash()`, w
 
 ## Not built yet
 
-- **The Keras 3 backend.** The `keras` area is a stub whose `run` raises `NotImplementedError`; its planned design is in [the adapters page](../design-train/api/adapters.md).
+- **Keras with sharding, and losses that need a PRNG key.** `backend="keras"` refuses `sharding=` and a `Loss` whose `key` is required ([#330](https://github.com/jejjohnson/pipekit/issues/330)); its design is in [the Keras adapter page](../design-train/keras_adapter.md).
 - **`CatalogDataset`** and the `catalog` extra, once geocatalog is on PyPI; the design is in [the datasets page](../design-train/api/datasets.md).
 - **More cache formats.** `CachedDataset` writes zarr only; `"parquet"` and `"tfrecord"` raise `NotImplementedError`.
 - **More BlackJAX samplers.** MCLMC, HMC, SGLD and SGHMC are planned; NUTS is the one that runs.

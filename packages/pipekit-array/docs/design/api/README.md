@@ -76,7 +76,7 @@ The test kit proves the override equals the generic path.
    This is the "what does the pipeline do" surface.
 2. **[qc.md](qc.md)**: the numeric QC family.
    This is the "what does the pipeline guard against" surface.
-3. **[inference.md](inference.md)**: `ModelOp`, the trained-model wrapper that closes the train-to-serve loop for pipekit-train's Lightning and Keras adapters.
+3. **[inference.md](inference.md)**: `ModelOp`, the generic trained-model wrapper for models that no pipekit-train backend trains.
 4. **[dim_functions.md](dim_functions.md)**: the dim-level functions, their xarray parity and their testing gates.
 
 Each operator spec covers the constructor signature, the `_apply` contract, the `get_config()` shape, the `compute_output_signature` behaviour (if non-trivial), per-backend caveats, and a one- or two-line example.

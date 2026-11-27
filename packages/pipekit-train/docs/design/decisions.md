@@ -476,7 +476,7 @@ doesn't shard evaluation yet; this makes that possible.
 
 ## D18: The Keras backend wraps `compile` and `fit`
 
-**Status:** proposed
+**Status:** accepted
 
 **Context:** `backend="keras"` is a stub (D5). A Keras 3 model on the JAX backend can be trained two ways: by Keras's own `fit`, or by a JAX loop around `Model.stateless_call` that treats Keras only as the model definition. Users of the second user story in [`keras_adapter.md`](keras_adapter.md) rely on `compile`, `add_loss`, Keras callbacks and Keras Tuner. Measurements on Keras 3.15.1 (§5 of that page) show `fit` stopping at an exact step, validating at the end of a cut-short epoch, giving per-step losses after `reset_metrics()`, and resuming exactly from a period boundary.
 
@@ -497,7 +497,7 @@ doesn't shard evaluation yet; this makes that possible.
 
 ## D19: The Keras backend runs on JAX only
 
-**Status:** proposed
+**Status:** accepted
 
 **Context:** Keras 3 runs on JAX, TensorFlow and PyTorch, chosen once by `KERAS_BACKEND` at the first `import keras`. With no backend set and no TensorFlow installed, the import fails, because the default is TensorFlow. D15 removed PyTorch training, `keras.distribution` is implemented for JAX only, and the stack's arrays are JAX.
 
@@ -513,7 +513,7 @@ doesn't shard evaluation yet; this makes that possible.
 
 ## D20: `KerasModelOp` lives in the Keras area, with its own weight blob
 
-**Status:** proposed
+**Status:** accepted
 
 **Context:** D7 says a trained model is an operator whose weights round-trip through a registry, and pipekit-array's A8 planned `pipekit_array.ModelOp` for Keras. That operator is not built, holds no weights by design, and pipekit-array takes no backend dependency. A `.keras` file is a zip whose metadata records the save time, so two saves of the same weights hash differently.
 
@@ -530,7 +530,7 @@ doesn't shard evaluation yet; this makes that possible.
 
 ## D21: Equinox models train under the Keras backend and come back in their own wrapper
 
-**Status:** proposed
+**Status:** accepted
 
 **Context:** A user may want Keras's loop, Keras Tuner or Keras layers around a model written in Equinox, and the cross-backend comparison in [`keras_adapter.md`](keras_adapter.md) trains one Equinox model under both backends. Keras 3 runs JAX code as a layer through `keras.layers.JaxLayer`. Measured on Keras 3.15.1 and Equinox 0.13.8: an `eqx.nn.MLP` in a `JaxLayer` takes the same SGD step as hand-written JAX (to 3.0e-8), the trained module is rebuilt exactly, and Keras deletes the arrays it was given unless they are copied first, because it donates the buffers it trains.
 

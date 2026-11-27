@@ -1,13 +1,13 @@
 ---
-status: draft
-version: 0.1.0
+status: accepted
+version: 0.2.0
 ---
 
 # Design: the Keras 3 backend (`backend="keras"`)
 
 `backend="keras"` trains a Keras 3 model through the same `TrainingLoop` that trains Equinox models, and returns a `KerasModelOp` whose weights round-trip through a `ModelRegistry`. Keras's own `compile` and `fit` do the training (D1), on the JAX backend only (D19), and pipekit-train adds the parts Keras does not have: the step budget, the callbacks and metric writer, checkpoints that resume the data position, and the `TrainingArtifact`. The same backend also trains an Equinox model given as a `JaxModelOp`, an `EquinoxModelOp` or a `JaxOperator`: the module runs inside Keras as a `JaxLayer`, and the trained module comes back in the wrapper it was given (D21).
 
-This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18 to D21 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the five scripts listed in §5; none of the names it proposes exists yet.
+This page is the full design of the backend, a sibling of [`numpyro_adapter.md`](numpyro_adapter.md) and [`blackjax_adapter.md`](blackjax_adapter.md). Its decisions are D18 to D21 in [`decisions.md`](decisions.md), and its build plan is §10. Every Keras fact the design relies on was measured on Keras 3.15.1 with JAX 0.12.1 on CPU, with the five scripts listed in §5; every name it proposes ships, built under epic #317, and the sketches below are marked `today`.
 
 ## 1. Motivation
 
@@ -165,7 +165,7 @@ from typing import Any
 import keras
 
 
-# proposed (D18)
+# today (pipekit-train)
 @dataclass
 class KerasTask:
     """The Keras training target (loop.task for backend="keras")."""
@@ -187,7 +187,7 @@ With no task, the backend synthesises one from `loop.loss`, as the Equinox backe
 A `pipekit_train.Loss` is called `(predicted, target)` and may return `(scalar, aux)`. The bridge swaps the arguments for Keras, and each auxiliary term becomes a metric weighted by batch size, so its validation value is the per-sample mean of §3:
 
 ```python
-# proposed (D18)
+# today (pipekit-train)
 class _LossBridge(keras.losses.Loss):
     """A pipekit_train.Loss as a Keras loss; the aux terms are dropped here."""
 
@@ -198,7 +198,7 @@ class _LossBridge(keras.losses.Loss):
         return result[0] if isinstance(result, tuple) else result
 
 
-# proposed (D18)
+# today (pipekit-train)
 class _AuxMetric(keras.metrics.Metric):
     """One aux term of a Loss, averaged per sample: Σ_b n_b a_b / Σ_b n_b."""
 
@@ -243,7 +243,7 @@ flowchart LR
 The bridge is one Keras callback:
 
 ```python
-# proposed (D18)
+# today (pipekit-train)
 class _PipekitBridge(keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         # k = optimizer.iterations, the global step
@@ -270,7 +270,7 @@ Checkpoints are written by a second callback at the end of each Keras epoch whos
 ```python
 # Shapes: N samples at serving time
 
-# proposed (D20)
+# today (pipekit-train)
 class KerasModelOp(Operator):
     """A Keras model as a pipekit operator, with a weight-blob round trip."""
 
@@ -311,7 +311,7 @@ import keras
 import numpy as np
 
 
-# proposed (D21)
+# today (pipekit-train)
 class EquinoxLayer(keras.layers.JaxLayer):
     """An Equinox module as a Keras layer; `.module` is the module as trained."""
 
@@ -367,7 +367,7 @@ An Equinox-backed `model_op` needs both extras, `pipekit-train[keras,equinox]`; 
 
 ## 9. Example API usage
 
-Each example shows the plain Keras code first, with `compile`, `fit` and `predict`, and then the same training through `TrainingLoop`. The plain Keras block of §9.1 uses only names that ship today and was run as written on Keras 3.15.1; the other blocks use proposed names and have not been run.
+Each example shows the plain Keras code first, with `compile`, `fit` and `predict`, and then the same training through `TrainingLoop`. The plain Keras block of §9.1 was run as written on Keras 3.15.1. The notebook `docs/notebooks/pipekit_train_keras.ipynb` runs §9.1 and §9.3 on Keras 3.14.1, with a metric log and a comparison plot added; §9.2 needs keras-fairkl and is not run.
 
 ### 9.1 A Keras model
 
@@ -441,7 +441,7 @@ from pipekit_train import (
     TrainingLoop,
 )
 
-# proposed (D20)
+# today (pipekit-train)
 from pipekit_train.backends.keras import KerasModelOp
 
 # today (pipekit-train)
@@ -453,7 +453,7 @@ val_dataset = IterableDataset(
     source=list(zip(x_val, y_val)), content_hash="linreg-val-128"
 )
 
-# proposed (D18)
+# today (pipekit-train)
 # θ_K after K = 2,000 steps of AdamW on ℓ = MSE, validated every 200 steps
 trained_op, artifact = TrainingLoop(
     model_op=KerasModelOp(model),
@@ -470,7 +470,7 @@ trained_op, artifact = TrainingLoop(
     seed=0,
 ).run()
 
-# proposed (D20)
+# today (pipekit-train)
 # ŷ = f_θ_K(x)
 # (N_val, D_x) → (N_val, D_y)
 predictions = trained_op(x_val)
@@ -485,7 +485,7 @@ A keras-fairkl model keeps its own `compile`, because its penalty lives in `add_
 fair_model = fairkl.FairModelWrapper(base_model, mu=1.0)
 fair_model.compile(optimizer="adam", loss="mse")
 
-# proposed (D18)
+# today (pipekit-train)
 # each batch is ({"x": X_B, "q": Q_B}, Y_B)
 TrainingLoop(
     model_op=KerasModelOp(fair_model),
@@ -508,13 +508,13 @@ The emulator is an Equinox MLP written per sample, on the data of §9.1. In plai
 import equinox as eqx
 import jax
 
-# proposed (D21)
+# today (pipekit-train)
 from pipekit_train.backends.keras import EquinoxLayer
 
 # user
 emulator = eqx.nn.MLP(3, 1, width_size=64, depth=2, key=jax.random.key(0))
 
-# proposed (D21)
+# today (pipekit-train)
 emulator_layer = EquinoxLayer(emulator)
 # today (keras)
 keras_emulator = keras.Sequential([keras.Input((3,)), emulator_layer])
@@ -540,7 +540,7 @@ keras_emulator.fit(
 # (N_val, D_x) → (N_val, D_y)
 predictions = keras_emulator.predict(x_val, verbose=0)
 
-# proposed (D21)
+# today (pipekit-train)
 # the trained eqx.nn.MLP, rebuilt from the layer's weights
 trained_emulator = emulator_layer.module
 ```
@@ -565,7 +565,7 @@ equinox_op, equinox_artifact = TrainingLoop(
     backend="equinox",
 ).run()
 
-# proposed (D21)
+# today (pipekit-train)
 # the same module through Keras fit, returned as a JaxModelOp
 keras_op, keras_artifact = TrainingLoop(
     model_op=JaxModelOp(emulator),

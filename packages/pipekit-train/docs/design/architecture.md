@@ -82,7 +82,7 @@ packages/pipekit-train/
 │   └── adapters/
 │       ├── __init__.py
 │       ├── equinox.py         # v0.1 reference adapter
-│       └── keras.py           # scaffold — raises NotImplementedError
+│       └── keras.py           # compile and fit on JAX (keras_adapter.md)
 ├── tests/
 └── docs/
     └── design/                # this design doc

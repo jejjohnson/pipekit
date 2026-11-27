@@ -273,14 +273,13 @@ geoarray carriers reach the same functions through their own registered adapter 
 ## 7. Integration with pipekit-train
 
 `pipekit-train` ships `EquinoxModelOp` in-package as its trained-model wrapper, with `pipekit_jax.JaxModelOp` as the weight-blob round-trippable upgrade.
-**For the Lightning and Keras adapters planned for pipekit-train v0.2 and v0.3**, `pipekit_array.ModelOp` (not built yet) is the natural trained-model wrapper to return.
+The Lightning backend was dropped and the Keras backend returns its own `KerasModelOp` (pipekit-train D15, D20), so `pipekit_array.ModelOp` (not built yet) is the wrapper for models that no pipekit-train backend trains.
 The boundary:
 
 | Backend | Trained-model op | Lives in |
 | --- | --- | --- |
 | Equinox | `EquinoxModelOp` (light) / `JaxModelOp` (round trip) | `pipekit-train` / `pipekit-jax` |
-| Lightning | `ModelOp` | `pipekit-array` (not built) |
-| Keras 3 | `ModelOp` | `pipekit-array` (not built) |
+| Keras 3 | `KerasModelOp` (round trip) | `pipekit-train` |
 | sklearn | `ModelOp` | `pipekit-array` (not built) |
 
 This implements pipekit-train's open promise in its `docs/design/api/adapters.md`: "wrap the final module's `nn.Module` in `pipekit-array.ModelOp` and return" (ADR A8).

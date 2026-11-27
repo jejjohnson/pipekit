@@ -223,31 +223,13 @@ test_equinox_sharding.py`) and a scripted 2-process `jax.distributed` smoke
 ---
 
 (keras-v03)=
-## Keras (v0.3 scaffold)
+## Keras (implemented)
 
-`pipekit_train.adapters.keras`. Extras: `pipekit-train[keras]`.
+`pipekit_train.backends.keras`. Extras: `pipekit-train[keras]`, and `[equinox]` too for an Equinox model. The full design is [`../keras_adapter.md`](../keras_adapter.md), with ADRs D18 to D21.
 
-v0.1 ships with the same `NotImplementedError` stub.
+`run(loop)` trains with Keras 3's own `compile` and `fit`, on the JAX backend only (D19). One Keras epoch is one evaluation period of `eval_every_n_steps` steps, and a Keras callback stops `fit` at exactly `max_steps`, drives the loop's callbacks and metric writer, and logs each step's own loss, read off Keras's running means (D18). `loop.loss` is bridged into a Keras loss, with its auxiliary terms as metrics weighted by batch size; a `KerasTask` passes a Keras loss and metrics, Keras callbacks, or `keep_compile=True` for a model compiled with its own loss. `optimizer_config` becomes the Keras optimiser optax would build, with optax's defaults and Adam's ε where optax puts it. The batches come from the Grain pipeline the Equinox backend also reads, and checkpoints at period ends hold the weights, the optimiser and the data position, so a resumed run ends with the weights of an uninterrupted one.
 
-The design below is superseded by the full design in [`../keras_adapter.md`](../keras_adapter.md) (D18 to D20): the backend wraps `compile` and `fit` on the JAX backend only, reads the shared Grain batches rather than `tf.data`, and returns a `KerasModelOp` with a weight blob rather than `pipekit-array.ModelOp`.
-
-### Planned design
-
-When v0.3 lands, the adapter will:
-
-1. Translate `loop.loss` into a `keras.losses.Loss` subclass (or
-   accept the user's pre-built `tf.keras.losses` instance via
-   `loop.task`).
-2. Configure the optimiser via `keras.optimizers.get` using
-   `optimizer_config`.
-3. Wrap `loop.dataset` as a `tf.data.Dataset.from_generator(...)`.
-4. Call `model.compile(...)` then `model.fit(...)`.
-5. Wrap the trained `keras.Model` in `pipekit-array.ModelOp` and
-   return.
-
-Keras 3's multi-backend (TF / JAX / torch) means the Keras adapter
-gives a *second* JAX path orthogonal to the Equinox one — useful for
-projects that already standardise on Keras layers.
+`loop.model_op` is a `KerasModelOp`, whose weights round-trip through a registry as a byte-stable blob (D20), or an operator that is or holds an Equinox module, which trains as an `EquinoxLayer` and comes back in its own wrapper (D21). Not supported yet: `sharding=`, and a `Loss` whose `key` is required (#330).
 
 ---
 

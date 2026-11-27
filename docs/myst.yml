@@ -101,6 +101,8 @@ project:
           title: NumPyro NUTS
         - file: notebooks/pipekit_train_blackjax.ipynb
           title: BlackJAX NUTS
+        - file: notebooks/pipekit_train_keras.ipynb
+          title: Keras backend
     - title: Design
       children:
         - title: pipekit-ops

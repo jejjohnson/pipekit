@@ -42,7 +42,7 @@ Three conceptual layers, all on top of `pipekit_ops.Operator`:
 - **Numeric QC:** `AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`.
   These are the numeric-content checks `pipekit_ops.qc` refused to write, because they need to look inside the array.
 - **Inference:** `ModelOp(model, method="__call__", batch_size=None)`, a framework-agnostic trained-model wrapper.
-  It is what the planned Lightning and Keras backends in `pipekit-train` would return from `loop.run()`; the Equinox backend already ships its own `EquinoxModelOp`, and `pipekit_jax.JaxModelOp` round-trips weights (ADR A8).
+  No pipekit-train backend returns it: the Equinox backend ships its own `EquinoxModelOp`, `pipekit_jax.JaxModelOp` round-trips Equinox weights (ADR A8), and the Keras backend returns its own `KerasModelOp`.
 
 Every operator follows the same shape: `_apply(x, …)` calls `array_namespace(x)` to pick the backend, calls the Array API functions, and returns an array of the same backend.
 There is no conversion, no `.cpu()` and no `.numpy()`.

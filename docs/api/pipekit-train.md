@@ -35,7 +35,7 @@ The loop, its callbacks and its metric writers.
 ## Backends
 
 The Equinox, Optax and Orbax backend is the v0.1 reference.
-The Keras backend ships as a scaffold that raises `NotImplementedError` on `run()` until v0.3 lands; see [`adapters.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/api/adapters.md) for the planned designs.
+The Keras backend trains with Keras 3's `compile` and `fit` on JAX; see [`keras_adapter.md`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-train/docs/design/keras_adapter.md) for its design.
 
 ### Equinox
 
