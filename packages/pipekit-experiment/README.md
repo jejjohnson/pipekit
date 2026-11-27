@@ -1,250 +1,270 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-dark.svg">
-    <img alt="pipekit-experiment" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-light.svg" width="518">
-  </picture>
-</p>
+<div align="center">
 
-**A content-addressed model registry, tracker protocols and reproducibility records for pipekit pipelines, with adapters for DVC, Hydra and Metaflow.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-dark.svg">
+  <img alt="pipekit-experiment" src="https://raw.githubusercontent.com/jejjohnson/pipekit/main/docs/assets/packages/pipekit-experiment/logo-light.svg" width="518">
+</picture>
 
-<p align="center">
-  <a href="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-blue">
-  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
-</p>
+**A content-addressed model registry, run records and tracker protocols for pipekit pipelines, on pipekit-ops, with bridges to DVC, Hydra and Metaflow, storage on any fsspec filesystem (s3fs for S3), and extras that pin MLflow and W&B for a tracker of your own.**
 
-<p align="center">
-  <a href="https://jejjohnson.github.io/pipekit/"><b>Docs</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/"><b>API</b></a> ·
-  <a href="https://jejjohnson.github.io/pipekit/train-register-forecast/"><b>Tutorial</b></a>
-</p>
+[![Tests](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/ci.yml)
+[![Lint](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/lint.yml)
+[![Type Check](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/pipekit/actions/workflows/typecheck.yml)
+[![Docs](https://github.com/jejjohnson/pipekit/actions/workflows/pages.yml/badge.svg)](https://jejjohnson.github.io/pipekit/)
+[![codecov](https://codecov.io/gh/jejjohnson/pipekit/branch/main/graph/badge.svg)](https://codecov.io/gh/jejjohnson/pipekit)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-experiment/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-## Why it exists
+📖 [Documentation](https://jejjohnson.github.io/pipekit/) ·
+🚀 [Quickstart](https://jejjohnson.github.io/pipekit/quickstart-experiment/) ·
+📚 [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/) ·
+🧭 [Design](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-experiment/docs/design)
 
-Consider a methane plume detector that runs on every EMIT scene.
-Six months after a detection, someone asks which model produced it, which pre-processing sat in front of it, and whether the files on the bucket are still the ones we validated.
-A directory called `models/plume_v3_final2/` does not answer that.
+</div>
 
-pipekit-experiment identifies a stored model by the hash of what it is: the operator's config and its weight bytes.
-Names such as `production` are tags that point at a hash, so promoting a model moves a tag and never touches the model.
-Loading checks the bytes against the hash, so a file changed behind the registry's back is refused instead of served.
-Around the registry sit two protocols for external tools (`ExperimentTracker`, `ModelRegistry`), two JSON records that pin what a training or inference run used, and thin adapters for DVC, Hydra and Metaflow.
+---
 
-## Where it sits
+Consider a methane plume detector that runs on every EMIT scene. Six months after a detection, someone asks which model produced it, which pre-processing sat in front of it, and whether the files on the bucket are still the ones we validated. A directory called `models/plume_v3_final2/` does not answer that. So pipekit-experiment identifies a stored model by what it is, the operator's state and its weight bytes, and gives it one address,
 
-pipekit-experiment is built on pipekit-ops; it does not use pipekit-array.
-Both are libraries in their own right, which you can build on directly.
-
-```
-   your training and inference pipelines
-                     │
-   pipekit-train ────┤  ([experiment] extra: TrainingArtifact, LogToExperiment)
-   pipekit-jax ──────┤  (JaxModelOp.from_registry reads load_weights)
-                     │
-          ┌──────────┴──────────┐
-          │ pipekit-experiment  │  ◀ this package
-          │ registry, trackers, │
-          │  artifacts, adapters│
-          └──────────┬──────────┘
-            ┌────────┴────────┐
-            │                 │
-       pipekit-ops       pipekit-array
-       (dependency:      (not used)
-        Operator state,
-        pipeline_hash)
+```math
+h = \mathrm{sha256}\left(\mathrm{json}(s) \Vert \mathtt{0x00} \Vert w\right)
 ```
 
-- **pipekit-ops** is the one required dependency.
-  The registry stores `Operator.state`, rebuilds with `Operator.from_state`, and hashes with `pipekit_ops.saving.pipeline_hash`, so anything that round-trips through `pipekit_ops.dumps` / `loads` can be stored.
-- **pipekit-array** is not a dependency and is not used; array-backed operators store like any other operator.
-
-## Install
-
-```bash
-uv add pipekit-experiment
-uv add 'pipekit-experiment[dvc,hydra,metaflow,s3]'   # combine the extras you need
-```
-
-| Extra | What it adds | When you need it |
-| --- | --- | --- |
-| *(none)* | `pipekit-ops` | the registry, protocols, run records and artifacts |
-| `s3` | `fsspec`, `s3fs` | `S3ModelRegistry` on S3, or any other fsspec URI with its driver |
-| `dvc` | `dvc` | `DVCDatasetVersioning`, which calls the `dvc` CLI |
-| `hydra` | `hydra-core`, `hydra-zen` | `HydraConfigLoader`: pipelines to and from Hydra configs |
-| `metaflow` | `metaflow` | `MetaflowStepAdapter`: an operator as a Metaflow `@step` |
-| `mlflow` | `mlflow` | nothing yet: the extra pins the library, but no MLflow adapter ships |
-| `wandb` | `wandb` | nothing yet: the extra pins the library, but no W&B adapter ships |
-
-Each adapter imports its tool lazily and raises an `ImportError` with the install hint on first use, so the package imports cleanly with no extras.
-
-## Quickstart
-
-Store the pre-processing in front of the plume detector, with opaque weight bytes beside it, then promote it and load it back by tag.
+where $`s`$ is the operator's state record (the nested module, class and config of `Operator.state`), $`\mathrm{json}`$ writes it with sorted keys, $`w \in \{0, \dots, 255\}^{N_w}`$ are the $`N_w`$ weight bytes ($`N_w = 0`$ when there are none), $`\Vert`$ joins byte strings, $`\mathtt{0x00}`$ is one zero byte that separates the two parts, and $`h`$ is the 64-character hex digest. Names such as `production` are tags that point at an $`h`$, so promoting a model moves a tag and never touches the model, and loading recomputes $`h`$ from the stored files, so a file changed behind the registry's back is refused instead of served.
 
 ```python
-import tempfile
-
-import pipekit_experiment as pe
-from pipekit_ops import Pick, Rename
-
-root = tempfile.mkdtemp()
-
-# today (pipekit-ops)
-# the scene pre-processing a plume detector was trained behind
-prep = Pick(["xch4", "u10", "v10"]) | Rename({"u10": "u", "v10": "v"})
-print(prep({"xch4": 1912.0, "u10": 3.1, "v10": -0.4, "qa": 1}))
-# {'xch4': 1912.0, 'u': 3.1, 'v': -0.4}
-weights = b"\x00\x01\x02\x03"  # user: opaque bytes, such as a model's weights
+# Shapes: h is a 64-character hex digest
+# (registry, prep, weights and pipeline_yaml as in the quickstart below)
 
 # today (pipekit-experiment)
-registry = pe.LocalModelRegistry(root)
-h = registry.store(prep, name="plume-prep-v1", tags={"sensor": "emit"}, weights=weights)
-print(h == registry.store(prep, weights=weights))     # True: same content, same hash
-
+# h = sha256(json(s) ‖ 0x00 ‖ w), the address of the model
+model_hash = registry.store(prep, weights=weights)
 # today (pipekit-experiment)
-registry.tag(h, "production")                          # promote; force=True moves a tag
-again = registry.load("production")                    # by tag, or by hash
-print(again.state == prep.state)                       # True
-print(registry.load_weights(h) == weights)             # True
-print(registry.list(tags={"sensor": "emit"}) == [h])   # True
-print(isinstance(registry, pe.ModelRegistry))          # True
+# a tag names h; moving it promotes a model and never touches one
+registry.tag(model_hash, "production")
+# today (pipekit-experiment)
+# rebuilt only when the stored files still hash to h
+served = registry.load("production")
+# today (pipekit-experiment)
+# a run's record pins h, so the run leads back to the model it used
+record = pe.InferenceArtifact(pipeline_yaml, pinned_model_hashes={"prep": model_hash})
 ```
 
-Pin the hash in an inference record, and see the registry refuse a tampered entry:
+None of it is a new serialisation format. The registry stores `Operator.state` from [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops), rebuilds with `Operator.from_state` and addresses with `pipekit_ops.pipeline_hash`, so anything that round-trips through `pipekit_ops.dumps` and `loads` can be stored, and `pipeline_hash(op, weights)` is the address before you store it. `S3ModelRegistry` runs the same code on any [fsspec](https://github.com/fsspec/filesystem_spec) URI, with [s3fs](https://github.com/fsspec/s3fs) for `s3://`. The bridges hand pipelines to the tools that run them: `DVCDatasetVersioning` calls the [DVC](https://github.com/iterative/dvc) CLI for dataset hashes, `HydraConfigLoader` writes and reads [Hydra](https://github.com/facebookresearch/hydra) `_target_` configs (with [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) for `builds` specs), and `MetaflowStepAdapter` turns an operator into a [Metaflow](https://github.com/Netflix/metaflow) step. For [MLflow](https://github.com/mlflow/mlflow) and [W&B](https://github.com/wandb/wandb) the package gives the `ExperimentTracker` protocol and an extra that pins each library, and no adapter yet.
+
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_overview/pipekit_experiment_overview.png" alt="pipekit-experiment in one picture: one content address for a model, built from the pipeline's state and its weights, and the five things done with it: store, verify, promote, record and hand over" width="100%"></p>
+
+## 🌟 Highlights
+
+- 🔐 **Content addresses**: `store` returns `pipeline_hash(op, weights)`, so storing the same operator and weights twice is a no-op that merges their tags, and `b""` and `None` weights give the same address.
+- 🛡️ **Loading verifies**: `load` and `load_weights` re-hash the stored `operator.json` and `weights.bin` and raise `HashMismatchError` when they no longer match, and `load` also checks that the rebuilt operator hashes back to $`h`$.
+- 🏷️ **Promotion by tag**: `tag` refuses to move a tag that already names a hash unless you pass `force=True`, so promoting and rolling back stay deliberate, and `list(tags=...)` filters models by their metadata.
+- ☁️ **Two backends, one code path**: `LocalModelRegistry` writes through a temp file and `os.replace`, so a crash never leaves half a file, and `S3ModelRegistry` shares its store, load and tag code on any fsspec URI.
+- 🧾 **Run records**: `TrainingArtifact` and `InferenceArtifact` are JSON records that pin what a run used by hash and bring the models back with `reload_model` and `reload_models`, beside the plain `Run`, `RunMetrics` and `RunArtifacts`.
+- 🔌 **Seams checked by shape**: `ModelRegistry` and `ExperimentTracker` are runtime-checkable protocols, so a registry or tracker for any tool satisfies them without inheriting from this package.
+- 🌉 **Bridges with a sandbox**: `HydraConfigLoader.from_yaml_sandboxed` builds a pipeline from untrusted `_target_` YAML using only the classes registered with `pipekit_ops.register`, and never calls `hydra.utils.instantiate`.
+
+## 📐 One address, five questions
+
+Every module answers a question about a stored model, and each answer is read from $`h`$. We write $`s'`$ and $`w'`$ for the state and the weights as they are read back from storage.
+
+| Question | Equation | Module |
+|---|---|---|
+| Which model is this? | $`h = \mathrm{sha256}(\mathrm{json}(s) \Vert \mathtt{0x00} \Vert w)`$ | `registry`: `store` |
+| Is it still the model we validated? | $`\mathrm{sha256}(\mathrm{json}(s') \Vert \mathtt{0x00} \Vert w') = h`$ | `registry`: `load`, `load_weights`, `HashMismatchError` |
+| Which model is in service? | $`\mathrm{tag} \mapsto h`$ | `registry`: `tag`, `resolve_tag`, `list` |
+| What did a run use? | the record holds every $`h`$ | `artifacts`, `run` |
+| Can another tool store or track? | any object with the protocol's methods | `protocols`, `bridges` |
+
+The second row is two checks. The stored text and bytes must hash to $`h`$, which catches a file edited after `store`, and the operator rebuilt from them must hash to $`h`$ as well, which catches a state that does not round-trip through `Operator.from_state`. An operator that holds a closure (a `Lambda`, a JAX model wrapper) is marked `forbid_in_yaml`, so `load` cannot rebuild it and raises, while its weights are still checked and readable with `load_weights`; the [quickstart](https://jejjohnson.github.io/pipekit/quickstart-experiment/) shows that path and the layout on disk.
+
+## 📥 Install
+
+pipekit-experiment is not on PyPI, so install it from the pipekit repository on GitHub. Its one dependency is pipekit-ops, which is not on PyPI either and has no third-party dependencies, so the two are installed together; the base install brings in no third-party package and needs Python 3.12 or newer.
+
+```bash
+pip install "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" "pipekit-experiment @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-experiment"
+```
+
+Six extras add the tools: `s3` (fsspec and s3fs) for `S3ModelRegistry`, `dvc` (the DVC package, though the bridge calls the `dvc` CLI it installs), `hydra` (hydra-core and hydra-zen) for `HydraConfigLoader`, `metaflow` for `MetaflowStepAdapter`, and `mlflow` and `wandb`, which only pin those libraries for a tracker you write. Each bridge imports its tool on first use and says which extra to install when it is missing, so the package imports cleanly with no extras.
+
+```bash
+pip install "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-ops" "pipekit-experiment[s3] @ git+https://github.com/jejjohnson/pipekit.git#subdirectory=packages/pipekit-experiment"
+```
+
+A project that depends on it pins one tag of the pipekit repository for every pipekit package it uses. uv reads `[tool.uv.sources]` only from the project it installs, so pipekit-experiment's requirement on pipekit-ops needs its own entry, and two different tags would give uv two URLs for pipekit-ops, which it reports as a conflict.
+
+```toml
+[project]
+dependencies = ["pipekit-ops", "pipekit-experiment[s3]"]"]
+
+[tool.uv.sources]
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
+pipekit-experiment = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-experiment", tag = "pipekit-array-v0.3.1" }
+```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
+
+## 🛰️ Quickstart: pin a plume detector's pre-processing
+
+We store the pre-processing that sits in front of the plume detector, with four opaque weight bytes $`w`$ beside it ($`N_w = 4`$), promote it to `production`, pin it in an inference record and then edit the stored weights by hand. The operator's state $`s`$ is the record of `Pick` and `Rename` inside one `Sequential`, and the scene is one dict of four named scalars.
 
 ```python
 import pathlib
+import tempfile
+
+import pipekit_experiment as pe
+from pipekit_ops import Pick, Rename, dumps
+
+
+# Shapes: one scene of 4 named scalars; h is a 64-character hex digest
+
+root = pathlib.Path(tempfile.mkdtemp())
+scene = {"xch4": 1912.0, "u10": 3.1, "v10": -0.4, "qa": 1}
+
+# today (pipekit-ops)
+# the pre-processing a plume detector was trained behind
+prep = Pick(["xch4", "u10", "v10"]) | Rename({"u10": "u", "v10": "v"})
+# user
+# w, opaque bytes such as a model's weights
+weights = b"\x00\x01\x02\x03"
 
 # today (pipekit-experiment)
-# a reproducibility record that pins the model by hash
-artifact = pe.InferenceArtifact(
-    pipeline_yaml="...",  # user: your inference pipeline, from pipekit_ops.dumps
-    pinned_model_hashes={"prep": h},
+registry = pe.LocalModelRegistry(root)
+# today (pipekit-experiment)
+# h = sha256(json(s) ‖ 0x00 ‖ w)
+model_hash = registry.store(prep, tags={"sensor": "emit"}, weights=weights)
+# today (pipekit-experiment)
+# the same s and w give the same h, so storing again is a no-op
+same_hash = registry.store(prep, weights=weights) == model_hash
+# today (pipekit-experiment)
+# promote: the tag "production" now names h
+registry.tag(model_hash, "production")
+# today (pipekit-experiment)
+# load by tag, after checking the stored files against h
+served = registry.load("production")
+
+# today (pipekit-experiment)
+# an inference record that pins the model by h
+record = pe.InferenceArtifact(
+    pipeline_yaml=dumps(served),
+    pinned_model_hashes={"prep": model_hash},
 )
-artifact.save(pathlib.Path(root) / "inference.json")
-pinned = pe.InferenceArtifact.load(pathlib.Path(root) / "inference.json")
-print(pinned.reload_models(registry)["prep"].state == prep.state)  # True
+record.save(root / "inference.json")
+# today (pipekit-experiment)
+pinned = pe.InferenceArtifact.load(root / "inference.json")
+reloaded = pinned.reload_models(registry)["prep"]
 
 # user
-# edit the stored weights behind the registry's back
-(pathlib.Path(root) / h / "weights.bin").write_bytes(b"tampered")
+# change the stored weights behind the registry's back
+(root / model_hash / "weights.bin").write_bytes(b"tampered")
 try:
-    registry.load(h)
+    # today (pipekit-experiment)
+    registry.load(model_hash)
+    refused = False
 except pe.HashMismatchError:
-    print("refused")                                   # refused
+    refused = True
+
+print(model_hash[:12], same_hash, served(scene), reloaded.state == prep.state, refused)
 ```
 
-## What ships
+This prints `d415f4253757 True {'xch4': 1912.0, 'u': 3.1, 'v': -0.4} True True`: the first twelve characters of $`h`$, the second `store` landing on the same address, the pre-processing served by tag (the quality flag dropped and the winds renamed), the model the inference record pinned coming back with the same state, and the registry refusing the entry once its weights were edited. Nothing here is specific to a dict pipeline, so storing a fitted scaler, a threshold or a JAX model's weights works the same way.
 
-Version 0.1.0.
+The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-experiment/) takes this further: the layout on disk and the calling convention, promotion and rollback by tag, operators that do not round-trip, the registry on an object store, a tracker written to the protocol, training records, and the DVC, Hydra and Metaflow bridges.
 
-| Module | Public names | Purpose |
-| --- | --- | --- |
-| `registry` | `LocalModelRegistry`, `S3ModelRegistry`, `HashMismatchError` | Content-addressed storage on a local disk or any fsspec URI |
-| `protocols` | `ModelRegistry`, `ExperimentTracker` | Runtime-checkable seams for registries and trackers |
-| `run` | `Run`, `RunMetrics`, `RunArtifacts` | Plain records of a run, its metrics and its attached files |
-| `artifacts` | `TrainingArtifact`, `InferenceArtifact` | JSON records that pin what a training or inference run used |
-| `bridges.dvc` | `DVCDatasetVersioning` | Dataset hashes through the DVC CLI (`[dvc]`) |
-| `bridges.hydra` | `HydraConfigLoader` | Pipelines to and from Hydra configs, with a sandboxed loader (`[hydra]`) |
-| `bridges.metaflow` | `MetaflowStepAdapter` | An operator as a Metaflow `@step` (`[metaflow]`) |
+## 🔬 What else is in the box
 
-The top-level names are exported from `pipekit_experiment`; the bridges to other tools are imported from their modules under `pipekit_experiment.bridges`.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_roles/pipekit_experiment_roles-dark.svg">
+    <img alt="pipekit-experiment on the GeoStack role ladder: the registries and run records as structures, the registry calls as primitives, with orchestration and the protocols beside the ladder" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_roles/pipekit_experiment_roles-light.svg" width="100%">
+  </picture>
+</p>
 
-### Not built yet
+The ten top-level names are exported from `pipekit_experiment` and listed in its `__all__`; the bridges are imported from their modules under `pipekit_experiment.bridges`, one module per tool. The package defines no Operator of its own: geostack's [pipekit shelf page](https://github.com/jejjohnson/geostack/blob/main/docs/design/skill_tree_pipekit.md) places it beside the role ladder, with orchestration, because it stores, records and hands over the steps and recipes that pipekit-ops builds.
 
-- **MLflow and W&B adapters.** The `[mlflow]` and `[wandb]` extras exist, but no `ExperimentTracker` for either ships, and no concrete tracker of any kind ships yet.
-  `pipekit_train.LogToExperiment` forwards to any object that satisfies the protocol.
-- **Per-cell benchmark runs.** pipekit-evaluate's benchmark ladder does not write a `Run` per cell yet.
+| Module | Symbols | Notes |
+|---|---|---|
+| `pipekit_experiment.registry` | `LocalModelRegistry`, `S3ModelRegistry`, `HashMismatchError` | Content-addressed storage on a local disk or any fsspec URI (`s3`), with `store`, `load`, `load_weights`, `list`, `tag` and `resolve_tag` |
+| `pipekit_experiment.protocols` | `ModelRegistry`, `ExperimentTracker` | Runtime-checkable seams for registries and trackers |
+| `pipekit_experiment.run` | `Run`, `RunMetrics`, `RunArtifacts` | Plain records of a run, its metric series and its attached files |
+| `pipekit_experiment.artifacts` | `TrainingArtifact`, `InferenceArtifact` | JSON records that pin what a training or inference run used |
+| `pipekit_experiment.bridges.dvc` | `DVCDatasetVersioning` | Dataset hashes through the DVC CLI (`dvc`) |
+| `pipekit_experiment.bridges.hydra` | `HydraConfigLoader` | Pipelines to and from Hydra `_target_` configs, with a sandboxed loader (`hydra`) |
+| `pipekit_experiment.bridges.metaflow` | `MetaflowStepAdapter` | An operator as a Metaflow `@step` (`metaflow`) |
 
-## How it works
+## 📓 Tutorials
 
-### Content addressing
+| # | Tutorial | What it shows |
+|---|---|---|
+| 1 | [Train an emulator](https://jejjohnson.github.io/pipekit/train-emulator/) | a pipekit-train loop whose model is stored in a `LocalModelRegistry` and whose run returns a `TrainingArtifact` |
+| 2 | [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/) | a trained model registered by hash and dropped into a pipekit-cycle forecast |
+| 3 | [Run inference](https://jejjohnson.github.io/pipekit/inference/) | an inference pipeline that loads its model from the registry |
 
-`store(op, weights=...)` writes three files under `<root>/<hash>/`: `operator.json` (the operator's state), `weights.bin` (the bytes, if any) and `metadata.json` (the tags).
-The hash is `pipeline_hash(op, weights)`, a sha256 over the stable JSON of the state and the weight bytes, so storing the same content twice is a no-op that merges the tags.
-`b""` and `None` weights hash the same, so the layout never depends on which one you passed.
-Tags live in `<root>/_tags/<name>`, one hash per file.
-`tag(h, name)` refuses to move an existing tag unless you pass `force=True`, which is how promotion stays deliberate.
-`LocalModelRegistry` writes through a temp file and `os.replace`, so a crash never leaves half a file; `S3ModelRegistry` is as atomic as the object store under it.
+## 📖 Documentation
 
-### Loading verifies
+- **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-experiment/)**: the address and the layout on disk, the calling convention, tags, operators that do not round-trip, the object-store backend, trackers and run records, the three bridges, and what is not built yet.
+- **[Protocols](https://jejjohnson.github.io/pipekit/protocols/)**: the workspace's protocols side by side, `ExperimentTracker` and `ModelRegistry` among them.
+- **[Patterns](https://jejjohnson.github.io/pipekit/patterns/)**: one pre-processing object for training and serving, promotion by tag, and the feedback loop, each built on the registry.
+- **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/)**: every public symbol, generated from the docstrings.
+- **[Design decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-experiment/docs/design/decisions.md)**: why the tool integrations are bridges (X1).
 
-`load(ref)` takes a hash or a tag, re-hashes the stored text and weights, and raises `HashMismatchError` when they no longer match.
-It then rebuilds the operator with `Operator.from_state` and checks that the rebuilt operator hashes back to the same value.
-An entry stored before pipekit 0.2.0 (when the core was imported as `pipekit`) still loads: the module names are updated with `pipekit_ops.upgrade_state` and the rest is checked as before.
-References and tag names must be single path segments, so a caller-supplied string never escapes the registry root.
+## 🧩 Ecosystem
 
-### Operators that do not round-trip
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_ecosystem/pipekit_experiment_ecosystem-dark.svg">
+    <img alt="The package that imports pipekit-experiment on main: pipekit-train, through its experiment extra" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_experiment_ecosystem/pipekit_experiment_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
-An operator marked `forbid_in_yaml` (a `Lambda`, a `CallableForward`, a JAX model wrapper) has a config that is a debug payload, not a recipe, so `load` cannot rebuild it and raises.
-Its weights are still verified and readable with `load_weights`.
-The pattern for those models is to rebuild a skeleton in code and read the weights into it, which is what `pipekit_jax.JaxModelOp.from_registry` does.
+pipekit-experiment is one package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core tier of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the address of a stored model and the records that point at it, and composes the rest in:
 
-### Trackers and artifacts
+| Concern | Owner |
+|---|---|
+| Operator state, `from_state`, `pipeline_hash`, `register` and the sandboxed loader | [`pipekit-ops`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) |
+| Object storage for `S3ModelRegistry` (the `s3` extra) | [`fsspec`](https://github.com/fsspec/filesystem_spec) and [`s3fs`](https://github.com/fsspec/s3fs) |
+| Dataset versions for `DVCDatasetVersioning` (the `dvc` extra) | [`DVC`](https://github.com/iterative/dvc) |
+| Configs for `HydraConfigLoader` (the `hydra` extra) | [`Hydra`](https://github.com/facebookresearch/hydra) and [`hydra-zen`](https://github.com/mit-ll-responsible-ai/hydra-zen) |
+| Flow steps for `MetaflowStepAdapter` (the `metaflow` extra) | [`Metaflow`](https://github.com/Netflix/metaflow) |
+| Experiment tracking behind `ExperimentTracker` (the `mlflow` and `wandb` extras, no adapter yet) | [`MLflow`](https://github.com/mlflow/mlflow) and [`W&B`](https://github.com/wandb/wandb) |
 
-`ExperimentTracker` is four calls (`start_run`, `log_metrics`, `log_artifact`, `end_run`), and an adapter for any tool satisfies it structurally.
-`TrainingArtifact` records the training pipeline, the dataset hash, the trained-model hash, the tracker run and the lockfile; `pipekit_train.TrainingLoop.run()` returns one when this package is installed.
-`InferenceArtifact` pins every registry-resolved operator of an inference pipeline by hash, and `reload_models(registry)` brings them back.
+Dependencies point one way: pipekit-experiment imports pipekit-ops and nothing else from the workspace (not pipekit-array, though array-backed operators store like any other), and no package it builds on imports it. Inside the workspace, pipekit-train's `experiment` extra makes `TrainingLoop.run()` return a `TrainingArtifact` (it imports `pipekit_experiment.artifacts` when the package is installed), and its `Checkpoint` and `LogToExperiment` callbacks take any `ModelRegistry` or `ExperimentTracker` by shape; pipekit-jax imports nothing from it, and `JaxModelOp.from_registry` reads weights from any `ModelRegistry`; the `pipekit` umbrella installs it. Outside the workspace, vardax lists it in its `persist` extra and geostack's report notebooks import `LocalModelRegistry`.
 
-### The adapters
+## 🌳 Repository layout
 
-`DVCDatasetVersioning` shells out to the `dvc` CLI (`add`, `pull`, `push`, `hash`, `status`) and `record_hash_in(path, sink)` puts a dataset's hash into a dict you pass, ready for a `TrainingArtifact`.
-`HydraConfigLoader` turns a pipeline into a Hydra config and back.
-`from_yaml` calls `hydra.utils.instantiate`, which will import any dotted path, so for YAML you did not write use `from_yaml_sandboxed`, which builds only the classes you registered with `pipekit_ops.register`:
-
-```python
-from pipekit_experiment.bridges.hydra import HydraConfigLoader
-from pipekit_ops import Get, Rename, Sequential, register
-
-# today (pipekit-ops)
-wind = Rename({"u10": "u", "v10": "v"}) | Get("u")
-print(wind({"xch4": 1912.0, "u10": 3.1, "v10": -0.4}))  # 3.1
-
-# today (pipekit-experiment)
-text = HydraConfigLoader.to_yaml(wind)                   # through hydra_zen.builds
-print(HydraConfigLoader.from_yaml(text).state == wind.state)  # True
-
-# today (pipekit-ops)
-# untrusted YAML builds only the classes you register
-for cls in (Sequential, Rename, Get):
-    register(cls)
-print(HydraConfigLoader.from_yaml_sandboxed(text).state == wind.state)  # True
+```
+packages/pipekit-experiment/
+├── src/pipekit_experiment/
+│   ├── __init__.py      ← the ten public names
+│   ├── registry.py      ← LocalModelRegistry, S3ModelRegistry, HashMismatchError
+│   ├── protocols.py     ← ModelRegistry, ExperimentTracker
+│   ├── run.py           ← Run, RunMetrics, RunArtifacts
+│   ├── artifacts.py     ← TrainingArtifact, InferenceArtifact
+│   └── bridges/         ← dvc.py, hydra.py, metaflow.py, one module per tool (X1)
+├── tests/               ← one file per module and per bridge
+└── docs/design/         ← decisions.md
 ```
 
-`MetaflowStepAdapter.as_step(op, name=..., inputs=[...])` builds a step that reads `self.<input>` for each input, applies the operator and writes `self.<name>`; `decorate=False` gives the bare function, which you can test without Metaflow:
+## ⚙️ Development
 
-```python
-from metaflow import FlowSpec
-from pipekit_experiment.bridges.metaflow import MetaflowStepAdapter
+The package is developed inside the workspace, so clone the repository and run the tasks from its root.
 
-
-# today (pipekit-experiment)
-class WindFlow(FlowSpec):
-    # reads self.scene, writes self.u
-    u = MetaflowStepAdapter.as_step(wind, name="u", inputs=["scene"])
-
-
-# user
-class Namespace:
-    scene = {"xch4": 1912.0, "u10": 3.1, "v10": -0.4}
-
-
-# today (pipekit-experiment)
-step = MetaflowStepAdapter.as_step(wind, name="u", inputs=["scene"], decorate=False)
-ns = Namespace()
-step(ns)
-print(ns.u)  # 3.1
+```bash
+git clone https://github.com/jejjohnson/pipekit.git
+cd pipekit
+make install                                        # uv sync + the pre-commit hooks
+uv run pytest packages/pipekit-experiment/tests     # this package's tests
+make lint                                           # ruff check on the whole repo
+make typecheck                                      # ty check on every package
+make docs                                           # the MyST prose and the API reference, with a link check
 ```
 
-## Learn more
+`make help` lists every task. [`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md) holds the rules for contributors and coding agents across the workspace: the checks to pass before every commit, the docs build and the commit conventions.
 
-- API reference: [pipekit-experiment](https://jejjohnson.github.io/pipekit/reference/pipekit-experiment/).
-- Tutorials: [Train, register, forecast](https://jejjohnson.github.io/pipekit/train-register-forecast/), [Train an emulator](https://jejjohnson.github.io/pipekit/train-emulator/).
-- Design: master plan [Report 12](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_10_pipekit_experiment.md).
-- The foundations: [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) and [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array).
-- Packages that use this one: [pipekit-train](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train) (training artifacts, `LogToExperiment`), [pipekit-jax](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-jax) (`JaxModelOp.from_registry`).
-
-## License
+## 📄 License
 
 MIT. See [LICENSE](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-experiment/LICENSE).
