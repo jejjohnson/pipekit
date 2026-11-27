@@ -279,19 +279,19 @@ class KerasModelOp(Operator):
         return self.model(x, training=False)
 
     def serialize_weights(self) -> bytes:
-        """b"PKKRW1\\n" | header length | JSON [(path, shape, dtype)] | raw arrays."""
+        """b"PKKRW1\\n" | header length | JSON [(name, shape, dtype)] | raw arrays."""
 
     def with_weights(self, blob: bytes, *, copy: bool = True) -> "KerasModelOp":
         """The skeleton with the blob's weights; a copy unless copy=False."""
 
-    @classmethod
-    def from_registry(cls, skeleton, registry, ref) -> "KerasModelOp": ...
+    def from_registry(self, registry, ref) -> "KerasModelOp":
+        """The weights stored under ref, loaded into a copy of the skeleton self."""
 
     def get_config(self) -> dict[str, Any]:
         return {"model_class": type(self.model).__qualname__}
 ```
 
-`with_weights` copies the skeleton's model, checks the header's paths, shapes and dtypes against the copy, and loads with `set_weights`, so a blob never lands in a model of another shape. The copy is `keras.models.clone_model` with a `clone_function` that rebuilds an `EquinoxLayer` from its `module` (§8.7), because `clone_model` otherwise rebuilds each layer from its config and an Equinox module has none. A model that `clone_model` cannot copy at all, such as a subclassed model without `get_config`, raises a `TypeError` that names `with_weights(blob, copy=False)`, which loads the blob into the skeleton's own model instead. Like `JaxModelOp`, the skeleton is needed because a model's architecture is Python, not bytes. A user who wants a portable file calls `model.save` on `op.model`; that file is not what the registry hashes.
+`with_weights` copies the skeleton's model, checks the header's weight names, shapes and dtypes against the copy, and loads with `set_weights`, so a blob never lands in a model of another shape. The names are the weights' own (`kernel`, `bias`), not their full paths, because Keras numbers layer names per process (`dense_2`), so a full path would give the same weights two hashes. The copy is `keras.models.clone_model` with a `clone_function` that rebuilds an `EquinoxLayer` from its `module` (§8.7), because `clone_model` otherwise rebuilds each layer from its config and an Equinox module has none. A model that `clone_model` cannot copy at all, such as a subclassed model without `get_config`, raises a `TypeError` that names `with_weights(blob, copy=False)`, which loads the blob into the skeleton's own model instead. Like `JaxModelOp`, the skeleton is needed because a model's architecture is Python, not bytes. A user who wants a portable file calls `model.save` on `op.model`; that file is not what the registry hashes.
 
 ### 8.7 Equinox models: `EquinoxLayer` (D21)
 
