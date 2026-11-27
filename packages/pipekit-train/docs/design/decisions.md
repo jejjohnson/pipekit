@@ -491,6 +491,8 @@ doesn't shard evaluation yet; this makes that possible.
 - Data-parallel training goes through `keras.distribution`, later, not through the Equinox `ShardingSpec`.
 - The Grain batch pipeline moves out of the Equinox area so both backends read the same batches.
 
+**Amended (#320):** the backend does not reset Keras's metrics after each step. It reads each step's own loss off two successive running means, so the cost in option (A) of resetting metrics, and the first consequence above, do not hold: a user's Keras callback sees the epoch's means. The measurement in the context, per-step losses after `reset_metrics()`, compared them with `train_on_batch`, which itself returns a running mean.
+
 ---
 
 ## D19: The Keras backend runs on JAX only
