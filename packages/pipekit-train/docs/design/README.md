@@ -40,7 +40,7 @@ docs/design/
 │   ├── models.md          # Layer 3 — TrainingLoop (StatefulOperator),
 │   │                      # the outer loop, the TrainingArtifact handshake.
 │   └── adapters.md        # Layer 4 — Equinox (v0.1 reference),
-│                          # Keras (v0.3 scaffold).
+│                          # Keras (compile and fit on JAX).
 └── examples/
     ├── README.md          # Index and reading order.
     ├── direct.md          # Cloud-mask classifier (CatalogDataset).

@@ -119,6 +119,6 @@ reloaded_model = loaded.reload_model(registry)
 
 **What changes for different backends:**
 
-Swap `backend="equinox"` for `backend="keras"` (v0.3) and supply
-a Keras UNet via `pipekit-array.ModelOp` instead of a JaxModelOp.
+Swap `backend="equinox"` for `backend="keras"` and supply a Keras
+UNet in a `KerasModelOp` instead of a JaxModelOp.
 The rest of the pipeline is unchanged.

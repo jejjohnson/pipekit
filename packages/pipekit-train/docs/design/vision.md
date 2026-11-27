@@ -50,10 +50,10 @@ pieces, all on top of `pipekit-ops` core:
   `pipekit-experiment.ExperimentTracker`.
 - **Backend adapters** under `pipekit_train.adapters.*`, one per
   training tool, extras-gated. The Equinox adapter is the v0.1
-  reference; Keras is scaffolded.
+  reference; Keras 3 trains through its own `compile` and `fit`.
 
 The trained model is itself a `pipekit_ops.Operator`. After training, the
-output is a `pipekit-array.ModelOp` (PyTorch / Keras) or a
+output is a `KerasModelOp` (Keras) or a
 `pipekit-jax.JaxModelOp` (Equinox) wrapping the trained weights, and
 its content hash flows into the `pipekit-experiment` model registry.
 

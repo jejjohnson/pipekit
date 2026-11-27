@@ -172,10 +172,11 @@ The pipekit-train extension on top of these is:
 
 ---
 
-## Per-adapter primitives — Keras (v0.3 scaffold)
+## Per-adapter primitives — Keras
 
 Keras's idiom is `model.compile(loss=..., optimizer=...)` +
-`model.fit(...)`. The Keras adapter (when implemented) maps `Loss`
-to a `keras.losses.Loss` subclass and configures `model.compile` from
-the rest of the `TrainingLoop` config. Documented in
-[adapters.md](adapters.md#keras-v03).
+`model.fit(...)`. The Keras adapter maps `Loss` to a
+`keras.losses.Loss`, with its auxiliary terms as batch-weighted metrics,
+and configures `model.compile` from the rest of the `TrainingLoop`
+config. Documented in [adapters.md](adapters.md#keras-implemented) and
+[keras_adapter.md](../keras_adapter.md).
