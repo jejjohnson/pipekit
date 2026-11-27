@@ -1,22 +1,23 @@
-"""Tests for the Keras adapter stub.
+"""The Keras backend's area without Keras installed.
 
-The adapter module ships as a NotImplementedError stub per the design (see
-``docs/design/api/adapters.md``). It must be importable without Keras
-installed, and ``run`` must raise a clear message. (The Equinox adapter is the
-reference implementation and is tested in ``tests/adapters/test_equinox.py``.)
+Importing ``pipekit_train.backends.keras`` must not import Keras, so that a CLI
+can branch on what is installed; using it without Keras must name the extra.
+The backend itself is tested in ``tests/adapters/test_keras_run.py``.
 """
 
 from __future__ import annotations
 
-import pytest
-from pipekit_train.backends import keras as keras_adapter
+import subprocess
+import sys
 
 
-def test_keras_adapter_run_raises_not_implemented():
-    with pytest.raises(NotImplementedError, match=r"v0\.3"):
-        keras_adapter.run(loop=None)
-
-
-def test_keras_message_points_at_design_doc():
-    with pytest.raises(NotImplementedError, match=r"docs/design"):
-        keras_adapter.run(loop=None)
+def test_using_the_keras_backend_without_keras_names_the_extra() -> None:
+    code = (
+        "import sys; sys.modules['keras'] = None\n"
+        "from pipekit_train.backends import keras as area\n"
+        "try:\n    area.import_keras()\nexcept ImportError as e:\n    print(e)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert "pipekit-train[keras]" in out.stdout
