@@ -87,6 +87,15 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             "KerasTask(keep_compile=True) needs a compiled model; call "
             "model.compile(...) first."
         )
+    if int(getattr(model, "steps_per_execution", 1)) != 1:
+        raise ValueError(
+            "backend='keras' runs the loop's callbacks after every step, so the "
+            "model must be compiled with steps_per_execution=1; got "
+            f"{model.steps_per_execution}."
+        )
+    # A model compiled before may arrive with steps already taken; the loop's
+    # budget and cadences count this run's steps.
+    offset = int(model.optimizer.iterations.numpy())
 
     period = loop.eval_every_n_steps
     validation: dict[str, Any] = {}
@@ -94,7 +103,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
         steps, batches = _validation_batches(loop.val_dataset, loop.batch_size)
         validation = {"validation_data": batches, "validation_steps": steps}
 
-    bridge = _bridge(keras)(loop, period, per_step)
+    bridge = _bridge(keras)(loop, period, per_step, offset)
     try:
         model.fit(
             _train_batches(source, first),
@@ -109,7 +118,7 @@ def run(loop: TrainingLoop) -> tuple[Operator, dict[str, Any]]:
             loop.metric_writer.close()
 
     trained_model_op = copy.copy(loop.model_op)
-    final_step = int(model.optimizer.iterations.numpy())
+    final_step = int(model.optimizer.iterations.numpy()) - offset
     _common.dispatch(
         loop.callbacks,
         "on_train_end",
@@ -236,9 +245,14 @@ def _bridge(keras: Any) -> type:
 
     class _PipekitBridge(keras.callbacks.Callback):
         def __init__(
-            self, loop: TrainingLoop, period: int, per_step: tuple[str, ...]
+            self,
+            loop: TrainingLoop,
+            period: int,
+            per_step: tuple[str, ...],
+            offset: int = 0,
         ) -> None:
             super().__init__()
+            self.offset = offset
             self.loop = loop
             self.period = period
             self.per_step = per_step
@@ -247,7 +261,8 @@ def _bridge(keras: Any) -> type:
             self._means: dict[str, float] = {}
 
         def _step(self) -> int:
-            return int(self.model.optimizer.iterations.numpy())
+            """This run's step: the optimiser's count less the steps it came with."""
+            return int(self.model.optimizer.iterations.numpy()) - self.offset
 
         def _state(self, metrics: dict[str, float]) -> Any:
             return _carry(self.loop.model_op, self._step(), self.loop, metrics)

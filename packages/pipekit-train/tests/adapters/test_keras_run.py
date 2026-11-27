@@ -221,6 +221,34 @@ def test_keep_compile_keeps_the_models_own_loss() -> None:
     assert set(artifact.backend_info["final_metrics"]) == {"loss"}
 
 
+def test_keep_compile_counts_this_runs_steps() -> None:
+    """A model that trained before keeps its optimiser count; the budget is new."""
+    model = _model()
+    model.compile(optimizer="adam", loss="mse")
+    data = _Pairs(32, 5)
+    for _ in range(7):
+        model.train_on_batch(data.x[:16], data.y[:16])
+    recorder = _Recorder()
+    _, artifact = _loop(
+        model,
+        loss=None,
+        task=KerasTask(keep_compile=True),
+        optimizer_config={"name": "adamw", "lr": 3e-4},
+        max_steps=5,
+        callbacks=(recorder,),
+    ).run()
+    assert artifact.backend_info["final_step"] == 5
+    assert len(recorder.step_metrics) == 5
+    assert int(model.optimizer.iterations.numpy()) == 12
+
+
+def test_keep_compile_needs_one_step_per_execution() -> None:
+    model = _model()
+    model.compile(optimizer="adam", loss="mse", steps_per_execution=2)
+    with pytest.raises(ValueError, match="steps_per_execution=1"):
+        _loop(model, loss=None, task=KerasTask(keep_compile=True)).run()
+
+
 def test_a_keras_loss_in_the_task_replaces_the_loop_loss() -> None:
     _, artifact = _loop(
         _model(), loss=None, task=KerasTask(loss="mae", metrics=("mse",)), max_steps=5
