@@ -29,12 +29,13 @@ from pipekit_train.backends._batches import (
 class Feed:
     """The training batches, numbered by the step that trains on them.
 
-    Keras reads two batches ahead when it wraps a generator, to learn their
-    shapes. A ``fit`` call of one step therefore reads a batch it does not train
-    on, which would shift the saved position and be lost to the next ``fit``
-    call. The feed keeps each batch it read, with the data position after it,
-    until training has passed it, and a new generator replays the batches read
-    but not yet trained on.
+    Keras reads ahead of the step it trains: a ``fit`` call of n steps reads
+    n + 1 batches from a generator (Keras 3.14). The data position after the
+    k-th step is therefore not the source's position when step k ends, and the
+    batch read ahead at the end of one ``fit`` call would be lost to the next.
+    The feed keeps each batch it read, with the data position after it, until
+    training has passed it, and a new generator replays the batches read but
+    not yet trained on.
 
     Args:
         source: The training batches.
