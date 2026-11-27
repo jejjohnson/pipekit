@@ -103,12 +103,14 @@ A uv project points `[tool.uv.sources]` at the repository with one tag for every
 
 ```toml
 [project]
-dependencies = ["pipekit-array[numpy,compat]"]
+dependencies = ["pipekit-ops", "pipekit-array[numpy,compat]"]"]
 
 [tool.uv.sources]
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.3.1" }
 pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-array-v0.3.1" }
 ```
+
+uv applies `[tool.uv.sources]` only to a project's direct dependencies, so every pipekit package named there is listed in `dependencies` too.
 
 ## 🛰️ Quickstart: a year of NDVI over one tile
 
