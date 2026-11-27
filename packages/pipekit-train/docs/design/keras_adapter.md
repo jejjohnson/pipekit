@@ -49,7 +49,11 @@ When P does not divide K, the last Keras epoch is cut short at step K by `stop_t
 \bar{\ell}_ j = \frac{1}{j} \sum_{i=1}^{j} \ell_i
 ```
 
-while the Equinox backend writes $\ell_ j$ itself. Resetting Keras's metrics after each step makes the reported value $\ell_ j$ again (§5).
+while the Equinox backend writes $\ell_ j$ itself. Two successive means give the step's own value back, without touching Keras's metrics, so a user's Keras callbacks still see the epoch's means (§5):
+
+```math
+\ell_ j = j \bar{\ell}_ j - (j - 1) \bar{\ell}_ {j-1}
+```
 
 **Validation.** The validation loss should be the per-sample mean over all N_val samples, with batches of size $n_ b$ and the last one ragged:
 
@@ -67,7 +71,7 @@ Keras's loss tracker weights each batch by its size and gives the left side. A m
 | Training | `Model.compile(optimizer, loss, metrics)`, `Model.fit(x, steps_per_epoch, epochs, initial_epoch, validation_data, validation_steps, callbacks)` | the loop (D18) |
 | Data | `fit` takes a Python generator of `(x, y)` batches; Keras 3.11 and later also read a Grain dataset directly | a generator over the loop's own Grain iterator, so its position can be saved |
 | Loss | `keras.losses.Loss` with `call(y_true, y_pred)`, and `add_loss` inside a layer's `call` | the bridge from `pipekit_train.Loss` (argument order swaps) |
-| Metrics | `keras.metrics.Metric` with `update_state(y_true, y_pred, sample_weight)`, `Model.reset_metrics()` | the auxiliary terms of a `Loss`, and per-step logs |
+| Metrics | `keras.metrics.Metric` with `update_state(y_true, y_pred, sample_weight)` | the auxiliary terms of a `Loss` |
 | Optimisers | `keras.optimizers.Adam`, `AdamW`, `SGD`, `RMSprop`; `optimizer.iterations`, `optimizer.variables` | `optimizer_config`, the step counter and checkpoints |
 | Callbacks | `keras.callbacks.Callback`: `on_train_batch_end`, `on_test_end`, `on_epoch_end`; `self.model.stop_training = True` | the bridge to the pipekit callbacks |
 | Weights | `Model.weights` (each with a `.path`, shape and dtype), `get_weights()`, `set_weights()` | the weight blob of `KerasModelOp` (D20) |
@@ -88,7 +92,7 @@ Five scripts, run on Keras 3.15.1, JAX 0.12.1, Equinox 0.13.8, optax and Grain o
 | `fit` with P = 100, K = 250, a stop at step 250 | `optimizer.iterations` = 250; the generator was read 250 times, so it does not read ahead |
 | Validation events in that run | at steps 100, 200 and 250 |
 | `logs["loss"]` in `on_train_batch_end` | 6.2364, 5.7980, 5.8843: the running means of the per-batch losses 6.2364, 5.3597, 6.0567 |
-| The same with `reset_metrics()` after each step | equal to `train_on_batch` per step, to every printed digit |
+| The per-step loss recovered from two successive means (#320) | equal, to 1e-5, to each batch's loss computed by hand at the weights before its step; `train_on_batch` is no reference, because it too returns the running mean over its calls |
 | Validation on 70 samples in batches of 32 | Keras's loss 3.234939, the exact per-sample mean 3.234939; a scalar metric function 3.289946, the mean of the batch means |
 | A blob of `get_weights()` with a (path, shape, dtype) header | the same bytes on two calls; loaded into a skeleton built with another seed, the predictions differ by 0.0 |
 | `model.save` twice, two seconds apart | different SHA-256 for the `.keras` files; the same for `.weights.h5` |
@@ -97,6 +101,7 @@ Five scripts, run on Keras 3.15.1, JAX 0.12.1, Equinox 0.13.8, optax and Grain o
 | Three one-period `fit` calls on one model | 1.06 s, 0.23 s and 0.26 s: the train function is compiled once |
 | `optimizer_config` defaults | Keras `Adam` and `AdamW` take `epsilon=1e-7`, optax `eps=1e-8`; Keras `AdamW` takes `weight_decay=0.004`, optax `1e-4` |
 | 200 steps of one Equinox MLP on the same batches, optax against Keras | SGD: weights identical; Adam with `eps=1e-8` on both: largest difference 4.8e-7; AdamW with matched settings: 1.3e-6; Adam with Keras's default `epsilon`: 8.1e-6 (weights up to 0.88) |
+| One step, then 100 and 2,000 steps, of a 64-wide Equinox MLP under `backend="equinox"` and `backend="keras"` with ε matched (#320) | 2.5e-4, 9.6e-4 and 1.0e-1 apart: Keras adds ε before the bias correction, which matters where gradients are small; with ε scaled by √(1−β₂ᵗ), a 64-wide Keras MLP matches optax to 2e-6 over 100 steps |
 | An `eqx.nn.MLP` in a `JaxLayer`, as a flat list of array leaves | one SGD step equals the hand-written JAX step to 3.0e-8; after 300 steps the module rebuilt from the layer is an `MLP` and predicts what the Keras model predicts, difference 0.0 |
 | The same module given to `JaxLayer` without copying its arrays | after one step its arrays are deleted (`RuntimeError: Array has been deleted`): Keras donates the buffers it trains. With copied arrays the original module stays usable |
 | An Equinox module behind a Keras `Dense` layer | trains: loss 4.75 to 3.81 in 20 epochs |
@@ -136,7 +141,7 @@ What stays local to the backend: the loss bridge, the batch-weighted metric for 
 
 Four choices had real alternatives. Each is a record in [`decisions.md`](decisions.md); this is the summary.
 
-- **D18: wrap `compile` and `fit`.** The alternative was a stateless JAX loop that treats Keras only as a model definition and reuses the Equinox loop. That loop would match the Equinox backend step for step, but it would ignore the model's `compile`, skip Keras callbacks and Keras Tuner, and write a second training loop, which D1 rules out. `fit` gives exact step counts and exact resumes in the measurements of §5, so its cost is two semantics the design states: metrics are reset after each step, and checkpoints fall on period boundaries.
+- **D18: wrap `compile` and `fit`.** The alternative was a stateless JAX loop that treats Keras only as a model definition and reuses the Equinox loop. That loop would match the Equinox backend step for step, but it would ignore the model's `compile`, skip Keras callbacks and Keras Tuner, and write a second training loop, which D1 rules out. `fit` gives exact step counts and exact resumes in the measurements of §5, so its cost is one semantic the design states: checkpoints fall on period boundaries. Keras logs running means, and the per-step values are read off them (§3).
 - **D19: the JAX backend only.** Keras also runs on TensorFlow and PyTorch, but D15 removed PyTorch training, the stack's arrays are JAX, `keras.distribution` is JAX-only, and every measurement above is on JAX. The backend sets `KERAS_BACKEND=jax` when Keras is not yet imported and raises when Keras was imported on another backend.
 - **D20: `KerasModelOp` lives in the Keras area, with its own weight blob.** `pipekit_array.ModelOp` is not built, holds no weights by design (A8), and pipekit-array takes no backend dependency. The `.keras` file is not byte-stable. So the operator writes a blob of a signature header and the raw arrays, as `pipekit_jax.JaxModelOp` does for Equinox.
 - **D21: Equinox models train under the Keras backend and come back in their own wrapper.** The alternatives were to refuse them, which leaves Equinox users without Keras Tuner or Keras layers and makes the cross-backend comparison need two models, or to return a `KerasModelOp`, which would lose `JaxModelOp`'s registry round trip and make the output class depend on the backend. The module runs as an `EquinoxLayer`, a `JaxLayer` over copies of its array leaves, and `backend="equinox"` stays the reference for Equinox models.
@@ -210,7 +215,7 @@ The auxiliary keys are read by calling the loss once on the first batch before `
 
 ### 8.4 `optimizer_config`
 
-The backend translates `optimizer_config` with the same names as every other backend (`OPTIMIZER_NAMES`: `adam`, `adamw`, `sgd`, `rmsprop`). `lr` becomes `learning_rate`, optax's `b1`, `b2`, `eps` and `decay` become Keras's `beta_1`, `beta_2`, `epsilon` and `rho`, and a value the config leaves out takes optax's default (`eps=1e-8`; `weight_decay=1e-4` for `adamw`). One config therefore means one optimiser on both backends, where Keras's own defaults would differ (§5).
+The backend translates `optimizer_config` with the same names as every other backend (`OPTIMIZER_NAMES`: `adam`, `adamw`, `sgd`, `rmsprop`). `lr` becomes `learning_rate`, optax's `b1`, `b2`, `eps` and `decay` become Keras's `beta_1`, `beta_2`, `epsilon` and `rho`, and a value the config leaves out takes optax's default (`eps=1e-8`; `weight_decay=1e-4` for `adamw`). Keras's Adam and AdamW also add ε before the bias correction, which on optax's scale is ε/√(1−β₂ᵗ), about 32 times larger at the first step, so the backend scales ε by √(1−β₂ᵗ) at each step (#320). One config therefore means one optimiser on both backends, where Keras's own defaults and ε would differ (§5). RMSprop needs nothing: both add ε inside the square root.
 
 ### 8.5 What `run(loop)` does
 
@@ -243,9 +248,9 @@ class _PipekitBridge(keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         # k = optimizer.iterations, the global step
         step = int(self.model.optimizer.iterations)
-        metrics = {name: float(value) for name, value in logs.items()}
-        # ℓ_k itself rather than the running mean of §3
-        self.model.reset_metrics()
+        means = {name: float(value) for name, value in logs.items()}
+        # ℓ_j = j m_j - (j - 1) m_{j-1} for the loss and the aux terms (§3)
+        metrics = self._own_values(batch, means)
         # write every log_every_n_steps; fire on_step_end (and on_epoch_end
         # every loop.steps_per_epoch steps) through _common.dispatch
         ...
@@ -352,7 +357,7 @@ An Equinox-backed `model_op` needs both extras, `pipekit-train[keras,equinox]`; 
 | `eval_every_n_steps` | P, the length of one Keras epoch |
 | `steps_per_epoch` | fires the pipekit `on_epoch_end`; independent of P |
 | `batch_size` | the Grain batch; ragged last batch in validation |
-| `log_every_n_steps` | per-step values, after `reset_metrics` |
+| `log_every_n_steps` | per-step values of the loss and the aux terms, read off Keras's running means; other Keras metrics as Keras reports them |
 | `callbacks` | driven by the bridge; `EarlyStopping` stops at the end of the period |
 | `checkpoint_dir` | Orbax, at period ends, with the data position |
 | `sharding` | must be `None` in the first release |
@@ -594,7 +599,7 @@ Left for later, each an issue once the six land: Equinox modules with `eqx.nn.St
 
 ## 11. Open questions
 
-1. **Resetting metrics each step.** It gives per-step logs, but a user's own Keras callback that reads the training logs at the end of an epoch then sees the last step's values, not the epoch's mean. The alternative is to log Keras's running means and say so. The proposal resets.
+1. **Per-step logs.** Settled by #320: the per-step values are read off Keras's running means rather than by resetting Keras's metrics after each step, so a user's Keras callbacks still see the epoch's means.
 2. **The seed.** `keras.utils.set_random_seed(loop.seed)` would make dropout and other seeded layers reproducible, but it also reseeds Python's and NumPy's global generators in the caller's process. The proposal does not call it and documents that layers seed themselves; the alternative calls it and documents the side effect.
 3. **Checkpoint cadence.** The proposal raises when `every_n_steps` is not a multiple of P. Rounding it up to the next multiple, with a warning, is the alternative.
 4. **The version floor of Keras.** Keras 3.11 is the first release that reads Grain datasets in `fit`, but the backend passes a generator and does not need that. The floor is whatever CI passes on.

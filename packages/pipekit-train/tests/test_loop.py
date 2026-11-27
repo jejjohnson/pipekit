@@ -274,7 +274,8 @@ def test_training_loop_has_no_lightning_backend():
         )
 
 
-def test_training_loop_dispatches_to_keras_stub_with_clear_error():
+def test_training_loop_dispatches_to_keras_with_clear_error():
+    """An operator the Keras backend can't train is named; so is a missing extra."""
     loop = TrainingLoop(
         model_op=_IdentityModel(),
         dataset=_toy_dataset(),
@@ -282,7 +283,9 @@ def test_training_loop_dispatches_to_keras_stub_with_clear_error():
         max_steps=10,
         backend="keras",
     )
-    with pytest.raises(NotImplementedError, match=r"v0\.3"):
+    with pytest.raises(
+        (TypeError, ImportError), match=r"KerasModelOp|pipekit-train\[keras"
+    ):
         loop.run()
 
 
