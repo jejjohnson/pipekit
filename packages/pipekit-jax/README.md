@@ -52,6 +52,8 @@ reloaded = skeleton.with_weights(trained.serialize_weights())
 
 None of it is a new framework. A `JaxOperator` is a [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops) `Operator` and an [Equinox](https://github.com/patrick-kidger/equinox) `eqx.Module` at once. pipekit reads its config off the `__init__` that Equinox generates, so `|`, `Sequential`, `Graph` and the JSON round trip keep working, and its array fields are leaves for `eqx.filter_jit`, `eqx.filter_grad` and `jax.vmap`. The cycles take a [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle) `ForwardModel` or any stateful operator and keep `Cycle`'s `(carrier, state)` contract, but step inside one [JAX](https://github.com/jax-ml/jax) `jax.lax.scan`. The weights travel as Equinox's `tree_serialise_leaves` bytes behind a signature header, and with the `array` extra `to_jax` gives a [pipekit-array](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array) `KernelOp` the same treatment.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_jax_overview/pipekit_jax_overview.png" alt="pipekit-jax in one picture: a step that is both a pipekit operator and an Equinox module, and the five things done with it: scan, roll out, take a gradient, store and convert" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🧩 **Operators that are modules**: subclass `JaxOperator` and declare fields as on any `eqx.Module`; the config is derived from those fields and coerced to JSON builtins, and the inexact-array fields are differentiable leaves.
@@ -184,6 +186,13 @@ The [docs quickstart](https://jejjohnson.github.io/pipekit/quickstart-jax/) carr
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_jax_roles/pipekit_jax_roles-dark.svg">
+    <img alt="pipekit-jax on the GeoStack role ladder: the scan cycles and Rollout as recipes, JaxOperator, JaxModelOp and the conversions as steps, with JAX and Equinox on the rungs below" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_jax_roles/pipekit_jax_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Every name below is exported from `pipekit_jax`, except `check_jax_operator`, which is imported from `pipekit_jax.testing`. The steps (`JaxOperator`, `JaxModelOp`, `JaxKernelOp`) are one transformation each with their own config, ready to chain, and the cycles (`ScanCycle`, `EnsembleScanCycle`, `Rollout`) are recipes that run a step $`n`$ times as one job. `to_jax` builds a step, and `check_jax_operator` is a test helper beside the ladder.
 
 | Module | Symbols | Notes |
@@ -210,6 +219,13 @@ Every name below is exported from `pipekit_jax`, except `check_jax_operator`, wh
 - **[pipekit-train boundaries, §13.1](https://jejjohnson.github.io/pipekit/boundaries/)**: the reproducibility caveat of pipekit-train's own `EquinoxModelOp`, which `JaxModelOp` closes.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_jax_ecosystem/pipekit_jax_ecosystem-dark.svg">
+    <img alt="The packages that import pipekit-jax on their main branches, each with the modules it imports: gridax through its pipekit extra, sesmax-core and somax" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_jax_ecosystem/pipekit_jax_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-jax is one package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), at tier 0 of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the bridge from pipekit's operators to JAX's transformations, and composes the rest in:
 
