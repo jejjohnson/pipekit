@@ -53,6 +53,8 @@ ladder = pev.Benchmark(task, estimators, [scorer]).run().to_report()
 
 None of it is a new metrics library. The metrics stay in the carrier libraries ([`xrops.metrics`](https://github.com/jejjohnson/geotoolz/tree/main/packages/xrtoolz-ops) for xarray, [`geotoolz`](https://github.com/jejjohnson/geotoolz) for GeoTensors), which never import this package, and `MetricScorer` wraps any of them, or any other `(prediction, reference) -> result` callable, with its tags. The content hash is [pipekit-ops](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-ops)'s (`pipekit_ops.saving`), so a report is identified the way a pipeline is. And a benchmark `Task` returns [pipekit-cycle](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-cycle)'s `ForwardModel` and `ObservationOperator` as its simulator and observation operator, so a benchmark is built from the same parts as a `DACycle`; this package names them for type checking only, so pipekit-cycle is an extra.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_evaluate_overview/pipekit_evaluate_overview.png" alt="pipekit-evaluate in one picture: data, scorers or a benchmark task go in, one EvaluationReport comes out, and every answer is read off it" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🏷️ **Three tags on every scorer**: `Unit`, `Lens` and `Stage` are read off any scorer as `ScorerTags` by `tags_of`, so a scorer with only a `name` is a point-wise field score for validation and final evaluation.
@@ -187,6 +189,13 @@ The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-evaluate/) take
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_evaluate_roles/pipekit_evaluate_roles-dark.svg">
+    <img alt="pipekit-evaluate on the GeoStack role ladder, every public name placed by the job it does" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_evaluate_roles/pipekit_evaluate_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each public name sits on one rung of the GeoStack role ladder, by the job it does: the scorers are strategies (②), the estimates and estimators models (③), `evaluate` an algorithm (④) and `Benchmark` a recipe (⑥), while the tags, the cells and the reports are the structures (⓪) the rest act on. The table lists them by area.
 
 | Area | Symbols | Notes |
@@ -208,6 +217,13 @@ An area imports only from the ones before it, in the order of the table ([E1](ht
 - **[Report 14 of the GeoStack](https://github.com/jejjohnson/geostack/blob/main/docs/reports/14_pipekit_evaluate.md)**: why the metrics stay with their carriers while this package orchestrates them, and the tags and the report of its workstream A.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_evaluate_ecosystem/pipekit_evaluate_ecosystem-dark.svg">
+    <img alt="pipekit-evaluate and what it builds on: no library of the stack imports it on main yet, only geostack's report notebooks" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_evaluate_ecosystem/pipekit_evaluate_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-evaluate is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in Core tier 0 of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the tags, the report and the ladder, and composes the rest in:
 
