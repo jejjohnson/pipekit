@@ -153,7 +153,7 @@ Two shipped pieces cannot: `Estimator` computes a dask input on the host, becaus
 The Equinox adapter returns `EquinoxModelOp` (in-package, no round trip) or `pipekit-jax.JaxModelOp` (full round trip), per user choice.
 The contract is "the returned op is a `pipekit_ops.Operator`"; the specific class differs by backend.
 
-**As built:** `JaxModelOp` ships in pipekit-jax; `ModelOp` is not built yet (phase D).
+**As built:** `JaxModelOp` ships in pipekit-jax; `ModelOp` is not built yet (phase D). pipekit-train dropped Lightning (its D15), and its Keras backend returns its own `KerasModelOp` with a weight blob (its D20), not `ModelOp`.
 For sklearn-style estimators on named carriers, `Estimator` ships instead (OP-O3): it is fitted and applied by dim name, and sets `forbid_in_yaml`.
 
 ## A9. Named carriers: `DimArray`, through pipekit's adapter registry

@@ -29,9 +29,9 @@ y_hat = op(x_test)  # (N, D) → (N,)
 
 There are three reasons:
 
-1. **It closes the train-to-serve loop for pipekit-train.**
-   The Lightning and Keras adapters (v0.2 / v0.3 of pipekit-train; see `docs/design/api/adapters.md` in that package) need to return a `pipekit_ops.Operator` from `loop.run()` that wraps the trained `nn.Module` or `keras.Model`.
-   That operator is `ModelOp`.
+1. **It was to close the train-to-serve loop for pipekit-train.**
+   The Lightning and Keras adapters were to return `ModelOp` from `loop.run()`.
+   Lightning was dropped (pipekit-train D15), and the Keras backend returns its own `pipekit_train.backends.keras.KerasModelOp`, whose weights round-trip through a registry as a byte-stable blob (pipekit-train D20), so no pipekit-train backend waits on `ModelOp`.
 2. **It is the natural home for sklearn and NumPy-ML pipelines.**
    A lot of working code wraps a fitted `RandomForestClassifier` or a trained sklearn pipeline, and `ModelOp` is the one-line shim that makes them compose into a pipekit `Sequential`.
 3. **It generalises `pipekit_array.BatchAlong`'s `inner` argument.**
@@ -132,15 +132,9 @@ probs = pipe(X_test)  # (n_samples, n_features) → (n_samples, n_classes)
 
 On a named carrier, `Estimator(rf_classifier, sample_dims=..., method="predict_proba")` already does this today, fitting by dim name (`pipekit_array.bridges.sklearn`).
 
-### Keras model wrapped after pipekit-train (planned for v0.3 of pipekit-train)
+### Keras models after pipekit-train
 
-```python
-# Inside pipekit_train.adapters.keras.run():
-def run(loop):
-    keras_model, history = _train(loop)
-    # proposed (phase D)
-    return ModelOp(model=keras_model), TrainingArtifact(...)
-```
+The Keras backend of pipekit-train returns a `KerasModelOp`, not a `ModelOp`: it needs Keras to write and reload the weights, and pipekit-array takes no backend dependency (A8). `ModelOp(model=keras_model, method_kwargs={"training": False})` remains the way to wrap a Keras model that pipekit-train did not train, when its weights are kept out of band.
 
 ### Large-input batched inference
 
