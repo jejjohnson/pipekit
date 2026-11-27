@@ -57,6 +57,8 @@ None of it is a new trainer. `TrainingLoop` and `HyperSweep` are [pipekit-ops](h
 
 pipekit-train is one package of the pipekit workspace; the [workspace README](https://github.com/jejjohnson/pipekit/blob/main/README.md) introduces the others.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_overview/pipekit_train_overview.png" alt="pipekit-train in one picture: you supply a dataset, a model, a loss and the settings; TrainingLoop runs one training over a backend (Equinox with optax, NumPyro, BlackJAX, and a Keras slot); out comes the trained model as an operator, its artifact, checkpoints and logs" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🔁 **The trained model is an operator**: `TrainingLoop.run()` returns the trained model as a `pipekit_ops.Operator`, in the wrapper you passed in or as a `NumpyroPredictiveOp`. Beside it comes an artifact with the pipeline's config, the dataset's content hash, the trained model's hash, the backend's final metrics and, where uv is installed, the environment's `uv pip freeze`.
@@ -219,6 +221,13 @@ The [quickstart](https://jejjohnson.github.io/pipekit/quickstart-train/) takes t
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_roles/pipekit_train_roles-dark.svg">
+    <img alt="pipekit-train on the GeoStack role ladder: TrainingLoop and HyperSweep as recipes, the model operators as steps, each backend's run as an algorithm, the training state as models, losses, tasks and callbacks as strategies, hashing and checkpoint calls as primitives, and the datasets as structures" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_roles/pipekit_train_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each public name sits on one rung of the GeoStack role ladder, by the job it does; the table lists them by area. The package is five areas, and an area imports only from the ones before it. `pipekit_train` re-exports the first four areas' names except `Split`, `hash_config` and `call_loss`, and each backend is imported from its own area.
 
 | Area | Symbols | Notes |
@@ -252,6 +261,13 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 - **[`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md)**: the rules for contributors and coding agents.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_ecosystem/pipekit_train_ecosystem-dark.svg">
+    <img alt="The packages that import pipekit-train on their main branches, both through an extra, each with the areas it imports: geotoolz-patcher and plumax" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_train_ecosystem/pipekit_train_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 pipekit-train is a package of the pipekit [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/), in the Core tier of the [GeoStack](https://github.com/jejjohnson/geostack). It owns the training run and its record, and composes the rest in:
 
