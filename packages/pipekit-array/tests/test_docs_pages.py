@@ -65,9 +65,11 @@ def test_page_blocks_run_and_print_what_the_page_says(
     # A real module, so dataclasses and pickling resolve the page's classes.
     module = types.ModuleType(f"docs_{path.stem.replace('-', '_')}")
     monkeypatch.setitem(sys.modules, module.__name__, module)
-    # A page may turn on JAX's 64-bit mode, as a test suite does; undo it.
+    # Each page starts in JAX's default 32-bit mode, whatever the suite set, and
+    # may turn on 64-bit mode, as a test suite does; restore the flag after.
     jax = pytest.importorskip("jax")
     previous = jax.config.jax_enable_x64
+    jax.config.update("jax_enable_x64", False)
     try:
         _run(page, blocks, module)
     finally:
