@@ -28,6 +28,9 @@ pytest.importorskip("array_api_compat")
 DOCS = Path(__file__).resolve().parents[3] / "docs"
 PAGES = [
     "tour-array.md",
+    "guides/carriers-and-backends.md",
+    "guides/library-on-pipekit-array.md",
+    "background/array-api.md",
     "tutorials/padded-batches.md",
     "tutorials/sklearn-named-dims.md",
 ]
