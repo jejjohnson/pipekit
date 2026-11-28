@@ -5,6 +5,6 @@
   "packages/pipekit-cycle": "0.3.1",
   "packages/pipekit-experiment": "0.2.1",
   "packages/pipekit-evaluate": "0.3.1",
-  "packages/pipekit-train": "0.3.1",
+  "packages/pipekit-train": "0.3.2",
   "packages/pipekit-jax": "0.4.1"
 }

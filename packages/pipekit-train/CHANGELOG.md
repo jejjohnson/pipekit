@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.3.1...pipekit-train-v0.3.2) (2026-11-28)
+
+
+### Features
+
+* **train:** a Keras model as an operator, KerasModelOp, with a byte-stable weight blob ([#327](https://github.com/jejjohnson/pipekit/issues/327)) ([c3eeca3](https://github.com/jejjohnson/pipekit/commit/c3eeca3bffe85bfb928d7b0a2d3292d818f20c54))
+* **train:** a Keras run resumes from a checkpoint with the weights of an uninterrupted run ([#332](https://github.com/jejjohnson/pipekit/issues/332)) ([6dfb0df](https://github.com/jejjohnson/pipekit/commit/6dfb0df73ba3c7c6839664f9ea39edd28a5a46d8))
+* **train:** the Keras backend trains a KerasModelOp through compile and fit ([#329](https://github.com/jejjohnson/pipekit/issues/329)) ([cedb8ae](https://github.com/jejjohnson/pipekit/commit/cedb8ae88d47ff38ef25aeb1cf95aef684709277))
+* **train:** the Keras backend trains Equinox models and returns them in their own wrapper ([#331](https://github.com/jejjohnson/pipekit/issues/331)) ([043a9a0](https://github.com/jejjohnson/pipekit/commit/043a9a082f7c79040c4d1db869fb6f83b0534836))
+
 ## [0.3.1](https://github.com/jejjohnson/pipekit/compare/pipekit-train-v0.3.0...pipekit-train-v0.3.1) (2026-11-26)
 
 
