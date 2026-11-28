@@ -28,6 +28,8 @@ pytest.importorskip("array_api_compat")
 DOCS = Path(__file__).resolve().parents[3] / "docs"
 PAGES = [
     "tour-array.md",
+    "tutorials/padded-batches.md",
+    "tutorials/sklearn-named-dims.md",
 ]
 
 _BLOCK = re.compile(r"```python\n(.*?)```", flags=re.S)
@@ -44,13 +46,18 @@ def _blocks(text: str) -> list[tuple[str, str | None]]:
         after = text[m.end() : end]
         fenced, inline = _FENCED.search(after), _INLINE.search(after)
         if fenced and (not inline or fenced.start() < inline.start()):
-            expected = fenced.group(1).strip()
+            expected = _lines(fenced.group(1))
         elif inline:
-            expected = inline.group(1).strip()
+            expected = _lines(inline.group(1))
         else:
             expected = None
         out.append((m.group(1), expected))
     return out
+
+
+def _lines(text: str) -> str:
+    """Text without trailing spaces on its lines, which editors strip."""
+    return "\n".join(line.rstrip() for line in text.strip().splitlines())
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -88,7 +95,5 @@ def _run(
             except Exception as err:  # pragma: no cover - surfaced with context
                 raise AssertionError(f"{page} block {i} failed:\n{code}") from err
         if expected is not None:
-            printed = "\n".join(
-                line.rstrip() for line in stdout.getvalue().strip().splitlines()
-            )
+            printed = _lines(stdout.getvalue())
             assert printed == expected, f"{page} block {i} printed:\n{printed}"
