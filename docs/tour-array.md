@@ -322,7 +322,7 @@ This prints `('time', 'band') (1, 3) True`: one change between the two seasons f
 Four operators have no function twin:
 
 - `ApplyAlong(inner, dim)` runs an operator on each item along a dim, and serialises when `inner` does; `MapOver(fn, dim)` does the same with a function and is `forbid_in_yaml`.
-- `BatchAlong(inner, size, dim, pad=...)` runs an operator on chunks of one carrier, for a model on a cube larger than device memory.
+- `BatchAlong(inner, size, dim, pad=...)` runs an operator on chunks of one carrier, for a model on a cube larger than device memory ([Patch inference in padded batches](tutorials/padded-batches.md)).
 - `MeanScalar`, `StackAlong` and `ConcatenateAlong` work on raw arrays (`StackAlong` and `ConcatenateAlong` take named carriers too, with `dim=`).
 
 :::{note}
@@ -335,7 +335,7 @@ Each bridge is one module behind one extra, and imports its library only when us
 
 - **`bridges.xarray`** (`[xarray]`): `XarrayAdapter`, registered lazily the first time a DataArray reaches pipekit, so every named function and operator above takes a DataArray; several take xarray's own fast path, which stays lazy on dask. `from_xarray` turns a DataArray into a `DimArray`, its 1-D index coordinates becoming labels.
 - **`bridges.einx`** (`[einx]`): einx patterns with dim names as axes, `rearrange`, `reduce`, `einsum` and `repeat`, and `Einx`, one pattern as a serialisable operator.
-- **`bridges.sklearn`** (`[sklearn]`): `Estimator`, a scikit-learn-style estimator fitted and applied on a carrier through `to_rows` and `from_rows`.
+- **`bridges.sklearn`** (`[sklearn]`): `Estimator`, a scikit-learn-style estimator fitted and applied on a carrier through `to_rows` and `from_rows` ([A scikit-learn model over named dims](tutorials/sklearn-named-dims.md)).
 
 ```python
 from pipekit_array.bridges import einx as pe
@@ -398,4 +398,5 @@ The rest of the area:
 
 ## Where next
 
+- [Patch inference in padded batches](tutorials/padded-batches.md) and [A scikit-learn model over named dims](tutorials/sklearn-named-dims.md): two tasks from start to finish.
 - The [design pages](design-array/README.md): the vision, the architecture, the decisions and the operator catalogue.

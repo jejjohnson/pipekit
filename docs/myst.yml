@@ -93,6 +93,12 @@ project:
           title: Quickstart
         - file: tour-array.md
           title: Tour of the six areas
+        - title: Tutorials
+          children:
+            - file: tutorials/padded-batches.md
+              title: Patch inference in padded batches
+            - file: tutorials/sklearn-named-dims.md
+              title: A scikit-learn model over named dims
         - title: Design
           children:
             - file: design-array/README.md
