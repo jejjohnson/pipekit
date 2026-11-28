@@ -15,6 +15,14 @@ The blocks run in order, as one script, so a later block uses the names of an ea
 | `bridges` | `bridges.xarray` (`XarrayAdapter`, `from_xarray`), `bridges.einx` (`rearrange`, `reduce`, `einsum`, `repeat`, `Einx`), `bridges.sklearn` (`Estimator`) | xarray, einx patterns or a scikit-learn model on named dims |
 | `testing` | `assert_backends_agree`, `assert_traces`, `check_kernel_op`, `check_adapter`, `assert_matches_oracle`, `assert_adjoint`, `assert_mean` and 12 more | the test suite of a library built on pipekit-array |
 
+```{figure} https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/pipekit_array_imports/pipekit_array_imports-light.svg
+:alt: pipekit-array's six areas as cards, each with the libraries it imports, and arrows for the imports between them: bridges imports kernels and named, operators imports named, kernels imports named and arrays, and testing sits beside the package.
+:width: 100%
+:label: fig-array-imports
+
+The six areas and what each imports: solid chips at import, dashed ones the first time a function runs. The schematic is kept in [geostack](https://github.com/jejjohnson/geostack/tree/main/docs/images/libraries/pipekit_array_imports) with the stack's other library schematics.
+```
+
 An area imports only from the ones before it, and `testing` from all of them ([ADR A30](design-array/decisions.md)). Import a name from its area (`from pipekit_array.arrays import scan`), never from a file in it. `import pipekit_array` re-exports the names of `named`, `kernels` and `operators` that a pipeline uses, `Estimator` and `BackendError`, 68 names in all; `arrays` and `testing` are imported by name.
 
 ## `arrays`: formulas on plain arrays
