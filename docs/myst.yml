@@ -91,6 +91,8 @@ project:
       children:
         - file: quickstart/quickstart-array.md
           title: Quickstart
+        - file: tour-array.md
+          title: Tour of the six areas
         - title: Design
           children:
             - file: design-array/README.md

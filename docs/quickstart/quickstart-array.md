@@ -290,6 +290,7 @@ A pipeline saved before the package was split into areas still loads: an operato
 
 ## Learn more
 
+- The [tour of the six areas](../tour-array.md): every area of the package, with the main names at work.
 - The [design docs](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/docs/design): vision, [architecture](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/docs/design/architecture.md), [decisions](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/docs/design/decisions.md), boundaries and the per-operator specs.
 - The master plan, [Report 3, "Sister libraries"](https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_3_pipekit_array.md).
 - The [API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-array/).
