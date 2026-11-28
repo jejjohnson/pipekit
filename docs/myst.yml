@@ -93,6 +93,14 @@ project:
           title: Quickstart
         - file: tour-array.md
           title: Tour of the six areas
+        - title: Guides
+          children:
+            - file: guides/carriers-and-backends.md
+              title: Carriers and backends
+            - file: guides/library-on-pipekit-array.md
+              title: Writing a library on pipekit-array
+            - file: background/array-api.md
+              title: "Background: the array API standard"
         - title: Tutorials
           children:
             - file: tutorials/padded-batches.md

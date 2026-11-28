@@ -212,7 +212,7 @@ that is, the sixteen pixels as one dim, five changes from six months, two season
 
 ### Many carriers, and a function per item
 
-`stack` and `concat` join carriers with the same dims and never align them; `combine` applies a function to the data of several carriers; `map_over` runs a function on each item along a dim and stacks the results back. `join_backends` is what each of them runs first: NumPy data next to JAX data joins it, and any other mix raises `BackendError`.
+`stack` and `concat` join carriers with the same dims and never align them; `combine` applies a function to the data of several carriers; `map_over` runs a function on each item along a dim and stacks the results back. `join_backends` is what each of them runs first: NumPy data next to JAX data joins it, and any other mix raises `BackendError` ([Carriers and backends](guides/carriers-and-backends.md) has the rules).
 
 ```python
 # Shapes: T = 6 monthly scenes; B = 3 bands; Y = X = 4 pixels
@@ -362,7 +362,7 @@ This prints `('B04', 'B08', 'B11') ('time', 'band') True`: the band labels back 
 
 ## `testing`: the checks a library runs
 
-`pipekit_array.testing` is what geophysix, radiomax and the other libraries on pipekit-array test their functions with. Here are the three most used, on the depression function from the first section. They compare float64 results, so a test suite turns on JAX's 64-bit mode once, in its `conftest.py`.
+`pipekit_array.testing` is what geophysix, radiomax and the other libraries on pipekit-array test their functions with. The [guide to writing a library on pipekit-array](guides/library-on-pipekit-array.md) puts them together; here are the three most used, on the depression function from the first section. They compare float64 results, so a test suite turns on JAX's 64-bit mode once, in its `conftest.py`.
 
 ```python
 import jax
@@ -398,5 +398,8 @@ The rest of the area:
 
 ## Where next
 
+- [Carriers and backends](guides/carriers-and-backends.md): which mixes of libraries join, which raise, NaN and dask.
+- [Writing a library on pipekit-array](guides/library-on-pipekit-array.md): a formula module from `arrays` to a tested operator.
+- [Background: the array API standard](background/array-api.md): what the standard gives, and what pipekit-array adds.
 - [Patch inference in padded batches](tutorials/padded-batches.md) and [A scikit-learn model over named dims](tutorials/sklearn-named-dims.md): two tasks from start to finish.
 - The [design pages](design-array/README.md): the vision, the architecture, the decisions and the operator catalogue.
