@@ -7,7 +7,7 @@ version: 0.1.0
 
 ## 1. The dispatch pattern
 
-Every operator follows the same three-line core, as `MeanScalar` does in [`operators/_reduce.py`](../../src/pipekit_array/operators/_reduce.py):
+Every operator follows the same three-line core, as `MeanScalar` does in [`operators/_reduce.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/operators/_reduce.py):
 
 ```python
 from typing import Any
@@ -79,7 +79,7 @@ return xp.add(x, y)
 `array_namespace(x, y)` is the standard's way to assert "both inputs are on the same backend" and pick the namespace; with NumPy next to JAX it picks JAX's (A24).
 Operators with several array inputs always use the multi-argument form.
 
-The named layer has its own form of this rule: `join_backends` in [`named/_dispatch.py`](../../src/pipekit_array/named/_dispatch.py) raises `BackendError` when the inputs of `dot`, `combine`, `concat`, `stack` or `take_along` sit on more than one backend.
+The named layer has its own form of this rule: `join_backends` in [`named/_dispatch.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_dispatch.py) raises `BackendError` when the inputs of `dot`, `combine`, `concat`, `stack` or `take_along` sit on more than one backend.
 
 ### R3. No backend-name conditionals
 
@@ -172,7 +172,7 @@ The standard needs a small wrapper because Array API namespace discovery has two
 1. **Native conformance** (NumPy 2.0+, JAX, CuPy): the array implements `__array_namespace__()` directly.
 2. **Wrapped conformance** (PyTorch, older NumPy, dask edge cases): the `array-api-compat` library provides the namespace.
 
-The shipped shim in [`named/_dispatch.py`](../../src/pipekit_array/named/_dispatch.py), simplified:
+The shipped shim in [`named/_dispatch.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_dispatch.py), simplified:
 
 ```python
 # pipekit_array/named/_dispatch.py
@@ -288,7 +288,7 @@ For sklearn on named carriers, `Estimator` already ships (`[sklearn]`): it fits 
 ## 8. Test matrix
 
 The CI surface fans out across backends.
-The pattern, as in [`tests/test_reduce.py`](../../tests/test_reduce.py):
+The pattern, as in [`tests/operators/test_reduce.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/tests/operators/test_reduce.py):
 
 ```python
 # tests/test_reduce.py

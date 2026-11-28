@@ -221,7 +221,7 @@ Every name below is exported from `pipekit_jax`, except `check_jax_operator`, wh
 - **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-jax/)**: the registry round trip, the signed blob, `JaxOperator` and its contract check, pipelines as pytrees, the cycle options, `to_jax`, and how each works.
 - **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-jax/)**: every public symbol, generated from the docstrings, with the measured compile times and gradient memory of the cycles.
 - **[Documentation](https://jejjohnson.github.io/pipekit/)**: the whole workspace, with the concepts, the other packages and their tutorials.
-- **[pipekit-train boundaries, §13.1](https://jejjohnson.github.io/pipekit/boundaries/)**: the reproducibility caveat of pipekit-train's own `EquinoxModelOp`, which `JaxModelOp` closes.
+- **[pipekit-train boundaries, §13.1](https://jejjohnson.github.io/pipekit/boundaries-1/)**: the reproducibility caveat of pipekit-train's own `EquinoxModelOp`, which `JaxModelOp` closes.
 
 ## 🧩 Ecosystem
 

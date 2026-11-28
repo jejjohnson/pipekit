@@ -11,7 +11,8 @@ version: 0.1.0
 
 ## Status
 
-pipekit-array 0.1.1 ships part of this design.
+pipekit-array 0.3.1 ships most of this design.
+Since ADR A30 the package is six areas (`arrays`, `named`, `kernels`, `operators`, `bridges`, `testing`), described in [architecture.md](architecture.md) §3; the module names of the v0.1 catalogue below are the plan's, not the package's.
 
 | Part | Status |
 | --- | --- |
@@ -21,6 +22,7 @@ pipekit-array 0.1.1 ships part of this design.
 | `batch` / `Padded`, `to_rows` / `from_rows`, `Estimator`, the einx bridge, `KernelOp`, the xarray adapter, the test kit | today |
 | `Subsample` | retired: it is `isel` with a stepped slice (A15) |
 | `Histogram` (array-aware), `AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`, `ModelOp` | not built |
+| The weight-blob model wrappers of ADR A8 | today, outside pipekit-array: `pipekit_jax.JaxModelOp`, and `EquinoxModelOp` and `KerasModelOp` in pipekit-train |
 
 ## Structure
 
@@ -64,13 +66,13 @@ The design brings together two upstream sources:
 - The master plan, [`research_journal_v2/notes/geotoolz/master_plan/toolz_3_pipekit_array.md`][report-3] (Report 3, "Sister libraries on top of pipekit").
   It sets the three-library carrier story (`pipekit-array` for arrays, `geotoolz` for `GeoTensor`, `xr_toolz` for xarray) and the operator catalogue (about 12 operators, about 400 LOC) that pipekit-array v0.1 ships.
 - The `pipekit-ops` core surface, in particular:
-  - [`pipekit_ops.qc`][pipekit-qc], whose module docstring defers numeric checks to `pipekit-array`;
+  - the QC operators of [`pipekit_ops.operators`][pipekit-qc], whose module docstring defers numeric checks to `pipekit-array`;
   - [`pipekit_ops.observe.Histogram`][pipekit-observe], the controller pattern this design extends with a carrier-aware `to_array=...` default;
-  - [`pipekit_ops.parallel.BatchedMap`][pipekit-parallel], the iterable-shaped variant; pipekit-array's array-shaped operator is named `BatchAlong` so it does *not* shadow it (ADR A19).
+  - [`pipekit_ops.execution.BatchedMap`][pipekit-parallel], the iterable-shaped variant; pipekit-array's array-shaped operator is named `BatchAlong` so it does *not* shadow it (ADR A19).
 
 [report-3]: https://github.com/jejjohnson/research_journal_v2/blob/main/notes/geotoolz/master_plan/toolz_3_pipekit_array.md
-[pipekit-qc]: ../../../pipekit-ops/src/pipekit_ops/qc.py
-[pipekit-observe]: ../../../pipekit-ops/src/pipekit_ops/observe.py
-[pipekit-parallel]: ../../../pipekit-ops/src/pipekit_ops/parallel.py
+[pipekit-qc]: https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/operators/_qc.py
+[pipekit-observe]: https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/observe/_observers.py
+[pipekit-parallel]: https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/execution/_presets.py
 
 Where the two sources diverge, this design resolves the tension explicitly in [decisions.md](decisions.md).

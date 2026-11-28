@@ -2,7 +2,7 @@
 
 Array-API operators on top of `pipekit-ops`.
 One operator runs on NumPy, JAX, CuPy, PyTorch or dask because it dispatches on `array_namespace(x)`.
-The [design doc](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/docs/design/README.md) has the architecture, the ADRs and the v0.1 operator catalogue.
+The [design pages](https://jejjohnson.github.io/pipekit/readme-2/) have the architecture, the ADRs and the operator catalogue the package was planned from.
 
 What ships today: namespace dispatch, `MeanScalar`, `StackAlong` and `ConcatenateAlong`, the named carrier `DimArray`, all the dim-level functions with their operator twins (`ApplyAlong` included), padded batches and `BatchAlong`, sample tables and `Estimator`, the einx bridge, `KernelOp`, the xarray adapter and the test kit.
 What is still to build from the v0.1 catalogue: the numeric QC family (`AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`), the array-aware `Histogram` and the trained-model wrapper `ModelOp`.

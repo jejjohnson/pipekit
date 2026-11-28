@@ -7,7 +7,7 @@ version: 0.1.0
 
 Format: each decision states the choice, the alternatives considered and the reason.
 Reviewers should treat these as the load-bearing commitments of the design; everything else follows from them.
-An **As built** paragraph records where the shipped code (pipekit-array 0.1.1) departs from a decision or adds to it.
+An **As built** paragraph records where the shipped code departs from a decision or adds to it.
 
 ## A1. Dispatch via `array_namespace(x)`, not a backend registry
 
@@ -83,13 +83,13 @@ pipekit-array's value is the *generic* operator; if the operator can't be generi
 > Superseded by A19: the array-shaped operator is `BatchAlong`, and it ships.
 
 **Decision:** `pipekit-array.parallel.BatchedMap(op, batch_size=8, axis=0)` splits the input array along `axis`, applies `op` to each chunk, and concatenates the results back along `axis`.
-It is **distinct from** `pipekit_ops.parallel.BatchedMap`, which takes an iterable and applies `op` to each item.
+It is **distinct from** `pipekit_ops.execution.BatchedMap`, which takes an iterable and applies `op` to each item.
 
 The two coexist, and users pick by carrier shape:
 
 | `op` input type | Use |
 | --- | --- |
-| iterable of carriers | `pipekit_ops.parallel.BatchedMap` |
+| iterable of carriers | `pipekit_ops.execution.BatchedMap` |
 | single large array | `pipekit_array.parallel.BatchedMap` |
 
 **Rationale:** the same name for a different problem.

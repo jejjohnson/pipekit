@@ -91,6 +91,30 @@ project:
       children:
         - file: quickstart/quickstart-array.md
           title: Quickstart
+        - title: Design
+          children:
+            - file: design-array/README.md
+              title: Overview
+            - file: design-array/vision.md
+              title: Vision
+            - file: design-array/architecture.md
+              title: Architecture
+            - file: design-array/decisions.md
+              title: Decisions (ADRs)
+            - file: design-array/boundaries.md
+              title: Boundaries and future work
+            - title: Operator catalogue
+              children:
+                - file: design-array/api/README.md
+                  title: Overview
+                - file: design-array/api/dim_functions.md
+                  title: Dim-level functions
+                - file: design-array/api/operators.md
+                  title: Data-flow operators
+                - file: design-array/api/qc.md
+                  title: Numeric QC (not built)
+                - file: design-array/api/inference.md
+                  title: ModelOp (not built)
     - title: Cycles (pipekit-cycle)
       children:
         - file: quickstart/quickstart-cycle.md

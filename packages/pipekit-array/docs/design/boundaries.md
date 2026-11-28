@@ -89,7 +89,7 @@ These were explicitly considered and rejected for the v0.1 scope.
 
 ## 3. v0.1 Definition of Done
 
-The v0.1 implementation PRs close on the list below; ticks mark what pipekit-array 0.1.1 has.
+The v0.1 implementation PRs close on the list below; ticks mark what pipekit-array 0.3.1 has.
 
 - [ ] All 12 operators implemented and tested per the `api/` files:
   - [x] `ApplyAlong`, `StackAlong`, `ConcatenateAlong`;
@@ -132,6 +132,8 @@ The numbers track Report 3's "12 operators, ~400 LOC" estimate plus the test fan
 The dim-level functions were not in this phasing; they shipped in their own four phases (#204 to #207), described in [api/dim_functions.md](api/dim_functions.md) §8.
 
 ## 5. Versioning targets
+
+These were the targets when the design was written. The package reached 0.3 by another route: the dim-level functions, the plain-array functions of `pipekit_array.arrays` and the six areas of ADR A30. None of Q1 to Q5 has shipped.
 
 - **v0.1:** all 12 operators, NumPy / JAX / torch CI fan-out, basic signature inference for reshaping operators (this design).
 - **v0.2:** sharding for `BatchAlong` (Q3), likely in a per-backend sister package; spectral extension operators (Q1); streaming `Histogram` (Q4); deeper signature integration (Q7).

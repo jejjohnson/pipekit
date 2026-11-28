@@ -20,11 +20,11 @@ Five major libraries (NumPy 2.0+, JAX, CuPy, PyTorch 2.0+ and dask) conform, ful
 [array-api]: https://data-apis.org/array-api/
 
 What is *missing* from pipekit-ops is a place for these operators to live.
-`pipekit_ops.qc` deliberately stays carrier-agnostic; its docstring says that numeric checks (`AssertValueRange`, `AssertNoNaN`) "live in sister libraries (Report 3, `pipekit-array`)".
+The QC operators of `pipekit_ops.operators` deliberately stay carrier-agnostic; their module docstring says that numeric checks (`AssertValueRange`, `AssertNoNaN`) "live in sister libraries (Report 3, `pipekit-array`)".
 `pipekit_ops.observe.Histogram` ships a generic controller with a user-supplied `to_array` adapter, and `pipekit-array` would ship the carrier-aware version, where `to_array` defaults to the Array API's flatten path.
 The boundary is already drawn, and this package is the thing on the other side.
 
-**As built (0.1.1).** The data-flow operators (`ApplyAlong`, `StackAlong`, `ConcatenateAlong`, `MeanScalar`, `BatchAlong`) ship, and `Subsample` was retired in favour of `isel` with a stepped slice (ADR A15).
+**As built (0.3.1).** The data-flow operators (`ApplyAlong`, `StackAlong`, `ConcatenateAlong`, `MeanScalar`, `BatchAlong`) ship, and `Subsample` was retired in favour of `isel` with a stepped slice (ADR A15).
 The QC family, the array `Histogram` and `ModelOp` are not built yet.
 The package grew a second surface the original plan did not have: the named carrier `DimArray` and the dim-level functions of [api/dim_functions.md](api/dim_functions.md), which work by dim name on any registered carrier.
 
@@ -40,7 +40,7 @@ Three conceptual layers, all on top of `pipekit_ops.Operator`:
 - **Data-flow operators:** `ApplyAlong`, `StackAlong`, `ConcatenateAlong`, `Subsample`, `MeanScalar`, `BatchAlong` (carrier-shaped) and `Histogram` (a carrier-aware controller).
   These are the combinators and reducers that show up in every array pipeline.
 - **Numeric QC:** `AssertClose`, `AssertValueRange`, `AssertNoNaN`, `AssertValidFraction`.
-  These are the numeric-content checks `pipekit_ops.qc` refused to write, because they need to look inside the array.
+  These are the numeric-content checks the QC operators of `pipekit_ops.operators` refused to write, because they need to look inside the array.
 - **Inference:** `ModelOp(model, method="__call__", batch_size=None)`, a framework-agnostic trained-model wrapper.
   No pipekit-train backend returns it: the Equinox backend ships its own `EquinoxModelOp`, `pipekit_jax.JaxModelOp` round-trips Equinox weights (ADR A8), and the Keras backend returns its own `KerasModelOp`.
 

@@ -249,10 +249,10 @@ An `axis` out of range for the signature's rank raises `ValueError`.
 ## `BatchAlong(inner: Operator, size: int, dim: str, pad: str = "none")`
 
 Ships today in `pipekit_array.operators` (phase 3 of [dim_functions.md](dim_functions.md), #206).
-It was renamed from the planned array-shaped `BatchedMap(inner, batch_size, axis)` by ADR A19, which supersedes A5: `pipekit_ops.parallel.BatchedMap` takes an iterable and calls `inner` on lists, so one name for both would fail in confusing ways when both are imported.
+It was renamed from the planned array-shaped `BatchedMap(inner, batch_size, axis)` by ADR A19, which supersedes A5: `pipekit_ops.execution.BatchedMap` takes an iterable and calls `inner` on lists, so one name for both would fail in confusing ways when both are imported.
 
 Split the input carrier along the named `dim` into chunks of `size`, apply `inner` to each chunk, and concatenate the results along `dim`.
-It is the carrier-shaped analogue of `pipekit_ops.parallel.BatchedMap` (which takes an iterable).
+It is the carrier-shaped analogue of `pipekit_ops.execution.BatchedMap` (which takes an iterable).
 
 ```python
 import numpy as np
