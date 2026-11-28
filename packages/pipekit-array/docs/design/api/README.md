@@ -6,7 +6,8 @@ version: 0.1.0
 # API: operator catalogue
 
 The v0.1 plan is 12 operators across 7 modules.
-The grouping mirrors `pipekit-ops` core where it makes sense (`combinators` with `pipekit_ops.combine`, `qc` with `pipekit_ops.qc`, `observe` with `pipekit_ops.observe`, `batching` with `pipekit_ops.parallel`).
+The grouping mirrored `pipekit-ops` where it made sense: `combinators` with `Fanout`, `qc` with the QC operators, `observe` with `pipekit_ops.observe`, and `batching` with `pipekit_ops.execution`.
+The package did not keep these modules: since ADR A30 it is six areas, and every built operator below is in `pipekit_array.operators` ([architecture.md](../architecture.md) §3).
 Six of the 12 are built or replaced today; the QC family, `Histogram` and `ModelOp` are not built yet.
 
 ## At a glance
@@ -31,7 +32,7 @@ Beyond the catalogue, the package ships `batch` and `Padded` (A10), `to_rows` / 
 ## Named carriers: dim-level functions
 
 These run on any carrier with a registered `pipekit_ops.NamedArrayAdapter` (a `DimArray`, an `xr.DataArray`, a geoarray carrier), by dim name rather than axis.
-Each is a function in `dims` or one of the phase modules below, and, where it serialises, an operator in `dim_operators` (GA-Q3; geostack `docs/design/pipekit_kernels.md`).
+Each is a function in `pipekit_array.named` and, where it serialises, an operator in `pipekit_array.operators` (GA-Q3; geostack `docs/design/pipekit_kernels.md`).
 Every row ships today.
 
 | Function     | Operator    | Does                                                    |
@@ -64,7 +65,7 @@ Every row ships today.
 | `quantile`   | `Quantile`  | quantiles over named dims; a list `q` adds a `quantile` dim (`dim_algebra`) |
 | `dot`        | `Dot`       | sum of a product over named dims; shared dims not summed are batch dims |
 
-All sixteen functions of **[dim_functions.md](dim_functions.md)** ship today: phase 1 in `dim_shapes` (#204), phase 2 in `dim_shifts` (#205), phase 3 in `dim_windows` (#206), phase 4 in `dim_algebra` (#207).
+All sixteen functions of **[dim_functions.md](dim_functions.md)** ship today, in `pipekit_array.named`. They landed in four phases (#204 to #207), first in modules of their own (`dim_shapes`, `dim_shifts`, `dim_windows`, `dim_algebra`) that ADR A30 folded into the areas.
 The design page has the xarray parity table and the as-built notes.
 
 An adapter may override any of them with a method of the same name (xarray's `reduce` stays lazy on dask; geoarray's `map_over` is one `jax.vmap`).

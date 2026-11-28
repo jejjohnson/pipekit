@@ -6,16 +6,16 @@ version: 0.1.0
 # QC: numeric assertions
 
 > **Status: not built** (phase C of `boundaries.md` §4).
-> `pipekit_array.qc` does not exist in pipekit-array 0.1.1, so every operator on this page is `proposed`.
-> Until it lands, `pipekit_ops.qc.AssertThat` (an operator as the predicate) and `AssertCallable` (a function) cover one-off numeric checks.
+> `pipekit_array.qc` does not exist in pipekit-array 0.3.1, so every operator on this page is `proposed`.
+> Until it lands, `pipekit_ops.operators.AssertThat` (an operator as the predicate) and `AssertCallable` (a function) cover one-off numeric checks.
 
 Four pass-through assertions that look inside the array.
-They sit above `pipekit_ops.qc`, which stays carrier-agnostic (its module docstring defers numeric checks to pipekit-array), and below `geoops.qc` / `xr_toolz.qa`, which would subclass these with carrier-specific defaults.
+They sit above the QC operators of `pipekit_ops.operators`, which stay carrier-agnostic (their module docstring defers numeric checks to pipekit-array), and below `geoops.qc` / `xr_toolz.qa`, which would subclass these with carrier-specific defaults.
 
 All four follow the same pass-through shape:
 
 - on success, return the carrier unchanged;
-- on failure, raise `QCError` (defined in `pipekit_ops.qc`) or, for ops that take `on_fail="warn"`, emit a `UserWarning` and return the carrier unchanged.
+- on failure, raise `QCError` (defined in `pipekit_ops.operators`) or, for ops that take `on_fail="warn"`, emit a `UserWarning` and return the carrier unchanged.
 
 The `on_fail` argument is the same across the family:
 
@@ -197,7 +197,7 @@ The two compose: use `AssertValidFraction(0.5)` upstream of `AssertNoNaN()`, to 
 
 ## Failure messages
 
-All four operators raise `QCError` (a subclass of `AssertionError`, defined in `pipekit_ops.qc`) on failure.
+All four operators raise `QCError` (a subclass of `AssertionError`, defined in `pipekit_ops.operators`) on failure.
 The message format is operator-specific but follows a common shape:
 
 ```

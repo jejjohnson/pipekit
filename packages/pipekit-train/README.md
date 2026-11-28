@@ -257,8 +257,8 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 ## 📖 Documentation
 
 - **[Quickstart](https://jejjohnson.github.io/pipekit/quickstart-train/)**: the emulator above in full, a sweep, a Bayesian fit under two engines, the backends, the calling conventions and what is not built yet.
-- **[Design](https://jejjohnson.github.io/pipekit/readme-2/)**: the vision, the architecture, the boundaries, the API layer by layer, the NumPyro, BlackJAX and Keras backend designs and worked examples of the three training shapes, also [on GitHub](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design).
-- **[Decisions](https://jejjohnson.github.io/pipekit/decisions-1/)**: the ADRs D1 to D21, from the thin loop over existing tools to the Keras backend.
+- **[Design](https://jejjohnson.github.io/pipekit/readme-4/)**: the vision, the architecture, the boundaries, the API layer by layer, the NumPyro, BlackJAX and Keras backend designs and worked examples of the three training shapes, also [on GitHub](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-train/docs/design).
+- **[Decisions](https://jejjohnson.github.io/pipekit/decisions-2/)**: the ADRs D1 to D21, from the thin loop over existing tools to the Keras backend.
 - **[API reference](https://jejjohnson.github.io/pipekit/reference/pipekit-train/)**: every public name, generated from the docstrings.
 - **[Getting started](https://jejjohnson.github.io/pipekit/getting-started/)**: the workspace's first trained model, stored in a registry and run in a cycle.
 - **[`AGENTS.md`](https://github.com/jejjohnson/pipekit/blob/main/AGENTS.md)**: the rules for contributors and coding agents.

@@ -6,7 +6,8 @@ version: 0.1.0
 # Inference: `ModelOp`
 
 > **Status: not built** (phase D of `boundaries.md` §4).
-> `pipekit_array.inference` does not exist in pipekit-array 0.1.1, so every call to `ModelOp` below is `proposed`.
+> `pipekit_array.inference` does not exist in pipekit-array 0.3.1, so every call to `ModelOp` below is `proposed`.
+> The weight-blob wrappers of ADR A8 were built outside pipekit-array: `pipekit_jax.JaxModelOp`, and `EquinoxModelOp` and `KerasModelOp` in pipekit-train, so a Keras or Equinox model already has an operator. The generic wrapper for scikit-learn, torch and plain functions has not.
 > Two shipped pieces cover part of the ground: `BatchAlong` (`pipekit_array.operators`) splits a carrier for chunked inference, and `Estimator` (`pipekit_array.bridges.sklearn`, `[sklearn]`) fits and applies a scikit-learn-style estimator on a named carrier.
 
 `ModelOp` is the framework-agnostic trained-model wrapper.

@@ -5,9 +5,9 @@ version: 0.1.0
 
 # Dim-level functions: the missing ones
 
-The dim-level functions in [`named`](../../../src/pipekit_array/named) select, reduce, stack and map by dim name on any carrier with a `pipekit_ops.NamedArrayAdapter`.
+The dim-level functions in [`named`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/src/pipekit_array/named) select, reduce, stack and map by dim name on any carrier with a `pipekit_ops.NamedArrayAdapter`.
 Before #204 they could not rename a dim, add or drop a length-1 dim, broadcast one carrier against another, merge `y x` into `pixel`, shift or difference along time, cut windows, coarsen, take a quantile or contract two carriers.
-This page adds those as free functions with operator twins in `dim_operators`, and checks every name and argument against xarray.
+This page adds those as free functions with operator twins in `pipekit_array.operators` (planned as `dim_operators`), and checks every name and argument against xarray.
 
 **Status.** All sixteen functions, their twins, `ApplyAlong`, `BatchAlong` and `relabel` shipped in four phases: #204 (dims), #205 (index-only transforms), #206 (windows) and #207 (statistics and algebra).
 Where the build departed from this design, the page says so in an **As built** note next to the design text; the ADR IDs (A11 to A22) and the section numbers are unchanged.
@@ -29,17 +29,17 @@ Where the build departed from this design, the page says so in an **As built** n
 
 **Not changed:**
 
-- The joining rule (GA-Q3, in the module docstring of [`named`](../../../src/pipekit_array/named)): a function never reads coordinate values or geometry.
+- The joining rule (GA-Q3, in the module docstring of [`named`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/src/pipekit_array/named)): a function never reads coordinate values or geometry.
   Every new function works on positions, and labels only follow the data.
-- `NamedArrayAdapter` keeps its seven required methods ([`adapters.py`](../../../../pipekit-ops/src/pipekit_ops/adapters.py)).
+- `NamedArrayAdapter` keeps its seven required methods ([`carriers/_adapters.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/carriers/_adapters.py)).
   Every new function has a generic path through `data`, `isel` and `rewrap`, and an adapter may add a fast path of the same name.
   One optional method is added, `relabel`, for the six functions that put labels on a dim `rewrap` cannot label (section 3.0, decision A22).
-- `DimArray` gets no methods ([`named/_carrier.py`](../../../src/pipekit_array/named/_carrier.py)).
+- `DimArray` gets no methods ([`named/_carrier.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_carrier.py)).
 - Element-wise functions (`fillna`, `clip`, `isin`, `isnull`, `round`, `astype`) stay `combine` calls: they touch no dim.
 - `groupby`, `resample`, `interp`, `reindex` and anything else that selects by label value stay in xarray (and coordax).
 
-**As built:** the functions live in four files of `pipekit_array.named`, [`named/_shape.py`](../../../src/pipekit_array/named/_shape.py), [`named/_shift.py`](../../../src/pipekit_array/named/_shift.py), [`named/_window.py`](../../../src/pipekit_array/named/_window.py) and [`named/_reduce.py`](../../../src/pipekit_array/named/_reduce.py), so the four phases could be written in parallel.
-They share the helpers of [`named/_dispatch.py`](../../../src/pipekit_array/named/_dispatch.py) and are re-exported from `pipekit_array`.
+**As built:** the functions live in four files of `pipekit_array.named`, [`named/_shape.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_shape.py), [`named/_shift.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_shift.py), [`named/_window.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_window.py) and [`named/_reduce.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_reduce.py), so the four phases could be written in parallel.
+They share the helpers of [`named/_dispatch.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_dispatch.py) and are re-exported from `pipekit_array`.
 
 ## 2. The running example
 
@@ -79,14 +79,14 @@ mean = reduce(cube, "mean", "time")  # (T, B, Y, X) → (B, Y, X)
 ## 3. The function catalogue
 
 Columns: the signature (keyword dims, `x` positional-only as in `isel`), the semantics, what the adapter must provide, the JAX behaviour and the status.
-"Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`named`](../../../src/pipekit_array/named)).
+"Generic" means the function runs on any adapter through `data`, `isel` and `rewrap`, with the array namespace from `namespace_of` ([`named`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/src/pipekit_array/named)).
 "Static" lists the arguments that fix output shapes, so they must be Python values under `jax.jit`.
-Every function in the tables ships today: phase 1 (section 3.1) in [`named/_shape.py`](../../../src/pipekit_array/named/_shape.py), phase 2 (section 3.2) in [`named/_shift.py`](../../../src/pipekit_array/named/_shift.py), phase 3 (section 3.3) in [`named/_window.py`](../../../src/pipekit_array/named/_window.py) and phase 4 (section 3.4) in [`named/_reduce.py`](../../../src/pipekit_array/named/_reduce.py).
+Every function in the tables ships today: phase 1 (section 3.1) in [`named/_shape.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_shape.py), phase 2 (section 3.2) in [`named/_shift.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_shift.py), phase 3 (section 3.3) in [`named/_window.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_window.py) and phase 4 (section 3.4) in [`named/_reduce.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_reduce.py).
 A dim named like one of a function's keyword-only arguments (`mode` and `constant_values` for `pad`, `fill_value` for `shift`, `window_dim` and `stride` for `window`, `boundary` for `coarsen`) cannot be passed through `**dims`, because Python binds the keyword first (see the as-built note under A15).
 
 ### 3.0 Labels on new or renamed dims
 
-`rewrap(x, data, dims)` keeps labels by dim name: `DimArrayAdapter.rewrap` copies `x.labels[dim]` for each output dim whose size is unchanged ([`named/_carrier.py`](../../../src/pipekit_array/named/_carrier.py)), and the xarray adapter keeps a coordinate when all its dims survive with their sizes ([`xarray.py`](../../../src/pipekit_array/xarray.py)).
+`rewrap(x, data, dims)` keeps labels by dim name: `DimArrayAdapter.rewrap` copies `x.labels[dim]` for each output dim whose size is unchanged ([`named/_carrier.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/named/_carrier.py)), and the xarray adapter keeps a coordinate when all its dims survive with their sizes ([`bridges/xarray.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/bridges/xarray.py)).
 So `rewrap` alone cannot label a dim whose name or labels are new, and six functions need exactly that:
 
 | Function | Output dim | Its labels |
@@ -100,7 +100,7 @@ So `rewrap` alone cannot label a dim whose name or labels are new, and six funct
 
 With `rewrap` only, `rename(cube, band="channel")` on a `DimArray` would drop the band labels, because `rewrap` looks them up under `channel`.
 
-The fix is one optional adapter method, in a runtime-checkable `LabelledAdapter` protocol next to `NamedArrayAdapter` in `pipekit_ops.adapters`:
+The fix is one optional adapter method, in a runtime-checkable `LabelledAdapter` protocol next to `NamedArrayAdapter` in `pipekit_ops.carriers`:
 
 ```python
 # today (pipekit-ops): LabelledAdapter.relabel, A22
@@ -225,7 +225,7 @@ For a namespace without `einsum`, the fallback is to `broadcast_like` every inpu
 
 ### 3.5 Operator twins
 
-Every twin lives in [`operators`](../../../src/pipekit_array/operators), takes only names and numbers, round-trips through `dumps` / `loads`, and implements `compute_output_signature` from `Signature.drop_dims` and `Signature.replace_dims`.
+Every twin lives in [`operators`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/src/pipekit_array/operators), takes only names and numbers, round-trips through `dumps` / `loads`, and implements `compute_output_signature` from `Signature.drop_dims` and `Signature.replace_dims`.
 
 | Function | Operator | Serialises | Output signature | Status |
 | --- | --- | --- | --- | --- |
@@ -421,10 +421,10 @@ A method would exist only on `DimArray`, so code written with it would not run o
 Alternative: thin method sugar that calls the free functions; rejected, because it invites carrier-specific code and doubles the documented surface.
 
 **A14. `merge_dims` / `split_dims`, not `stack` / `unstack`.**
-Recommended: new names, because `stack` already means xarray's `concat` along a new dim ([`named`](../../../src/pipekit_array/named)).
+Recommended: new names, because `stack` already means xarray's `concat` along a new dim ([`named`](https://github.com/jejjohnson/pipekit/tree/main/packages/pipekit-array/src/pipekit_array/named)).
 Placement follows xarray's `stack`: other dims first, the merged dim last, C order.
 Labels: the merged dim's label is the tuple of the source labels, with positions for an unlabelled source (xarray's `MultiIndex` does the same); `split_dims` recovers each source's labels from the tuples, so the round trip is exact.
-`einx.rearrange("(y x)")` stays as is: it names the dim `y_x` and drops labels ([`bridges/einx.py`](../../../src/pipekit_array/bridges/einx.py)).
+`einx.rearrange("(y x)")` stays as is: it names the dim `y_x` and drops labels ([`bridges/einx.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/bridges/einx.py)).
 Alternative: `unstack` reading sizes from the tuple labels; rejected, because the sizes must be static under `jit`.
 As built: with no labelled source, the merged dim gets no labels rather than tuples of positions, and a split part whose labels are exactly its positions comes back unlabelled (section 3.0); both round trips stay exact.
 
@@ -433,7 +433,7 @@ Recommended: `window` returns $n = \lfloor (N - S)/s \rfloor + 1$ full windows, 
 The generic path stacks raw strided slices, not carriers: the slices carry different labels and `stack` rightly refuses them (checked).
 It copies the data $S$ times; the xarray adapter's fast path uses `rolling(...).construct`, which is a view.
 `coarsen` is a composition and keeps no labels on the coarsened dim; xarray's `coord_func` averages coordinate values, which this layer never reads.
-`ApplyToBands(inner, axis)` in [operators.md](operators.md) is `MapOver` by semantics but not by serialisation: `MapOver` holds a callable and sets `forbid_in_yaml`, a class-level flag checked by `build_operator` ([`_base/operator.py`](../../../../pipekit-ops/src/pipekit_ops/_base/operator.py)).
+`ApplyToBands(inner, axis)` in [operators.md](operators.md) is `MapOver` by semantics but not by serialisation: `MapOver` holds a callable and sets `forbid_in_yaml`, a class-level flag checked by `build_operator` ([`core/_operator.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/core/_operator.py)).
 So `ApplyAlong(inner: Operator, dim)` is a separate class that serialises when `inner` does.
 Alternative: xarray's `rolling(...).construct` semantics (length $N$, NaN-padded); rejected, because `pad` then `window` gives it in one more line, and the reverse needs a slice.
 As built: the xarray fast path fills with zero, not NaN, before `isel` drops the partial windows, so integer and bool input keep their dtype there too.
@@ -462,7 +462,7 @@ As built: `q` is cast to the input's float dtype, a `q` outside [0, 1] or a list
 
 **A19. `BatchAlong` supersedes ADR A5.**
 Recommended: the planned array-shaped `BatchedMap(inner, batch_size, axis)` becomes `BatchAlong(inner, size, dim, pad="none")`.
-`pipekit_ops.BatchedMap` takes an iterable and calls `inner` on lists ([`parallel.py`](../../../../pipekit-ops/src/pipekit_ops/parallel.py)); the array one would split one carrier along a dim.
+`pipekit_ops.BatchedMap` takes an iterable and calls `inner` on lists ([`execution/_presets.py`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-ops/src/pipekit_ops/execution/_presets.py)); the array one would split one carrier along a dim.
 Two classes with one name and different inputs fail in confusing ways when both are imported, and the array one has not shipped, so the rename costs nothing now.
 `pad` takes ADR A10's policy strings: `"last"` pads the short final chunk so `jit` compiles once.
 Alternative: keep A5 and rely on the import path; rejected.
@@ -488,7 +488,7 @@ As built: `LabelledAdapter` is exported from `pipekit_ops`, and pipekit-array fi
 
 ## 7. Testing gates
 
-Fixtures: the test kit's layout ([`testing`](../../../src/pipekit_array/testing/_carriers.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
+Fixtures: the test kit's layout ([`testing`](https://github.com/jejjohnson/pipekit/blob/main/packages/pipekit-array/src/pipekit_array/testing/_carriers.py)), `time band y x` of shape (3, 3, 4, 5) with band labels, on NumPy, JAX and dask; and the running example at (12, 13, 256, 256), float32.
 
 | Gate | Pass condition |
 | --- | --- |
